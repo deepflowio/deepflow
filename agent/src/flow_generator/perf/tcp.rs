@@ -68,6 +68,7 @@ enum PacketSeqType {
     Discontinuous,
     Continuous,
     BothContinuous,
+    OutOfOrder,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -319,6 +320,7 @@ impl SessionPeer {
         }
 
         let (mut lt, mut gte, index) = self.search(&seg);
+        let has_gte = gte.is_some();
         if Self::is_retrans_segment(&lt, &gte, &seg) {
             PacketSeqType::Retrans
         } else if Self::is_error_segment(&lt, &gte, &seg) {
@@ -329,16 +331,25 @@ impl SessionPeer {
                     self.insert_seq_segment(index, seg);
                     if self.seq_list_len as usize >= SEQ_LIST_MAX_LEN {
                         self.merge_seq_list(SEQ_LIST_MAX_LEN - 2);
-                        PacketSeqType::Merge
+                    }
+
+                    if has_gte {
+                        PacketSeqType::OutOfOrder
                     } else {
                         PacketSeqType::Discontinuous
                     }
                 }
                 ContinuousFlags::BOTH_CONTINUOUS => {
                     self.merge_seq_list(index - 1);
-                    PacketSeqType::BothContinuous
+                    PacketSeqType::OutOfOrder
                 }
-                _ => PacketSeqType::Continuous,
+                _ => {
+                    if has_gte {
+                        PacketSeqType::OutOfOrder
+                    } else {
+                        PacketSeqType::Continuous
+                    }
+                }
             }
         }
     }
@@ -428,6 +439,13 @@ pub(crate) struct PerfData {
     retrans_syn: u32,
     retrans_synack: u32,
 
+    // Out of order count
+    ooo_0: u32,
+    ooo_1: u32,
+
+    // Fin count
+    fin_count: u32,
+
     updated: bool,
 }
 
@@ -489,6 +507,20 @@ impl PerfData {
         self.updated = true;
     }
 
+    fn calc_ooo(&mut self, fpd: bool) {
+        if fpd {
+            self.ooo_0 += 1;
+        } else {
+            self.ooo_1 += 1;
+        }
+        self.updated = true;
+    }
+
+    fn calc_fin(&mut self) {
+        self.fin_count += 1;
+        self.updated = true;
+    }
+
     fn calc_zero_win(&mut self, fpd: bool) {
         if fpd {
             self.zero_win_count_0 += 1;
@@ -544,9 +576,12 @@ impl PerfData {
         stats.total_retrans_count = self.retrans_sum;
         stats.counts_peers[0].zero_win_count = self.zero_win_count_0;
         stats.counts_peers[1].zero_win_count = self.zero_win_count_1;
+        stats.counts_peers[0].ooo_count = self.ooo_0;
+        stats.counts_peers[1].ooo_count = self.ooo_0;
 
         stats.syn_count = self.syn;
         stats.synack_count = self.synack;
+        stats.fin_count = self.fin_count;
         stats.retrans_syn_count = self.retrans_syn;
         stats.retrans_synack_count = self.retrans_synack;
 
@@ -698,13 +733,17 @@ impl TcpPerf {
                     .fetch_add(1, Ordering::Relaxed);
                 (true, false)
             }
+            PacketSeqType::OutOfOrder => {
+                self.perf_data.calc_ooo(packet_direction);
+                (false, false)
+            }
             _ => (false, false),
         }
     }
 
     fn is_abnormal_tcp_flags(flags: TcpFlags) -> bool {
         if flags.contains(TcpFlags::SYN) {
-            if flags.intersects(TcpFlags::FIN | TcpFlags::RST) {
+            if flags.intersects(TcpFlags::RST) {
                 return true;
             }
         } else {
@@ -714,7 +753,7 @@ impl TcpPerf {
         }
 
         if !flags.contains(TcpFlags::ACK) {
-            if flags.intersects(TcpFlags::PSH | TcpFlags::FIN | TcpFlags::URG) {
+            if flags.intersects(TcpFlags::PSH | TcpFlags::URG) {
                 return true;
             }
         }
@@ -724,7 +763,7 @@ impl TcpPerf {
 
     fn is_unconcerned_tcp_flags(flags: TcpFlags) -> bool {
         // flow perf do not take care
-        if flags.intersects(TcpFlags::FIN | TcpFlags::RST) {
+        if flags.intersects(TcpFlags::RST) {
             return true;
         }
 
@@ -963,6 +1002,10 @@ impl TcpPerf {
                 self.perf_data.calc_retrans_synack();
             }
             self.perf_data.calc_synack();
+        }
+
+        if p.is_fin() {
+            self.perf_data.calc_fin();
         }
 
         is_retrans
@@ -1590,7 +1633,7 @@ mod tests {
                 },
                 21
             ),
-            PacketSeqType::Error
+            PacketSeqType::Retrans
         );
         assert_eq!(
             peer.assert_seq_number(
@@ -1600,7 +1643,7 @@ mod tests {
                 },
                 5
             ),
-            PacketSeqType::Error
+            PacketSeqType::Retrans
         );
         assert_eq!(
             peer.assert_seq_number(
@@ -1620,7 +1663,7 @@ mod tests {
                 },
                 4
             ),
-            PacketSeqType::Discontinuous
+            PacketSeqType::OutOfOrder
         );
         assert_eq!(
             peer.assert_seq_number(
@@ -1630,7 +1673,7 @@ mod tests {
                 },
                 1
             ),
-            PacketSeqType::BothContinuous
+            PacketSeqType::OutOfOrder
         );
         assert_eq!(
             peer.assert_seq_number(
@@ -1640,7 +1683,7 @@ mod tests {
                 },
                 2
             ),
-            PacketSeqType::Continuous
+            PacketSeqType::OutOfOrder
         );
         assert_eq!(
             peer.assert_seq_number(
@@ -1650,7 +1693,7 @@ mod tests {
                 },
                 1
             ),
-            PacketSeqType::Continuous
+            PacketSeqType::OutOfOrder
         );
         assert_eq!(
             peer.assert_seq_number(
@@ -1670,7 +1713,7 @@ mod tests {
                 },
                 28
             ),
-            PacketSeqType::Error
+            PacketSeqType::Retrans
         );
         assert_eq!(
             peer.assert_seq_number(
@@ -1680,7 +1723,7 @@ mod tests {
                 },
                 5
             ),
-            PacketSeqType::Error
+            PacketSeqType::Retrans
         );
         assert_eq!(
             peer.assert_seq_number(
@@ -1690,7 +1733,7 @@ mod tests {
                 },
                 5
             ),
-            PacketSeqType::Continuous
+            PacketSeqType::OutOfOrder
         );
         assert_eq!(
             peer.assert_seq_number(
@@ -1700,7 +1743,7 @@ mod tests {
                 },
                 3
             ),
-            PacketSeqType::Discontinuous
+            PacketSeqType::OutOfOrder
         );
 
         assert_eq!(
@@ -1881,7 +1924,7 @@ mod tests {
                 ..Default::default()
             },
             rtt_full: Timestamp::from_secs(11),
-            zero_win_count_0: 2,
+            zero_win_count_0: 3,
             zero_win_count_1: 5,
             syn: 1,
             synack: 1,

@@ -56,6 +56,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: false,
 }
 		client seq_list: [SeqSegment { seq: 4294966404, len: 6 }]
@@ -118,6 +121,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: false,
 }
 		client seq_list: [SeqSegment { seq: 4294966404, len: 606 }]
@@ -180,6 +186,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: false,
 }
 		client seq_list: [SeqSegment { seq: 4294966404, len: 612 }]
@@ -242,6 +251,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: false,
 }
 		client seq_list: [SeqSegment { seq: 4294966404, len: 612 }]
@@ -304,6 +316,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: false,
 }
 		client seq_list: [SeqSegment { seq: 4294966404, len: 612 }]
@@ -366,6 +381,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 		client seq_list: [SeqSegment { seq: 4294966404, len: 612 }]
@@ -428,6 +446,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 		client seq_list: [SeqSegment { seq: 339, len: 4 }]
@@ -490,6 +511,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 		client seq_list: [SeqSegment { seq: 339, len: 10 }]
@@ -552,6 +576,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 		client seq_list: [SeqSegment { seq: 339, len: 10 }]
@@ -614,6 +641,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 		client seq_list: [SeqSegment { seq: 339, len: 613 }]
@@ -676,6 +706,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 		client seq_list: [SeqSegment { seq: 339, len: 613 }]
@@ -738,6 +771,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 		client seq_list: [SeqSegment { seq: 339, len: 613 }]
@@ -800,6 +836,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 		client seq_list: [SeqSegment { seq: 339, len: 613 }]

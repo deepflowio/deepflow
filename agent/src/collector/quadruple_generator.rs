@@ -1070,6 +1070,8 @@ impl QuadrupleGenerator {
                     zero_win_rx: dst_perf.zero_win_count as u64,
                     retrans_syn: stats.tcp.retrans_syn_count,
                     retrans_synack: stats.tcp.retrans_synack_count,
+                    ooo_tx: src_perf.ooo_count as u64,
+                    ooo_rx: dst_perf.ooo_count as u64,
                 };
             } else {
                 flow_meter.latency.art_max = stats.tcp.art_max;
