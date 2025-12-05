@@ -166,6 +166,7 @@ const (
 	COLUMN_METRIC_ID                  = "metric_id"
 	COLUMN_METRIC_UNIT                = "metric_unit"
 	COLUMN_METRIC_VALUE               = "metric_value"
+	COLUMN_METRIC_VALUE_STR           = "metric_value_str"
 	COLUMN_MOUNT_SOURCE               = "mount_source"
 	COLUMN_MOUNT_POINT                = "mount_point"
 	COLUMN_NAT_REAL_IP4_0             = "nat_real_ip4_0"
@@ -505,6 +506,7 @@ var ColumnNames = []string{
 	COLUMN_METRIC_ID,
 	COLUMN_METRIC_UNIT,
 	COLUMN_METRIC_VALUE,
+	COLUMN_METRIC_VALUE_STR,
 	COLUMN_MOUNT_SOURCE,
 	COLUMN_MOUNT_POINT,
 	COLUMN_NAT_REAL_IP4_0,

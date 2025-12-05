@@ -408,7 +408,7 @@ var ColumnAdd71 = []*ColumnAdds{
 	{
 		Dbs:         []string{"event"},
 		Tables:      []string{"alert_event", "alert_event_local"},
-		ColumnNames: []string{"trigger_threshold", "metric_unit"},
+		ColumnNames: []string{"trigger_threshold", "metric_unit", "metric_value_str"},
 		ColumnType:  ckdb.String,
 	},
 }

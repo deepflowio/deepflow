@@ -53,6 +53,7 @@ type AlertEventStore struct {
 	PolicyType       uint8
 	AlertPolicy      string
 	MetricValue      float64
+	MetricValueStr   string
 	EventLevel       uint8
 	TargetTags       string
 	TagStrKeys       []string
@@ -85,6 +86,7 @@ func AlertEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("policy_type", ckdb.UInt8),
 		ckdb.NewColumn("alert_policy", ckdb.LowCardinalityString),
 		ckdb.NewColumn("metric_value", ckdb.Float64),
+		ckdb.NewColumn("metric_value_str", ckdb.String),
 		ckdb.NewColumn("event_level", ckdb.UInt8),
 		ckdb.NewColumn("target_tags", ckdb.String),
 
