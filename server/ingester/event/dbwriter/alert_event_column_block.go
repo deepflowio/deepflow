@@ -28,6 +28,7 @@ type AlertEventBlock struct {
 	ColPolicyType       proto.ColUInt8
 	ColAlertPolicy      *proto.ColLowCardinality[string]
 	ColMetricValue      proto.ColFloat64
+	ColMetricValueStr   proto.ColStr
 	ColEventLevel       proto.ColUInt8
 	ColTargetTags       proto.ColStr
 	ColTagStringNames   *proto.ColArr[string]
@@ -49,6 +50,7 @@ func (b *AlertEventBlock) Reset() {
 	b.ColPolicyType.Reset()
 	b.ColAlertPolicy.Reset()
 	b.ColMetricValue.Reset()
+	b.ColMetricValueStr.Reset()
 	b.ColEventLevel.Reset()
 	b.ColTargetTags.Reset()
 	b.ColTagStringNames.Reset()
@@ -71,6 +73,7 @@ func (b *AlertEventBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_POLICY_TYPE, Data: &b.ColPolicyType},
 		proto.InputColumn{Name: ckdb.COLUMN_ALERT_POLICY, Data: b.ColAlertPolicy},
 		proto.InputColumn{Name: ckdb.COLUMN_METRIC_VALUE, Data: &b.ColMetricValue},
+		proto.InputColumn{Name: ckdb.COLUMN_METRIC_VALUE_STR, Data: &b.ColMetricValueStr},
 		proto.InputColumn{Name: ckdb.COLUMN_EVENT_LEVEL, Data: &b.ColEventLevel},
 		proto.InputColumn{Name: ckdb.COLUMN_TARGET_TAGS, Data: &b.ColTargetTags},
 		proto.InputColumn{Name: ckdb.COLUMN_TAG_STRING_NAMES, Data: b.ColTagStringNames},
@@ -107,6 +110,7 @@ func (n *AlertEventStore) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColPolicyType.Append(n.PolicyType)
 	block.ColAlertPolicy.Append(n.AlertPolicy)
 	block.ColMetricValue.Append(n.MetricValue)
+	block.ColMetricValueStr.Append(n.MetricValueStr)
 	block.ColEventLevel.Append(n.EventLevel)
 	block.ColTargetTags.Append(n.TargetTags)
 	block.ColTagStringNames.Append(n.TagStrKeys)
