@@ -19,7 +19,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use log::debug;
 use serde::{ser::SerializeStruct, Serialize, Serializer};
-use simple_dns::{rdata::RData, Packet, PacketFlag, SimpleDnsError, QTYPE, RCODE, TYPE};
+use simple_dns::{rdata::RData, Packet, PacketFlag, SimpleDnsError, QTYPE, RCODE, TYPE, OPCODE};
 
 use super::{
     pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
@@ -36,7 +36,7 @@ use crate::{
     config::handler::LogParserConfig,
     flow_generator::{
         error::{Error, Result},
-        protocol_logs::set_captured_byte,
+        protocol_logs::{set_captured_byte, pb_adapter::KeyVal},
     },
     utils::bytes::read_u16_be,
 };
@@ -66,9 +66,10 @@ fn qtype_to_string(qtype: QTYPE) -> String {
 pub struct DnsInfo {
     pub trans_id: u16,
     pub query_type: Option<QTYPE>,
+    pub opcode: Option<OPCODE>,
 
     pub query_name: String,
-    pub answers: Vec<(TYPE, String)>,
+    pub answers: Vec<(TYPE, String, u32)>,
 
     pub is_unconcerned: bool,
     pub status_code: Option<u8>,
@@ -114,6 +115,9 @@ impl Serialize for DnsInfo {
         }
         if let Some(qtype) = self.query_type {
             state.serialize_field("request_type", &qtype_to_string(qtype))?;
+        }
+        if let Some(opcode) = self.opcode {
+            state.serialize_field("opcode", &format!("{:?}", opcode))?;
         }
         if !self.query_name.is_empty() {
             state.serialize_field("request_resource", &self.query_name)?;
@@ -172,7 +176,7 @@ impl L7ProtocolInfoInterface for DnsInfo {
     }
 
     fn get_request_resource_length(&self) -> usize {
-        self.query_name.len() + self.answers.iter().map(|(_, s)| s.len()).sum::<usize>()
+        self.query_name.len() + self.answers.iter().map(|(_, s, _)| s.len()).sum::<usize>()
     }
 
     fn is_on_blacklist(&self) -> bool {
@@ -235,6 +239,7 @@ impl DnsInfo {
         };
         info.query_name = question.qname.to_string();
         info.query_type = Some(question.qtype);
+        info.opcode = Some(p.opcode());
         Ok(info)
     }
 
@@ -254,6 +259,7 @@ impl DnsInfo {
         };
         info.query_name = question.qname.to_string();
         info.query_type = Some(question.qtype);
+        info.opcode = Some(p.opcode());
         for rr in p.answers.iter().chain(p.name_servers.iter()) {
             let answer = match &rr.rdata {
                 RData::A(d) => Ipv4Addr::from(d.address).to_string(),
@@ -266,7 +272,7 @@ impl DnsInfo {
                 // simple-dns do not have dname support, perhaps this is not often used
                 _ => String::new(),
             };
-            info.answers.push((rr.rdata.type_code(), answer));
+            info.answers.push((rr.rdata.type_code(), answer, rr.ttl));
         }
         Ok(info)
     }
@@ -277,7 +283,7 @@ impl DnsInfo {
         let mut info = if p.has_flags(PacketFlag::RESPONSE) {
             let mut info = Self::parse_response(&p)?;
             if let Some(c) = params.parse_config {
-                for (_, answer) in info.answers.iter() {
+                for (_, answer, _) in info.answers.iter() {
                     if c.unconcerned_dns_nxdomain_trie.is_unconcerned(answer) {
                         info.is_unconcerned = true;
                         break;
@@ -309,14 +315,14 @@ impl DnsInfo {
 
     fn answers_to_string(&self) -> String {
         let mut answers = String::new();
-        for (i, (rtype, answer)) in self.answers.iter().enumerate() {
+        for (i, (rtype, answer, ttl)) in self.answers.iter().enumerate() {
             if i > 0 {
                 answers.push_str(ANSWER_SPLIT);
             }
             if answer.is_empty() {
                 let _ = write!(&mut answers, "{rtype:?}");
             } else {
-                let _ = write!(&mut answers, "{rtype:?}={answer}");
+                let _ = write!(&mut answers, "{rtype:?}={answer} TTL={ttl}");
             }
         }
         answers
@@ -357,6 +363,10 @@ impl From<DnsInfo> for L7ProtocolSendLog {
             },
             ext_info: Some(ExtendedInfo {
                 request_id: Some(f.trans_id as u32),
+                attributes: Some(vec![KeyVal {
+                    key: "opcode".to_string(),
+                    val: format!("{:?}", f.opcode.unwrap_or_else(||OPCODE::Reserved)),
+                }]),
                 ..Default::default()
             }),
             flags,
