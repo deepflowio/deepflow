@@ -321,12 +321,14 @@ impl From<TunnelField> for flow_log::TunnelField {
 pub struct TcpPerfCountsPeer {
     pub retrans_count: u32,
     pub zero_win_count: u32,
+    pub ooo_count: u32,
 }
 
 impl TcpPerfCountsPeer {
     pub fn sequential_merge(&mut self, other: &TcpPerfCountsPeer) {
         self.retrans_count += other.retrans_count;
         self.zero_win_count += other.zero_win_count;
+        self.ooo_count += other.ooo_count;
     }
 }
 
@@ -335,6 +337,7 @@ impl From<TcpPerfCountsPeer> for flow_log::TcpPerfCountsPeer {
         flow_log::TcpPerfCountsPeer {
             retrans_count: p.retrans_count,
             zero_win_count: p.zero_win_count,
+            ooo_count: p.ooo_count,
         }
     }
 }
@@ -369,6 +372,8 @@ pub struct TcpPerfStats {
     pub retrans_syn_count: u32,
     #[serde(rename = "retrans_synack")]
     pub retrans_synack_count: u32,
+
+    pub fin_count: u32,
 
     #[serde(flatten, serialize_with = "serialize_tcp_perf_counts")]
     pub counts_peers: [TcpPerfCountsPeer; 2],
@@ -438,6 +443,7 @@ impl TcpPerfStats {
         self.counts_peers[0].sequential_merge(&other.counts_peers[0]);
         self.counts_peers[1].sequential_merge(&other.counts_peers[1]);
         self.total_retrans_count += other.total_retrans_count;
+        self.fin_count += other.fin_count;
     }
 
     pub fn reverse(&mut self) {
@@ -803,7 +809,6 @@ impl FlowMetricsPeer {
         self.l3_byte_count += other.l3_byte_count;
         self.l4_byte_count += other.l4_byte_count;
         self.packet_count += other.packet_count;
-
         self.total_byte_count = other.total_byte_count;
         self.total_packet_count = other.total_packet_count;
         self.first = other.first;
@@ -939,6 +944,8 @@ pub struct Flow {
     pub synack_seq: u32,
     pub last_keepalive_seq: u32,
     pub last_keepalive_ack: u32,
+
+    pub init_ipid: u32,
 
     #[serde(serialize_with = "timestamp_to_micros")]
     pub start_time: Timestamp,
@@ -1257,6 +1264,7 @@ impl From<Flow> for flow_log::Flow {
             acl_gids: f.acl_gids.into_iter().map(|g| g as u32).collect(),
             direction_score: f.direction_score as u32,
             request_domain: f.request_domain,
+            init_ipid: f.init_ipid,
         }
     }
 }
