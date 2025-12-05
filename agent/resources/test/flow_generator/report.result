@@ -20,14 +20,17 @@ TcpPerfStats {
     synack_count: 1,
     retrans_syn_count: 0,
     retrans_synack_count: 0,
+    fin_count: 2,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 0,
@@ -55,14 +58,17 @@ TcpPerfStats {
     synack_count: 1,
     retrans_syn_count: 0,
     retrans_synack_count: 0,
+    fin_count: 2,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 0,
@@ -90,14 +96,17 @@ TcpPerfStats {
     synack_count: 1,
     retrans_syn_count: 0,
     retrans_synack_count: 0,
+    fin_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 0,
@@ -124,14 +133,17 @@ TcpPerfStats {
     synack_count: 0,
     retrans_syn_count: 0,
     retrans_synack_count: 0,
+    fin_count: 2,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 0,
@@ -159,14 +171,17 @@ TcpPerfStats {
     synack_count: 1,
     retrans_syn_count: 0,
     retrans_synack_count: 0,
+    fin_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 0,
@@ -193,14 +208,17 @@ TcpPerfStats {
     synack_count: 0,
     retrans_syn_count: 0,
     retrans_synack_count: 0,
+    fin_count: 2,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 0,
@@ -228,14 +246,17 @@ TcpPerfStats {
     synack_count: 1,
     retrans_syn_count: 0,
     retrans_synack_count: 0,
+    fin_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 0,
@@ -246,30 +267,33 @@ TcpPerfStats {
     rtt_server_max: 0,
     srt_max: 10040,
     art_max: 30358,
-    cit_max: 15033,
+    cit_max: 0,
     rtt: 0,
     rtt_client_sum: 0,
     rtt_server_sum: 0,
     srt_sum: 10040,
     art_sum: 30358,
-    cit_sum: 15033,
+    cit_sum: 0,
     rtt_client_count: 0,
     rtt_server_count: 0,
     srt_count: 1,
     art_count: 1,
-    cit_count: 1,
+    cit_count: 0,
     syn_count: 0,
     synack_count: 0,
     retrans_syn_count: 0,
     retrans_synack_count: 0,
+    fin_count: 2,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 0,
@@ -297,14 +321,17 @@ TcpPerfStats {
     synack_count: 1,
     retrans_syn_count: 0,
     retrans_synack_count: 0,
+    fin_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 0,
@@ -331,14 +358,17 @@ TcpPerfStats {
     synack_count: 0,
     retrans_syn_count: 0,
     retrans_synack_count: 0,
+    fin_count: 2,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 0,
@@ -366,14 +396,17 @@ TcpPerfStats {
     synack_count: 1,
     retrans_syn_count: 0,
     retrans_synack_count: 0,
+    fin_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 0,
@@ -400,14 +433,17 @@ TcpPerfStats {
     synack_count: 1,
     retrans_syn_count: 1,
     retrans_synack_count: 1,
+    fin_count: 2,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 1,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 1,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 2,
@@ -435,14 +471,17 @@ TcpPerfStats {
     synack_count: 1,
     retrans_syn_count: 0,
     retrans_synack_count: 0,
+    fin_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 0,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 0,
@@ -469,14 +508,17 @@ TcpPerfStats {
     synack_count: 1,
     retrans_syn_count: 1,
     retrans_synack_count: 1,
+    fin_count: 2,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 1,
             zero_win_count: 0,
+            ooo_count: 0,
         },
         TcpPerfCountsPeer {
             retrans_count: 1,
             zero_win_count: 0,
+            ooo_count: 0,
         },
     ],
     total_retrans_count: 2,
