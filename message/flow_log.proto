@@ -55,6 +55,8 @@ message Flow {
     string request_domain = 26;
 
     repeated uint64 aggregated_flow_ids = 27;
+
+    uint32 init_ipid = 28;
 }
 
 message FlowKey {
@@ -152,11 +154,14 @@ message TCPPerfStats {
     uint32 cit_max = 19;
     uint32 cit_sum = 20;
     uint32 cit_count = 21;
+
+    uint32 fin_count = 22;
 }
 
 message TcpPerfCountsPeer {
     uint32 retrans_count = 1;
     uint32 zero_win_count = 2;
+    uint32 ooo_count = 3;
 }
 
 message L7PerfStats {
