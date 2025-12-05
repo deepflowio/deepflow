@@ -308,8 +308,15 @@ pub const STATEMENT_ID_OFFSET: usize = RESPONSE_CODE_OFFSET + RESPONSE_CODE_LEN;
 pub const EXECUTE_STATEMENT_PARAMS_OFFSET: usize = STATEMENT_ID_OFFSET + STATEMENT_ID_LEN + 5;
 
 // Login
+
+// Client Capabilities
 pub const CLIENT_PROTOCOL_41: u16 = 512;
+pub const CONNECT_WITH_DB: u16 = 1 << 3;
+// Extended Client Capabilities
+pub const CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA: u16 = 1 << 5;
+
 pub const CLIENT_CAPABILITIES_FLAGS_OFFSET: usize = 0;
+pub const EXTENDED_CLIENT_CAPABILITIES_FLAGS_OFFSET: usize = 2;
 pub const FILTER_OFFSET: usize = 9;
 pub const FILTER_SIZE: usize = 23;
 pub const LOGIN_USERNAME_OFFSET: usize = 32;

@@ -1154,18 +1154,38 @@ impl MysqlLog {
             return Err(Error::InvalidLoginInfo("bad filter"));
         }
 
-        match Self::string_null(&payload[LOGIN_USERNAME_OFFSET..]) {
+        let mut offset = LOGIN_USERNAME_OFFSET;
+        let username = match Self::string_null(&payload[offset..]) {
             Some(context) if context.is_ascii() => {
-                if let Some(info) = info.as_mut() {
-                    info.context = format!("Login username: {}", context);
-                    info.generate_endpoint();
-                }
+                offset += context.len() + 1;
+                Some(context)
             }
             _ => return Err(Error::InvalidLoginInfo("username not found or not ascii")),
-        }
+        };
 
+        let mut database = None;
         if let Some(info) = info.as_mut() {
             info.status = L7ResponseStatus::Ok;
+
+            // CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA
+            if offset < payload.len() {
+                offset += payload[offset] as usize + 1;
+            }
+
+            if offset < payload.len()
+                && (client_capabilities_flags & CONNECT_WITH_DB) == CONNECT_WITH_DB
+            {
+                database = Self::string_null(&payload[offset..]);
+            }
+
+            if let Some(username) = username {
+                info.context = if let Some(database) = database {
+                    format!("Login username: {} db: {}", username, database)
+                } else {
+                    format!("Login username: {}", username)
+                };
+                info.generate_endpoint();
+            }
         }
 
         Ok(())
