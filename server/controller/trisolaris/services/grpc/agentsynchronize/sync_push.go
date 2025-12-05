@@ -659,7 +659,7 @@ func (e *AgentEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) er
 	var err error
 	orgID := trisolaris.GetOrgIDByTeamID(r.GetTeamId())
 	if orgID == 0 {
-		log.Errorf("get orgid failed by team_id(%s)", r.GetTeamId(), logger.NewORGPrefix(orgID))
+		log.Errorf("get orgid failed by team_id (%s)", r.GetTeamId(), logger.NewORGPrefix(orgID))
 		response := &api.SyncResponse{
 			Status: &STATUS_FAILED,
 		}
@@ -671,6 +671,7 @@ func (e *AgentEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) er
 		return nil
 	}
 
+	key := r.GetCtrlIp() + "-" + r.GetCtrlMac()
 	enabledPush := trisolaris.GetPushEnabled()
 
 	firstPush := true
@@ -681,13 +682,17 @@ func (e *AgentEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) er
 
 		if !enabledPush {
 			firstPush = false
-			in.Send(&api.SyncResponse{Status: &STATUS_HEARTBEAT})
-			log.Debugf("push disabled for agent (%s-%s)", r.GetCtrlIp(), r.GetCtrlMac(), logger.NewORGPrefix(orgID))
+			err = in.Send(&api.SyncResponse{Status: &STATUS_HEARTBEAT})
+			if err != nil {
+				log.Error(err)
+				break
+			}
+			log.Debugf("push disabled for agent (%s)", key, logger.NewORGPrefix(orgID))
 			continue
 		}
 
 		sleepRand := trisolaris.GetPushDelayRand()
-		log.Debugf("agent(%s-%s) push sleep %d ms", r.GetCtrlIp(), r.GetCtrlMac(), sleepRand, logger.NewORGPrefix(orgID))
+		log.Debugf("agent(%s) push sleep %d ms", key, sleepRand, logger.NewORGPrefix(orgID))
 		time.Sleep(time.Duration(sleepRand) * time.Millisecond)
 
 		response, err := e.pushResponse(r, firstPush)
@@ -702,6 +707,6 @@ func (e *AgentEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) er
 			break
 		}
 	}
-	log.Infof("exit agent(%s-%s) push", r.GetCtrlIp(), r.GetCtrlMac(), logger.NewORGPrefix(orgID))
+	log.Infof("exit agent (%s) push", key, logger.NewORGPrefix(orgID))
 	return err
 }
