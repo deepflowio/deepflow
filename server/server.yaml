@@ -147,6 +147,7 @@ controller:
   dm:
     enabled: false
     dsn: DM8DSN
+    # schema should not have the same name as user-name
     schema: deepflow
     user-name: root
     user-password: deepflow
