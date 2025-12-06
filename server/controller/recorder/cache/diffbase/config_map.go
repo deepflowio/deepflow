@@ -32,7 +32,7 @@ func (b *DataSet) AddConfigMap(dbItem *metadbmodel.ConfigMap, seq int) {
 			Lcuuid:   dbItem.Lcuuid,
 		},
 		Name:     dbItem.Name,
-		Data:     dbItem.Data,
+		Data:     string(dbItem.Data),
 		DataHash: dbItem.DataHash,
 	}
 	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, b.ConfigMaps[dbItem.Lcuuid].ToLoggable()), b.metadata.LogPrefixes)
