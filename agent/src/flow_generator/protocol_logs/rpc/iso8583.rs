@@ -16,7 +16,7 @@
 
 use serde::Serialize;
 
-use enterprise_utils::rpc::iso8583::{Iso8583ParseConfig, Iso8583Parser};
+use enterprise_utils::l7::rpc::iso8583::{Iso8583ParseConfig, Iso8583Parser};
 use public::l7_protocol::L7Protocol;
 
 use crate::config::handler::LogParserConfig;
