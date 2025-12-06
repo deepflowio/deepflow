@@ -115,7 +115,7 @@ func (h *ConfigMap) generateDBItemToAdd(cloudItem *cloudmodel.ConfigMap) (*metad
 	}
 	dbItem := &metadbmodel.ConfigMap{
 		Name:           cloudItem.Name,
-		Data:           string(yamlData),
+		Data:           yamlData,
 		DataHash:       cloudItem.DataHash,
 		PodNamespaceID: podNamespaceID,
 		PodClusterID:   podClusterID,
@@ -145,7 +145,7 @@ func (h *ConfigMap) generateUpdateInfo(diffBase *diffbase.ConfigMap, cloudItem *
 			log.Errorf("failed to convert %s JSON data: %v to YAML: %s", h.resourceType, cloudItem.Data, h.metadata.LogPrefixes)
 			return nil, nil, false
 		}
-		mapInfo["data"] = string(yamlData)
+		mapInfo["data"] = yamlData
 		structInfo.Data.Set(diffBase.Data, string(yamlData))
 	}
 	return structInfo, mapInfo, len(mapInfo) > 0
