@@ -29,7 +29,8 @@ import (
 const TRACE_TREE_VERSION_0X12 = 0x12 // before 20240827
 const TRACE_TREE_VERSION_0X13 = 0x13
 const TRACE_TREE_VERSION_0x14 = 0x14 // before 20251027
-const TRACE_TREE_VERSION = 0x15
+const TRACE_TREE_VERSION_0x15 = 0x15 // before 20251206
+const TRACE_TREE_VERSION = 0x16
 
 func HashSearchIndex(key string) uint64 {
 	return utils.DJBHash(17, key)
@@ -54,6 +55,7 @@ type SpanInfo struct {
 	AutoServiceID1   uint32
 	AppService0      string
 	AppService1      string
+	Endpoints        []string
 
 	IsIPv4 bool
 	IP40   uint32
@@ -66,6 +68,8 @@ type NodeInfo struct {
 	AutoServiceType uint8
 	AutoServiceID   uint32
 	AppService      string
+	Endpoints0      []string
+	Endpoints1      []string
 
 	IsIPv4 bool
 	IP4    uint32
@@ -149,6 +153,10 @@ func (t *TraceTree) Encode() {
 			encoder.WriteVarintU32(s.AutoServiceID1)
 			encoder.WriteString255(s.AppService0)
 			encoder.WriteString255(s.AppService1)
+			encoder.WriteU16(uint16(len(s.Endpoints)))
+			for _, e := range s.Endpoints {
+				encoder.WriteString255(e)
+			}
 
 			encoder.WriteBool(s.IsIPv4)
 			if s.IsIPv4 {
@@ -172,6 +180,15 @@ func (t *TraceTree) Encode() {
 		encoder.WriteU8(nodeInfo.AutoServiceType)
 		encoder.WriteVarintU32(nodeInfo.AutoServiceID)
 		encoder.WriteString255(nodeInfo.AppService)
+		encoder.WriteU16(uint16(len(nodeInfo.Endpoints0)))
+		for _, e := range nodeInfo.Endpoints0 {
+			encoder.WriteString255(e)
+		}
+		encoder.WriteU16(uint16(len(nodeInfo.Endpoints1)))
+		for _, e := range nodeInfo.Endpoints1 {
+			encoder.WriteString255(e)
+		}
+
 		encoder.WriteBool(nodeInfo.IsIPv4)
 		if nodeInfo.IsIPv4 {
 			encoder.WriteU32(nodeInfo.IP4)
@@ -218,6 +235,11 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 			s.AutoServiceID1 = decoder.ReadVarintU32()
 			s.AppService0 = decoder.ReadString255()
 			s.AppService1 = decoder.ReadString255()
+			endpointCount := int(decoder.ReadU16())
+			s.Endpoints = make([]string, endpointCount)
+			for k := 0; k < endpointCount; k++ {
+				s.Endpoints[k] = decoder.ReadString255()
+			}
 
 			s.IsIPv4 = decoder.ReadBool()
 			if s.IsIPv4 {
@@ -236,6 +258,16 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		nodeInfo.AutoServiceType = decoder.ReadU8()
 		nodeInfo.AutoServiceID = decoder.ReadVarintU32()
 		nodeInfo.AppService = decoder.ReadString255()
+		endpointCount := int(decoder.ReadU16())
+		nodeInfo.Endpoints0 = make([]string, endpointCount)
+		for j := 0; j < endpointCount; j++ {
+			nodeInfo.Endpoints0[j] = decoder.ReadString255()
+		}
+		endpointCount = int(decoder.ReadU16())
+		nodeInfo.Endpoints1 = make([]string, endpointCount)
+		for j := 0; j < endpointCount; j++ {
+			nodeInfo.Endpoints1[j] = decoder.ReadString255()
+		}
 		nodeInfo.IsIPv4 = decoder.ReadBool()
 		if nodeInfo.IsIPv4 {
 			nodeInfo.IP4 = decoder.ReadU32()

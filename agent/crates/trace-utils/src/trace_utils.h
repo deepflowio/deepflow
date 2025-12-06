@@ -22,6 +22,12 @@
 #include <stdint.h>
 #include "consts.h"
 
+#define LUA_RUNTIME_DETECT_METHOD_LEN 256
+
+#define LUA_RUNTIME_PATH_LEN 1024
+
+#define LUA_RUNTIME_VERSION_LEN 32
+
 #define UNWIND_ENTRIES_PER_SHARD 65535
 
 #define UNWIND_SHARDS_PER_PROCESS 256
@@ -43,9 +49,18 @@ enum RegType {
 };
 typedef uint8_t RegType;
 
+typedef struct lua_unwind_table_t lua_unwind_table_t;
+
 typedef struct python_unwind_table_t python_unwind_table_t;
 
 typedef struct unwind_table_t unwind_table_t;
+
+typedef struct {
+    uint32_t kind;
+    uint8_t version[LUA_RUNTIME_VERSION_LEN];
+    uint8_t detection_method[LUA_RUNTIME_DETECT_METHOD_LEN];
+    uint8_t path[LUA_RUNTIME_PATH_LEN];
+} lua_runtime_info_t;
 
 typedef struct {
     uint32_t id;
@@ -150,13 +165,94 @@ typedef struct {
     py_type_object_t type_object;
 } python_offsets_t;
 
+typedef struct {
+    uint8_t offsets_id;
+    uint8_t reserved[7];
+    uint64_t state_address;
+} lua_unwind_info_t;
+
+typedef struct {
+    uint32_t features;
+    uint32_t off_l_ci;
+    uint32_t off_l_base_ci;
+    uint32_t off_l_end_ci;
+    uint32_t off_ci_func;
+    uint32_t off_ci_top;
+    uint32_t off_ci_savedpc;
+    uint32_t off_ci_prev;
+    uint32_t off_tvalue_tt;
+    uint32_t off_tvalue_val;
+    uint32_t off_closure_isc;
+    uint32_t off_lclosure_p;
+    uint32_t off_cclosure_f;
+    uint32_t off_proto_source;
+    uint32_t off_proto_linedefined;
+    uint32_t off_proto_code;
+    uint32_t off_proto_sizecode;
+    uint32_t off_proto_lineinfo;
+    uint32_t off_proto_abslineinfo;
+    uint32_t off_tstring_len;
+    uint32_t sizeof_tstring;
+    uint32_t sizeof_callinfo;
+    uint32_t sizeof_tvalue;
+} lua_ofs;
+
+typedef struct {
+    uint8_t fr2;
+    uint8_t gc64;
+    uint16_t pad;
+    uint32_t tv_sz;
+    uint32_t off_l_base;
+    uint32_t off_l_stack;
+    uint32_t off_gcproto_firstline;
+    uint32_t off_gcproto_chunkname;
+    uint32_t off_gcstr_data;
+    uint32_t off_gcfunc_cfunc;
+    uint32_t off_gcfunc_ffid;
+    uint32_t off_gcfunc_pc;
+    uint32_t off_gcproto_bc;
+    uint32_t off_gcstr_len;
+    uint32_t off_l_glref;
+    uint32_t off_global_state_dispatchmode;
+} lj_ofs;
+
 bool frame_pointer_heuristic_check(uint32_t pid);
 
-bool is_lua_process(uint32_t pid);
+int32_t is_lua_process(uint32_t pid);
 
 bool is_python_process(uint32_t pid);
 
+int32_t lua_detect(uint32_t pid, lua_runtime_info_t *out);
+
+char *lua_format_folded_stack_trace(void *tracer,
+                                    uint32_t pid,
+                                    const uint64_t *frames,
+                                    uint32_t frame_count,
+                                    bool new_cache,
+                                    void *info_p,
+                                    const char *err_tag);
+
+void lua_set_map_fds(int32_t lang_flags_fd,
+                     int32_t unwind_info_fd,
+                     int32_t lua_offsets_fd,
+                     int32_t luajit_offsets_fd);
+
+lua_unwind_table_t *lua_unwind_table_create(int32_t lang_flags_fd,
+                                            int32_t unwind_info_fd,
+                                            int32_t lua_offsets_fd,
+                                            int32_t luajit_offsets_fd);
+
+void lua_unwind_table_destroy(lua_unwind_table_t *table);
+
+void lua_unwind_table_load(lua_unwind_table_t *table, uint32_t pid);
+
+void lua_unwind_table_unload(lua_unwind_table_t *table, uint32_t pid);
+
+size_t merge_lua_stacks(void *trace_str, size_t len, const void *u_trace, const void *i_trace);
+
 size_t merge_python_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
+
+int32_t protect_cpu_affinity_c(void);
 
 python_unwind_table_t *python_unwind_table_create(int32_t unwind_info_map_fd,
                                                   int32_t offsets_map_fd);
@@ -182,5 +278,4 @@ void unwind_table_unload(unwind_table_t *table, uint32_t pid);
 
 void unwind_table_unload_all(unwind_table_t *table);
 
-int protect_cpu_affinity_c(void);
-#endif /* TRACE_UTILS_H */
+#endif  /* TRACE_UTILS_H */

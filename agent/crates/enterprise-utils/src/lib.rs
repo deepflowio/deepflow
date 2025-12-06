@@ -383,6 +383,41 @@ pub mod l7 {
             }
         }
     }
+
+    pub mod rpc {
+        pub mod iso8583 {
+            use public::bitmap::Bitmap;
+
+            pub struct Iso8583ParseConfig {
+                pub extract_fields: Bitmap,
+                pub translation_enabled: bool,
+                pub pan_obfuscate: bool,
+            }
+
+            #[derive(Debug, Clone)]
+            pub struct FieldValue {
+                pub id: u32,
+                pub description: String,
+                pub value: String,
+                pub translated: Option<String>, // if translation_enabled configured
+            }
+
+            #[derive(Default)]
+            pub struct Iso8583Parser {
+                pub fields: Vec<FieldValue>,
+            }
+
+            impl Iso8583Parser {
+                pub fn check_payload(&mut self, _: &[u8], _: &Iso8583ParseConfig) -> bool {
+                    unimplemented!()
+                }
+
+                pub fn parse_payload(&mut self, _: &[u8], _: bool, _: &Iso8583ParseConfig) -> bool {
+                    unimplemented!()
+                }
+            }
+        }
+    }
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -423,39 +458,6 @@ pub mod rpc {
     pub mod remote_exec {
         pub fn extra_commands() -> Vec<public::rpc::remote_exec::Command> {
             unimplemented!()
-        }
-    }
-
-    pub mod iso8583 {
-        use public::bitmap::Bitmap;
-
-        pub struct Iso8583ParseConfig {
-            pub extract_fields: Bitmap,
-            pub translation_enabled: bool,
-            pub pan_obfuscate: bool,
-        }
-
-        #[derive(Debug, Clone)]
-        pub struct FieldValue {
-            pub id: u32,
-            pub description: String,
-            pub value: String,
-            pub translated: Option<String>, // if translation_enabled configured
-        }
-
-        #[derive(Default)]
-        pub struct Iso8583Parser {
-            pub fields: Vec<FieldValue>,
-        }
-
-        impl Iso8583Parser {
-            pub fn check_payload(&mut self, _: &[u8], _: &Iso8583ParseConfig) -> bool {
-                unimplemented!()
-            }
-
-            pub fn parse_payload(&mut self, _: &[u8], _: bool, _: &Iso8583ParseConfig) -> bool {
-                unimplemented!()
-            }
         }
     }
 }
