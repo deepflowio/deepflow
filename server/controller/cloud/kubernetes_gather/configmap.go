@@ -17,9 +17,9 @@
 package kubernetes_gather
 
 import (
+	"encoding/json"
 	"time"
 
-	"github.com/bitly/go-simplejson"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -29,43 +29,48 @@ import (
 func (k *KubernetesGather) getConfigMaps() (configMaps []model.ConfigMap, err error) {
 	log.Debug("get configmaps starting", logger.NewORGPrefix(k.orgID))
 	for _, c := range k.k8sInfo["*v1.ConfigMap"] {
-		cData, cErr := simplejson.NewJson([]byte(c))
+		cRaw := json.RawMessage(c)
+		cData, cErr := rawMessageToMap(cRaw)
 		if cErr != nil {
 			err = cErr
-			log.Errorf("configmap initialization simplejson error: (%s)", cErr.Error(), logger.NewORGPrefix(k.orgID))
+			log.Errorf("configmap initialization json error: (%s)", cErr.Error(), logger.NewORGPrefix(k.orgID))
 			return
 		}
-		metaData, ok := cData.CheckGet("metadata")
+		metaData, ok := getJSONMap(cData, "metadata")
 		if !ok {
 			log.Info("configmap metadata not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		uID := metaData.Get("uid").MustString()
+		uID := getJSONString(metaData, "uid")
 		if uID == "" {
 			log.Info("configmap uid not found", logger.NewORGPrefix(k.orgID))
 			continue
 		}
-		name := metaData.Get("name").MustString()
+		name := getJSONString(metaData, "name")
 		if name == "" {
 			log.Infof("configmap (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		uLcuuid := common.IDGenerateUUID(k.orgID, uID)
-		namespace := metaData.Get("namespace").MustString()
+		namespace := getJSONString(metaData, "namespace")
 		namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
 		if !ok {
 			log.Infof("configmap (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
 			continue
 		}
 		var created time.Time
-		cTime := metaData.Get("creationTimestamp").MustString()
+		cTime := getJSONString(metaData, "creationTimestamp")
 		if cTime != "" {
 			localTime, err := time.Parse(time.RFC3339, cTime)
 			if err == nil {
 				created = localTime.Local()
 			}
 		}
-		dataStr := k.simpleJsonMarshal(cData.Get("data"))
+		dataMap, _ := getJSONMap(cData, "data")
+		if dataMap == nil {
+			dataMap = map[string]interface{}{}
+		}
+		dataStr := k.simpleJsonMarshal(dataMap)
 		configMaps = append(configMaps, model.ConfigMap{
 			Data:               dataStr,
 			DataHash:           cloudcommon.GenerateMD5Sum(dataStr),
