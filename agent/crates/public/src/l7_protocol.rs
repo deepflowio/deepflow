@@ -173,6 +173,18 @@ impl Default for L7ProtocolEnum {
     }
 }
 
+impl From<CustomProtocol> for L7ProtocolEnum {
+    fn from(protocol: CustomProtocol) -> Self {
+        L7ProtocolEnum::Custom(protocol)
+    }
+}
+
+impl From<L7Protocol> for L7ProtocolEnum {
+    fn from(protocol: L7Protocol) -> Self {
+        L7ProtocolEnum::L7Protocol(protocol)
+    }
+}
+
 impl L7ProtocolEnum {
     pub fn get_l7_protocol(&self) -> L7Protocol {
         match self {

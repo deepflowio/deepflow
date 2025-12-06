@@ -54,7 +54,7 @@ use public::{
 };
 
 #[cfg(feature = "enterprise")]
-use enterprise_utils::l7::custom_policy::config::{CustomFieldPolicies, CustomProtocolConfigs};
+use enterprise_utils::l7::custom_policy::config::{CustomFieldPolicy, CustomProtocolConfig};
 
 pub const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
@@ -1733,7 +1733,7 @@ pub struct ApplicationProtocolInference {
     pub enabled_protocols: Vec<String>,
     pub protocol_special_config: ProtocolSpecialConfig,
     #[cfg(feature = "enterprise")]
-    pub custom_protocols: CustomProtocolConfigs,
+    pub custom_protocols: Vec<CustomProtocolConfig>,
 }
 
 impl Default for ApplicationProtocolInference {
@@ -1753,7 +1753,7 @@ impl Default for ApplicationProtocolInference {
             ],
             protocol_special_config: ProtocolSpecialConfig::default(),
             #[cfg(feature = "enterprise")]
-            custom_protocols: CustomProtocolConfigs::default(),
+            custom_protocols: Default::default(),
         }
     }
 }
@@ -1992,7 +1992,7 @@ pub struct RequestLogTagExtraction {
     pub obfuscate_protocols: Vec<String>,
     pub custom_fields: HashMap<String, Vec<CustomFields>>,
     #[cfg(feature = "enterprise")]
-    pub custom_field_policies: CustomFieldPolicies,
+    pub custom_field_policies: Vec<CustomFieldPolicy>,
     pub raw: RequestLogTagExtractionRaw,
 }
 
@@ -2007,7 +2007,7 @@ impl Default for RequestLogTagExtraction {
             ]),
             obfuscate_protocols: vec!["Redis".to_string()],
             #[cfg(feature = "enterprise")]
-            custom_field_policies: CustomFieldPolicies::default(),
+            custom_field_policies: Default::default(),
             raw: RequestLogTagExtractionRaw::default(),
         }
     }
@@ -2955,12 +2955,15 @@ impl UserConfig {
         {
             use std::collections::hash_map;
 
-            let custom_ports = self
-                .processors
-                .request_log
-                .application_protocol_inference
-                .custom_protocols
-                .port_range();
+            use enterprise_utils::l7::custom_policy::custom_protocol_policy::ExtraCustomProtocolConfig;
+
+            let custom_ports = ExtraCustomProtocolConfig::port_range(
+                self.processors
+                    .request_log
+                    .application_protocol_inference
+                    .custom_protocols
+                    .as_slice(),
+            );
             if !custom_ports.is_empty() {
                 let custom_str = L7ProtocolParser::Custom(Default::default()).as_str();
                 match new.entry(custom_str.to_string()) {
