@@ -59,6 +59,13 @@ type DFWebService struct {
 	Timeout int    `default:"30" yaml:"timeout"`
 }
 
+type QuerierJSService struct {
+	Enabled bool   `default:"false" yaml:"enabled"`
+	Host    string `default:"querier-js" yaml:"host"`
+	Port    int    `default:"30420" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
+}
+
 type ControllerConfig struct {
 	LogFile                        string `default:"/var/log/controller.log" yaml:"log-file"`
 	LogLevel                       string `default:"info" yaml:"log-level"`
@@ -82,13 +89,15 @@ type ControllerConfig struct {
 	NoIPOverlapping                bool   `default:"false" yaml:"no-ip-overlapping"`
 	AgentCommandTimeout            int    `default:"30" yaml:"agent-cmd-timeout"`
 
-	DFWebService DFWebService   `yaml:"df-web-service"`
-	FPermit      common.FPermit `yaml:"fpermit"`
-	Pcap         configs.Pcap   `yaml:"pcap"`
+	DFWebService     DFWebService     `yaml:"df-web-service"`
+	QuerierJSService QuerierJSService `yaml:"querier-js-service"`
+	FPermit          common.FPermit   `yaml:"fpermit"`
+	Pcap             configs.Pcap     `yaml:"pcap"`
 
 	MetadbCfg     metadb.Config
 	PostgreSQLCfg metadb.PostgreSQLConfig     `yaml:"postgresql"`
 	MySqlCfg      metadb.MySQLConfig          `yaml:"mysql"`
+	DMCfg         metadb.DMConfig             `yaml:"dm"`
 	RedisCfg      redis.Config                `yaml:"redis"`
 	ClickHouseCfg clickhouse.ClickHouseConfig `yaml:"clickhouse"`
 
@@ -111,13 +120,23 @@ type Config struct {
 }
 
 func (c *Config) Validate() error {
-	if !c.ControllerConfig.MySqlCfg.Enabled && !c.ControllerConfig.PostgreSQLCfg.Enabled {
-		return fmt.Errorf("mysql or postgresql must be enabled")
-	}
-	if c.ControllerConfig.MySqlCfg.Enabled && c.ControllerConfig.PostgreSQLCfg.Enabled {
-		return fmt.Errorf("mysql and postgresql can not be enabled at the same time")
+	if !c.exactlyOneMetadbEnabled() {
+		return fmt.Errorf("only one metadb can be enabled at the same time")
 	}
 	return nil
+}
+
+func (c *Config) exactlyOneMetadbEnabled() bool {
+	count := 0
+	for _, enabled := range []bool{c.ControllerConfig.MySqlCfg.Enabled, c.ControllerConfig.PostgreSQLCfg.Enabled, c.ControllerConfig.DMCfg.Enabled} {
+		if enabled {
+			count++
+			if count > 1 {
+				return false
+			}
+		}
+	}
+	return count == 1
 }
 
 func (c *Config) Load(path string) {
@@ -158,6 +177,7 @@ func (c *Config) Load(path string) {
 
 	c.ControllerConfig.MetadbCfg.InitFromMySQL(c.ControllerConfig.MySqlCfg)
 	c.ControllerConfig.MetadbCfg.InitFromPostgreSQL(c.ControllerConfig.PostgreSQLCfg)
+	c.ControllerConfig.MetadbCfg.InitFromDaMeng(c.ControllerConfig.DMCfg)
 }
 
 func DefaultConfig() *Config {

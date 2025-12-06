@@ -10,7 +10,7 @@ use crate::{
         flow::{L7PerfStats, L7Protocol},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
     },
     config::handler::LogParserConfig,
     flow_generator::{
@@ -175,8 +175,8 @@ impl BrpcInfo {
 impl From<BrpcInfo> for L7ProtocolSendLog {
     fn from(info: BrpcInfo) -> Self {
         let flags = match info.is_tls {
-            true => EbpfFlags::TLS.bits(),
-            false => EbpfFlags::NONE.bits(),
+            true => ApplicationFlags::TLS.bits(),
+            false => ApplicationFlags::NONE.bits(),
         };
 
         let request_id = info.get_request_id();
@@ -362,10 +362,7 @@ mod tests {
 
     use crate::{
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
-        config::{
-            handler::{L7LogDynamicConfig, LogParserConfig, TraceType},
-            ExtraLogFields,
-        },
+        config::handler::{L7LogDynamicConfigBuilder, LogParserConfig, TraceType},
         flow_generator::L7_RRT_CACHE_CAPACITY,
         utils::test::Capture,
     };
@@ -404,23 +401,15 @@ mod tests {
             );
             param.set_captured_byte(payload.len());
 
-            let config = L7LogDynamicConfig::new(
-                vec![],
-                vec![],
-                true,
-                vec![TraceType::Sw8, TraceType::TraceParent],
-                vec![TraceType::Sw8, TraceType::TraceParent],
-                ExtraLogFields::default(),
-                false,
-                #[cfg(feature = "enterprise")]
-                std::collections::HashMap::new(),
-                0,
-                0,
-                0,
-                256,
-            );
+            let config = L7LogDynamicConfigBuilder {
+                proxy_client: vec![],
+                x_request_id: vec![],
+                trace_types: vec![TraceType::Sw8, TraceType::TraceParent],
+                span_types: vec![TraceType::Sw8, TraceType::TraceParent],
+                ..Default::default()
+            };
             let parse_config = &LogParserConfig {
-                l7_log_dynamic: config.clone(),
+                l7_log_dynamic: config.into(),
                 ..Default::default()
             };
 

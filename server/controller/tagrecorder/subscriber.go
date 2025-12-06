@@ -201,6 +201,7 @@ type SubscriberComponent[
 	subscriberDG        SubscriberDataGenerator[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]
 	hookers             map[int]interface{}
 	softDelete          bool
+	subscribeRecorder   bool // Whether to subscribe to recorder messages, default is true
 }
 
 func newSubscriberComponent[
@@ -221,6 +222,7 @@ func newSubscriberComponent[
 		resourceTypeName:    resourceTypeName,
 		hookers:             make(map[int]interface{}),
 		softDelete:          false,
+		subscribeRecorder:   true,
 	}
 	s.initDBOperator()
 	return s
@@ -241,10 +243,28 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) initD
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) generateKeyTargets(md *message.Metadata, sources []*MT) ([]KT, []CT) {
 	keys := []KT{}
 	targets := []CT{}
+	seenKeys := map[KT]bool{}
 	for _, item := range sources {
+		if item == nil {
+			log.Errorf("subscriber resource is nil")
+			continue
+		}
 		ks, ts := s.subscriberDG.sourceToTarget(md, item)
-		keys = append(keys, ks...)
-		targets = append(targets, ts...)
+		if len(ks) == 0 || len(ts) == 0 {
+			continue
+		}
+		if len(ks) != len(ts) {
+			log.Errorf("sourceToTarget returned mismatched lengths: keys=%d, targets=%d", len(ks), len(ts))
+			continue
+		}
+		// deduplicate
+		for i, k := range ks {
+			if !seenKeys[k] {
+				keys = append(keys, k)
+				targets = append(targets, ts[i])
+				seenKeys[k] = true
+			}
+		}
 	}
 	return keys, targets
 }
@@ -254,7 +274,14 @@ func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) SetCo
 	s.dbOperator.setConfig(cfg)
 }
 
+func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) setSubscribeRecorder(subscribeRecorder bool) {
+	s.subscribeRecorder = subscribeRecorder
+}
+
 func (s *SubscriberComponent[MAPT, MAT, MUPT, MUT, MDPT, MDT, MT, CT, KT]) Subscribe() {
+	if !s.subscribeRecorder {
+		return
+	}
 	pubsub.Subscribe(
 		s,
 		pubsub.NewSubscriptionSpec(s.subResourceTypeName, pubsub.TopicResourceBatchAddedFull),

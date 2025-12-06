@@ -20,10 +20,10 @@ import (
 	context "golang.org/x/net/context"
 
 	api "github.com/deepflowio/deepflow/message/agent"
-	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
 	"github.com/deepflowio/deepflow/server/libs/logger"
+	"github.com/gogo/protobuf/proto"
 )
 
 var EmptyGPIDResponse = &api.GPIDSyncResponse{}
@@ -50,11 +50,9 @@ func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest
 	}
 	if in.GetAgentId() == 0 {
 		response := processInfo.GetGPIDResponseByVtapID(vtapCache.GetVTapID())
-		syncBytesSize := common.GetVarSize(response)
-		currentBufferSize := vtapCache.GetGRPCBufferSize()
-		grpcBufferSize, changed := checkGRPCBufferSize(currentBufferSize, syncBytesSize)
-		if changed && grpcBufferSize > currentBufferSize {
-			vtapCache.UpdateLastGPIDSyncBytes(syncBytesSize)
+		syncBytesSize := uint64(proto.Size(response))
+		currentBufferSize := vtapCache.GetGRPCBufferFromLastGPIDSync(syncBytesSize)
+		if exceedsGRPCBuffer(currentBufferSize, syncBytesSize) {
 			log.Warningf("agent (%s) need sync gpid size: %d more than max buffer size: %d, stop sync", vtapCacheKey, syncBytesSize, currentBufferSize, logger.NewORGPrefix(orgID))
 			return EmptyGPIDResponse, nil
 		}
@@ -69,11 +67,9 @@ func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest
 		in.GetCtrlIp(), in.GetCtrlMac(), in.GetAgentId(), in.GetTeamId(), len(in.GetEntries()), logger.NewORGPrefix(orgID))
 	processInfo.UpdateAgentGPIDReq(in)
 	resp := processInfo.GetGPIDResponseByReq(in)
-	syncBytesSize := common.GetVarSize(resp)
-	currentBufferSize := vtapCache.GetGRPCBufferSize()
-	grpcBufferSize, changed := checkGRPCBufferSize(currentBufferSize, syncBytesSize)
-	if changed && grpcBufferSize > currentBufferSize {
-		vtapCache.UpdateLastGPIDSyncBytes(syncBytesSize)
+	syncBytesSize := uint64(proto.Size(resp))
+	currentBufferSize := vtapCache.GetGRPCBufferFromLastGPIDSync(syncBytesSize)
+	if exceedsGRPCBuffer(currentBufferSize, syncBytesSize) {
 		log.Warningf("agent (%s) need sync gpid size: %d more than max buffer size: %d, stop sync", vtapCacheKey, syncBytesSize, currentBufferSize, logger.NewORGPrefix(orgID))
 		return EmptyGPIDResponse, nil
 	}

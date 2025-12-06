@@ -71,3 +71,6 @@ event_level                , event_level               , event_level            
 target_tags                , target_tags               , target_tags               , string         ,                       , Event Info        , 111          , 0             , 
 _target_uid                , _target_uid               , _target_uid               , string         ,                       , Event Info        , 111          , 0             , 111
 _query_region              , _query_region             , _query_region             , string         ,                       , Event Info        , 111          , 0             ,
+trigger_threshold          , trigger_threshold         , trigger_threshold         , string         ,                       , Event Info        , 111          , 0             ,
+metric_unit                , metric_unit               , metric_unit               , string         ,                       , Event Info        , 111          , 0             ,
+metric_value_str           , metric_value_str          , metric_value_str          , string         ,                       , Event Info        , 111          , 0             ,

@@ -21,22 +21,22 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/db/metadb/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
-	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/sqladapter"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/sqladapter/types"
 )
 
 type DBConfig struct {
 	DB     *gorm.DB
 	Config config.Config
-	SqlFmt schema.SqlFmt
+	SqlFmt types.SQLAdapter
 }
 
 func NewDBConfig(db *gorm.DB, cfg config.Config) *DBConfig {
 	return &DBConfig{
 		DB:     db,
 		Config: cfg,
-		SqlFmt: schema.GetSqlFmt(cfg),
+		SqlFmt: sqladapter.GetSQLAdapter(cfg),
 	}
 }
 
@@ -54,21 +54,4 @@ func (dc *DBConfig) SetConfig(c config.Config) {
 
 func LogDBName(databaseName string, format string, a ...any) string {
 	return fmt.Sprintf("[DB-%s] ", databaseName) + fmt.Sprintf(format, a...)
-}
-
-func GetSessionWithoutName(cfg config.Config) (*gorm.DB, error) {
-	connector, err := common.GetConnector(cfg, false, cfg.TimeOut, false)
-	if err != nil {
-		return nil, err
-	}
-	return common.InitSession(cfg, connector)
-}
-
-func GetSessionWithName(cfg config.Config) (*gorm.DB, error) {
-	// set multiStatements=true in dsn only when migrating Metadb
-	connector, err := common.GetConnector(cfg, true, cfg.TimeOut*2, true)
-	if err != nil {
-		return nil, err
-	}
-	return common.InitSession(cfg, connector)
 }

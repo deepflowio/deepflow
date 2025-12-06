@@ -48,7 +48,7 @@ use crate::error;
 use crate::{
     common::ebpf::{GO_HTTP2_UPROBE, GO_HTTP2_UPROBE_DATA},
     ebpf::{
-        MSG_REASM_SEG, MSG_REASM_START, MSG_REQUEST_END, MSG_RESPONSE_END,
+        MSG_CLOSE, MSG_REASM_SEG, MSG_REASM_START, MSG_REQUEST_END, MSG_RESPONSE_END,
         PACKET_KNAME_MAX_PADDING, SK_BPF_DATA, SOCK_DATA_HTTP2, SOCK_DATA_TLS_HTTP2, SOCK_DIR_RCV,
         SOCK_DIR_SND,
     },
@@ -63,6 +63,7 @@ use packet_segmentation_reassembly::Segment;
 use public::{
     buffer::BatchedBuffer,
     packet::Downcast,
+    proto::flow_log::FlagBits,
     utils::net::{is_unicast_link_local, MacAddr},
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -140,9 +141,10 @@ impl<'a> From<BatchedBuffer<u8>> for RawPacket<'a> {
 
 bitflags! {
     #[derive(Default)]
-    pub struct EbpfFlags: u32 {
-        const NONE = 0;
-        const TLS = 1;
+    pub struct ApplicationFlags: u32 {
+        const NONE = FlagBits::FlagNone as u32;
+        const TLS = FlagBits::FlagTls as u32;
+        const ASYNC = FlagBits::FlagAsync as u32;
     }
 }
 
@@ -236,6 +238,7 @@ pub struct MetaPacket<'a> {
     pub raw_from_ebpf_offset: usize,
     pub sub_packet_index: usize,
     pub sub_packets: Vec<SubPacket>,
+    pub is_socket_closed: bool,
 
     pub socket_id: u64,
     pub cap_start_seq: u64,
@@ -244,7 +247,7 @@ pub struct MetaPacket<'a> {
     //  流结束标识, 目前只有 go http2 uprobe 用到
     pub is_request_end: bool,
     pub is_response_end: bool,
-    pub ebpf_flags: EbpfFlags,
+    pub ebpf_flags: ApplicationFlags,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub segment_flags: SegmentFlags,
 
@@ -284,7 +287,7 @@ impl<'a> MetaPacket<'a> {
 
     #[inline]
     pub fn is_tls(&self) -> bool {
-        self.ebpf_flags.contains(EbpfFlags::TLS)
+        self.ebpf_flags.contains(ApplicationFlags::TLS)
     }
 
     #[inline]
@@ -1155,11 +1158,12 @@ impl<'a> MetaPacket<'a> {
         packet.ebpf_type = EbpfType::try_from(data.source)?;
         packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocol_hint as u8);
         packet.ebpf_flags = if data.is_tls {
-            EbpfFlags::TLS
+            ApplicationFlags::TLS
         } else {
-            EbpfFlags::NONE
+            ApplicationFlags::NONE
         };
         packet.segment_flags = SegmentFlags::from(data.msg_type);
+        packet.is_socket_closed = data.msg_type == MSG_CLOSE;
 
         // 目前只有 go uprobe http2 的方向判断能确保准确
         if data.source == GO_HTTP2_UPROBE || data.source == GO_HTTP2_UPROBE_DATA {

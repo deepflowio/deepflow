@@ -17,7 +17,6 @@
 package common
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -31,9 +30,9 @@ func DropDatabaseIfInitTablesFailed(dc *DBConfig, editionFunc EditionInitTablesF
 	log.Info(LogDBName(dc.Config.Database, "drop database if fails to initialize tables"))
 	err := editionFunc(dc)
 	if err != nil {
-		err := DropDatabase(dc)
-		if err != nil {
-			log.Error(LogDBName(dc.Config.Database, "failed to drop database: %s", err.Error()))
+		newErr := DropDatabase(dc)
+		if newErr != nil {
+			log.Error(LogDBName(dc.Config.Database, "failed to drop database: %s", newErr.Error()))
 		}
 		return err
 	}
@@ -51,38 +50,25 @@ func InitCETables(dc *DBConfig) error {
 func InitTables(dc *DBConfig, rawSqlDir string) error {
 	log.Info(LogDBName(dc.Config.Database, "initialize %s tables", rawSqlDir))
 
-	err := InitDBVersionTable(dc, rawSqlDir)
-	if err != nil {
-		return err
-	}
-
-	// 先初始化所有组织需要的 CE 表，再判断数据库是否是 default 组织，如果是 default 组织，初始化仅 default 组织所需数据。
-	err = InitORGTables(dc, rawSqlDir)
-	if err != nil {
-		return err
+	for _, sqlFile := range GetSortedSQLFiles(rawSqlDir, false) {
+		err := ReadAndExecuteSqlFile(dc, sqlFile)
+		if err != nil {
+			return err
+		}
 	}
 
 	// 通过判断数据库名称后缀，判断数据库是否是 default 组织。
 	if !strings.HasSuffix(dc.Config.Database, common.NON_DEFAULT_ORG_DATABASE_SUFFIX) {
-		if err := InitDefaultORGTables(dc, rawSqlDir); err != nil {
-			return err
+		for _, sqlFile := range GetSortedSQLFiles(rawSqlDir, true) {
+			err := ReadAndExecuteSqlFile(dc, sqlFile)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	log.Info(LogDBName(dc.Config.Database, "initialized %s tables successfully", rawSqlDir))
 	return nil
-}
-
-func InitDBVersionTable(dc *DBConfig, rawSqlDir string) error {
-	return ReadAndExecuteSqlFile(dc, fmt.Sprintf("%s/db_version.sql", rawSqlDir))
-}
-
-func InitORGTables(dc *DBConfig, rawSqlDir string) error {
-	return ReadAndExecuteSqlFile(dc, fmt.Sprintf("%s/init.sql", rawSqlDir))
-}
-
-func InitDefaultORGTables(dc *DBConfig, rawSqlDir string) error {
-	return ReadAndExecuteSqlFile(dc, fmt.Sprintf("%s/default_init.sql", rawSqlDir))
 }
 
 func ReadAndExecuteSqlFile(dc *DBConfig, sqlFile string) error {

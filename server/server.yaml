@@ -93,6 +93,13 @@ controller:
     port: 20825
     timeout: 30
 
+  # deepflow querier js config
+  querier-js-service:
+    enabled: false
+    host: querier-js
+    port: 30420
+    timeout: 30
+
   # deepflow fpermit service config
   fpermit:
     enabled: false
@@ -135,6 +142,17 @@ controller:
     host: postgresql
     port: 5432
     timeout: 30
+
+  # dameng相关配置
+  dm:
+    enabled: false
+    dsn: DM8DSN
+    # schema should not have the same name as user-name
+    schema: deepflow
+    user-name: root
+    user-password: deepflow
+    host: dm
+    port: 5236
     
     # whether drop meta database when init failed
     drop-database-enabled: false
@@ -285,6 +303,15 @@ controller:
         event:
           # context lines count for config diff
           config_diff_context: 3
+        self_heal: 
+          enabled: true
+          resources:
+          #  - pod_service
+          #  - pod_group
+          #  - pod
+          #  - config_map
+        tagrecorder_self_heal: 
+          enabled: true
   tagrecorder:
     # size of data in batch operation for MySQL
     mysql_batch_size: 1000
@@ -298,6 +325,12 @@ controller:
       host: 127.0.0.1
       port: 123
       timeout: 1
+
+    # grpc service push config
+    push:
+      enabled: true
+      # unit: second , min: 1 max: 10
+      delay-max: 0
 
     trident-type-for-unknow-vtap: 0
 
@@ -324,6 +357,9 @@ controller:
     # clean up the data and cache of the table kubernetes_cluster according to the data 
     # that was not synchronized before a certain period of time 
     clear-kubernetes-time: 600
+
+    # auto grpc message size change to smaller interval, unit: second
+    auto-grpc-buffer-size-interval: 3600
 
     ## plaform data real refresh delay time
     ## uint: s, default: 1
@@ -719,6 +755,8 @@ ingester:
   #    tables-contain: 1s_local
   #  - database: profile
   #  - database: application_log
+  #  - database: event
+  #    tables-contain: file_event_local
 
   ## ingester模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
   #ingester-enabled: true

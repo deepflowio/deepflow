@@ -760,6 +760,7 @@ type PodCluster struct {
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION" mapstructure:"REGION"`
 	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN" mapstructure:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID" mapstructure:"UID"`
 }
 
 func (p PodCluster) GetDomainLcuuid() string {
@@ -781,6 +782,7 @@ type PodNamespace struct {
 	Domain           string            `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 	LearnedCloudTags map[string]string `gorm:"column:learned_cloud_tags;type:text;default:'';serializer:json" json:"LEARNED_CLOUD_TAGS" mapstructure:"LEARNED_CLOUD_TAGS"`
 	CustomCloudTags  map[string]string `gorm:"column:custom_cloud_tags;type:text;default:'';serializer:json" json:"CUSTOM_CLOUD_TAGS" mapstructure:"CUSTOM_CLOUD_TAGS"`
+	UID              string            `gorm:"column:uid;type:char(64);default:''" json:"UID" mapstructure:"UID"`
 }
 
 func (p PodNamespace) GetDomainLcuuid() string {
@@ -924,7 +926,8 @@ type PodGroup struct {
 	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
 	Type           int    `gorm:"column:type;type:int;default:null" json:"TYPE" mapstructure:"TYPE"` // 1: Deployment 2: StatefulSet 3: ReplicationController
 	PodNum         int    `gorm:"column:pod_num;type:int;default:1" json:"POD_NUM" mapstructure:"POD_NUM"`
-	Label          string `gorm:"column:label;type:text;default:''" json:"LABEL" mapstructure:"LABEL"` // separated by ,
+	Label          string `gorm:"column:label;type:text;default:''" json:"LABEL" mapstructure:"LABEL"`                    // separated by ,
+	NetworkMode    int    `gorm:"column:network_mode;type:int;default:1" json:"NETWORK_MODE" mapstructure:"NETWORK_MODE"` // 1: Pod network 2: Host network
 	Metadata       string `gorm:"column:metadata;type:text;default:''" json:"METADATA" mapstructure:"-"`
 	MetadataHash   string `gorm:"column:metadata_hash;type:char(64);default:''" json:"METADATA_HASH" mapstructure:"-"`
 	Spec           string `gorm:"column:spec;type:text;default:''" json:"SPEC" mapstructure:"-"`
@@ -1052,7 +1055,7 @@ func (p Pod) GetSubDomainLcuuid() string {
 
 type ConfigMap struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
-	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
+	OperatedTime   `gorm:"embedded" mapstructure:",squash"`
 	Name           string    `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
 	Data           string    `gorm:"column:data;type:text;default:''" json:"DATA" mapstructure:"-"`
 	DataHash       string    `gorm:"column:data_hash;type:char(64);default:''" json:"DATA_HASH" mapstructure:"-"`
@@ -1102,7 +1105,7 @@ type CustomService struct {
 	OperatedTime   `gorm:"embedded" mapstructure:",squash"`
 	Name           string `gorm:"column:name;type:varchar(128);default:''" json:"NAME" mapstructure:"NAME"`
 	Type           int    `gorm:"column:type;type:int;default:0" json:"TYPE" mapstructure:"TYPE"`
-	MatchType      int    `gorm:"column:match_type;type:int;default:0" json:"MATCH_TYPE" mapstructure:"MATCH_TYPE"`
+	MatchType      int    `gorm:"column:match_type;type:int;default:1" json:"MATCH_TYPE" mapstructure:"MATCH_TYPE"`
 	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"EPC_ID" mapstructure:"EPC_ID"`
 	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:0" json:"POD_CLUSTER_ID" mapstructure:"POD_CLUSTER_ID"`
 	PodNamespaceID int    `gorm:"column:pod_namespace_id;type:int;default:0" json:"POD_NAMESPACE_ID" mapstructure:"POD_NAMESPACE_ID"`

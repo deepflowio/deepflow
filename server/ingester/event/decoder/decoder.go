@@ -253,7 +253,7 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 	}
 
 	s.AutoInstanceID, s.AutoInstanceType = ingestercommon.GetAutoInstance(s.PodID, s.GProcessID, s.PodNodeID, s.L3DeviceID, uint32(s.SubnetID), uint8(s.L3DeviceType), s.L3EpcID)
-	customServiceID := d.platformData.QueryCustomService(s.OrgId, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0)
+	customServiceID := d.platformData.QueryCustomService(s.OrgId, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, s.ServiceID, s.PodGroupID, s.L3DeviceID, uint8(s.L3DeviceType))
 	s.AutoServiceID, s.AutoServiceType = ingestercommon.GetAutoService(customServiceID, s.ServiceID, s.PodGroupID, s.GProcessID, uint32(s.PodClusterID), s.L3DeviceID, uint32(s.SubnetID), uint8(s.L3DeviceType), podGroupType, s.L3EpcID)
 
 	s.AppInstance = strconv.Itoa(int(e.Pid))
@@ -406,7 +406,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 		s.ServiceID = d.platformData.QueryPodService(s.OrgId, s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
 	}
 
-	customServiceID := d.platformData.QueryCustomService(s.OrgId, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0)
+	customServiceID := d.platformData.QueryCustomService(s.OrgId, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, s.ServiceID, s.PodGroupID, s.L3DeviceID, uint8(s.L3DeviceType))
 	s.AutoServiceID, s.AutoServiceType =
 		ingestercommon.GetAutoService(
 			customServiceID,
@@ -457,6 +457,7 @@ func (d *Decoder) writeAlertEvent(event *alert_event.AlertEvent) {
 	s.PolicyType = uint8(event.GetPolicyType())
 	s.AlertPolicy = event.GetAlertPolicy()
 	s.MetricValue = event.GetMetricValue()
+	s.MetricValueStr = event.GetMetricValueStr()
 	s.EventLevel = uint8(event.GetEventLevel())
 	s.TargetTags = event.GetTargetTags()
 
@@ -464,6 +465,8 @@ func (d *Decoder) writeAlertEvent(event *alert_event.AlertEvent) {
 	s.TagStrValues = event.GetTagStrValues()
 	s.TagIntKeys = event.GetTagIntKeys()
 	s.TagIntValues = event.GetTagIntValues()
+	s.TriggerThreshold = event.GetTriggerThreshold()
+	s.MetricUnit = event.GetMetricUnit()
 	s.XTargetUid = event.GetXTargetUid()
 	s.XQueryRegion = event.GetXQueryRegion()
 

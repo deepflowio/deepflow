@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2024 Yunshan Networks
+/**
+ * Copyright (c) 2025 Yunshan Networks
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,39 +14,31 @@
  * limitations under the License.
  */
 
-package schema
+package sqladapter
 
 import (
 	"github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/config"
-	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema/rawsql/mysql"
-	"github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/schema/rawsql/postgres"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/sqladapter/edition"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/sqladapter/types"
 )
 
 var log = logging.MustGetLogger("db.metadb.migrator.schema")
 
-type SqlFmt interface {
-	SetConfig(config.Config)
-	GetRawSqlDirectory(parentDir string) string
-	CreateDatabase() string
-	DropDatabase() string
-	SelectDatabase() string
-	SelectTable(string) string
-	SelectColumn(tableName, columnName string) string
-	InsertDBVersion(tableName, version string) string
-}
-
-func GetSqlFmt(cfg config.Config) SqlFmt {
-	var r SqlFmt
+func GetSQLAdapter(cfg config.Config) types.SQLAdapter { // TODO merge into session
+	var r types.SQLAdapter
 	switch cfg.Type {
 	case config.MetaDBTypeMySQL:
-		r = &mysql.SqlFmt{}
+		r = &MySQLAdapter{}
 	case config.MetaDBTypePostgreSQL:
-		r = &postgres.SqlFmt{}
+		r = &PostgreSQLAdapter{}
 	default:
-		log.Errorf("unsupported database type: %s", cfg.Type)
-		return nil
+		var err error
+		r, err = edition.GetAdapter(cfg)
+		if err != nil {
+			log.Fatalf("get sql adapter failed: %v", err)
+		}
 	}
 	r.SetConfig(cfg)
 	return r

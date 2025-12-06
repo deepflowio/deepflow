@@ -431,9 +431,18 @@ func (c *Cloud) run() {
 func (c *Cloud) startKubernetesGatherTask() {
 	log.Infof("cloud (%s) kubernetes gather task started", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 	c.runKubernetesGatherTask()
+	ticker := time.NewTicker(time.Duration(c.cfg.KubernetesGatherInterval) * time.Second)
 	go func() {
-		for range time.Tick(time.Duration(c.cfg.KubernetesGatherInterval) * time.Second) {
-			c.runKubernetesGatherTask()
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-c.cCtx.Done():
+				log.Infof("cloud (%s) kubernetes gather task stopped", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
+				return
+			case <-ticker.C:
+				c.runKubernetesGatherTask()
+			}
 		}
 	}()
 }
@@ -442,7 +451,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 	var domain metadbmodel.Domain
 	err := c.db.DB.Where("lcuuid = ?", c.basicInfo.Lcuuid).First(&domain).Error
 	if err != nil {
-		log.Error(err, logger.NewORGPrefix(c.orgID))
+		log.Errorf("get domain (%s) failed: %s", c.basicInfo.Name, err.Error(), logger.NewORGPrefix(c.orgID))
 		return
 	}
 
@@ -475,9 +484,9 @@ func (c *Cloud) runKubernetesGatherTask() {
 			oldSubDomains.Add(lcuuid)
 		}
 
-		c.db.DB.Where(
-			"enabled = ? AND domain = ? AND state != ?",
-			common.DOMAIN_ENABLED_TRUE, c.basicInfo.Lcuuid, common.RESOURCE_STATE_CODE_NO_LICENSE,
+		c.db.DB.Where(map[string]interface{}{"domain": c.basicInfo.Lcuuid}).Where(
+			"enabled = ? AND state != ?",
+			common.DOMAIN_ENABLED_TRUE, common.RESOURCE_STATE_CODE_NO_LICENSE,
 		).Find(&subDomains)
 		lcuuidToSubDomain := make(map[string]*metadbmodel.SubDomain)
 		for index, subDomain := range subDomains {
@@ -591,13 +600,13 @@ func (c *Cloud) appendAddtionalResourcesData(resource model.Resource) model.Reso
 // new centent field: compressed_content
 func getContentFromAdditionalResource(domainUUID string, db *gorm.DB) (*metadbmodel.DomainAdditionalResource, error) {
 	var dbItems []metadbmodel.DomainAdditionalResource
-	result := db.Select("content").Where("domain = ? AND content != ''", domainUUID).Find(&dbItems)
+	result := db.Select("content").Where(map[string]interface{}{"domain": domainUUID}).Where("content != ''").Find(&dbItems)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
 	if result.RowsAffected == 0 {
-		result = db.Select("compressed_content").Where("domain = ?", domainUUID).Find(&dbItems)
+		result = db.Select("compressed_content").Where(map[string]interface{}{"domain": domainUUID}).Find(&dbItems)
 		if result.Error != nil {
 			return nil, result.Error
 		}

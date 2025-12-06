@@ -18,6 +18,9 @@ message AlertEvent {
     optional uint32 org_id = 12;
     optional uint32 user_id = 13;
     optional uint32 team_id = 14;
+    optional string trigger_threshold = 15;
+    optional string metric_unit = 16;
+    optional string metric_value_str = 17;
 
     optional string _target_uid = 21;
     optional string _query_region = 22;

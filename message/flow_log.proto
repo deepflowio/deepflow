@@ -209,6 +209,12 @@ message ExtendedInfo {
     repeated double metrics_values = 19;
 }
 
+enum FlagBits {
+  FLAG_NONE = 0;
+  FLAG_TLS = 1;   // 1<<0
+  FLAG_ASYNC = 2; // 1<<1
+}
+
 message AppProtoLogsData {
     AppProtoLogsBaseInfo base = 1;
 
@@ -222,15 +228,17 @@ message AppProtoLogsData {
 
     uint32 row_effect = 16;
     uint32 direction_score = 17;
-    // Flags Bimmap:
-    // 32                                  1     0
-    // +-----------------------------------+-----+
-    // | Reserve                           | TLS |
+    // Flags Bitmap (enum FlagBits):
+    // 32                           2       1     0
+    // +------------------------------------+-----+
+    // | Reserve                    | async | TLS |
     // +-----------------------------------+-----+
     uint32 flags = 18;
     // Excluding L2-L4 packet header
     uint32 captured_request_byte = 19;
     uint32 captured_response_byte = 20;
+    string biz_code = 21;
+    string biz_scenario = 22;
 }
 
 message AppProtoLogsBaseInfo {

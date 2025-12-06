@@ -19,6 +19,7 @@ package config
 const (
 	MetaDBTypeMySQL      = "MySQL"
 	MetaDBTypePostgreSQL = "PostgreSQL"
+	MetaDBTypeDM         = "DM"
 )
 
 type Config struct {
@@ -31,13 +32,7 @@ type Config struct {
 	ProxyPort    uint32
 	UserName     string
 	UserPassword string
-	TimeOut      uint32
-
-	// PostgreSQL
-	Schema string
-
-	// MySQL
-	AutoIncrementIncrement uint32
+	TimeOut      uint16
 
 	DropDatabaseEnabled bool
 	MaxOpenConns        uint16
@@ -45,6 +40,15 @@ type Config struct {
 	ConnMaxLifeTime     uint16
 	BatchSize0          uint32
 	BatchSize1          uint32
+
+	// PostgreSQL
+	Schema string
+
+	// MySQL
+	AutoIncrementIncrement uint32
+
+	// DM
+	DSN string
 }
 
 func (c Config) GetAutoIncrementIncrement() uint32 {
@@ -58,44 +62,46 @@ func (c *Config) InitFromMySQL(mysqlCfg MySQLConfig) {
 	if !mysqlCfg.Enabled {
 		return
 	}
-	c.Type = MetaDBTypeMySQL
-	c.Database = mysqlCfg.Database
-	c.Host = mysqlCfg.Host
-	c.Port = mysqlCfg.Port
-	c.ProxyHost = mysqlCfg.ProxyHost
-	c.ProxyPort = mysqlCfg.ProxyPort
-	c.UserName = mysqlCfg.UserName
-	c.UserPassword = mysqlCfg.UserPassword
-	c.TimeOut = mysqlCfg.TimeOut
-	c.AutoIncrementIncrement = mysqlCfg.AutoIncrementIncrement
-	c.DropDatabaseEnabled = mysqlCfg.DropDatabaseEnabled
-	c.MaxOpenConns = mysqlCfg.MaxOpenConns
-	c.MaxIdleConns = mysqlCfg.MaxIdleConns
-	c.ConnMaxLifeTime = mysqlCfg.ConnMaxLifeTime
-	c.BatchSize0 = mysqlCfg.BatchSize0
-	c.BatchSize1 = mysqlCfg.BatchSize1
+	mysqlCfg.FullfillConfig(c)
 }
 
 func (c *Config) InitFromPostgreSQL(postgreSQLCfg PostgreSQLConfig) {
 	if !postgreSQLCfg.Enabled {
 		return
 	}
-	c.Type = MetaDBTypePostgreSQL
-	c.Database = postgreSQLCfg.Database
-	c.Schema = postgreSQLCfg.Schema
-	c.Host = postgreSQLCfg.Host
-	c.Port = postgreSQLCfg.Port
-	c.ProxyHost = postgreSQLCfg.ProxyHost
-	c.ProxyPort = postgreSQLCfg.ProxyPort
-	c.UserName = postgreSQLCfg.UserName
-	c.UserPassword = postgreSQLCfg.UserPassword
-	c.TimeOut = postgreSQLCfg.TimeOut
-	c.DropDatabaseEnabled = postgreSQLCfg.DropDatabaseEnabled
-	c.MaxOpenConns = postgreSQLCfg.MaxOpenConns
-	c.MaxIdleConns = postgreSQLCfg.MaxIdleConns
-	c.ConnMaxLifeTime = postgreSQLCfg.ConnMaxLifeTime
-	c.BatchSize0 = postgreSQLCfg.BatchSize0
-	c.BatchSize1 = postgreSQLCfg.BatchSize1
+	postgreSQLCfg.FullfillConfig(c)
+}
+
+func (c *Config) InitFromDaMeng(dmCfg DMConfig) {
+	if !dmCfg.Enabled {
+		return
+	}
+	dmCfg.FullfillConfig(c)
+}
+
+type commonConfig struct {
+	UserName     string `default:"root" yaml:"user-name"`
+	UserPassword string `default:"deepflow" yaml:"user-password"`
+
+	TimeOut             uint16 `default:"30" yaml:"timeout"`
+	DropDatabaseEnabled bool   `default:"false" yaml:"drop-database-enabled"`
+	MaxOpenConns        uint16 `default:"100" yaml:"max_open_conns"`
+	MaxIdleConns        uint16 `default:"50" yaml:"max_idle_conns"`
+	ConnMaxLifeTime     uint16 `default:"60" yaml:"conn_max_life_time"`
+	BatchSize0          uint32 `default:"100000" yaml:"batch-size-0"`
+	BatchSize1          uint32 `default:"2500" yaml:"batch-size-1"`
+}
+
+func (c commonConfig) fullfillConfig(cfg *Config) {
+	cfg.UserName = c.UserName
+	cfg.UserPassword = c.UserPassword
+	cfg.TimeOut = c.TimeOut
+	cfg.DropDatabaseEnabled = c.DropDatabaseEnabled
+	cfg.MaxOpenConns = c.MaxOpenConns
+	cfg.MaxIdleConns = c.MaxIdleConns
+	cfg.ConnMaxLifeTime = c.ConnMaxLifeTime
+	cfg.BatchSize0 = c.BatchSize0
+	cfg.BatchSize1 = c.BatchSize1
 }
 
 type MySQLConfig struct {
@@ -105,33 +111,121 @@ type MySQLConfig struct {
 	Port                   uint32 `default:"30130" yaml:"port"`
 	ProxyHost              string `default:"" yaml:"proxy-host"`
 	ProxyPort              uint32 `default:"0" yaml:"proxy-port"`
-	UserName               string `default:"root" yaml:"user-name"`
-	UserPassword           string `default:"deepflow" yaml:"user-password"`
-	TimeOut                uint32 `default:"30" yaml:"timeout"`
 	AutoIncrementIncrement uint32 `default:"1" yaml:"auto_increment_increment"`
-	DropDatabaseEnabled    bool   `default:"false" yaml:"drop-database-enabled"`
-	MaxOpenConns           uint16 `default:"100" yaml:"max_open_conns"`
-	MaxIdleConns           uint16 `default:"50" yaml:"max_idle_conns"`
-	ConnMaxLifeTime        uint16 `default:"60" yaml:"conn_max_life_time"`
-	BatchSize0             uint32 `default:"100000" yaml:"batch-size-0"`
-	BatchSize1             uint32 `default:"2500" yaml:"batch-size-1"`
+	// commonConfig
+	UserName     string `default:"root" yaml:"user-name"`
+	UserPassword string `default:"deepflow" yaml:"user-password"`
+
+	TimeOut             uint16 `default:"30" yaml:"timeout"`
+	DropDatabaseEnabled bool   `default:"false" yaml:"drop-database-enabled"`
+	MaxOpenConns        uint16 `default:"100" yaml:"max_open_conns"`
+	MaxIdleConns        uint16 `default:"50" yaml:"max_idle_conns"`
+	ConnMaxLifeTime     uint16 `default:"60" yaml:"conn_max_life_time"`
+	BatchSize0          uint32 `default:"100000" yaml:"batch-size-0"`
+	BatchSize1          uint32 `default:"2500" yaml:"batch-size-1"`
+}
+
+func (c MySQLConfig) FullfillConfig(cfg *Config) {
+	// c.fullfillConfig(cfg)
+	cfg.UserName = c.UserName
+	cfg.UserPassword = c.UserPassword
+	cfg.TimeOut = c.TimeOut
+	cfg.DropDatabaseEnabled = c.DropDatabaseEnabled
+	cfg.MaxOpenConns = c.MaxOpenConns
+	cfg.MaxIdleConns = c.MaxIdleConns
+	cfg.ConnMaxLifeTime = c.ConnMaxLifeTime
+	cfg.BatchSize0 = c.BatchSize0
+	cfg.BatchSize1 = c.BatchSize1
+
+	cfg.Type = MetaDBTypeMySQL
+	cfg.Database = c.Database
+	cfg.Host = c.Host
+	cfg.Port = c.Port
+	cfg.ProxyHost = c.ProxyHost
+	cfg.ProxyPort = c.ProxyPort
+	cfg.AutoIncrementIncrement = c.AutoIncrementIncrement
 }
 
 type PostgreSQLConfig struct {
-	Enabled             bool   `default:"false" yaml:"enabled"`
-	Database            string `default:"deepflow" yaml:"database"`
-	Schema              string `default:"public" yaml:"schema"`
-	Host                string `default:"postgresql" yaml:"host"`
-	Port                uint32 `default:"5432" yaml:"port"`
-	ProxyHost           string `default:"" yaml:"proxy-host"`
-	ProxyPort           uint32 `default:"0" yaml:"proxy-port"`
-	UserName            string `default:"root" yaml:"user-name"`
-	UserPassword        string `default:"deepflow" yaml:"user-password"`
-	TimeOut             uint32 `default:"30" yaml:"timeout"`
+	Enabled   bool   `default:"false" yaml:"enabled"`
+	Database  string `default:"deepflow" yaml:"database"`
+	Schema    string `default:"public" yaml:"schema"`
+	Host      string `default:"postgresql" yaml:"host"`
+	Port      uint32 `default:"5432" yaml:"port"`
+	ProxyHost string `default:"" yaml:"proxy-host"`
+	ProxyPort uint32 `default:"0" yaml:"proxy-port"`
+	// commonConfig
+	UserName     string `default:"root" yaml:"user-name"`
+	UserPassword string `default:"deepflow" yaml:"user-password"`
+
+	TimeOut             uint16 `default:"30" yaml:"timeout"`
 	DropDatabaseEnabled bool   `default:"false" yaml:"drop-database-enabled"`
-	MaxOpenConns        uint16 `default:"100" yaml:"max-open-conns"`
-	MaxIdleConns        uint16 `default:"50" yaml:"max-idle-conns"`
-	ConnMaxLifeTime     uint16 `default:"60" yaml:"conn-max-life-time"`
+	MaxOpenConns        uint16 `default:"100" yaml:"max_open_conns"`
+	MaxIdleConns        uint16 `default:"50" yaml:"max_idle_conns"`
+	ConnMaxLifeTime     uint16 `default:"60" yaml:"conn_max_life_time"`
 	BatchSize0          uint32 `default:"100000" yaml:"batch-size-0"`
 	BatchSize1          uint32 `default:"2500" yaml:"batch-size-1"`
+}
+
+func (c PostgreSQLConfig) FullfillConfig(cfg *Config) {
+	// c.fullfillConfig(cfg)
+	cfg.UserName = c.UserName
+	cfg.UserPassword = c.UserPassword
+	cfg.TimeOut = c.TimeOut
+	cfg.DropDatabaseEnabled = c.DropDatabaseEnabled
+	cfg.MaxOpenConns = c.MaxOpenConns
+	cfg.MaxIdleConns = c.MaxIdleConns
+	cfg.ConnMaxLifeTime = c.ConnMaxLifeTime
+	cfg.BatchSize0 = c.BatchSize0
+	cfg.BatchSize1 = c.BatchSize1
+
+	cfg.Type = MetaDBTypePostgreSQL
+	cfg.Database = c.Database
+	cfg.Schema = c.Schema
+	cfg.Host = c.Host
+	cfg.Port = c.Port
+	cfg.ProxyHost = c.ProxyHost
+	cfg.ProxyPort = c.ProxyPort
+}
+
+type DMConfig struct {
+	Enabled   bool   `default:"false" yaml:"enabled"`
+	Schema    string `default:"deepflow" yaml:"schema"`
+	Host      string `default:"dameng" yaml:"host"`
+	Port      uint32 `default:"5236" yaml:"port"`
+	ProxyHost string `default:"" yaml:"proxy-host"`
+	ProxyPort uint32 `default:"0" yaml:"proxy-port"`
+	// commonConfig
+	UserName     string `default:"root" yaml:"user-name"`
+	UserPassword string `default:"deepflow" yaml:"user-password"`
+
+	DSN                 string `default:"" yaml:"dsn"`
+	TimeOut             uint16 `default:"30" yaml:"timeout"`
+	DropDatabaseEnabled bool   `default:"false" yaml:"drop-database-enabled"`
+	MaxOpenConns        uint16 `default:"100" yaml:"max_open_conns"`
+	MaxIdleConns        uint16 `default:"50" yaml:"max_idle_conns"`
+	ConnMaxLifeTime     uint16 `default:"60" yaml:"conn_max_life_time"`
+	BatchSize0          uint32 `default:"100000" yaml:"batch-size-0"`
+	BatchSize1          uint32 `default:"2500" yaml:"batch-size-1"`
+}
+
+func (c DMConfig) FullfillConfig(cfg *Config) {
+	// c.fullfillConfig(cfg)
+	cfg.UserName = c.UserName
+	cfg.UserPassword = c.UserPassword
+	cfg.TimeOut = c.TimeOut
+	cfg.DropDatabaseEnabled = c.DropDatabaseEnabled
+	cfg.MaxOpenConns = c.MaxOpenConns
+	cfg.MaxIdleConns = c.MaxIdleConns
+	cfg.ConnMaxLifeTime = c.ConnMaxLifeTime
+	cfg.BatchSize0 = c.BatchSize0
+	cfg.BatchSize1 = c.BatchSize1
+
+	cfg.DSN = c.DSN
+	cfg.Type = MetaDBTypeDM
+	cfg.Database = c.Schema
+	cfg.Host = c.Host
+	cfg.Port = c.Port
+	cfg.ProxyHost = c.ProxyHost
+	cfg.ProxyPort = c.ProxyPort
 }

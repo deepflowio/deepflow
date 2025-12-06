@@ -24,17 +24,21 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/message/trident"
+	flow_metrics "github.com/deepflowio/deepflow/server/libs/flow-metrics"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/google/gopacket/layers"
 )
 
 type ServiceTable struct {
-	epcIDIPv4Table         [trident.ServiceProtocol_UDP_SERVICE + 1]map[uint64]uint32
-	epcIDIPv6Table         map[EpcIDIPv6Key]uint32
-	podClusterIDTable      map[uint64]uint32
-	podGroupIDTable        map[uint64]uint32
-	customServiceIpv4Table map[uint64]uint32
-	customServiceIpv6Table map[EpcIDIPv6Key]uint32
+	epcIDIPv4Table          [trident.ServiceProtocol_UDP_SERVICE + 1]map[uint64]uint32
+	epcIDIPv6Table          map[EpcIDIPv6Key]uint32
+	podClusterIDTable       map[uint64]uint32
+	podGroupIDTable         map[uint64]uint32
+	customServiceIpv4Table  map[uint64]uint32
+	customServiceIpv6Table  map[EpcIDIPv6Key]uint32
+	customServicePodService map[uint32]uint32
+	customServicePodGroup   map[uint32]uint32
+	customServiceChost      map[uint32]uint32
 }
 
 type EpcIDIPv6Key struct {
@@ -93,15 +97,29 @@ func (s *ServiceTable) QueryPodService(podID, podNodeID, podClusterID, podGroupI
 	}
 	serviceProtocol := toServiceProtocol(protocol)
 
+	serviceID := uint32(0)
+	// 数据中的 IP 地址是 Pod IP，或者是由 Hostnetwork Pod（自身没有 IP）使用的 Node IP
+	// -------------------------------------------------------------------------------------------------------
+	// The IP address in the data is a Pod IP, or a Node IP used by a HostNetwork Pod (which has no own Pod IP)
 	if podID != 0 {
-		return s.podGroupIDTable[genPodXIDKey(podGroupID, serviceProtocol, serverPort)]
-	} else if podNodeID != 0 {
-		// If serverPort is 0, the matched Service may not be accurate
-		if serverPort == 0 {
-			return 0
-		}
-		return s.podClusterIDTable[genPodXIDKey(podClusterID, serviceProtocol, serverPort)]
+		serviceID = s.podGroupIDTable[genPodXIDKey(podGroupID, serviceProtocol, serverPort)]
+
+		// 数据中的 IP 地址是 Node IP，当然也包括由 Hostnetwork Pod（自身没有 IP）使用的 Node IP
+		// ----------------------------------------------------------------------------------------------------------------
+		// The IP address in the data is a Node IP, including the Node IP used by a HostNetwork Pod (which has no own Pod IP)
+	} else if podNodeID != 0 && serverPort != 0 { // If serverPort is 0, the matched Service may not be accurate
+		serviceID = s.podClusterIDTable[genPodXIDKey(podClusterID, serviceProtocol, serverPort)]
 	}
+
+	if serviceID != 0 {
+		return serviceID
+	}
+	// 注意：在 Hostnetwork 场景下，控制器会将 Hostnetwork Pod 的服务信息通过 ip + server_port 的形式下发下来。
+	// 因此如果前两步没有查询到服务信息时，还需要继续查询。
+	// ------------------------------------------------------------------------------------------------------
+	// Note: In HostNetwork scenarios, the Controller distributes service information of HostNetwork Pods
+	// in the form of (ip + server_port). Therefore, if the service information was not found in the above steps,
+	// an additional lookup is still required.
 
 	// for performance optimization, return directly. Since when epcID <= 0, there is no Service information.
 	if epcID <= 0 {
@@ -113,12 +131,35 @@ func (s *ServiceTable) QueryPodService(podID, podNodeID, podClusterID, podGroupI
 	return s.epcIDIPv4Table[serviceProtocol][genEpcIDIPv4Key(epcID, ipv4, serverPort)]
 }
 
-func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, serverPort uint16) uint32 {
+func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, serverPort uint16, podServiceId, podGroupId, l3DeviceId uint32, l3DeviceType uint8) uint32 {
 	// for performance optimization, return directly. Since when epcID <= 0, there is no Service information.
 	if epcID <= 0 {
 		return 0
 	}
 
+	// priority 1. pod service
+	if podServiceId != 0 && len(s.customServicePodService) > 0 {
+		serviceId := s.customServicePodService[podServiceId]
+		if serviceId != 0 {
+			return serviceId
+		}
+	}
+	// priority 2. pod group
+	if podGroupId != 0 && len(s.customServicePodGroup) > 0 {
+		serviceId := s.customServicePodGroup[podGroupId]
+		if serviceId != 0 {
+			return serviceId
+		}
+	}
+	// priority 3. chost
+	if l3DeviceId != 0 && l3DeviceType == uint8(flow_metrics.VMDevice) && len(s.customServiceChost) > 0 {
+		serviceId := s.customServiceChost[l3DeviceId]
+		if serviceId != 0 {
+			return serviceId
+		}
+	}
+
+	// priority 4. port ip
 	if isIPv6 {
 		if len(s.customServiceIpv6Table) == 0 {
 			return 0
@@ -141,11 +182,14 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ipv4 uint32,
 
 func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
 	s := &ServiceTable{
-		epcIDIPv6Table:         make(map[EpcIDIPv6Key]uint32),
-		podClusterIDTable:      make(map[uint64]uint32),
-		podGroupIDTable:        make(map[uint64]uint32),
-		customServiceIpv4Table: make(map[uint64]uint32),
-		customServiceIpv6Table: make(map[EpcIDIPv6Key]uint32),
+		epcIDIPv6Table:          make(map[EpcIDIPv6Key]uint32),
+		podClusterIDTable:       make(map[uint64]uint32),
+		podGroupIDTable:         make(map[uint64]uint32),
+		customServiceIpv4Table:  make(map[uint64]uint32),
+		customServiceIpv6Table:  make(map[EpcIDIPv6Key]uint32),
+		customServicePodService: make(map[uint32]uint32),
+		customServicePodGroup:   make(map[uint32]uint32),
+		customServiceChost:      make(map[uint32]uint32),
 	}
 	for i := range s.epcIDIPv4Table {
 		s.epcIDIPv4Table[i] = make(map[uint64]uint32)
@@ -168,7 +212,10 @@ func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
 			s.podClusterIDTable[genPodXIDKey(podClusterId, trident.ServiceProtocol_ANY, 0)] = serviceId
 		// Service from 'pod + port' generate 'pod_group_id + port' table
 		case trident.ServiceType_POD_SERVICE_POD_GROUP:
-			podGroupIds := svc.GetPodGroupIds() // FIXME @zhuofeng
+			podGroupIds := svc.GetPodGroupIds()
+			if len(podGroupIds) == 0 {
+				break
+			}
 			podGroupId := podGroupIds[0]
 			for _, port := range svc.GetServerPorts() {
 				s.podGroupIDTable[genPodXIDKey(podGroupId, protocol, uint16(port))] = serviceId
@@ -239,6 +286,18 @@ func (s *ServiceTable) addCustomService(svc *trident.ServiceInfo) {
 	epcId := int32(svc.GetEpcId())
 	serviceId := svc.GetId()
 
+	for _, podServiceId := range svc.GetPodServiceIds() {
+		s.customServicePodService[podServiceId] = serviceId
+	}
+
+	for _, podGroupId := range svc.GetPodGroupIds() {
+		s.customServicePodGroup[podGroupId] = serviceId
+	}
+
+	for _, chostId := range svc.GetChostIds() {
+		s.customServiceChost[chostId] = serviceId
+	}
+
 	ips := svc.GetIps()
 	if len(ips) == 0 {
 		return
@@ -262,6 +321,10 @@ func (s *ServiceTable) addCustomService(svc *trident.ServiceInfo) {
 			s.customServiceIpv6Table[key] = serviceId
 		}
 	}
+}
+
+func (s *ServiceTable) addCustomServicePodGroup(svc *trident.ServiceInfo) {
+
 }
 
 func (s *ServiceTable) String() string {
@@ -382,5 +445,33 @@ func (s *ServiceTable) String() string {
 		epcID, ipv6, _, port := parseEpcIDIPv6Key(&epcIP)
 		fmt.Fprintf(sb, "  %-6d  %-15s %-15d %-6d \n", epcID, ipv6, port, id)
 	}
+
+	if len(s.customServicePodService) > 0 {
+		sb.WriteString("\npodServiceId custom service\n")
+		sb.WriteString("\n7  podServiceId            serviceID\n")
+		sb.WriteString("------------------------------------------------------\n")
+		for podServiceId, serviceId := range s.customServicePodService {
+			fmt.Fprintf(sb, "  %-11d            %-15d \n", podServiceId, serviceId)
+		}
+	}
+
+	if len(s.customServicePodGroup) > 0 {
+		sb.WriteString("\npodServiceId custom service\n")
+		sb.WriteString("\n8  podGrouopId            serviceID\n")
+		sb.WriteString("------------------------------------------------------\n")
+		for podGroupId, serviceId := range s.customServicePodGroup {
+			fmt.Fprintf(sb, "  %-11d            %-15d \n", podGroupId, serviceId)
+		}
+	}
+
+	if len(s.customServiceChost) > 0 {
+		sb.WriteString("\nchostId custom service\n")
+		sb.WriteString("\n9  chostId            serviceID\n")
+		sb.WriteString("------------------------------------------------------\n")
+		for chostId, serviceId := range s.customServiceChost {
+			fmt.Fprintf(sb, "  %-11d            %-15d \n", chostId, serviceId)
+		}
+	}
+
 	return sb.String()
 }

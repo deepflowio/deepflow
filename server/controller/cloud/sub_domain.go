@@ -126,7 +126,7 @@ func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResourc
 	podReplicaSets := c.getSubDomainPodReplicaSets(lcuuid, &kubernetesGatherResource, azLcuuid)
 
 	// pods
-	pods := c.getSubDomainPods(lcuuid, &kubernetesGatherResource, nodeLcuuidToAZLcuuid)
+	pods := c.getSubDomainPods(lcuuid, azLcuuid, &kubernetesGatherResource, nodeLcuuidToAZLcuuid)
 
 	// IP
 	ips, reservedPodSubnetLcuuidToIPNum, updatedVInterfaceLcuuidToNetworkLcuuid :=
@@ -180,7 +180,7 @@ func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResourc
 func (c *Cloud) getOwnDomainResource() model.Resource {
 	oResource := model.Resource{}
 	var vpcs []metadbmodel.VPC
-	err := c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vpcs).Error
+	err := c.db.DB.Where(map[string]interface{}{"domain": c.basicInfo.Lcuuid}).Find(&vpcs).Error
 	if err != nil {
 		log.Errorf("get own domain resource vpc failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
@@ -191,42 +191,42 @@ func (c *Cloud) getOwnDomainResource() model.Resource {
 	}
 
 	var vms []metadbmodel.VM
-	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&vms).Error
+	err = c.db.DB.Where(map[string]interface{}{"domain": c.basicInfo.Lcuuid}).Find(&vms).Error
 	if err != nil {
 		log.Errorf("get own domain resource vm failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var vinterfaces []metadbmodel.VInterface
-	err = c.db.DB.Select("id", "lcuuid", "iftype", "mac", "devicetype", "deviceid", "region").Where("domain = ?", c.basicInfo.Lcuuid).Find(&vinterfaces).Error
+	err = c.db.DB.Select("id", "lcuuid", "iftype", "mac", "devicetype", "deviceid", "region").Where(map[string]interface{}{"domain": c.basicInfo.Lcuuid}).Find(&vinterfaces).Error
 	if err != nil {
 		log.Errorf("get own domain resource vinterface failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var wanIPs []metadbmodel.WANIP
-	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&wanIPs).Error
+	err = c.db.DB.Where(map[string]interface{}{"domain": c.basicInfo.Lcuuid}).Find(&wanIPs).Error
 	if err != nil {
 		log.Errorf("get own domain resource wan ip failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var lanIPs []metadbmodel.LANIP
-	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&lanIPs).Error
+	err = c.db.DB.Where(map[string]interface{}{"domain": c.basicInfo.Lcuuid}).Find(&lanIPs).Error
 	if err != nil {
 		log.Errorf("get own domain resource lan ip failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var networks []metadbmodel.Network
-	err = c.db.DB.Where("domain = ? AND sub_domain = ''", c.basicInfo.Lcuuid).Find(&networks).Error
+	err = c.db.DB.Where(map[string]interface{}{"domain": c.basicInfo.Lcuuid, "sub_domain": ""}).Find(&networks).Error
 	if err != nil {
 		log.Errorf("get own domain resource network failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
 	}
 
 	var subnets []metadbmodel.Subnet
-	err = c.db.DB.Where("domain = ?", c.basicInfo.Lcuuid).Find(&subnets).Error
+	err = c.db.DB.Where(map[string]interface{}{"domain": c.basicInfo.Lcuuid}).Find(&subnets).Error
 	if err != nil {
 		log.Errorf("get own domain resource subnet failed: (%s)", err.Error(), logger.NewORGPrefix(c.orgID))
 		return oResource
@@ -609,6 +609,7 @@ func (c *Cloud) getSubDomainPodGroups(
 			Spec:               podGroup.Spec,
 			SpecHash:           podGroup.SpecHash,
 			Label:              podGroup.Label,
+			NetworkMode:        podGroup.NetworkMode,
 			Type:               podGroup.Type,
 			PodNum:             podGroup.PodNum,
 			PodNamespaceLcuuid: podGroup.PodNamespaceLcuuid,
@@ -664,12 +665,16 @@ func (c *Cloud) getSubDomainPodReplicaSets(
 }
 
 func (c *Cloud) getSubDomainPods(
-	subDomainLcuuid string, resource *kubernetes_model.KubernetesGatherResource, nodeLcuuidToAZLcuuid map[string]string,
+	subDomainLcuuid, azLcuuid string, resource *kubernetes_model.KubernetesGatherResource, nodeLcuuidToAZLcuuid map[string]string,
 ) []model.Pod {
 	var retPods []model.Pod
 
 	// 遍历Pods，更新az信息；并添加到Cloud的Resource中
 	for _, pod := range resource.Pods {
+		podAZLcuuid, ok := nodeLcuuidToAZLcuuid[pod.PodNodeLcuuid]
+		if !ok || podAZLcuuid == "" {
+			podAZLcuuid = azLcuuid
+		}
 		retPods = append(retPods, model.Pod{
 			Lcuuid:              pod.Lcuuid,
 			Name:                pod.Name,
@@ -685,7 +690,7 @@ func (c *Cloud) getSubDomainPods(
 			PodNamespaceLcuuid:  pod.PodNamespaceLcuuid,
 			PodClusterLcuuid:    pod.PodClusterLcuuid,
 			VPCLcuuid:           pod.VPCLcuuid,
-			AZLcuuid:            nodeLcuuidToAZLcuuid[pod.PodNodeLcuuid],
+			AZLcuuid:            podAZLcuuid,
 			RegionLcuuid:        pod.RegionLcuuid,
 			SubDomainLcuuid:     subDomainLcuuid,
 		})

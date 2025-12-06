@@ -10,6 +10,8 @@ replace (
 	github.com/deepflowio/deepflow/server/controller/cloud/platform => ./controller/cloud/platform
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand => ./controller/cloud/tencent/expand
 	github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition => ./controller/db/metadb/migrator/edition
+	github.com/deepflowio/deepflow/server/controller/db/metadb/session/edition => ./controller/db/metadb/session/edition
+	github.com/deepflowio/deepflow/server/controller/db/metadb/sqladapter/edition => ./controller/db/metadb/sqladapter/edition
 	github.com/deepflowio/deepflow/server/controller/genesis/store/sync/redis => ./controller/genesis/store/sync/redis
 	github.com/deepflowio/deepflow/server/controller/http/appender => ./controller/http/appender
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense => ./controller/http/service/agentlicense
@@ -55,11 +57,13 @@ require (
 	github.com/cornelk/hashmap v1.0.8
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowio/deepflow/message v0.0.0-20240924113131-ec9660ac2e46
+	github.com/deepflowio/deepflow/message v0.0.0-20251106062554-cd61c2b9c965
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
-	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-20220727111425-3ab2abb8d80b
 	github.com/deepflowio/deepflow/server/controller/cloud/tencent/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/metadb/migrator/edition v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/db/metadb/session/edition v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/db/metadb/sqladapter/edition v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/genesis/store/sync/redis v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense v0.0.0-00010101000000-000000000000
@@ -84,10 +88,11 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.4
-	github.com/golang/snappy v0.0.4
+	github.com/golang/snappy v1.0.0
 	github.com/google/gopacket v1.1.19
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/schema v1.4.1
 	github.com/grafana/pyroscope-go v1.2.0
 	github.com/influxdata/influxdb v1.9.7
 	github.com/jarcoal/httpmock v1.3.1
@@ -120,7 +125,7 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.11.0
 	github.com/swaggo/files v1.0.1
-	github.com/swaggo/gin-swagger v1.6.0
+	github.com/swaggo/gin-swagger v1.6.1
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.726
 	github.com/textnode/fencer v0.0.0-20121219195347-6baed0e5ef9a
 	github.com/vishvananda/netlink v1.1.0
@@ -135,6 +140,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.34.0
 	go.opentelemetry.io/otel/trace v1.34.0
 	go.opentelemetry.io/proto/otlp v1.1.0
+	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	golang.org/x/net v0.43.0
 	golang.org/x/sync v0.16.0
 	golang.org/x/sys v0.35.0
@@ -145,14 +151,21 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.3.4
 	gorm.io/driver/postgres v1.5.11
-	gorm.io/driver/sqlite v1.3.4
-	gorm.io/gorm v1.25.10
+	gorm.io/driver/sqlite v1.6.0
+	gorm.io/gorm v1.31.0
 	inet.af/netaddr v0.0.0-20211027220019-c74959edd3b6
 	k8s.io/api v0.33.2
 	k8s.io/apimachinery v0.33.2
 	k8s.io/client-go v0.33.2
 	sigs.k8s.io/yaml v1.4.0
 	skywalking.apache.org/repo/goapi v0.0.0-20230712035303-201c1fb2d6ec
+)
+
+require (
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
+	github.com/golang/glog v1.2.5 // indirect
+	github.com/google/gnostic-models v0.6.9 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 )
 
 require (
@@ -210,10 +223,6 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.19.0 // indirect
-	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
-	github.com/golang/glog v1.2.5 // indirect
-	github.com/google/gnostic-models v0.6.9 // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20190812055157-5d271430af9f // indirect
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.8 // indirect
 	github.com/grafana/regexp v0.0.0-20220304095617-2e8d9baf4ac2 // indirect
@@ -249,7 +258,7 @@ require (
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-sqlite3 v1.14.12 // indirect
+	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
@@ -276,7 +285,7 @@ require (
 	github.com/smartystreets/assertions v1.2.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/swaggo/swag v1.8.12 // indirect
+	github.com/swaggo/swag v1.16.4 // indirect
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
@@ -298,7 +307,6 @@ require (
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20231121144256-b99613f794b6 // indirect
 	golang.org/x/arch v0.20.0 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
-	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/mod v0.26.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/term v0.34.0 // indirect

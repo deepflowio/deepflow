@@ -90,6 +90,7 @@ struct socket_bpf_data {
 	uint32_t cap_len;	// 返回的cap_data长度
 	uint64_t cap_seq;	// cap_data在Socket中的相对顺序号，从启动时的时钟开始自增1，用于数据乱序排序
 	uint8_t socket_role;	// this message is created by: 0:unkonwn 1:client(connect) 2:server(accept)
+	uint32_t fd;		// File descriptor for an open file or socket.
 	char *cap_data;		// 返回的应用数据
 };
 
@@ -201,6 +202,31 @@ struct bpf_offset_param_array {
 };
 
 struct bpf_socktrace_params {
+	/*
+	 * Socket Information
+	 * For detailed field descriptions, see the comments
+	 * in 'struct socket_info_s'.
+	 */ 
+	uint64_t socket_id;
+	uint64_t seq;
+	uint16_t l7_proto;
+	uint8_t data_source;
+	uint8_t direction;
+	uint8_t pre_direction;
+	bool is_tls;
+	uint32_t peer_fd;
+	uint8_t prev_data_len;
+	bool allow_reassembly;
+	bool finish_reasm;
+	bool force_reasm;
+	bool no_trace;
+	uint32_t reasm_bytes;
+	uint32_t update_time;
+
+	/*
+	 * Additional (monitoring) information for the socket
+	 * trace function module.
+	 */ 
 	uint8_t tracer_state;
 	uint32_t kern_socket_map_max;
 	uint32_t kern_socket_map_used;
@@ -262,12 +288,12 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "SofaRPC";
 	case PROTO_SOME_IP:
 		return "Some/IP";
+	case PROTO_ISO8583:
+		return "ISO-8583";
 	case PROTO_POSTGRESQL:
 		return "PgSQL";
 	case PROTO_ORACLE:
 		return "Oracle";
-	case PROTO_ISO8583:
-		return "ISO-8583";
 	case PROTO_FASTCGI:
 		return "FastCGI";
 	case PROTO_BRPC:

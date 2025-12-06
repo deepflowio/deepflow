@@ -109,7 +109,7 @@ var hostUniversalTags = []string{
 // convert promql aggregation functions to querier functions
 var aggFunctions = map[string]string{
 	"sum":          view.FUNCTION_SUM,
-	"avg":          view.FUNCTION_AVG,
+	"avg":          view.FUNCTION_AAVG,
 	"count":        view.FUNCTION_COUNT,
 	"min":          view.FUNCTION_MIN,
 	"max":          view.FUNCTION_MAX,
@@ -216,7 +216,7 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 
 			// aggregation for metrics, assert aggOperator is not empty
 			switch aggOperator {
-			case view.FUNCTION_SUM, view.FUNCTION_AVG, view.FUNCTION_MIN, view.FUNCTION_MAX, view.FUNCTION_STDDEV:
+			case view.FUNCTION_SUM, view.FUNCTION_AAVG, view.FUNCTION_AVG, view.FUNCTION_MIN, view.FUNCTION_MAX, view.FUNCTION_STDDEV:
 				metricWithAggFunc = fmt.Sprintf("%s(`%s`)", aggOperator, metricName)
 			case "1":
 				// group

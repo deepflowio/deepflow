@@ -51,7 +51,7 @@ use tokio::{
     time::{self, Interval},
 };
 
-use super::{Session, RPC_RETRY_INTERVAL};
+use super::{Session, RPC_RECONNECT_INTERVAL, RPC_RETRY_INTERVAL};
 use crate::{exception::ExceptionHandler, trident::AgentId};
 
 use public::{
@@ -282,16 +282,19 @@ impl Interior {
                     Ok(Some(message)) => message,
                     Ok(None) => {
                         debug!("server closed stream");
+                        tokio::time::sleep(RPC_RECONNECT_INTERVAL).await;
                         break;
                     }
                     Err(e) => {
                         warn!("receiving server remote_execute rpc has error: {:?}", e);
                         self.exc.set(pb::Exception::ControllerSocketError);
+                        tokio::time::sleep(RPC_RECONNECT_INTERVAL).await;
                         break;
                     }
                 };
                 if session_version != self.session.get_version() {
                     info!("grpc server or config changed");
+                    tokio::time::sleep(RPC_RECONNECT_INTERVAL).await;
                     break;
                 }
                 if message.exec_type.is_none() {
@@ -309,6 +312,7 @@ impl Interior {
                 }
                 if sender.send(message).await.is_err() {
                     debug!("responser channel closed");
+                    tokio::time::sleep(RPC_RECONNECT_INTERVAL).await;
                     break;
                 }
             }

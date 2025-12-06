@@ -64,7 +64,7 @@ var INT_ENUM_TAG = []string{
 	"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol",
 	"protocol", "response_status", "server_port", "status", "capture_nic_type", "tunnel_tier",
 	"tunnel_type", "instance_type", "nat_source", "role", "event_level", "policy_level",
-	"policy_app_type", "is_tls", "severity_number", "file_type",
+	"policy_app_type", "is_tls", "is_async", "severity_number", "file_type",
 }
 var INT_ENUM_PEER_TAG = []string{"tcp_flags_bit", "auto_instance_type", "auto_service_type"}
 var STRING_ENUM_TAG = []string{"observation_point", "event_type", "profile_language_type"}
@@ -832,8 +832,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// 单个外部字段-ext_metrics
 	tagResourceMap["tag."] = map[string]*Tag{
 		"default": NewTag(
-			"tag_values[indexOf(tag_names,'%s')]",
-			"tag_values[indexOf(tag_names,'%s')] != ''",
+			// null indicates the absence of this key
+			"if(indexOf(tag_names,'%s') != 0,tag_values[indexOf(tag_names,'%s')], NULL)",
+			"indexOf(tag_names,'%s') != 0",
 			"tag_values[indexOf(tag_names,'%s')] %s %v",
 			"%s(tag_values[indexOf(tag_names,'%s')],%v)",
 			"",
@@ -842,8 +843,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// 单个外部字段-l7_flow_log
 	tagResourceMap["attribute."] = map[string]*Tag{
 		"default": NewTag(
-			"attribute_values[indexOf(attribute_names,'%s')]",
-			"attribute_values[indexOf(attribute_names,'%s')] != ''",
+			// null indicates the absence of this key
+			"if(indexOf(attribute_names,'%s') != 0, attribute_values[indexOf(attribute_names,'%s')], NULL)",
+			"indexOf(attribute_names,'%s') != 0",
 			"attribute_values[indexOf(attribute_names,'%s')] %s %v",
 			"%s(attribute_values[indexOf(attribute_names,'%s')],%v)",
 			"",
@@ -1368,7 +1370,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 			"trace_id %s %s OR "+chCommon.TRACE_ID_2_TAG+" %s %s",
 			"",
-			"",
+			"trace_ids",
 		),
 	}
 	// X_Request_ID

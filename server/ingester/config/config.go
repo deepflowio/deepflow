@@ -527,7 +527,7 @@ func Load(path string) *Config {
 						0,
 					},
 				},
-				[]DatabaseTable{{"flow_log", ""}, {"flow_metrics", "1s_local"}, {"profile", ""}, {"application_log", ""}},
+				[]DatabaseTable{{"flow_log", ""}, {"flow_metrics", "1s_local"}, {"profile", ""}, {"application_log", ""}, {"event", "file_event_local"}},
 			},
 			ListenPort:               DefaultListenPort,
 			GrpcBufferSize:           DefaultGrpcBufferSize,

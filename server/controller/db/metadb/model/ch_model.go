@@ -382,7 +382,7 @@ type ChIntEnum struct {
 }
 
 type ChNodeType struct {
-	ResourceType int       `gorm:"primaryKey;column:resource_type;type:int;not null" json:"RESOURCE_TYPE"`
+	ResourceType *int      `gorm:"primaryKey;column:resource_type;type:int;not null" json:"RESOURCE_TYPE"`
 	NodeType     string    `gorm:"column:node_type;type:varchar(256);default:null" json:"NODE_TYPE"`
 	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
@@ -654,7 +654,26 @@ type ChUser struct {
 	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
 }
 
-type ChTagLastUpdatedAt struct {
-	TableName string    `gorm:"primaryKey;column:table_name;type:varchar(64);not null" json:"NAME"`
+type ChCustomBizService struct {
+	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name      string    `gorm:"column:name;type:varchar(256)" json:"NAME"`
+	IconID    int       `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	UID       string    `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	TeamID    int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+}
+
+func (ChCustomBizService) TableName() string {
+	return "ch_custom_biz_service"
+}
+
+type ChCustomBizServiceFilter struct {
+	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	ClientFilter string    `gorm:"column:client_filter;type:text" json:"CLIENT_FILTER"`
+	ServerFilter string    `gorm:"column:server_filter;type:text" json:"SERVER_FILTER"`
+	UpdatedAt    time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`
+}
+
+func (ChCustomBizServiceFilter) TableName() string {
+	return "ch_custom_biz_service_filter"
 }

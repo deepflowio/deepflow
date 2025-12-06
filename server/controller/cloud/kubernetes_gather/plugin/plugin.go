@@ -39,6 +39,10 @@ func GeneratePodGroup(orgID int, db *gorm.DB, metaData *simplejson.Json) (string
 		return "", "", err
 	}
 
+	if len(plugins) == 0 {
+		return "", "", nil
+	}
+
 	// TODO: convert to lua script
 	podGroupType, podGroupName := customSCIPodGroup(orgID, metaData)
 	if podGroupType != "" && podGroupName != "" {
@@ -83,7 +87,9 @@ func GeneratePodGroup(orgID int, db *gorm.DB, metaData *simplejson.Json) (string
 }
 
 func customSCIPodGroup(orgID int, metaData *simplejson.Json) (string, string) {
-	providerType := metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString()
+	providerType := strings.ToLower(
+		metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString(),
+	)
 	if providerType != "serverless" && providerType != "proprietary" {
 		log.Debugf("abstract type (%s) not support", providerType, logger.NewORGPrefix(orgID))
 		return "", ""

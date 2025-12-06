@@ -688,6 +688,42 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 	struct bpf_offset_param_array *array = &params->offset_array;
 	array->count = sys_cpus_count;
 
+	// Fetch socket Information from eBPF map
+	struct ebpf_map *map =
+	    ebpf_obj__get_map_by_name(t->obj, MAP_SOCKET_INFO_NAME);
+	if (map == NULL) {
+		ebpf_warning("[%s] map(name:%s) is NULL.\n", __func__,
+			     MAP_SOCKET_INFO_NAME);
+	}
+	int map_fd = map->fd;
+	struct socktrace_msg *msg = (struct socktrace_msg *)conf;
+	if (size != sizeof(*msg)) {
+		ebpf_warning("The parameter 'socktrace_msg' is passed"
+			     "incorrectly with a size mismatch. The passed"
+			     " size is %d, while the actual structure length"
+			     " is %d.\n", size, sizeof(*msg));
+		return -1;
+	}
+	uint64_t conn_key = (uint64_t)msg->pid << 32 | msg->fd;
+	struct socket_info_s info;
+	if (bpf_lookup_elem(map_fd, &conn_key, &info) == 0) {
+		params->socket_id = info.uid;
+		params->seq = info.seq;
+		params->l7_proto = info.l7_proto;
+		params->data_source = info.data_source;
+		params->direction = info.direction;
+		params->pre_direction = info.pre_direction;
+		params->is_tls = info.is_tls;
+		params->peer_fd = info.peer_fd;
+		params->prev_data_len = info.prev_data_len;
+		params->allow_reassembly = info.allow_reassembly;
+		params->finish_reasm = info.finish_reasm;
+		params->force_reasm = info.force_reasm;
+		params->no_trace = info.no_trace;
+		params->reasm_bytes = info.reasm_bytes;
+		params->update_time = info.update_time;
+	}
+
 	params->kern_socket_map_max = conf_max_socket_entries;
 	params->kern_trace_map_max = conf_max_trace_entries;
 	params->tracer_state = t->state;
@@ -1188,6 +1224,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 
 		submit_data->timestamp = sd->timestamp;
 		submit_data->direction = sd->direction;
+		submit_data->fd = sd->fd;
 		submit_data->source = sd->source;
 		submit_data->cap_data =
 		    (char *)((void **)&submit_data->cap_data + 1);
@@ -2212,8 +2249,8 @@ static inline int __set_data_limit_max(int limit_size)
 
 /**
  * Set maximum amount of data passed to the agent by eBPF programe.
- * @limit_size : The maximum length of data. If @limit_size exceeds 8192,
- *               it will automatically adjust to 8192 bytes.
+ * @limit_size : The maximum length of data. If @limit_size exceeds 16384,
+ *               it will automatically adjust to 16384 bytes.
  *               If limit_size is 0, Use the default values 4096.
  *
  * @return the set maximum buffer size value on success, < 0 on failure.
@@ -3617,7 +3654,7 @@ static int __unused get_fd_path(pid_t pid, u32 fd, char *buf, size_t bufsize)
 
 #define DATADUMP_FORMAT							\
 	"%s [datadump] SEQ %" PRIu64 " <%s> DIR %s TYPE %s(%d) PID %u "	\
-	"THREAD_ID %u COROUTINE_ID %" PRIu64 " ROLE %s"			\
+	"THREAD_ID %u COROUTINE_ID %" PRIu64 " FD %d ROLE %s"		\
 	" CONTAINER_ID %s SOURCE %d COMM %s "				\
 	"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64		\
 	" " "TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64			\
@@ -3675,7 +3712,7 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 		     sd->source == DATA_SOURCE_DPDK ? "Pkt" : proto_tag,
 		     sd->direction == T_EGRESS ? "out" : "in", type,
 		     sd->msg_type, sd->process_id, sd->thread_id,
-		     sd->coroutine_id, role_str,
+		     sd->coroutine_id, sd->fd, role_str,
 		     strlen((char *)sd->container_id) ==
 		     0 ? "null" : (char *)sd->container_id, sd->source,
 		     sd->process_kname, flow_str, sd->cap_len,

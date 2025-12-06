@@ -39,7 +39,7 @@ deepflow-agent 使用 cgroups 来限制自身的 CPU 用量，
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -63,7 +63,12 @@ global:
 
 **详细描述**:
 
-deepflow-agent 使用 cgroups 限制自身的 memory 用量.
+deepflow-agent 使用 cgroups 限制自身的 memory 用量。
+
+注意：
+- 专属采集器内存不受限制
+- 容器采集器内存限制由容器管理工具来实现
+- 同集群的容器采集器内存限制需要一致
 
 ### 日志每小时回传上限 {#global.limits.max_log_backhaul_rate}
 
@@ -889,6 +894,8 @@ global:
 **详细描述**:
 
 deepflow-agent 是否向 deepflow-server 做 NTP 同步的开关。
+
+注意：开启 NTP 前控制器需要先开启 NTP 服务，直到完成同步时间后采集器才会继续运行。
 
 ### 最大时钟偏差 {#global.ntp.max_drift}
 
@@ -3714,13 +3721,18 @@ inputs:
 是否启用使用 openssl 库的进程以支持 HTTPS 协议数据采集。
 
 可通过以下方式判断应用进程是否能够使用 `Uprobe hook openssl 库`来采集加密数据：
-- 执行命令`cat /proc/<PID>/maps | grep "libssl.so"`，若包含 openssl 相关信息
+- 执行命令`sudo cat /proc/<PID>/maps | grep "libssl.so"`，若包含 openssl 相关信息
   则说明该进程正在使用 openssl 库。
+- 如果上面没有搜到 "libssl.so" 也可能是静态编译了，这时候我们可以通过下面方式确认：
+  执行命令 `sudo nm /proc/<PID>/exe | grep SSL_write` 若包含 `SSL_write` 相关信息如：`0000000000502ac0 T SSL_write`
+  则说明该进程正在使用静态编译的 openssl 库。
 
 启用后，deepflow-agent 将获取符合正则表达式匹配的进程信息，并 Hook openssl 库的相应加解密接口。
 在日志中您会看到类似如下信息：
 ```
 [eBPF] INFO openssl uprobe, pid:1005, path:/proc/1005/root/usr/lib64/libssl.so.1.0.2k
+或者
+[eBPF] INFO openssl uprobe, pid:28890, path:/proc/28890/root/usr/sbin/nginx
 ```
 
 注意：开启此功能后，Envoy mTLS 流量可自动完成追踪；
@@ -4218,7 +4230,7 @@ inputs:
 **详细描述**:
 
 配置后 deepflow-agent 将对指定应用协议的处理增加乱序重排过程。注意：（1）开启特性将消耗更多的内存，因此
-需关注 agent 内存用量；（2）如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+需关注 agent 内存用量；（2）配置`HTTP2`或`gRPC`会全部开启这两个协议
 
 ##### 分段重组（SR）协议列表 {#inputs.ebpf.socket.preprocess.segmentation_reassembly_protocols}
 
@@ -4260,7 +4272,7 @@ inputs:
 注意：
 1. 该特性的生效的前提条件是`out_of_order_reassembly_protocols`开启并生效；
    - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
-2. 如需对`gRPC`协议乱序重排，请配置`HTTP2`协议。
+2. 配置`HTTP2`或`gRPC`会全部开启这两个协议
 
 ### File {#inputs.ebpf.file}
 
@@ -6247,7 +6259,10 @@ transforms:
     - host_metrics
     source: |
       .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
-      .tags.host = "${K8S_NODE_NAME_FOR_DEEPFLOW}"
+      host_name, _ = get_env_var("K8S_NODE_NAME_FOR_DEEPFLOW")
+      if !is_empty(host_name) {
+        .tags.host = host_name
+      }
       metrics_map = {
         "boot_time": "boot_time_seconds",
         "memory_active_bytes": "memory_Active_bytes",
@@ -7060,6 +7075,98 @@ processors:
 deepflow-agent 会周期性标记每一个<vpc, ip, protocol, port>四元组承载的应用协议类型，以加速
 后续数据的应用协议采集过程。为避免误判，应用协议类型的标记结果会周期性更新。该参数控制应用协议的更
 新周期。
+
+#### 推理白名单 {#processors.request_log.application_protocol_inference.inference_whitelist}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.inference_whitelist`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      inference_whitelist:
+      - port_list:
+        - 15001
+        - 15006
+        process_name: envoy
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+应用协议端口白名单列表，目前仅支持 eBPF 流量。当 eBPF 数据在白名单列表中时，不会再使用应用表查询应用协议，
+对应的应用协议通过轮训目前所有支持的协议来获取，白名单数据过多会降低 eBPF 数据的处理性能。
+
+配置键：
+- process_name: 进程名称，不支持正则表达式
+- port_list: 端口白名单列表
+
+##### 进程名称 {#processors.request_log.application_protocol_inference.inference_whitelist.process_name}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.inference_whitelist.process_name`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      inference_whitelist:
+      - process_name: ''
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+进程名称
+
+##### 端口列表 {#processors.request_log.application_protocol_inference.inference_whitelist.port_list}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.inference_whitelist.port_list`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      inference_whitelist:
+      - port_list: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**详细描述**:
+
+端口列表
 
 #### 启用协议列表 {#processors.request_log.application_protocol_inference.enabled_protocols}
 
@@ -8177,6 +8284,34 @@ processors:
 特征字段，中间用`,`分隔。
 如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
 
+##### Copy APM TraceID {#processors.request_log.tag_extraction.tracing_tag.copy_apm_trace_id}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`processors.request_log.tag_extraction.tracing_tag.copy_apm_trace_id`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    tag_extraction:
+      tracing_tag:
+        copy_apm_trace_id: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+设置为 true 时，将会抄写 APM TraceID 至 attribute.apm_trace_id 字段中。
+
 ##### APM SpanID {#processors.request_log.tag_extraction.tracing_tag.apm_span_id}
 
 **标签**:
@@ -8469,7 +8604,7 @@ processors:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 <mark>ee_feature</mark>
 
 **FQCN**:
@@ -8497,7 +8632,9 @@ processors:
 - policy_name: "my_policy" # 策略名称
   protocol_name: HTTP # 协议名称，如要解析 Grpc 请配置为 HTTP2，可选值： HTTP/HTTP2/Dubbo/SofaRPC/Custom/...
   custom_protocol_name: "my_protocol"  # 当 protocol_name 为 Custom 时生效，注意：此时必须存在一个 `processors.request_log.application_protocol_inference.custom_protocols` 配置，且自定义名称协议名称相等，否则无法解析
-  port_list: 1-65535
+  filters:
+    port_list: 1-65535 # 可以用于过滤端口
+    feature_string: "" # 可以用于提取前匹配 Payload
   fields:
   - field_name: "my_field" # 配置的字段
     field_match_type: "string" # 可选值："string"
@@ -8508,7 +8645,7 @@ processors:
     separator_between_subfield_kv_pair: "," # 用于分割 key-value 键值对的分隔符，默认值：空
     separator_between_subfield_key_and_value: "=" # 用于分割 key 和 value 的分隔符，默认值：空
 
-    field_type: "http_url_field" # 字段的提取类型，可选值：http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value，默认值为 `header_field`，含义见下方说明
+    field_type: "http_url_field" # 字段的提取类型，可选值：http_url_field/header_field/payload_json_value/payload_xml_value/payload_hessian2_value/sql_insertion_column，默认值为 `header_field`，含义见下方说明
     traffic_direction: request # 可以限定仅在请求（或仅在响应）中搜索，默认值为 both，可选值：request/response/both
     check_value_charset: false # 可用于检查提取结果是否合法
     value_primary_charset: ["digits", "alphabets", "chinese"] # 提取结果校验字符集，可选值：digits/alphabets/chinese
@@ -8525,6 +8662,7 @@ processors:
 - `payload_json_value`：从 Json Payload 中提取字段，形如：`"key": 1`,  或者 `"key": "value"`,  或者 `"key": None`, 等等 ...
 - `payload_xml_value`：从 XML Payload 中提取字段，形如：`<key attr="xxx">value</key>`
 - `payload_hessian2_value`：Payload 使用 Hessian2 编码，从中提取字段
+- `sql_insertion_column`：从 SQL 插入列中提取字段，例如：`INSERT INTO table (column1, column2) VALUES (value1, value2)`。目前只支持 MySQL 协议，且只能提取插入的第一列内容。
 
 #### 脱敏协议列表 {#processors.request_log.tag_extraction.obfuscate_protocols}
 
@@ -9242,10 +9380,36 @@ processors:
 
 **详细描述**:
 
-FlowMap 中存储的最大并发 Flow 数量。该配置同时影响 RRT 缓存容量。
-例如：`rrt-cache-capacity` = `flow-count-limit`。当 `rrt-cache-capacity` 不足时，
-将无法计算 L7 的 RRT。当 `inputs.cbpf.common.capture_mode` 为 `物理网络镜像` 并且该配置值小于等于 65535 时，
-将会被强制设置为 u32::MAX。
+FlowMap 中存储的最大并发 Flow 数量。当 `inputs.cbpf.common.capture_mode` 为 `物理网络镜像` 并且该配置值小于等
+于 65535 时，将会被强制设置为 u32::MAX。
+
+#### RRT 缓存容量 {#processors.flow_log.tunning.rrt_cache_capacity}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.flow_log.tunning.rrt_cache_capacity`
+
+**默认值**:
+```yaml
+processors:
+  flow_log:
+    tunning:
+      rrt_cache_capacity: 16000
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1024, 64000000] |
+
+**详细描述**:
+
+FlowMap 中 RRT Cache 表的容量。该表用于计算 RRT 延迟指标，过大会导致采集器内存占用高，过小会导致RRT指标缺失。
 
 #### 内存池大小 {#processors.flow_log.tunning.memory_pool_size}
 

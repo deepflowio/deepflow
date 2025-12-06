@@ -146,6 +146,39 @@ func createTopKColumn(functionAs, prefix string, elementIndex, argsLength int) (
 	return columnValue, columnAlias, nil
 }
 
+func ReplaceCustomBizServiceFilter(sql, orgID string) (string, error) {
+	//typePattern := `auto_service_type(_\d+)?\s*=\s*105\b`
+	typePattern := `(` + "`" + `?auto_service_type(_\d+)?` + "`" + `?)\s*=\s*105\b`
+	typeRegex := regexp.MustCompile(typePattern)
+	typeMatches := typeRegex.FindAllStringSubmatch(sql, -1)
+	suffixes := []string{}
+	if len(typeMatches) != 0 {
+		for _, match := range typeMatches {
+			suffix := match[2]
+			suffixes = append(suffixes, suffix)
+			sql = strings.ReplaceAll(sql, match[0], "1=1")
+		}
+
+		idPattern := `auto_service_id(_\d+)?\s*=\s*(\d+)`
+		idRegex := regexp.MustCompile(idPattern)
+		idMatches := idRegex.FindAllStringSubmatch(sql, -1)
+		for _, match := range idMatches {
+			suffix := match[1]
+			if slices.Contains(suffixes, suffix) {
+				transFilter, err := TransCustomBizFilter(match[0], orgID, match[2])
+				if err != nil {
+					return sql, err
+				}
+				if transFilter == "" {
+					transFilter = "1!=1"
+				}
+				sql = strings.ReplaceAll(sql, match[0], fmt.Sprintf("(%s)", transFilter))
+			}
+		}
+	}
+	return sql, nil
+}
+
 func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
 	// 解析show开头的sql
 	// show metrics/tags from <table_name> 例：show metrics/tags from l4_flow_log
@@ -160,6 +193,17 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	}
 	query_uuid := args.QueryUUID // FIXME: should be queryUUID
 	debug_info := &client.DebugInfo{}
+	// replace custom_biz_filter
+	fromMatch := fromRegexp.FindStringSubmatch(sql)
+	if len(fromMatch) > 1 {
+		table := fromMatch[1]
+		if table != "alert_event" {
+			sql, err = ReplaceCustomBizServiceFilter(sql, e.ORGID)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	}
 	// Parse withSql
 	withResult, withDebug, err := e.QueryWithSql(sql, args)
 	if err != nil {
@@ -199,7 +243,8 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			return result, debug_info.Get(), nil
 		}
 		e.DB = "flow_tag"
-	} else { // Normal query, added to sqllist
+	} else {
+		// Normal query, added to sqllist
 		sqlList = append(sqlList, sql)
 	}
 	results := &common.Result{}

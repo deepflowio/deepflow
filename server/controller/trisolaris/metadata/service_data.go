@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -35,8 +36,12 @@ type ServiceRawData struct {
 	podServiceIDToPodServicePorts map[int][]*models.PodServicePort
 	podGroupIDToPodGroupPorts     map[int][]*models.PodGroupPort
 	podGroupIDToPodServiceID      map[int]int
+	podGroupIDToVPCID             map[int]int
+	podGroupIDToNodeIPs           map[int][]string
+	podServicePortToPodServiceIDs map[int][]int
 	lbIDToVPCID                   map[int]int
 	customServiceIDToIPPorts      map[int]mapset.Set[customServiceIPPortKey]
+	customServiceIDToResourceIDs  map[int][]uint32
 }
 
 type customServiceIPPortKey struct {
@@ -62,8 +67,12 @@ func newServiceRawData() *ServiceRawData {
 		podServiceIDToPodServicePorts: make(map[int][]*models.PodServicePort),
 		podGroupIDToPodGroupPorts:     make(map[int][]*models.PodGroupPort),
 		podGroupIDToPodServiceID:      make(map[int]int),
+		podGroupIDToVPCID:             make(map[int]int),
+		podGroupIDToNodeIPs:           make(map[int][]string),
+		podServicePortToPodServiceIDs: make(map[int][]int),
 		lbIDToVPCID:                   make(map[int]int),
 		customServiceIDToIPPorts:      make(map[int]mapset.Set[customServiceIPPortKey]),
+		customServiceIDToResourceIDs:  make(map[int][]uint32),
 	}
 }
 
@@ -85,12 +94,47 @@ func newServiceDataOP(metaData *MetaData) *ServiceDataOP {
 
 func (r *ServiceRawData) ConvertDBData(md *MetaData) {
 	dbDataCache := md.GetDBDataCache()
+
+	// generate pod group to node ip relation
+	podNodeIDToIP := make(map[int]string)
+	podNodeIDToVPCID := make(map[int]int)
+	for _, podNode := range dbDataCache.GetPodNodes() {
+		podNodeIDToIP[podNode.ID] = podNode.IP
+		podNodeIDToVPCID[podNode.ID] = podNode.VPCID
+	}
+	for _, pod := range dbDataCache.GetPods() {
+		// get pod_node IP
+		podNodeIP, ok := podNodeIDToIP[pod.PodNodeID]
+		if !ok {
+			continue
+		}
+		// get pod_node VPCID
+		vpcID, ok := podNodeIDToVPCID[pod.PodNodeID]
+		if !ok {
+			continue
+		}
+		r.podGroupIDToVPCID[pod.PodGroupID] = vpcID
+		r.podGroupIDToNodeIPs[pod.PodGroupID] = append(
+			r.podGroupIDToNodeIPs[pod.PodGroupID], podNodeIP,
+		)
+	}
+
 	for _, psp := range dbDataCache.GetPodServicePorts() {
 		if _, ok := r.podServiceIDToPodServicePorts[psp.PodServiceID]; ok {
 			r.podServiceIDToPodServicePorts[psp.PodServiceID] = append(
 				r.podServiceIDToPodServicePorts[psp.PodServiceID], psp)
 		} else {
 			r.podServiceIDToPodServicePorts[psp.PodServiceID] = []*models.PodServicePort{psp}
+		}
+
+		if serviceIDs, ok := r.podServicePortToPodServiceIDs[psp.NodePort]; ok {
+			if slices.Contains(serviceIDs, psp.PodServiceID) {
+				continue
+			}
+			r.podServicePortToPodServiceIDs[psp.NodePort] = append(
+				r.podServicePortToPodServiceIDs[psp.NodePort], psp.PodServiceID)
+		} else {
+			r.podServicePortToPodServiceIDs[psp.NodePort] = []int{psp.PodServiceID}
 		}
 	}
 	podGroupIDToPodServiceIDs := make(map[int][]int, len(dbDataCache.GetPodGroupPorts()))
@@ -139,25 +183,87 @@ func (r *ServiceRawData) ConvertDBData(md *MetaData) {
 	}
 	r.podGroupIDToPodServiceID = podGroupIDToPodServiceID
 
-	r.customServiceIDToIPPorts = r.mergeCustomServices(md, dbDataCache.GetCustomServices())
+	r.mergeCustomServices(md, dbDataCache)
 }
 
-// VPC 内去重规则：
+// IP/PORT 类型 VPC 内去重规则：
 // 1. 按照 ip-port 元素去重后，ip-port 绑定第一个遍历到的服务
 // 2. 如果存在 ip-port 的 port 为空，则其他 ip-port 都丢弃，只保留这一个值
 // mergeCustomServices merges custom services according to the following rules:
 // 1. Deduplicate by ip-port, binding each ip-port to the first encountered service.
 // 2. If any ip has an empty port, discard all other ports for that ip and keep only the empty-port entry.
-func (r *ServiceRawData) mergeCustomServices(md *MetaData, customServices []*models.CustomService) map[int]mapset.Set[customServiceIPPortKey] {
+func (r *ServiceRawData) mergeCustomServices(md *MetaData, dbDataCache *dbcache.DBDataCache) {
+	vmUIDToID := make(map[string]int)
+	vmNameToID := make(map[string]int)
+	for _, vm := range dbDataCache.GetVms() {
+		vmUIDToID[vm.UID] = vm.ID
+		vmNameToID[vm.Name] = vm.ID
+	}
+	podServiceUIDToID := make(map[string]int)
+	podServiceNameToID := make(map[string]int)
+	for _, podService := range dbDataCache.GetPodServices() {
+		podServiceUIDToID[podService.UID] = podService.ID
+		podServiceNameToID[podService.Name] = podService.ID
+	}
+	podGroupUIDToID := make(map[string]int)
+	podGroupNameToID := make(map[string]int)
+	for _, podGroup := range dbDataCache.GetPodGroups() {
+		podGroupUIDToID[podGroup.UID] = podGroup.ID
+		podGroupNameToID[podGroup.Name] = podGroup.ID
+	}
+
+	customServices := dbDataCache.GetCustomServices()
 	customServiceIDToIPPorts := make(map[int]mapset.Set[customServiceIPPortKey])
+	customServiceIDToResourceIDs := make(map[int][]uint32)
+
 	ipPortKeyToServiceID := make(map[customServiceIPPortKey]int) // 记录每个 ip-port 绑定的服务ID
 	hasEmptyPortForIP := make(map[string]bool)                   // 记录每个 VPC 内的 IP 是否有空端口，key格式为 "vpcID:ip"
 
 	for _, cs := range customServices {
+		resources := strings.Split(cs.Resource, ",")
+		if slices.Contains([]int{CUSTOM_SERVICE_TYPE_CHOST, CUSTOM_SERVICE_TYPE_POD_SERVICE, CUSTOM_SERVICE_TYPE_POD_GROUP}, cs.Type) {
+			resourceIDs := make([]uint32, 0)
+			var resourceIDMap map[string]int
+			switch cs.Type {
+			case CUSTOM_SERVICE_TYPE_CHOST:
+				if cs.MatchType == CUSTOM_SERVICE_MATCH_TYPE_UID {
+					resourceIDMap = vmUIDToID
+				} else {
+					resourceIDMap = vmNameToID
+				}
+			case CUSTOM_SERVICE_TYPE_POD_SERVICE:
+				if cs.MatchType == CUSTOM_SERVICE_MATCH_TYPE_UID {
+					resourceIDMap = podServiceUIDToID
+				} else {
+					resourceIDMap = podServiceNameToID
+				}
+			case CUSTOM_SERVICE_TYPE_POD_GROUP:
+				if cs.MatchType == CUSTOM_SERVICE_MATCH_TYPE_UID {
+					resourceIDMap = podGroupUIDToID
+				} else {
+					resourceIDMap = podGroupNameToID
+				}
+			default:
+				continue
+			}
+			for _, resource := range resources {
+				resource = strings.TrimSpace(resource)
+				if resource == "" {
+					continue
+				}
+				if id, ok := resourceIDMap[resource]; ok {
+					resourceIDs = append(resourceIDs, uint32(id))
+				}
+			}
+			customServiceIDToResourceIDs[cs.ID] = resourceIDs
+
+			continue
+		}
+
 		var ipPorts []customServiceIPPortKey
 
 		if cs.Type == CUSTOM_SERVICE_TYPE_IP {
-			ips := strings.Split(cs.Resource, ",")
+			ips := resources
 			for _, ip := range ips {
 				ip = strings.TrimSpace(ip)
 				if ip == "" {
@@ -168,7 +274,7 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, customServices []*mod
 				ipPorts = append(ipPorts, ipPortKey)
 			}
 		} else {
-			ipPortStrs := strings.Split(cs.Resource, ",")
+			ipPortStrs := resources
 			for _, ipPortStr := range ipPortStrs {
 				ipPortStr = strings.TrimSpace(ipPortStr)
 				if ipPortStr == "" {
@@ -176,14 +282,14 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, customServices []*mod
 				}
 				separatorIndex := strings.LastIndex(ipPortStr, ":")
 				if separatorIndex == -1 {
-					log.Warningf("[ORG-%s] invalid ip port format: %s", md.ORGID, ipPortStr)
+					log.Warningf("[ORG-%v] invalid ip port format: %s", md.ORGID, ipPortStr)
 					continue
 				}
 				ip := ipPortStr[:separatorIndex]
 				portStr := ipPortStr[separatorIndex+1:]
 				port, err := strconv.Atoi(portStr)
 				if err != nil {
-					log.Warningf("[ORG-%s] invalid port format: %s", md.ORGID, portStr)
+					log.Warningf("[ORG-%v] invalid port format: %s", md.ORGID, portStr)
 					continue
 				}
 				ipPorts = append(ipPorts, newCustomServiceIPPortKey(cs.VPCID, ip, uint32(port)))
@@ -222,7 +328,8 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, customServices []*mod
 		customServiceIDToIPPorts[serviceID] = newIPPorts
 	}
 
-	return customServiceIDToIPPorts
+	r.customServiceIDToIPPorts = customServiceIDToIPPorts
+	r.customServiceIDToResourceIDs = customServiceIDToResourceIDs
 }
 
 func (s *ServiceDataOP) updateServiceRawData(serviceRawData *ServiceRawData) {
@@ -334,16 +441,43 @@ func (s *ServiceDataOP) generateService() {
 				keyToPorts[key] = []uint32{uint32(port.Port)}
 			}
 		}
+
 		for index := range groupKeys {
-			if valuse, ok := keyToPorts[groupKeys[index]]; ok {
+			if values, ok := keyToPorts[groupKeys[index]]; ok {
 				service := podGroupToProto(
 					podGroup.ID,
 					groupKeys[index].protocol,
-					valuse,
+					values,
 					trident.ServiceType_POD_SERVICE_POD_GROUP,
 					groupKeys[index].podServiceID,
 				)
 				services = append(services, service)
+			}
+		}
+
+		// if pod_group hostNetwork == true
+		// add ServiceType_POD_SERVICE_IP service(vpc_id + node_ips)
+		if podGroup.NetworkMode == POD_GROUP_HOST_NETWORK {
+			vpcID, ok := rData.podGroupIDToVPCID[podGroup.ID]
+			if !ok {
+				continue
+			}
+			nodeIPs, ok := rData.podGroupIDToNodeIPs[podGroup.ID]
+			if !ok {
+				continue
+			}
+			for index := range groupKeys {
+				if values, ok := keyToPorts[groupKeys[index]]; ok {
+					service := serviceToProto(
+						vpcID,
+						nodeIPs,
+						groupKeys[index].protocol,
+						values,
+						trident.ServiceType_POD_SERVICE_IP,
+						podServiceID,
+					)
+					services = append(services, service)
+				}
 			}
 		}
 	}
@@ -355,7 +489,8 @@ func (s *ServiceDataOP) generateService() {
 		if ok == false {
 			continue
 		}
-		if podService.ServiceClusterIP == "" {
+		// PodNamespaceID = 0 represent manual exposed service
+		if podService.ServiceClusterIP == "" && podService.PodNamespaceID != 0 {
 			log.Debugf(s.Logf("pod service(id=%d) has no service_cluster_ip", podService.ID))
 			continue
 		}
@@ -370,6 +505,14 @@ func (s *ServiceDataOP) generateService() {
 				protocolToPorts[protocol] = []uint32{uint32(podServiceport.Port)}
 			}
 			if podService.Type == POD_SERVICE_TYPE_NODEPORT || podService.Type == POD_SERVICE_TYPE_LOADBALANCER {
+				// PodNamespaceID = 0 represent manual exposed service
+				if podService.PodNamespaceID == 0 {
+					// if port related to multi-service, should use k8S self service id
+					serviceIDs, ok := rData.podServicePortToPodServiceIDs[podServiceport.NodePort]
+					if ok && len(serviceIDs) > 1 {
+						continue
+					}
+				}
 				key := NodeKey{
 					podClusterID: podService.PodClusterID,
 					protocol:     protocol,
@@ -384,18 +527,22 @@ func (s *ServiceDataOP) generateService() {
 			}
 		}
 
-		ips := []string{podService.ServiceClusterIP}
-		for index := range protocols {
-			if ports, ok := protocolToPorts[protocols[index]]; ok {
-				service := serviceToProto(
-					podService.VPCID,
-					ips,
-					protocols[index],
-					ports,
-					trident.ServiceType_POD_SERVICE_IP,
-					podService.ID,
-				)
-				services = append(services, service)
+		// PodNamespaceID = 0 represent manual exposed service
+		// if PodNamespaceID = 0, should not send clusterIP to ingester
+		if podService.PodNamespaceID != 0 {
+			ips := []string{podService.ServiceClusterIP}
+			for index := range protocols {
+				if ports, ok := protocolToPorts[protocols[index]]; ok {
+					service := serviceToProto(
+						podService.VPCID,
+						ips,
+						protocols[index],
+						ports,
+						trident.ServiceType_POD_SERVICE_IP,
+						podService.ID,
+					)
+					services = append(services, service)
+				}
 			}
 		}
 	}
@@ -461,6 +608,26 @@ func (s *ServiceDataOP) mergeCustomServices(dbDataCache *dbcache.DBDataCache) []
 	serviceTypeCustomService := trident.ServiceType_CUSTOM_SERVICE
 
 	for _, customService := range dbDataCache.GetCustomServices() {
+		if slices.Contains([]int{CUSTOM_SERVICE_TYPE_CHOST, CUSTOM_SERVICE_TYPE_POD_SERVICE, CUSTOM_SERVICE_TYPE_POD_GROUP}, customService.Type) {
+
+			service := &trident.ServiceInfo{
+				Type:         &serviceTypeCustomService,
+				Id:           proto.Uint32(uint32(customService.ID)),
+				EpcId:        proto.Uint32(uint32(customService.VPCID)),
+				PodClusterId: proto.Uint32(uint32(customService.PodClusterID)),
+			}
+			switch customService.Type {
+			case CUSTOM_SERVICE_TYPE_CHOST:
+				service.ChostIds = s.serviceRawData.customServiceIDToResourceIDs[customService.ID]
+			case CUSTOM_SERVICE_TYPE_POD_SERVICE:
+				service.PodServiceIds = s.serviceRawData.customServiceIDToResourceIDs[customService.ID]
+			case CUSTOM_SERVICE_TYPE_POD_GROUP:
+				service.PodGroupIds = s.serviceRawData.customServiceIDToResourceIDs[customService.ID]
+			}
+			services = append(services, service)
+			continue
+		}
+
 		ipPorts, ok := s.serviceRawData.customServiceIDToIPPorts[customService.ID]
 		if !ok {
 			continue

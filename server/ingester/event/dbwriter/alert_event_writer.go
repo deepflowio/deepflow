@@ -49,16 +49,19 @@ type AlertEventStore struct {
 	Time uint32
 	_id  uint64
 
-	PolicyId     uint32
-	PolicyType   uint8
-	AlertPolicy  string
-	MetricValue  float64
-	EventLevel   uint8
-	TargetTags   string
-	TagStrKeys   []string
-	TagStrValues []string
-	TagIntKeys   []string
-	TagIntValues []int64
+	PolicyId         uint32
+	PolicyType       uint8
+	AlertPolicy      string
+	MetricValue      float64
+	MetricValueStr   string
+	EventLevel       uint8
+	TargetTags       string
+	TagStrKeys       []string
+	TagStrValues     []string
+	TagIntKeys       []string
+	TagIntValues     []int64
+	TriggerThreshold string
+	MetricUnit       string
 
 	XTargetUid   string
 	XQueryRegion string
@@ -83,6 +86,7 @@ func AlertEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("policy_type", ckdb.UInt8),
 		ckdb.NewColumn("alert_policy", ckdb.LowCardinalityString),
 		ckdb.NewColumn("metric_value", ckdb.Float64),
+		ckdb.NewColumn("metric_value_str", ckdb.String),
 		ckdb.NewColumn("event_level", ckdb.UInt8),
 		ckdb.NewColumn("target_tags", ckdb.String),
 
@@ -90,6 +94,8 @@ func AlertEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("tag_string_values", ckdb.ArrayString),
 		ckdb.NewColumn("tag_int_names", ckdb.ArrayLowCardinalityString),
 		ckdb.NewColumn("tag_int_values", ckdb.ArrayInt64),
+		ckdb.NewColumn("trigger_threshold", ckdb.LowCardinalityString),
+		ckdb.NewColumn("metric_unit", ckdb.LowCardinalityString),
 
 		ckdb.NewColumn("_target_uid", ckdb.String),
 		ckdb.NewColumn("_query_region", ckdb.LowCardinalityString),

@@ -40,7 +40,17 @@ const (
 
 func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable) (*grpc.Info, *grpc.Info) {
 	var info, info1 *grpc.Info
+
 	if t.L3EpcID != datatype.EPC_FROM_INTERNET {
+		// if the local end is a loopback address, use peer Pod for matching
+		if utils.IsLoopback(t.IsIPv4 == 0, t.IP, t.IP6) {
+			// use peer pod information for matching
+			if t.PodID == 0 && t.PodID1 != 0 {
+				t.TagSource |= uint8(flow_metrics.Peer)
+				t.PodID = t.PodID1
+			}
+		}
+
 		// if the GpId exists but the podId does not exist, first obtain the podId through the GprocessId table delivered by the Controller
 		if t.GPID != 0 && t.PodID == 0 {
 			vtapId, podId := platformData.QueryGprocessInfo(t.OrgId, t.GPID)
@@ -86,6 +96,13 @@ func getPlatformInfos(t *flow_metrics.Tag, platformData *grpc.PlatformInfoTable)
 	}
 
 	if t.Code&EdgeCode == EdgeCode && t.L3EpcID1 != datatype.EPC_FROM_INTERNET {
+		if utils.IsLoopback(t.IsIPv4 == 0, t.IP1, t.IP61) {
+			if t.PodID1 == 0 && t.PodID != 0 {
+				t.TagSource1 |= uint8(flow_metrics.Peer)
+				t.PodID1 = t.PodID
+			}
+		}
+
 		if t.GPID1 != 0 && t.PodID1 == 0 {
 			vtapId, podId := platformData.QueryGprocessInfo(t.OrgId, t.GPID1)
 			if podId != 0 && vtapId == t.VTAPID {
@@ -194,7 +211,7 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 		}
 	}
 	t.AutoInstanceID1, t.AutoInstanceType1 = common.GetAutoInstance(t.PodID1, t.GPID1, t.PodNodeID1, t.L3DeviceID1, uint32(t.SubnetID1), uint8(t.L3DeviceType1), t.L3EpcID1)
-	customSeriviceID1 := platformData.QueryCustomService(t.OrgId, t.L3EpcID1, t.IsIPv4 == 0, t.IP1, t.IP61, t.ServerPort)
+	customSeriviceID1 := platformData.QueryCustomService(t.OrgId, t.L3EpcID1, t.IsIPv4 == 0, t.IP1, t.IP61, t.ServerPort, t.ServiceID1, t.PodGroupID1, t.L3DeviceID1, uint8(t.L3DeviceType1))
 	t.AutoServiceID1, t.AutoServiceType1 = common.GetAutoService(customSeriviceID1, t.ServiceID1, t.PodGroupID1, t.GPID1, uint32(t.PodClusterID1), t.L3DeviceID1, uint32(t.SubnetID1), uint8(t.L3DeviceType1), podGroupType1, t.L3EpcID1)
 
 	if info != nil {
@@ -255,7 +272,7 @@ func DocumentExpand(doc app.Document, platformData *grpc.PlatformInfoTable) erro
 	if t.Code&EdgeCode == 0 {
 		serverPort = t.ServerPort
 	}
-	customServiceID := platformData.QueryCustomService(t.OrgId, t.L3EpcID, t.IsIPv4 == 0, t.IP, t.IP6, serverPort)
+	customServiceID := platformData.QueryCustomService(t.OrgId, t.L3EpcID, t.IsIPv4 == 0, t.IP, t.IP6, serverPort, t.ServiceID, t.PodGroupID, t.L3DeviceID, uint8(t.L3DeviceType))
 	t.AutoServiceID, t.AutoServiceType = common.GetAutoService(customServiceID, t.ServiceID, t.PodGroupID, t.GPID, uint32(t.PodClusterID), t.L3DeviceID, uint32(t.SubnetID), uint8(t.L3DeviceType), podGroupType, t.L3EpcID)
 
 	if t.SignalSource == SIGNAL_SOURCE_OTEL {

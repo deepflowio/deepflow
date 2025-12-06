@@ -31,7 +31,7 @@ use crate::{
         flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
-        meta_packet::EbpfFlags,
+        meta_packet::ApplicationFlags,
     },
     config::handler::LogParserConfig,
     flow_generator::{
@@ -326,9 +326,9 @@ impl DnsInfo {
 impl From<DnsInfo> for L7ProtocolSendLog {
     fn from(f: DnsInfo) -> Self {
         let flags = if f.is_tls {
-            EbpfFlags::TLS.bits()
+            ApplicationFlags::TLS.bits()
         } else {
-            EbpfFlags::NONE.bits()
+            ApplicationFlags::NONE.bits()
         };
         let status = f.status();
         let result = f.answers_to_string();

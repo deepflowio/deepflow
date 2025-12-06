@@ -88,16 +88,30 @@ func (v *VTapCheck) Stop() {
 
 func (v *VTapCheck) launchServerCheck(db *metadb.DB) {
 	var vtaps []metadbmodel.VTap
+	var vms []metadbmodel.VM
+	var podNodes []metadbmodel.PodNode
 	var reg = regexp.MustCompile(` |:`)
 
 	log.Debugf("vtap launch_server check start", db.LogPrefixORGID)
 
-	db.Select("type", "lcuuid", "name", "launch_server_id", "region", "type", "launch_server").Find(&vtaps)
+	db.Select("id", "lcuuid", "name", "region", "az").Find(&vms)
+	lcuuidToVM := make(map[string]metadbmodel.VM)
+	for _, vm := range vms {
+		lcuuidToVM[vm.Lcuuid] = vm
+	}
+
+	db.Select("id", "lcuuid", "name", "region", "az").Find(&podNodes)
+	lcuuidToPodNode := make(map[string]metadbmodel.PodNode)
+	for _, podNode := range podNodes {
+		lcuuidToPodNode[podNode.Lcuuid] = podNode
+	}
+
+	db.Select("id", "type", "lcuuid", "name", "launch_server_id", "region", "type", "launch_server").Find(&vtaps)
 	for _, vtap := range vtaps {
 		switch vtap.Type {
 		case common.VTAP_TYPE_WORKLOAD_V:
-			var vm metadbmodel.VM
-			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&vm); ret.Error != nil {
+			vm, ok := lcuuidToVM[vtap.Lcuuid]
+			if !ok {
 				log.Infof("delete vtap: %s %s, because no related vm", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
 				db.Delete(&vtap)
 			} else {
@@ -125,6 +139,14 @@ func (v *VTapCheck) launchServerCheck(db *metadb.DB) {
 						vtap.Lcuuid, vtap.Region, vm.Region, db.LogPrefixORGID,
 					)
 					db.Model(&vtap).Update("region", vm.Region)
+				}
+				// check and update az
+				if vtap.AZ != vm.AZ {
+					log.Infof(
+						"update vtap (%s) az from %s to %s",
+						vtap.Lcuuid, vtap.AZ, vm.AZ, db.LogPrefixORGID,
+					)
+					db.Model(&vtap).Update("az", vm.AZ)
 				}
 			}
 
@@ -159,10 +181,18 @@ func (v *VTapCheck) launchServerCheck(db *metadb.DB) {
 					)
 					db.Model(&vtap).Update("region", host.Region)
 				}
+				// check and update az
+				if vtap.AZ != host.AZ {
+					log.Infof(
+						"update vtap (%s) az from %s to %s",
+						vtap.Lcuuid, vtap.AZ, host.AZ, db.LogPrefixORGID,
+					)
+					db.Model(&vtap).Update("az", host.AZ)
+				}
 			}
 		case common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM:
-			var podNode metadbmodel.PodNode
-			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
+			podNode, ok := lcuuidToPodNode[vtap.Lcuuid]
+			if !ok {
 				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
 				db.Delete(&vtap)
 			} else {
@@ -196,6 +226,14 @@ func (v *VTapCheck) launchServerCheck(db *metadb.DB) {
 					)
 					db.Model(&vtap).Update("region", podNode.Region)
 				}
+				// check and update az
+				if vtap.AZ != podNode.AZ {
+					log.Infof(
+						"update vtap (%s) az from %s to %s",
+						vtap.Lcuuid, vtap.AZ, podNode.AZ, db.LogPrefixORGID,
+					)
+					db.Model(&vtap).Update("az", podNode.AZ)
+				}
 			}
 		case common.VTAP_TYPE_K8S_SIDECAR:
 			var pod metadbmodel.Pod
@@ -228,6 +266,13 @@ func (v *VTapCheck) launchServerCheck(db *metadb.DB) {
 					)
 					db.Model(&vtap).Update("region", pod.Region)
 				}
+				if vtap.AZ != pod.AZ {
+					log.Infof(
+						"update vtap (%s) az from %s to %s",
+						vtap.Lcuuid, vtap.AZ, pod.AZ, db.LogPrefixORGID,
+					)
+					db.Model(&vtap).Update("az", pod.AZ)
+				}
 			}
 		}
 	}
@@ -238,13 +283,16 @@ func (v *VTapCheck) typeCheck(db *metadb.DB) {
 	var vtaps []metadbmodel.VTap
 	var podNodes []metadbmodel.PodNode
 	var conns []metadbmodel.VMPodNodeConnection
+	var vms []metadbmodel.VM
 
 	log.Debugf("vtap type check start", db.LogPrefixORGID)
 
-	db.Find(&podNodes)
-	idToPodNode := make(map[int]*metadbmodel.PodNode)
-	for i, podNode := range podNodes {
-		idToPodNode[podNode.ID] = &podNodes[i]
+	db.Select("id", "lcuuid", "name", "ip").Find(&podNodes)
+	idToPodNode := make(map[int]metadbmodel.PodNode)
+	lcuuidToPodNode := make(map[string]metadbmodel.PodNode)
+	for _, podNode := range podNodes {
+		idToPodNode[podNode.ID] = podNode
+		lcuuidToPodNode[podNode.Lcuuid] = podNode
 	}
 
 	db.Find(&conns)
@@ -255,8 +303,9 @@ func (v *VTapCheck) typeCheck(db *metadb.DB) {
 		podNodeIDToVMID[conn.PodNodeID] = conn.VMID
 	}
 
-	var vms []metadbmodel.VM
-	if err := db.Where("htype in ?", []int{common.VM_HTYPE_BM_C, common.VM_HTYPE_BM_N, common.VM_HTYPE_BM_S}).Find(&vms).Error; err != nil {
+	if err := db.Select("id", "htype").Where(
+		"htype in ?", []int{common.VM_HTYPE_BM_C, common.VM_HTYPE_BM_N, common.VM_HTYPE_BM_S},
+	).Find(&vms).Error; err != nil {
 		log.Error(err, db.LogPrefixORGID)
 	}
 	vmIDToVMType := make(map[int]int)
@@ -294,8 +343,8 @@ func (v *VTapCheck) typeCheck(db *metadb.DB) {
 				continue
 			}
 		} else {
-			var podNode metadbmodel.PodNode
-			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
+			podNode, ok := lcuuidToPodNode[vtap.Lcuuid]
+			if !ok {
 				continue
 			}
 			vmID, ok := podNodeIDToVMID[podNode.ID]

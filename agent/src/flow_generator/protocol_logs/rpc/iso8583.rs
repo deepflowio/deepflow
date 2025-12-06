@@ -16,23 +16,24 @@
 
 use serde::Serialize;
 
-use enterprise_utils::l7::iso::iso8583::{Iso8583ParseConfig, Iso8583Parser};
+use enterprise_utils::l7::rpc::iso8583::{Iso8583ParseConfig, Iso8583Parser};
 use public::l7_protocol::L7Protocol;
 
-use super::{value_is_default, LogMessageType};
 use crate::config::handler::LogParserConfig;
 use crate::{
     common::{
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
+        meta_packet::ApplicationFlags,
     },
     flow_generator::{
         protocol_logs::{
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
-            set_captured_byte, swap_if, L7ResponseStatus, PrioFields, BASE_FIELD_PRIORITY,
+            set_captured_byte, swap_if, value_is_default, L7ResponseStatus, LogMessageType,
+            PrioFields, BASE_FIELD_PRIORITY,
         },
         AppProtoHead, Error, Result,
     },
@@ -68,6 +69,8 @@ pub struct Iso8583Info {
 
     #[serde(skip)]
     is_on_blacklist: bool,
+
+    is_async: bool,
 }
 
 impl Iso8583Info {
@@ -84,6 +87,9 @@ impl Iso8583Info {
             self.is_on_blacklist = other.is_on_blacklist;
         }
         self.attributes.append(&mut other.attributes);
+        if other.is_async {
+            self.is_async = other.is_async;
+        }
     }
 
     fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
@@ -134,6 +140,11 @@ impl L7ProtocolInfoInterface for Iso8583Info {
 
 impl From<Iso8583Info> for L7ProtocolSendLog {
     fn from(f: Iso8583Info) -> Self {
+        let flags = if f.is_async {
+            ApplicationFlags::ASYNC
+        } else {
+            ApplicationFlags::NONE
+        };
         let log = L7ProtocolSendLog {
             captured_request_byte: f.captured_request_byte,
             captured_response_byte: f.captured_response_byte,
@@ -158,6 +169,7 @@ impl From<Iso8583Info> for L7ProtocolSendLog {
                 attributes: Some(f.attributes),
                 ..Default::default()
             }),
+            flags: flags.bits(),
             ..Default::default()
         };
         log
@@ -290,6 +302,7 @@ impl L7ProtocolParserInterface for Iso8583Log {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
+        info.is_async = true;
 
         if let Some(perf_stats) = self.perf_stats.as_mut() {
             if let Some(stats) = info.perf_stats(param) {

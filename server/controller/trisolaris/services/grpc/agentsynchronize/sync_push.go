@@ -238,8 +238,8 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		versionGroups, in.GetVersionGroups(),
 		currentBufferSize,
 		in.GetProcessName(), in.GetRevision(), in.GetBootTime(), in.GetAgentGroupIdRequest())
-
-	if versionPlatformData != in.GetVersionPlatformData() || versionPlatformData == 0 ||
+	platformDataVerChange := versionPlatformData != in.GetVersionPlatformData()
+	if platformDataVerChange || versionPlatformData == 0 ||
 		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
 		log.Info(changedInfo, logger.NewORGPrefix(orgID))
 	} else {
@@ -289,8 +289,9 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	} else {
 		vtapCache.UpdatePushVersionPolicy(versionPolicy)
 	}
+
 	platformData := []byte{}
-	if versionPlatformData != in.GetVersionPlatformData() {
+	if platformDataVerChange {
 		platformData = vtapCache.GetAgentPlatformDataStr()
 	}
 	groups := []byte{}
@@ -373,28 +374,28 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		SelfUpdateUrl:       proto.String(selfUpdateURL),
 		Revision:            proto.String(upgradeRevision),
 	}
-	syncBytesSize := GetVarSize(syncResponse)
-	vtapCache.UpdateLastSyncBytes(syncBytesSize)
-	sendSize := vtapCache.GetGRPCBufferSize()
-	grpcBufferSize, changed := checkGRPCBufferSize(currentBufferSize, sendSize)
+	syncBytesSize := uint64(proto.Size(&syncResponse))
+	sendSize := vtapCache.GetGRPCBufferFromLastSync(syncBytesSize)
+	grpcBufferSize, changed := changeGRPCBufferSize(currentBufferSize, sendSize, platformDataVerChange && vtapCache.AllowMessageToReduce())
 	if !changed {
 		return &syncResponse, nil
 	}
 	log.Infof("agent (%s) need sync size: %d, change current buffer size: %d to %d", vtapCacheKey, syncBytesSize, currentBufferSize, grpcBufferSize, logger.NewORGPrefix(orgID))
-	if grpcBufferSize > currentBufferSize {
-		return &api.SyncResponse{
-			Status:            &STATUS_SUCCESS,
-			OnlyPartialFields: proto.Bool(true),
-			NewGrpcBufferSize: &grpcBufferSize,
-			UserConfig:        proto.String(userConfigData),
-			DynamicConfig:     dynamicConfig,
-			Containers:        containers,
-			SelfUpdateUrl:     proto.String(selfUpdateURL),
-			Revision:          proto.String(upgradeRevision),
-		}, nil
+	vtapCache.UpdateLastChangeTime(time.Now())
+	if grpcBufferSize < currentBufferSize {
+		syncResponse.NewGrpcBufferSize = &grpcBufferSize
+		return &syncResponse, nil
 	}
-	syncResponse.NewGrpcBufferSize = &grpcBufferSize
-	return &syncResponse, nil
+	return &api.SyncResponse{
+		Status:            &STATUS_SUCCESS,
+		OnlyPartialFields: proto.Bool(true),
+		NewGrpcBufferSize: &grpcBufferSize,
+		UserConfig:        proto.String(userConfigData),
+		DynamicConfig:     dynamicConfig,
+		Containers:        containers,
+		SelfUpdateUrl:     proto.String(selfUpdateURL),
+		Revision:          proto.String(upgradeRevision),
+	}, nil
 }
 
 func (e *AgentEvent) generateNoAgentCacheDynamicConfig() *api.DynamicConfig {
@@ -559,7 +560,7 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 		versionGroups != pushVersionGroups || versionPolicy != pushVersionPolicy {
 		log.Infof(changedInfo, logger.NewORGPrefix(orgID))
 	} else {
-		log.Debugf(changedInfo, logger.NewORGPrefix(orgID))
+		log.Debug(changedInfo, logger.NewORGPrefix(orgID))
 	}
 
 	platformData := []byte{}
@@ -648,11 +649,9 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 		CaptureNetworkTypes: tapTypes,
 		Containers:          containers,
 	}
-	pushBytesSize := GetVarSize(syncResponse)
-	currentBufferSize := vtapCache.GetGRPCBufferSize()
-	grpcBufferSize, changed := checkGRPCBufferSize(currentBufferSize, pushBytesSize)
-	if changed && grpcBufferSize > currentBufferSize {
-		vtapCache.UpdateLastPushBytes(pushBytesSize)
+	pushBytesSize := uint64(proto.Size(&syncResponse))
+	currentBufferSize := vtapCache.GetGRPCBufferFromLastPush(pushBytesSize)
+	if exceedsGRPCBuffer(currentBufferSize, pushBytesSize) {
 		log.Warningf("agent (%s) need push size: %d more than max buffer size: %d, stop push", vtapCacheKey, pushBytesSize, currentBufferSize, logger.NewORGPrefix(orgID))
 		return &api.SyncResponse{
 			Status: &STATUS_FAILED,
@@ -666,7 +665,7 @@ func (e *AgentEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) er
 	var err error
 	orgID := trisolaris.GetOrgIDByTeamID(r.GetTeamId())
 	if orgID == 0 {
-		log.Errorf("get orgid failed by team_id(%s)", r.GetTeamId(), logger.NewORGPrefix(orgID))
+		log.Errorf("get orgid failed by team_id (%s)", r.GetTeamId(), logger.NewORGPrefix(orgID))
 		response := &api.SyncResponse{
 			Status: &STATUS_FAILED,
 		}
@@ -677,27 +676,43 @@ func (e *AgentEvent) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) er
 
 		return nil
 	}
-	response, err := e.pushResponse(r, true)
-	if err != nil {
-		log.Error(err)
-	}
-	err = in.Send(response)
-	if err != nil {
-		log.Error(err)
-		return err
-	}
+
+	key := r.GetCtrlIp() + "-" + r.GetCtrlMac()
+	enabledPush := trisolaris.GetPushEnabled()
+
+	firstPush := true
 	for {
-		pushmanager.Wait(orgID)
-		response, err := e.pushResponse(r, false)
+		if !firstPush {
+			pushmanager.Wait(orgID)
+		}
+
+		if !enabledPush {
+			firstPush = false
+			err = in.Send(&api.SyncResponse{Status: &STATUS_HEARTBEAT})
+			if err != nil {
+				log.Error(err)
+				break
+			}
+			log.Debugf("push disabled for agent (%s)", key, logger.NewORGPrefix(orgID))
+			continue
+		}
+
+		sleepRand := trisolaris.GetPushDelayRand()
+		log.Debugf("agent(%s) push sleep %d ms", key, sleepRand, logger.NewORGPrefix(orgID))
+		time.Sleep(time.Duration(sleepRand) * time.Millisecond)
+
+		response, err := e.pushResponse(r, firstPush)
 		if err != nil {
 			log.Error(err)
 		}
+		firstPush = false
+
 		err = in.Send(response)
 		if err != nil {
 			log.Error(err)
 			break
 		}
 	}
-	log.Infof("exit agent(%s-%s) push", r.GetCtrlIp(), r.GetCtrlMac(), logger.NewORGPrefix(orgID))
+	log.Infof("exit agent (%s) push", key, logger.NewORGPrefix(orgID))
 	return err
 }

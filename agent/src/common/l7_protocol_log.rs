@@ -114,6 +114,7 @@ macro_rules! impl_protocol_parser {
                 match value {
                     "HTTP" => Ok(Self::Http(HttpLog::new_v1())),
                     "HTTP2" => Ok(Self::Http(HttpLog::new_v2(false))),
+                    "gRPC" => Ok(Self::Http(HttpLog::new_v2(true))),
                     "Custom"=>Ok(Self::Custom(Default::default())),
                     #[cfg(feature = "enterprise")]
                     "ISO-8583"=>Ok(Self::Iso8583(Default::default())),
@@ -460,7 +461,7 @@ impl RrtCache {
     const LOG_INTERVAL: u64 = 60_000_000;
 
     // When the number of concurrent transactions exceeds this value, the RRT calculation error will occur.
-    const MAX_RRT_CACHE_PER_FLOW: usize = 128;
+    const MAX_RRT_CACHE_PER_FLOW: usize = 16;
 
     pub fn get(&mut self, key: &LogCacheKey) -> Option<&LogCache> {
         self.logs.get(key)
