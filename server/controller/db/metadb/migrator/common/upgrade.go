@@ -84,6 +84,8 @@ func executeScript(dc *DBConfig, nextVersion string) error { // TODO ce
 		err = script.ScriptUpdateVMPodNSTags(dc.DB)
 	case script.SCRIPT_UPGRADE_VTAP_GROUP_CONFIG:
 		err = script.UpgradeVTapAgentConfig(dc.DB)
+	default:
+		err = script.ExecuteScript(dc.DB, nextVersion)
 	}
 	return err
 }
