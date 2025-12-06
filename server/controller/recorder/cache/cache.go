@@ -1582,7 +1582,7 @@ func (c *Cache) DeleteConfigMaps(lcuuids []string) {
 
 func (c *Cache) refreshConfigMaps() {
 	log.Info(refreshResource(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN), c.metadata.LogPrefixes)
-	configMaps, err := rcommon.PageSelectWhereFind[mysqlmodel.ConfigMap](c.metadata, []string{"lcuuid", "name", "data_hash", "id", "domain"}, c.getConditionDomainSubDomain())
+	configMaps, err := rcommon.PageWhereFind[mysqlmodel.ConfigMap](c.metadata, c.getConditionDomainSubDomain())
 	if err != nil {
 		c.refreshFailed = true
 		log.Error(dbQueryResourceFailed(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, err), c.metadata.LogPrefixes)
