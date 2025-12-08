@@ -1033,6 +1033,23 @@ impl EbpfCollector {
         #[cfg(feature = "extended_observability")]
         ebpf::set_dpdk_trace_enabled(config.dpdk_enabled);
 
+        if ebpf::set_tcp_option_tracing_sample_window(
+            config.ebpf.tcp_option_trace.sampling_window_bytes as u32,
+        ) != 0
+        {
+            warn!(
+                "failed to set tcp option tracing sampling window to {}",
+                config.ebpf.tcp_option_trace.sampling_window_bytes
+            );
+        }
+
+        if ebpf::set_tcp_option_tracing_enabled(config.ebpf.tcp_option_trace.enabled) != 0 {
+            warn!(
+                "failed to set tcp option tracing enabled to {}",
+                config.ebpf.tcp_option_trace.enabled
+            );
+        }
+
         if ebpf::running_socket_tracer(
             Self::ebpf_l7_callback,                              /* 回调接口 rust -> C */
             config.ebpf.tunning.userspace_worker_threads as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
@@ -1316,6 +1333,9 @@ impl EbpfCollector {
         info!("ebpf collector stopping ebpf-kernel.");
         unsafe {
             ebpf::socket_tracer_stop();
+            if ebpf::set_tcp_option_tracing_enabled(false) != 0 {
+                warn!("failed to disable tcp option tracing while stopping");
+            }
         }
     }
 
@@ -1481,6 +1501,23 @@ impl EbpfCollector {
             }
 
             Self::ebpf_on_config_change(config.l7_log_packet_size);
+
+            if ebpf::set_tcp_option_tracing_sample_window(
+                config.ebpf.tcp_option_trace.sampling_window_bytes as u32,
+            ) != 0
+            {
+                warn!(
+                    "failed to set tcp option tracing sampling window to {}",
+                    config.ebpf.tcp_option_trace.sampling_window_bytes
+                );
+            }
+
+            if ebpf::set_tcp_option_tracing_enabled(config.ebpf.tcp_option_trace.enabled) != 0 {
+                warn!(
+                    "failed to set tcp option tracing enabled to {}",
+                    config.ebpf.tcp_option_trace.enabled
+                );
+            }
         }
         if config.l7_log_enabled() || config.dpdk_enabled {
             self.start();
