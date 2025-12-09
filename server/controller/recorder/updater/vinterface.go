@@ -22,7 +22,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
@@ -34,8 +34,8 @@ type VInterface struct {
 	UpdaterBase[
 		cloudmodel.VInterface,
 		*diffbase.VInterface,
-		*mysqlmodel.VInterface,
-		mysqlmodel.VInterface,
+		*metadbmodel.VInterface,
+		metadbmodel.VInterface,
 		*message.AddedVInterfaces,
 		message.AddedVInterfaces,
 		message.AddNoneAddition,
@@ -53,8 +53,8 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 		newUpdaterBase[
 			cloudmodel.VInterface,
 			*diffbase.VInterface,
-			*mysqlmodel.VInterface,
-			mysqlmodel.VInterface,
+			*metadbmodel.VInterface,
+			metadbmodel.VInterface,
 			*message.AddedVInterfaces,
 			message.AddedVInterfaces,
 			message.AddNoneAddition,
@@ -83,7 +83,7 @@ func (i *VInterface) getDiffBaseByCloudItem(cloudItem *cloudmodel.VInterface) (d
 	return
 }
 
-func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mysqlmodel.VInterface, bool) {
+func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*metadbmodel.VInterface, bool) {
 	var networkID int
 	if cloudItem.NetworkLcuuid != "" {
 		var exists bool
@@ -132,7 +132,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*mys
 		}
 	}
 
-	dbItem := &mysqlmodel.VInterface{
+	dbItem := &metadbmodel.VInterface{
 		Name:       cloudItem.Name,
 		Type:       cloudItem.Type,
 		State:      1,

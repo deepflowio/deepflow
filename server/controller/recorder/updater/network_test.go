@@ -45,7 +45,7 @@ func (t *SuiteTest) getNetworkMock(mockDB bool) (*cache.Cache, cloudmodel.Networ
 
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
-		t.db.Create(&mysqlmodel.Network{Name: cloudItem.Name, Base: mysqlmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
+		t.db.Create(&metadbmodel.Network{Name: cloudItem.Name, Base: metadbmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
 		cache_.DiffBaseDataSet.Networks[cloudItem.Lcuuid] = &diffbase.Network{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
 	}
 
@@ -66,12 +66,12 @@ func (t *SuiteTest) TestHandleAddNetworkSucess() {
 	updater := NewNetwork(cache_, []cloudmodel.Network{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.Network
+	var addedItem *metadbmodel.Network
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.Networks), 1)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Network{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Network{})
 }
 
 func (t *SuiteTest) TestHandleUpdateNetworkSucess() {
@@ -82,14 +82,14 @@ func (t *SuiteTest) TestHandleUpdateNetworkSucess() {
 	updater := NewNetwork(cache, []cloudmodel.Network{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.Network
+	var addedItem *metadbmodel.Network
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.Networks), 1)
 	assert.Equal(t.T(), addedItem.Name, cloudItem.Name)
 	assert.Equal(t.T(), addedItem.SegmentationID, cloudItem.SegmentationID)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Network{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Network{})
 }
 
 func (t *SuiteTest) TestHandleDeleteNetworkSucess() {
@@ -98,10 +98,10 @@ func (t *SuiteTest) TestHandleDeleteNetworkSucess() {
 	updater := NewNetwork(cache, []cloudmodel.Network{cloudItem})
 	updater.HandleDelete()
 
-	var addedItem *mysqlmodel.Network
+	var addedItem *metadbmodel.Network
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.Networks), 0)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.Network{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.Network{})
 }

@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type RoutingTable struct {
 	UpdaterBase[
 		cloudmodel.RoutingTable,
 		*diffbase.RoutingTable,
-		*mysqlmodel.RoutingTable,
-		mysqlmodel.RoutingTable,
+		*metadbmodel.RoutingTable,
+		metadbmodel.RoutingTable,
 		*message.AddedRoutingTables,
 		message.AddedRoutingTables,
 		message.AddNoneAddition,
@@ -49,8 +49,8 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 		newUpdaterBase[
 			cloudmodel.RoutingTable,
 			*diffbase.RoutingTable,
-			*mysqlmodel.RoutingTable,
-			mysqlmodel.RoutingTable,
+			*metadbmodel.RoutingTable,
+			metadbmodel.RoutingTable,
 			*message.AddedRoutingTables,
 			message.AddedRoutingTables,
 			message.AddNoneAddition,
@@ -78,7 +78,7 @@ func (t *RoutingTable) getDiffBaseByCloudItem(cloudItem *cloudmodel.RoutingTable
 	return
 }
 
-func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (*mysqlmodel.RoutingTable, bool) {
+func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (*metadbmodel.RoutingTable, bool) {
 	vrouterID, exists := t.cache.ToolDataSet.GetVRouterIDByLcuuid(cloudItem.VRouterLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -87,7 +87,7 @@ func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (
 		), t.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysqlmodel.RoutingTable{
+	dbItem := &metadbmodel.RoutingTable{
 		Destination: cloudItem.Destination,
 		NexthopType: cloudItem.NexthopType,
 		Nexthop:     cloudItem.Nexthop,
