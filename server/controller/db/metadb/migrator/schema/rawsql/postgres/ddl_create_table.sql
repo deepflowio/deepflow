@@ -2488,12 +2488,13 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     auto_service_0          VARCHAR(256) DEFAULT '',
     auto_service_id_1       INTEGER DEFAULT 0,
     auto_service_type_1     INTEGER DEFAULT 0,
-    auto_service_1          VARCHAR(256) DEFAULT ''
+    auto_service_1          VARCHAR(256) DEFAULT '',
+    comb_policy_lcuuids     TEXT
 );
 TRUNCATE TABLE alarm_policy;
 COMMENT ON COLUMN alarm_policy.level IS '0.low 1.middle 2.high';
 COMMENT ON COLUMN alarm_policy.state IS '0.disabled 1.enabled';
-COMMENT ON COLUMN alarm_policy.app_type IS '1-system 3-indicator 4-custom_biz_service';
+COMMENT ON COLUMN alarm_policy.app_type IS '1-system 3-indicator 4-custom_biz_service 5-comb';
 COMMENT ON COLUMN alarm_policy.sub_type IS '1-指标量;20-组件状态;21-组件性能;22-自动删除;23-资源状态;24-平台信息';
 COMMENT ON COLUMN alarm_policy.deleted IS '0-not deleted; 1-deleted';
 COMMENT ON COLUMN alarm_policy.contrast_type IS '1.abs 2.baseline';
