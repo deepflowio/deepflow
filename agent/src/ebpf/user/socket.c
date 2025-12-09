@@ -944,13 +944,11 @@ static void process_event(struct process_event_t *e)
 		}
 
 		update_proc_info_cache(e->pid, PROC_EXEC);
-		unwind_process_exec(e->pid);
 		extended_process_exec(e->pid);
 	} else if (e->meta.event_type == EVENT_TYPE_PROC_EXIT) {
 		/* Cache for updating process information used in
 		 * symbol resolution. */
 		update_proc_info_cache(e->pid, PROC_EXIT);
-		unwind_process_exit(e->pid);
 		extended_process_exit(e->pid);
 	}
 }

@@ -407,7 +407,6 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 char *resolve_addr(void *tracer_handle, uint32_t pid, bool is_start_idx,
 			  u64 address, bool is_create, void *info_p)
 {
-	struct bpf_tracer *t = tracer_handle;
 	pid_t pid_signed = (pid_t)pid;
 
 	ASSERT(pid_signed >= 0);
