@@ -39,7 +39,7 @@ func (t *SuiteTest) TestHandleAddProcessSuccess() {
 	updater := NewProcess(c, []cloudmodel.Process{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var result *mysqlmodel.Process
+	var result *metadbmodel.Process
 	dbResult := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&result)
 	assert.Equal(t.T(), dbResult.RowsAffected, int64(1))
 	assert.Equal(t.T(), cloudItem.Name, result.Name)
@@ -56,7 +56,7 @@ func (t *SuiteTest) TestHandleUpdateProcessSuccess() {
 	updater.cloudData = []cloudmodel.Process{cloudItem}
 	updater.HandleAddAndUpdate()
 
-	var result *mysqlmodel.Process
+	var result *metadbmodel.Process
 	dbResult := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&result)
 	assert.Equal(t.T(), dbResult.RowsAffected, int64(1))
 	assert.Equal(t.T(), wantName, result.Name)
@@ -71,7 +71,7 @@ func (t *SuiteTest) TestHandleDeleteProcessSuccess() {
 	updater.cache.SetSequence(updater.cache.GetSequence() + 1)
 	updater.HandleDelete()
 
-	var result *mysqlmodel.Process
+	var result *metadbmodel.Process
 	dbResult := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&result)
 	assert.Equal(t.T(), dbResult.RowsAffected, int64(0))
 	if updater.cache.DiffBaseDataSet.Process[cloudItem.Lcuuid] != nil {

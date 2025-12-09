@@ -21,7 +21,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -32,8 +32,8 @@ type PodGroup struct {
 	UpdaterBase[
 		cloudmodel.PodGroup,
 		*diffbase.PodGroup,
-		*mysqlmodel.PodGroup,
-		mysqlmodel.PodGroup,
+		*metadbmodel.PodGroup,
+		metadbmodel.PodGroup,
 		*message.AddedPodGroups,
 		message.AddedPodGroups,
 		message.AddNoneAddition,
@@ -51,8 +51,8 @@ func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodG
 		newUpdaterBase[
 			cloudmodel.PodGroup,
 			*diffbase.PodGroup,
-			*mysqlmodel.PodGroup,
-			mysqlmodel.PodGroup,
+			*metadbmodel.PodGroup,
+			metadbmodel.PodGroup,
 			*message.AddedPodGroups,
 			message.AddedPodGroups,
 			message.AddNoneAddition,
@@ -81,7 +81,7 @@ func (p *PodGroup) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodGroup) (diffB
 	return
 }
 
-func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*mysqlmodel.PodGroup, bool) {
+func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*metadbmodel.PodGroup, bool) {
 	podNamespaceID, exists := p.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -109,7 +109,7 @@ func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*mysqlmo
 		return nil, false
 	}
 
-	dbItem := &mysqlmodel.PodGroup{
+	dbItem := &metadbmodel.PodGroup{
 		Name:           cloudItem.Name,
 		Type:           cloudItem.Type,
 		Label:          cloudItem.Label,

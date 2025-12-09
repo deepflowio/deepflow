@@ -23,7 +23,7 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -35,8 +35,8 @@ type VM struct {
 	UpdaterBase[
 		cloudmodel.VM,
 		*diffbase.VM,
-		*mysqlmodel.VM,
-		mysqlmodel.VM,
+		*metadbmodel.VM,
+		metadbmodel.VM,
 		*message.AddedVMs,
 		message.AddedVMs,
 		message.AddNoneAddition,
@@ -54,8 +54,8 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 		newUpdaterBase[
 			cloudmodel.VM,
 			*diffbase.VM,
-			*mysqlmodel.VM,
-			mysqlmodel.VM,
+			*metadbmodel.VM,
+			metadbmodel.VM,
 			*message.AddedVMs,
 			message.AddedVMs,
 			message.AddNoneAddition,
@@ -83,7 +83,7 @@ func (m *VM) getDiffBaseByCloudItem(cloudItem *cloudmodel.VM) (diffBase *diffbas
 	return
 }
 
-func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysqlmodel.VM, bool) {
+func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*metadbmodel.VM, bool) {
 	vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -113,7 +113,7 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*mysqlmodel.VM, bool
 	if cloudItem.Label == "" {
 		cloudItem.Label = ctrlrcommon.GenerateResourceShortUUID(ctrlrcommon.RESOURCE_TYPE_CHOST_EN)
 	}
-	dbItem := &mysqlmodel.VM{
+	dbItem := &metadbmodel.VM{
 		Name:             cloudItem.Name,
 		Label:            cloudItem.Label,
 		IP:               cloudItem.IP,

@@ -21,7 +21,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
@@ -34,8 +34,8 @@ type WANIP struct {
 	UpdaterBase[
 		cloudmodel.IP,
 		*diffbase.WANIP,
-		*mysqlmodel.WANIP,
-		mysqlmodel.WANIP,
+		*metadbmodel.WANIP,
+		metadbmodel.WANIP,
 		*message.AddedWANIPs,
 		message.AddedWANIPs,
 		message.AddNoneAddition,
@@ -53,8 +53,8 @@ func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
 		newUpdaterBase[
 			cloudmodel.IP,
 			*diffbase.WANIP,
-			*mysqlmodel.WANIP,
-			mysqlmodel.WANIP,
+			*metadbmodel.WANIP,
+			metadbmodel.WANIP,
 			*message.AddedWANIPs,
 			message.AddedWANIPs,
 			message.AddNoneAddition,
@@ -87,7 +87,7 @@ func (i *WANIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.IP) (diffBase *diff
 	return
 }
 
-func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysqlmodel.WANIP, bool) {
+func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.WANIP, bool) {
 	vinterfaceID, exists := i.cache.ToolDataSet.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -114,7 +114,7 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysqlmodel.WANIP
 		))
 		return nil, false
 	}
-	dbItem := &mysqlmodel.WANIP{
+	dbItem := &metadbmodel.WANIP{
 		IP:           ip,
 		Domain:       i.metadata.GetDomainLcuuid(),
 		SubDomain:    cloudItem.SubDomainLcuuid,

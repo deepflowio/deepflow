@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type LBVMConnection struct {
 	UpdaterBase[
 		cloudmodel.LBVMConnection,
 		*diffbase.LBVMConnection,
-		*mysqlmodel.LBVMConnection,
-		mysqlmodel.LBVMConnection,
+		*metadbmodel.LBVMConnection,
+		metadbmodel.LBVMConnection,
 		*message.AddedLBVMConnections,
 		message.AddedLBVMConnections,
 		message.AddNoneAddition,
@@ -49,8 +49,8 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 		newUpdaterBase[
 			cloudmodel.LBVMConnection,
 			*diffbase.LBVMConnection,
-			*mysqlmodel.LBVMConnection,
-			mysqlmodel.LBVMConnection,
+			*metadbmodel.LBVMConnection,
+			metadbmodel.LBVMConnection,
 			*message.AddedLBVMConnections,
 			message.AddedLBVMConnections,
 			message.AddNoneAddition,
@@ -78,7 +78,7 @@ func (c *LBVMConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBVMConnec
 	return
 }
 
-func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnection) (*mysqlmodel.LBVMConnection, bool) {
+func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnection) (*metadbmodel.LBVMConnection, bool) {
 	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -96,7 +96,7 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 		return nil, false
 	}
 
-	dbItem := &mysqlmodel.LBVMConnection{
+	dbItem := &metadbmodel.LBVMConnection{
 		Domain: c.metadata.GetDomainLcuuid(),
 		VMID:   vmID,
 		LBID:   lbID,

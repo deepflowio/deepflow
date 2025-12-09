@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
@@ -31,8 +31,8 @@ type VRouter struct {
 	UpdaterBase[
 		cloudmodel.VRouter,
 		*diffbase.VRouter,
-		*mysqlmodel.VRouter,
-		mysqlmodel.VRouter,
+		*metadbmodel.VRouter,
+		metadbmodel.VRouter,
 		*message.AddedVRouters,
 		message.AddedVRouters,
 		message.AddNoneAddition,
@@ -50,8 +50,8 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 		newUpdaterBase[
 			cloudmodel.VRouter,
 			*diffbase.VRouter,
-			*mysqlmodel.VRouter,
-			mysqlmodel.VRouter,
+			*metadbmodel.VRouter,
+			metadbmodel.VRouter,
 			*message.AddedVRouters,
 			message.AddedVRouters,
 			message.AddNoneAddition,
@@ -79,7 +79,7 @@ func (r *VRouter) getDiffBaseByCloudItem(cloudItem *cloudmodel.VRouter) (diffBas
 	return
 }
 
-func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*mysqlmodel.VRouter, bool) {
+func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*metadbmodel.VRouter, bool) {
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -88,7 +88,7 @@ func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*mysqlmode
 		), r.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysqlmodel.VRouter{
+	dbItem := &metadbmodel.VRouter{
 		Name:           cloudItem.Name,
 		Label:          cloudItem.Label,
 		State:          rcommon.VROUTER_STATE_RUNNING,

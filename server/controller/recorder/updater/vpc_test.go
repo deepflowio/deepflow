@@ -44,7 +44,7 @@ func (t *SuiteTest) getVPCMock(mockDB bool) (*cache.Cache, cloudmodel.VPC) {
 
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
-		t.db.Create(&mysqlmodel.VPC{Name: cloudItem.Name, Base: mysqlmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
+		t.db.Create(&metadbmodel.VPC{Name: cloudItem.Name, Base: metadbmodel.Base{Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
 		cache_.DiffBaseDataSet.VPCs[cloudItem.Lcuuid] = &diffbase.VPC{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
 	}
 
@@ -60,12 +60,12 @@ func (t *SuiteTest) TestHandleAddVPCSucess() {
 	updater := NewVPC(cache, []cloudmodel.VPC{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.VPC
+	var addedItem *metadbmodel.VPC
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.VPCs), 1)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VPC{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VPC{})
 }
 
 func (t *SuiteTest) TestHandleUpdateVPCSucess() {
@@ -77,7 +77,7 @@ func (t *SuiteTest) TestHandleUpdateVPCSucess() {
 	updater := NewVPC(cache, []cloudmodel.VPC{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.VPC
+	var addedItem *metadbmodel.VPC
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.VPCs), 1)
@@ -85,7 +85,7 @@ func (t *SuiteTest) TestHandleUpdateVPCSucess() {
 	assert.Equal(t.T(), addedItem.CIDR, cloudItem.CIDR)
 	assert.Equal(t.T(), addedItem.TunnelID, cloudItem.TunnelID)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.VPC{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.VPC{})
 }
 
 func (t *SuiteTest) TestHandleDeleteVPCSucess() {
@@ -94,7 +94,7 @@ func (t *SuiteTest) TestHandleDeleteVPCSucess() {
 	updater := NewVPC(cache, []cloudmodel.VPC{cloudItem})
 	updater.HandleDelete()
 
-	var addedItem *mysqlmodel.VPC
+	var addedItem *metadbmodel.VPC
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.VPCs), 0)

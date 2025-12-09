@@ -23,7 +23,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -34,8 +34,8 @@ type ConfigMap struct {
 	UpdaterBase[
 		cloudmodel.ConfigMap,
 		*diffbase.ConfigMap,
-		*mysqlmodel.ConfigMap,
-		mysqlmodel.ConfigMap,
+		*metadbmodel.ConfigMap,
+		metadbmodel.ConfigMap,
 		*message.AddedConfigMaps,
 		message.AddedConfigMaps,
 		message.AddNoneAddition,
@@ -53,8 +53,8 @@ func NewConfigMap(wholeCache *cache.Cache, cloudData []cloudmodel.ConfigMap) *Co
 		newUpdaterBase[
 			cloudmodel.ConfigMap,
 			*diffbase.ConfigMap,
-			*mysqlmodel.ConfigMap,
-			mysqlmodel.ConfigMap,
+			*metadbmodel.ConfigMap,
+			metadbmodel.ConfigMap,
 			*message.AddedConfigMaps,
 			message.AddedConfigMaps,
 			message.AddNoneAddition,
@@ -83,7 +83,7 @@ func (h *ConfigMap) getDiffBaseByCloudItem(cloudItem *cloudmodel.ConfigMap) (dif
 	return
 }
 
-func (h *ConfigMap) generateDBItemToAdd(cloudItem *cloudmodel.ConfigMap) (*mysqlmodel.ConfigMap, bool) {
+func (h *ConfigMap) generateDBItemToAdd(cloudItem *cloudmodel.ConfigMap) (*metadbmodel.ConfigMap, bool) {
 	podClusterID, exists := h.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -113,7 +113,7 @@ func (h *ConfigMap) generateDBItemToAdd(cloudItem *cloudmodel.ConfigMap) (*mysql
 		log.Errorf("failed to convert %s JSON to YAML: %s", h.resourceType, h.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysqlmodel.ConfigMap{
+	dbItem := &metadbmodel.ConfigMap{
 		Name:           cloudItem.Name,
 		Data:           string(yamlData),
 		DataHash:       cloudItem.DataHash,

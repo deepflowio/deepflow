@@ -22,7 +22,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
@@ -35,8 +35,8 @@ type Process struct {
 	UpdaterBase[
 		cloudmodel.Process,
 		*diffbase.Process,
-		*mysqlmodel.Process,
-		mysqlmodel.Process,
+		*metadbmodel.Process,
+		metadbmodel.Process,
 		*message.AddedProcesses,
 		message.AddedProcesses,
 		message.AddedProcessesAddition,
@@ -54,8 +54,8 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 		newUpdaterBase[
 			cloudmodel.Process,
 			*diffbase.Process,
-			*mysqlmodel.Process,
-			mysqlmodel.Process,
+			*metadbmodel.Process,
+			metadbmodel.Process,
 			*message.AddedProcesses,
 			message.AddedProcesses,
 			message.AddedProcessesAddition,
@@ -85,7 +85,7 @@ func (p *Process) getDiffBaseByCloudItem(cloudItem *cloudmodel.Process) (diffBas
 	return
 }
 
-func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysqlmodel.Process, bool) {
+func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*metadbmodel.Process, bool) {
 	deviceType, deviceID := p.cache.ToolDataSet.GetProcessDeviceTypeAndID(cloudItem.ContainerID, cloudItem.VTapID)
 	// add pod node id
 	var podNodeID int
@@ -126,7 +126,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*mysqlmode
 	if vmInfo != nil {
 		vpcID = vmInfo.VPCID
 	}
-	dbItem := &mysqlmodel.Process{
+	dbItem := &metadbmodel.Process{
 		Name:        cloudItem.Name,
 		VTapID:      cloudItem.VTapID,
 		PID:         cloudItem.PID,
@@ -202,7 +202,7 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 	return structInfo, mapInfo, len(mapInfo) > 0
 }
 
-func (p *Process) beforeAddPage(dbData []*mysqlmodel.Process) ([]*mysqlmodel.Process, *message.AddedProcessesAddition, bool) {
+func (p *Process) beforeAddPage(dbData []*metadbmodel.Process) ([]*metadbmodel.Process, *message.AddedProcessesAddition, bool) {
 	identifierToNewGID := make(map[tool.ProcessIdentifier]uint32)
 	for _, item := range dbData {
 		if item.GID != 0 {
@@ -246,7 +246,7 @@ func (p *Process) beforeAddPage(dbData []*mysqlmodel.Process) ([]*mysqlmodel.Pro
 	return dbData, &message.AddedProcessesAddition{}, true
 }
 
-func (p *Process) afterDeletePage(dbData []*mysqlmodel.Process) (*message.DeletedProcessesAddition, bool) {
+func (p *Process) afterDeletePage(dbData []*metadbmodel.Process) (*message.DeletedProcessesAddition, bool) {
 	deletedGIDs := mapset.NewSet[uint32]()
 	for _, item := range dbData {
 		if gid, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)); ok {

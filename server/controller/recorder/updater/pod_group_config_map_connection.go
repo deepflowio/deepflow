@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type PodGroupConfigMapConnection struct {
 	UpdaterBase[
 		cloudmodel.PodGroupConfigMapConnection,
 		*diffbase.PodGroupConfigMapConnection,
-		*mysqlmodel.PodGroupConfigMapConnection,
-		mysqlmodel.PodGroupConfigMapConnection,
+		*metadbmodel.PodGroupConfigMapConnection,
+		metadbmodel.PodGroupConfigMapConnection,
 		*message.AddedPodGroupConfigMapConnections,
 		message.AddedPodGroupConfigMapConnections,
 		message.AddNoneAddition,
@@ -49,8 +49,8 @@ func NewPodGroupConfigMapConnection(wholeCache *cache.Cache, cloudData []cloudmo
 		newUpdaterBase[
 			cloudmodel.PodGroupConfigMapConnection,
 			*diffbase.PodGroupConfigMapConnection,
-			*mysqlmodel.PodGroupConfigMapConnection,
-			mysqlmodel.PodGroupConfigMapConnection,
+			*metadbmodel.PodGroupConfigMapConnection,
+			metadbmodel.PodGroupConfigMapConnection,
 			*message.AddedPodGroupConfigMapConnections,
 			message.AddedPodGroupConfigMapConnections,
 			message.AddNoneAddition,
@@ -78,7 +78,7 @@ func (h *PodGroupConfigMapConnection) getDiffBaseByCloudItem(cloudItem *cloudmod
 	return
 }
 
-func (h *PodGroupConfigMapConnection) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupConfigMapConnection) (*mysqlmodel.PodGroupConfigMapConnection, bool) {
+func (h *PodGroupConfigMapConnection) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupConfigMapConnection) (*metadbmodel.PodGroupConfigMapConnection, bool) {
 	podGroupID, exists := h.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -95,7 +95,7 @@ func (h *PodGroupConfigMapConnection) generateDBItemToAdd(cloudItem *cloudmodel.
 		), h.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysqlmodel.PodGroupConfigMapConnection{
+	dbItem := &metadbmodel.PodGroupConfigMapConnection{
 		PodGroupID:  podGroupID,
 		ConfigMapID: configMapID,
 		Domain:      h.metadata.GetDomainLcuuid(),

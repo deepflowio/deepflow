@@ -20,7 +20,7 @@ import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -31,8 +31,8 @@ type VPC struct {
 	UpdaterBase[
 		cloudmodel.VPC,
 		*diffbase.VPC,
-		*mysqlmodel.VPC,
-		mysqlmodel.VPC,
+		*metadbmodel.VPC,
+		metadbmodel.VPC,
 		*message.AddedVPCs,
 		message.AddedVPCs,
 		message.AddNoneAddition,
@@ -50,8 +50,8 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 		newUpdaterBase[
 			cloudmodel.VPC,
 			*diffbase.VPC,
-			*mysqlmodel.VPC,
-			mysqlmodel.VPC,
+			*metadbmodel.VPC,
+			metadbmodel.VPC,
 			*message.AddedVPCs,
 			message.AddedVPCs,
 			message.AddNoneAddition,
@@ -79,11 +79,11 @@ func (v *VPC) getDiffBaseByCloudItem(cloudItem *cloudmodel.VPC) (diffBase *diffb
 	return
 }
 
-func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*mysqlmodel.VPC, bool) {
+func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*metadbmodel.VPC, bool) {
 	if cloudItem.Label == "" {
 		cloudItem.Label = common.GenerateResourceShortUUID(v.resourceType)
 	}
-	dbItem := &mysqlmodel.VPC{
+	dbItem := &metadbmodel.VPC{
 		Name:         cloudItem.Name,
 		Label:        cloudItem.Label,
 		Owner:        cloudItem.Owner,

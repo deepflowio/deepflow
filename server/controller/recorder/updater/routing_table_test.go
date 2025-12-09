@@ -44,7 +44,7 @@ func (t *SuiteTest) getRoutingTableMock(mockDB bool) (*cache.Cache, cloudmodel.R
 
 	cache_ := cache.NewCache(domainLcuuid)
 	if mockDB {
-		t.db.Create(&mysqlmodel.RoutingTable{Base: mysqlmodel.Base{Lcuuid: cloudItem.Lcuuid}, Destination: cloudItem.Destination})
+		t.db.Create(&metadbmodel.RoutingTable{Base: metadbmodel.Base{Lcuuid: cloudItem.Lcuuid}, Destination: cloudItem.Destination})
 		cache_.DiffBaseDataSet.RoutingTables[cloudItem.Lcuuid] = &diffbase.RoutingTable{DiffBase: diffbase.DiffBase{Lcuuid: cloudItem.Lcuuid}}
 	}
 
@@ -65,12 +65,12 @@ func (t *SuiteTest) TestHandleAddRoutingTableSucess() {
 	updater := NewRoutingTable(cache_, []cloudmodel.RoutingTable{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.RoutingTable
+	var addedItem *metadbmodel.RoutingTable
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache_.DiffBaseDataSet.RoutingTables), 1)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.RoutingTable{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.RoutingTable{})
 }
 
 func (t *SuiteTest) TestHandleUpdateRoutingTableSucess() {
@@ -80,13 +80,13 @@ func (t *SuiteTest) TestHandleUpdateRoutingTableSucess() {
 	updater := NewRoutingTable(cache, []cloudmodel.RoutingTable{cloudItem})
 	updater.HandleAddAndUpdate()
 
-	var addedItem *mysqlmodel.RoutingTable
+	var addedItem *metadbmodel.RoutingTable
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(1))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.RoutingTables), 1)
 	assert.Equal(t.T(), addedItem.Destination, cloudItem.Destination)
 
-	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysqlmodel.RoutingTable{})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&metadbmodel.RoutingTable{})
 }
 
 func (t *SuiteTest) TestHandleDeleteRoutingTableSucess() {
@@ -95,7 +95,7 @@ func (t *SuiteTest) TestHandleDeleteRoutingTableSucess() {
 	updater := NewRoutingTable(cache, []cloudmodel.RoutingTable{cloudItem})
 	updater.HandleDelete()
 
-	var addedItem *mysqlmodel.RoutingTable
+	var addedItem *metadbmodel.RoutingTable
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 	assert.Equal(t.T(), len(cache.DiffBaseDataSet.RoutingTables), 0)

@@ -19,7 +19,7 @@ package updater
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -30,8 +30,8 @@ type PeerConnection struct {
 	UpdaterBase[
 		cloudmodel.PeerConnection,
 		*diffbase.PeerConnection,
-		*mysqlmodel.PeerConnection,
-		mysqlmodel.PeerConnection,
+		*metadbmodel.PeerConnection,
+		metadbmodel.PeerConnection,
 		*message.AddedPeerConnections,
 		message.AddedPeerConnections,
 		message.AddNoneAddition,
@@ -49,8 +49,8 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 		newUpdaterBase[
 			cloudmodel.PeerConnection,
 			*diffbase.PeerConnection,
-			*mysqlmodel.PeerConnection,
-			mysqlmodel.PeerConnection,
+			*metadbmodel.PeerConnection,
+			metadbmodel.PeerConnection,
 			*message.AddedPeerConnections,
 			message.AddedPeerConnections,
 			message.AddNoneAddition,
@@ -78,7 +78,7 @@ func (c *PeerConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.PeerConnec
 	return
 }
 
-func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnection) (*mysqlmodel.PeerConnection, bool) {
+func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnection) (*metadbmodel.PeerConnection, bool) {
 	remoteVPCID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.RemoteVPCLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -112,7 +112,7 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 		), c.metadata.LogPrefixes)
 		return nil, false
 	}
-	dbItem := &mysqlmodel.PeerConnection{
+	dbItem := &metadbmodel.PeerConnection{
 		Name:           cloudItem.Name,
 		Label:          cloudItem.Label,
 		Domain:         c.metadata.GetDomainLcuuid(),

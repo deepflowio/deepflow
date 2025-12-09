@@ -22,7 +22,7 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
@@ -33,8 +33,8 @@ type PodNamespace struct {
 	UpdaterBase[
 		cloudmodel.PodNamespace,
 		*diffbase.PodNamespace,
-		*mysqlmodel.PodNamespace,
-		mysqlmodel.PodNamespace,
+		*metadbmodel.PodNamespace,
+		metadbmodel.PodNamespace,
 		*message.AddedPodNamespaces,
 		message.AddedPodNamespaces,
 		message.AddNoneAddition,
@@ -52,8 +52,8 @@ func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespac
 		newUpdaterBase[
 			cloudmodel.PodNamespace,
 			*diffbase.PodNamespace,
-			*mysqlmodel.PodNamespace,
-			mysqlmodel.PodNamespace,
+			*metadbmodel.PodNamespace,
+			metadbmodel.PodNamespace,
 			*message.AddedPodNamespaces,
 			message.AddedPodNamespaces,
 			message.AddNoneAddition,
@@ -81,7 +81,7 @@ func (n *PodNamespace) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodNamespace
 	return
 }
 
-func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (*mysqlmodel.PodNamespace, bool) {
+func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (*metadbmodel.PodNamespace, bool) {
 	podClusterID, exists := n.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
@@ -94,7 +94,7 @@ func (n *PodNamespace) generateDBItemToAdd(cloudItem *cloudmodel.PodNamespace) (
 	if cloudItem.CloudTags != nil {
 		cloudTags = cloudItem.CloudTags
 	}
-	dbItem := &mysqlmodel.PodNamespace{
+	dbItem := &metadbmodel.PodNamespace{
 		Name:             cloudItem.Name,
 		PodClusterID:     podClusterID,
 		SubDomain:        cloudItem.SubDomainLcuuid,
