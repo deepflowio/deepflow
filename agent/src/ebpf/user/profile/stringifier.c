@@ -70,6 +70,11 @@ static const char *k_sym_prefix = "[k] ";
 static const char *lib_sym_prefix = "[l] ";
 static const char *u_sym_prefix = "";
 
+extern char *lua_format_folded_stack_trace(void *tracer_handle, uint32_t pid,
+					   const __u64 *frames, __u32 frame_count,
+					   bool new_cache, void *info_p,
+					   const char *err_tag);
+
 /*
  * To track the scenario where stack data is missing in the eBPF
  * 'stack_map_*' table. This typically occurs due to the design of
@@ -378,21 +383,29 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 	return ret;
 }
 
-static char *resolve_addr(struct bpf_tracer *t, pid_t pid, bool is_start_idx,
+/*
+ * Shared native resolver for both the C stringifier and the Rust Lua decoder.
+ * Lua’s logical stack may include TAG_CFUNC frames (Lua→C calls). Rust calls 
+ * this helper to resolve those native PCs using the same symbol cache.
+ */
+char *resolve_addr(void *tracer_handle, uint32_t pid, bool is_start_idx,
 			  u64 address, bool is_create, void *info_p)
 {
-	ASSERT(pid >= 0);
+	struct bpf_tracer *t = tracer_handle;
+	pid_t pid_signed = (pid_t)pid;
+
+	ASSERT(pid_signed >= 0);
 
 	int len = 0;
 	char *ptr = NULL;
 	char format_str[32];
 	struct bcc_symbol sym;
 	memset(&sym, 0, sizeof(sym));
-	void *resolver = get_symbol_cache(pid, is_create);
+	void *resolver = get_symbol_cache(pid_signed, is_create);
 	if (resolver == NULL)
 		goto resolver_err;
 
-	int ret = symcache_resolve(pid, resolver, address, &sym, info_p, &ptr);
+	int ret = symcache_resolve(pid_signed, resolver, address, &sym, info_p, &ptr);
 	if (ret == 0 && ptr) {
 		char *p = ptr;
 		/*
@@ -603,6 +616,67 @@ failed:
 	return NULL;
 }
 
+static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
+					   int stack_id,
+					   pid_t pid,
+					   const char *stack_map_name,
+					   stack_str_hash_t * h,
+					   bool new_cache, void *info_p)
+{
+	/* Interpreter stacks are optional; missing ids indicate the kernel skipped unwinding. */
+	if (stack_id < 0) {
+		return NULL;
+	}
+
+	stack_str_hash_kv kv;
+	kv.key = ((u64) pid << 32) | (u32) stack_id;
+	kv.value = 0;
+	if (stack_str_hash_search(h, &kv, &kv) == 0) {
+		__sync_fetch_and_add(&h->hit_hash_count, 1);
+		return (char *)kv.value;
+	}
+
+	if (!stack_map_name) {
+		return NULL;
+	}
+	/* Raw frames come from the interpreter stack map populated by the Lua BPF program. */
+	int fd = bpf_table_get_fd(t, stack_map_name);
+	if (fd < 0) {
+		return NULL;
+	}
+
+	__u64 raw_frames[PERF_MAX_STACK_DEPTH] = { 0 };
+	__u32 key = stack_id;
+	if (bpf_lookup_elem(fd, &key, &raw_frames) != 0) {
+		return NULL;
+	}
+
+	u32 frame_count = 0;
+	for (; frame_count < PERF_MAX_STACK_DEPTH; frame_count++) {
+		if (raw_frames[frame_count] == 0) {
+			break;
+		}
+	}
+	if (frame_count == 0) {
+		return NULL;
+	}
+
+	char *result =
+	    lua_format_folded_stack_trace(t, pid, raw_frames, frame_count,
+					  new_cache, info_p, i_err_tag);
+	if (!result) {
+		return NULL;
+	}
+
+	kv.value = pointer_to_uword(result);
+	if (stack_str_hash_add_del(h, &kv, 1)) {
+		clib_mem_free(result);
+		result = NULL;
+	}
+
+	return result;
+}
+
 static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       int stack_id,
 				       pid_t pid,
@@ -612,6 +686,12 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       bool ignore_libs, bool use_symbol_table)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
+
+	if (use_symbol_table && is_lua_process((uint32_t)pid)) {
+		return folded_lua_stack_trace_string(t, stack_id, pid,
+						      stack_map_name, h,
+						      new_cache, info_p);
+	}
 
 	/*
 	 * Firstly, search the stack-trace hash to see if the
@@ -769,10 +849,28 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	}
 
 	bool has_intpstack = v->intpstack > 0;
+	bool is_lua = false;
+	bool is_python = false;
+
 	if (has_intpstack) {
-		i_trace_str = folded_stack_trace_string(t, v->intpstack, v->tgid, custom_stack_map_name, h, new_cache, info_p, v->timestamp, ignore_libs, true);
+		i_trace_str = folded_stack_trace_string(t, v->intpstack, v->tgid,
+							custom_stack_map_name, h,
+							new_cache, info_p,
+							v->timestamp,
+							ignore_libs, true);
 		if (i_trace_str != NULL) {
-			len += strlen(i_trace_str) + strlen(INCOMPLETE_PYTHON_STACK) + 2;
+			is_lua = is_lua_process((uint32_t)v->tgid);
+			is_python = (!is_lua) && is_python_process((uint32_t)v->tgid);
+		}
+
+		if (i_trace_str != NULL) {
+			if (is_python) {
+				len += strlen(i_trace_str)
+					+ strlen(INCOMPLETE_PYTHON_STACK)
+					+ 2;
+			} else {
+				len += strlen(i_trace_str) + 1;
+			}
 		} else {
 			len += strlen(i_err_tag);
 		}
@@ -784,10 +882,15 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		goto error;
 	}
 
-	/* trace_str = i_stack_str_fn() + ";" + u_stack_str_fn() + ";" + k_stack_str_fn(); */
+	/* trace_str combines user/interpreter/kstack strings in call-order (root -> leaf). */
 	int offset = 0;
 	if (i_trace_str && u_trace_str) {
-		offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		if (is_lua) {
+			offset += merge_lua_stacks(trace_str + offset, len - offset,
+						   u_trace_str, i_trace_str);
+		} else if (is_python) {
+			offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
+		}
 	} else if (i_trace_str) {
 		offset += snprintf(trace_str + offset, len - offset, "%s", i_trace_str);
 	} else if (u_trace_str) {

@@ -27,6 +27,7 @@ use std::io::Write;
 use log::info;
 
 // Crate internal modules
+pub use unwind::lua::{LjOfs, LuaOfs, LuaRuntimeInfo, LuaUnwindInfo, LuaUnwindTable};
 use unwind::{python::PythonUnwindTable, UnwindTable};
 pub use utils::protect_cpu_affinity;
 

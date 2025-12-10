@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
-use std::cell::OnceCell;
-use std::collections::{HashMap, HashSet};
-use std::mem::replace;
-use std::str;
-use std::sync::Arc;
+use std::{
+    cell::OnceCell,
+    collections::{HashMap, HashSet},
+    mem, str,
+    sync::Arc,
+};
 
 use hpack::Decoder;
 use nom::{AsBytes, ParseTo};
-use public::l7_protocol::L7ProtocolChecker;
 use serde::Serialize;
+
+use public::l7_protocol::L7ProtocolChecker;
 
 use super::{
     consts::*,
@@ -55,11 +57,13 @@ use crate::{
 
 cfg_if::cfg_if! {
 if #[cfg(feature = "enterprise")] {
-        use crate::common::flow::L7ProtocolEnum;
         use crate::flow_generator::protocol_logs::CUSTOM_FIELD_POLICY_PRIORITY;
         use enterprise_utils::l7::custom_policy::{
-            custom_field_policy::{field_type_support_protocol, set_from_tag, Policy},
-            enums::{FieldType, NativeTag},
+            custom_field_policy::{
+                enums::{Op, Operation, PayloadType, Source},
+                PolicySlice, Store,
+            },
+            enums::NativeTag,
         };
     }
 }
@@ -391,7 +395,7 @@ impl HttpInfo {
             .merge_same_priority(PLUGIN_FIELD_PRIORITY, custom.trace.trace_ids);
 
         if let Some(span_id) = custom.trace.span_id {
-            let prev = replace(
+            let prev = mem::replace(
                 &mut self.span_id,
                 PrioField::new(PLUGIN_FIELD_PRIORITY, span_id),
             );
@@ -429,93 +433,6 @@ impl HttpInfo {
 
         if let Some(is_async) = custom.is_async {
             self.is_async = is_async;
-        }
-    }
-
-    #[cfg(feature = "enterprise")]
-    fn merge_policy_tags_to_http(&mut self, tags: &mut HashMap<&'static str, String>) {
-        log::debug!("http merge custom poilcy tags: {:?}", tags);
-        if tags.is_empty() {
-            return;
-        }
-        if let Some(version) = tags.remove(NativeTag::Version.as_ref()) {
-            self.version = Version::try_from(version.as_str()).unwrap_or_default();
-        }
-        // req
-        if let Some(req_type) = tags.remove(NativeTag::RequestType.as_ref()) {
-            if self.method.is_none() {
-                self.method = Method::try_from(req_type.as_str()).unwrap_or_default();
-            }
-        }
-        set_from_tag!(self.host, tags, NativeTag::RequestDomain.as_ref());
-        set_from_tag!(self.path, tags, NativeTag::RequestResource.as_ref());
-        self.endpoint = tags.remove(NativeTag::Endpoint.as_ref());
-
-        if let Some(req_id) = tags.remove(NativeTag::RequestId.as_ref()) {
-            self.stream_id = req_id.parse::<u32>().map_or(None, Some);
-        }
-        if let Some(resp_code) = tags.remove(NativeTag::ResponseCode.as_ref()) {
-            self.response_code_to_attribute();
-            self.status_code = resp_code.parse::<u16>().unwrap_or_default();
-        }
-
-        // res
-        if let Some(resp_status) = tags.remove(NativeTag::ResponseStatus.as_ref()) {
-            self.status = L7ResponseStatus::from(resp_status.as_str());
-        }
-        self.custom_exception = tags.remove(NativeTag::ResponseException.as_ref());
-        self.custom_result = tags.remove(NativeTag::ResponseResult.as_ref());
-
-        if let Some(trace_id) = tags.remove(NativeTag::TraceId.as_ref()) {
-            self.trace_ids
-                .merge_field(CUSTOM_FIELD_POLICY_PRIORITY, trace_id);
-        }
-
-        if CUSTOM_FIELD_POLICY_PRIORITY <= self.span_id.prio {
-            if let Some(span_id) = tags.remove(NativeTag::SpanId.as_ref()) {
-                let prev = replace(
-                    &mut self.span_id,
-                    PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, span_id),
-                );
-                if !prev.is_default() {
-                    self.attributes.push(KeyVal {
-                        key: APM_SPAN_ID_ATTR.to_string(),
-                        val: prev.into_inner(),
-                    });
-                }
-            }
-        }
-
-        if match self.client_ip.as_ref() {
-            Some(client_ip) if CUSTOM_FIELD_POLICY_PRIORITY <= client_ip.prio => true,
-            None => true,
-            _ => false,
-        } {
-            if let Some(proxy_client) = tags.remove(NativeTag::HttpProxyClient.as_ref()) {
-                self.client_ip = Some(PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, proxy_client));
-            }
-        }
-
-        let x_req_id = match self.msg_type {
-            LogMessageType::Request => &mut self.x_request_id_0,
-            LogMessageType::Response => &mut self.x_request_id_1,
-            _ => return,
-        };
-
-        if CUSTOM_FIELD_POLICY_PRIORITY <= x_req_id.prio {
-            if let Some(x_request_id) = tags.remove(NativeTag::XRequestId.as_ref()) {
-                *x_req_id = PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, x_request_id)
-            }
-        }
-
-        if let Some(biz_type) = tags.remove(NativeTag::BizType.as_ref()) {
-            self.biz_type = biz_type.parse::<u8>().unwrap_or_default();
-        }
-        if let Some(biz_code) = tags.remove(NativeTag::BizCode.as_ref()) {
-            self.biz_code = biz_code;
-        }
-        if let Some(biz_scenario) = tags.remove(NativeTag::BizScenario.as_ref()) {
-            self.biz_scenario = biz_scenario;
         }
     }
 }
@@ -672,7 +589,7 @@ impl HttpInfo {
         super::swap_if!(self, biz_code, is_empty, other);
         super::swap_if!(self, biz_scenario, is_empty, other);
 
-        let other_trace_ids = std::mem::take(&mut other.trace_ids);
+        let other_trace_ids = mem::take(&mut other.trace_ids);
         self.trace_ids.merge(other_trace_ids);
         super::swap_if!(self, span_id, is_default, other);
         super::swap_if!(self, x_request_id_0, is_default, other);
@@ -843,7 +760,11 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                         }
                     }
                 },
-                exception: f.custom_exception.unwrap_or_default(),
+                exception: if f.status != L7ResponseStatus::Ok {
+                    f.custom_exception.unwrap_or_default()
+                } else {
+                    Default::default()
+                },
                 result: f.custom_result.unwrap_or_default(),
             },
             trace_info: Some(TraceInfo {
@@ -910,6 +831,9 @@ pub struct HttpLog {
     perf_stats: Option<L7PerfStats>,
     http2_req_decoder: Option<Decoder<'static>>,
     http2_resp_decoder: Option<Decoder<'static>>,
+
+    #[cfg(feature = "enterprise")]
+    custom_field_store: Store,
 }
 
 impl L7ProtocolParserInterface for HttpLog {
@@ -919,10 +843,6 @@ impl L7ProtocolParserInterface for HttpLog {
         }
 
         let mut info = HttpInfo::default();
-
-        // check_payload would not init policies, so we won't handle any tags here
-        #[cfg(feature = "enterprise")]
-        let mut tags = HashMap::new();
 
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
@@ -950,10 +870,6 @@ impl L7ProtocolParserInterface for HttpLog {
                             param,
                             &mut info,
                             #[cfg(feature = "enterprise")]
-                            &mut tags,
-                            #[cfg(feature = "enterprise")]
-                            None,
-                            #[cfg(feature = "enterprise")]
                             None,
                         )
                         .is_ok()
@@ -963,10 +879,6 @@ impl L7ProtocolParserInterface for HttpLog {
                             payload,
                             param,
                             &mut info,
-                            #[cfg(feature = "enterprise")]
-                            &mut tags,
-                            #[cfg(feature = "enterprise")]
-                            None,
                             #[cfg(feature = "enterprise")]
                             None,
                         )
@@ -989,35 +901,11 @@ impl L7ProtocolParserInterface for HttpLog {
         };
 
         #[cfg(feature = "enterprise")]
-        let port = match param.direction {
-            PacketDirection::ClientToServer => param.port_dst,
-            PacketDirection::ServerToClient => param.port_src,
-        };
-
+        self.custom_field_store.clear();
         #[cfg(feature = "enterprise")]
-        let (policy, policy_indices) = match self.proto {
-            L7Protocol::Http1 => {
-                match config
-                    .l7_log_dynamic
-                    .extra_field_policies
-                    .get(&L7ProtocolEnum::L7Protocol(self.proto))
-                {
-                    Some(policy) => (Some(&policy.policies), policy.indices.find(port)),
-                    _ => (None, None),
-                }
-            }
-            L7Protocol::Http2 | L7Protocol::Grpc => {
-                match config
-                    .l7_log_dynamic
-                    .extra_field_policies
-                    .get(&L7ProtocolEnum::L7Protocol(L7Protocol::Http2))
-                {
-                    Some(policy) => (Some(&policy.policies), policy.indices.find(port)),
-                    _ => (None, None),
-                }
-            }
-            _ => unreachable!(),
-        };
+        let custom_policies = config
+            .l7_log_dynamic
+            .get_custom_field_policies(self.proto.into(), param);
 
         match self.proto {
             L7Protocol::Http1 => {
@@ -1028,26 +916,17 @@ impl L7ProtocolParserInterface for HttpLog {
                     ..Default::default()
                 };
 
-                #[cfg(feature = "enterprise")]
-                let mut tags = HashMap::new();
-
                 let l7_payload = self.parse_http_v1(
                     payload,
                     param,
                     &mut info,
                     #[cfg(feature = "enterprise")]
-                    &mut tags,
-                    #[cfg(feature = "enterprise")]
-                    policy,
-                    #[cfg(feature = "enterprise")]
-                    policy_indices,
+                    custom_policies,
                 )?;
                 self.set_info_by_config(param, config, payload, Some(l7_payload), &mut info);
 
-                // only handle once for a packet, it also means priority is payload > header > url (if get the same key)
-                // 对一个流量只处理一次，同时意味着优先级为 payload > header > url (如果有相同的 key)
                 #[cfg(feature = "enterprise")]
-                info.merge_policy_tags_to_http(&mut tags);
+                self.merge_custom_fields(custom_policies, Some(l7_payload), &mut info);
 
                 if param.parse_log {
                     Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
@@ -1075,8 +954,6 @@ impl L7ProtocolParserInterface for HttpLog {
                         copy_apm_trace_id: config.l7_log_dynamic.copy_apm_trace_id,
                         ..Default::default()
                     };
-                    #[cfg(feature = "enterprise")]
-                    let mut tags = HashMap::new();
 
                     let ret = match param.ebpf_type {
                         EbpfType::GoHttp2Uprobe => self.parse_http2_go_uprobe(
@@ -1085,22 +962,14 @@ impl L7ProtocolParserInterface for HttpLog {
                             param,
                             &mut info,
                             #[cfg(feature = "enterprise")]
-                            &mut tags,
-                            #[cfg(feature = "enterprise")]
-                            policy,
-                            #[cfg(feature = "enterprise")]
-                            policy_indices,
+                            custom_policies,
                         ),
                         _ => self.parse_http_v2(
                             &payload[offset..],
                             param,
                             &mut info,
                             #[cfg(feature = "enterprise")]
-                            &mut tags,
-                            #[cfg(feature = "enterprise")]
-                            policy,
-                            #[cfg(feature = "enterprise")]
-                            policy_indices,
+                            custom_policies,
                         ),
                     };
                     let n = match ret {
@@ -1113,7 +982,7 @@ impl L7ProtocolParserInterface for HttpLog {
                     self.set_info_by_config(param, config, &payload[offset..], None, &mut info);
 
                     #[cfg(feature = "enterprise")]
-                    info.merge_policy_tags_to_http(&mut tags);
+                    self.merge_custom_fields(custom_policies, None, &mut info);
 
                     if !info.is_invalid() || info.proto == L7Protocol::Grpc {
                         if let Some(h) = info.headers_offset.as_mut() {
@@ -1363,9 +1232,7 @@ impl HttpLog {
         payload: &[u8],
         param: &ParseParam,
         info: &mut HttpInfo,
-        #[cfg(feature = "enterprise")] tags: &mut HashMap<&'static str, String>,
-        #[cfg(feature = "enterprise")] policy: Option<&Vec<Policy>>,
-        #[cfg(feature = "enterprise")] policy_indices: Option<&Vec<usize>>,
+        #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) -> Result<usize> {
         if payload.len() < HTTPV2_CUSTOM_DATA_MIN_LENGTH {
             return Err(Error::HttpHeaderParseFailed);
@@ -1394,10 +1261,20 @@ impl HttpLog {
         let val = &payload[val_offset..val_offset + val_len];
         self.on_header(config, key, val, direction, info)?;
         #[cfg(feature = "enterprise")]
-        {
-            self.on_header_extra(info, direction, tags, policy, policy_indices, key, val);
-            if key == b":path" {
-                self.on_http_url(info, direction, tags, policy, policy_indices);
+        if let Some(policies) = custom_policies {
+            if let Some((key, val)) = str::from_utf8(key).ok().zip(str::from_utf8(val).ok()) {
+                policies.apply(
+                    &mut self.custom_field_store,
+                    direction.into(),
+                    Source::Header(key, val),
+                );
+                if key == ":path" {
+                    policies.apply(
+                        &mut self.custom_field_store,
+                        direction.into(),
+                        Source::Url(&info.path),
+                    );
+                }
             }
         }
 
@@ -1434,9 +1311,7 @@ impl HttpLog {
         payload: &[u8],
         param: &ParseParam,
         info: &mut HttpInfo,
-        #[cfg(feature = "enterprise")] tags: &mut HashMap<&'static str, String>,
-        #[cfg(feature = "enterprise")] policy: Option<&Vec<Policy>>,
-        #[cfg(feature = "enterprise")] policy_indices: Option<&Vec<usize>>,
+        #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) -> Result<usize> {
         let n = self.check_http2_go_uprobe(
             config,
@@ -1444,11 +1319,7 @@ impl HttpLog {
             param,
             info,
             #[cfg(feature = "enterprise")]
-            tags,
-            #[cfg(feature = "enterprise")]
-            policy,
-            #[cfg(feature = "enterprise")]
-            policy_indices,
+            custom_policies,
         )?;
         set_captured_byte!(info, param);
         Ok(n)
@@ -1477,9 +1348,7 @@ impl HttpLog {
         payload: &'a [u8],
         param: &ParseParam,
         info: &mut HttpInfo,
-        #[cfg(feature = "enterprise")] tags: &mut HashMap<&'static str, String>,
-        #[cfg(feature = "enterprise")] policy: Option<&Vec<Policy>>,
-        #[cfg(feature = "enterprise")] policy_indices: Option<&Vec<usize>>,
+        #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) -> Result<&'a [u8]> {
         let (direction, config) = (
             param.direction,
@@ -1524,7 +1393,13 @@ impl HttpLog {
             info.msg_type = LogMessageType::Request;
 
             #[cfg(feature = "enterprise")]
-            self.on_http_url(info, direction, tags, policy, policy_indices);
+            if let Some(policies) = custom_policies {
+                policies.apply(
+                    &mut self.custom_field_store,
+                    direction.into(),
+                    Source::Url(&info.path),
+                );
+            }
         }
 
         let mut content_length: Option<u32> = None;
@@ -1556,15 +1431,13 @@ impl HttpLog {
             }
 
             #[cfg(feature = "enterprise")]
-            self.on_header_extra(
-                info,
-                direction,
-                tags,
-                policy,
-                policy_indices,
-                key.as_bytes(),
-                trim_value.as_bytes(),
-            );
+            if let Some(policies) = custom_policies {
+                policies.apply(
+                    &mut self.custom_field_store,
+                    direction.into(),
+                    Source::Header(key, trim_value),
+                );
+            }
         }
 
         #[cfg(target_os = "linux")]
@@ -1581,7 +1454,13 @@ impl HttpLog {
         }
 
         #[cfg(feature = "enterprise")]
-        self.on_payload(info, direction, tags, policy, policy_indices, l7_payload);
+        if let Some(policies) = custom_policies {
+            policies.apply(
+                &mut self.custom_field_store,
+                direction.into(),
+                Source::Payload(PayloadType::JSON | PayloadType::XML, l7_payload),
+            );
+        }
 
         Ok(l7_payload)
     }
@@ -1671,9 +1550,7 @@ impl HttpLog {
         payload: &[u8],
         param: &ParseParam,
         info: &mut HttpInfo,
-        #[cfg(feature = "enterprise")] tags: &mut HashMap<&'static str, String>,
-        #[cfg(feature = "enterprise")] policy: Option<&Vec<Policy>>,
-        #[cfg(feature = "enterprise")] policy_indices: Option<&Vec<usize>>,
+        #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) -> Result<usize> {
         let (direction, config) = (
             param.direction,
@@ -1764,18 +1641,22 @@ impl HttpLog {
                         content_length = Some(val.parse_to().unwrap_or_default())
                     }
                     #[cfg(feature = "enterprise")]
-                    {
-                        self.on_header_extra(
-                            info,
-                            direction,
-                            tags,
-                            policy,
-                            policy_indices,
-                            key,
-                            val,
-                        );
-                        if key == b":path" {
-                            self.on_http_url(info, direction, tags, policy, policy_indices);
+                    if let Some(policies) = custom_policies {
+                        if let Some((key, val)) =
+                            str::from_utf8(key).ok().zip(str::from_utf8(val).ok())
+                        {
+                            policies.apply(
+                                &mut self.custom_field_store,
+                                direction.into(),
+                                Source::Header(key, val),
+                            );
+                            if key == ":path" {
+                                policies.apply(
+                                    &mut self.custom_field_store,
+                                    direction.into(),
+                                    Source::Url(&info.path),
+                                );
+                            }
                         }
                     }
                 });
@@ -1875,191 +1756,17 @@ impl HttpLog {
         payload: &[u8],
         param: &ParseParam,
         info: &mut HttpInfo,
-        #[cfg(feature = "enterprise")] tags: &mut HashMap<&'static str, String>,
-        #[cfg(feature = "enterprise")] policy: Option<&Vec<Policy>>,
-        #[cfg(feature = "enterprise")] policy_indices: Option<&Vec<usize>>,
+        #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) -> Result<usize> {
         let n = self.check_http_v2(
             payload,
             param,
             info,
             #[cfg(feature = "enterprise")]
-            tags,
-            #[cfg(feature = "enterprise")]
-            policy,
-            #[cfg(feature = "enterprise")]
-            policy_indices,
+            custom_policies,
         )?;
         set_captured_byte!(info, param);
         Ok(n)
-    }
-
-    #[cfg(feature = "enterprise")]
-    fn on_http_url(
-        &mut self,
-        info: &mut HttpInfo,
-        direction: PacketDirection,
-        tags: &mut HashMap<&'static str, String>,
-        policy: Option<&Vec<Policy>>,
-        policy_indices: Option<&Vec<usize>>,
-    ) {
-        let (Some(policies), Some(policy_indices)) = (policy, policy_indices) else {
-            return;
-        };
-
-        let mut query_pairs = info.path.split(&['?', '&', '=']).skip(1);
-        while let (Some(key), Some(value)) = (query_pairs.next(), query_pairs.next()) {
-            let lowercase_key = key.to_lowercase();
-            'outer: for index in policy_indices {
-                let Some(field_policy) = (match (policies.get(*index), direction) {
-                    (Some(policy), PacketDirection::ClientToServer) => {
-                        policy.from_req_key.get(&FieldType::HttpUrl)
-                    }
-                    (Some(policy), PacketDirection::ServerToClient) => {
-                        policy.from_resp_key.get(&FieldType::HttpUrl)
-                    }
-                    _ => continue,
-                }) else {
-                    continue;
-                };
-                if let Some(fields) = field_policy.get(&lowercase_key) {
-                    for field in fields {
-                        if field.match_key(key) && !value.is_empty() {
-                            let Some(value) = field.get_value(value) else {
-                                continue;
-                            };
-                            field.insert_value(value.clone(), tags);
-                            if let Some(attr_name) = &field.attribute_name {
-                                info.attributes.push(KeyVal {
-                                    key: attr_name.to_owned(),
-                                    val: value.clone(),
-                                });
-                            }
-                            if let Some(metric_name) = &field.metric_name {
-                                info.metrics.push(MetricKeyVal {
-                                    key: metric_name.to_owned(),
-                                    val: value.parse::<f32>().unwrap_or(0.0),
-                                });
-                            }
-                            break 'outer;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[cfg(feature = "enterprise")]
-    fn on_header_extra(
-        &mut self,
-        info: &mut HttpInfo,
-        direction: PacketDirection,
-        tags: &mut HashMap<&'static str, String>,
-        policy: Option<&Vec<Policy>>,
-        policy_indices: Option<&Vec<usize>>,
-        key: &[u8],
-        val: &[u8],
-    ) {
-        let (Some(policies), Some(policy_indices)) = (policy, policy_indices) else {
-            return;
-        };
-        // mainly for http2 verify, http1 would be utf-8 string anyway
-        let (Ok(key), Ok(val)) = (str::from_utf8(key), str::from_utf8(val)) else {
-            return;
-        };
-        let lowercase_key = key.to_lowercase();
-        'outer: for index in policy_indices {
-            let Some(field_policy) = (match (policies.get(*index), direction) {
-                (Some(policy), PacketDirection::ClientToServer) => {
-                    policy.from_req_key.get(&FieldType::Header)
-                }
-                (Some(policy), PacketDirection::ServerToClient) => {
-                    policy.from_resp_key.get(&FieldType::Header)
-                }
-                _ => continue,
-            }) else {
-                continue;
-            };
-            if let Some(fields) = field_policy.get(&lowercase_key) {
-                for field in fields {
-                    if !field.match_key(key) {
-                        continue;
-                    }
-                    let Some(value) = field.get_value(val) else {
-                        continue;
-                    };
-                    field.insert_value(value.clone(), tags);
-                    if let Some(attr_name) = &field.attribute_name {
-                        info.attributes.push(KeyVal {
-                            key: attr_name.to_owned(),
-                            val: value.clone(),
-                        });
-                    }
-
-                    if let Some(metric_name) = &field.metric_name {
-                        info.metrics.push(MetricKeyVal {
-                            key: metric_name.to_owned(),
-                            val: value.parse::<f32>().unwrap_or(0.0),
-                        });
-                    }
-                    break 'outer;
-                }
-            }
-        }
-    }
-
-    #[cfg(feature = "enterprise")]
-    fn on_payload(
-        &mut self,
-        info: &mut HttpInfo,
-        direction: PacketDirection,
-        tags: &mut HashMap<&'static str, String>,
-        policy: Option<&Vec<Policy>>,
-        policy_indices: Option<&Vec<usize>>,
-        payload: &[u8],
-    ) {
-        if payload.len() == 0 {
-            return;
-        }
-        let (Some(policies), Some(policy_indices)) = (policy, policy_indices) else {
-            return;
-        };
-        for index in policy_indices {
-            let field_policy = match (policies.get(*index), direction) {
-                (Some(policy), PacketDirection::ClientToServer) => &policy.from_req_body,
-                (Some(policy), PacketDirection::ServerToClient) => &policy.from_resp_body,
-                _ => continue,
-            };
-            for (field_type, fields) in field_policy {
-                if !field_type_support_protocol(field_type, info.proto) {
-                    continue;
-                }
-
-                for field in fields {
-                    let Some(extract_field) = field.get_value_from_payload(payload, field_type)
-                    else {
-                        continue;
-                    };
-                    let Some(value) = field.get_value(&extract_field) else {
-                        continue;
-                    };
-                    field.insert_value(value.clone(), tags);
-                    if let Some(attr_name) = &field.attribute_name {
-                        info.attributes.push(KeyVal {
-                            key: attr_name.to_owned(),
-                            val: value.clone(),
-                        });
-                    }
-
-                    if let Some(metric_name) = &field.metric_name {
-                        info.metrics.push(MetricKeyVal {
-                            key: metric_name.to_owned(),
-                            val: value.parse::<f32>().unwrap_or(0.0),
-                        });
-                    }
-                }
-            }
-        }
     }
 
     fn on_header(
@@ -2221,6 +1928,120 @@ impl HttpLog {
         .map(|custom| {
             info.merge_custom_to_http(custom, param.direction);
         });
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn merge_custom_fields(
+        &mut self,
+        policies: Option<PolicySlice>,
+        l7_payload: Option<&[u8]>,
+        info: &mut HttpInfo,
+    ) {
+        let Some(policies) = policies else {
+            return;
+        };
+
+        for Operation { op, prio } in self.custom_field_store.drain_with(policies) {
+            match op {
+                Op::RewriteResponseStatus(status) => info.status_code = status as u32 as u16,
+                Op::RewriteNativeTag(tag, value) => {
+                    match tag {
+                        NativeTag::Version => {
+                            info.version = Version::try_from(value.as_str()).unwrap_or_default()
+                        }
+                        // req
+                        NativeTag::RequestType => {
+                            if info.method.is_none() {
+                                info.method = Method::try_from(value.as_str()).unwrap_or_default();
+                            }
+                        }
+                        NativeTag::RequestDomain => info.host = value.to_string(),
+                        NativeTag::RequestResource => info.path = value.to_string(),
+                        NativeTag::Endpoint => info.endpoint = Some(value.to_string()),
+                        NativeTag::RequestId => info.stream_id = value.parse::<u32>().ok(),
+                        // resp
+                        NativeTag::ResponseCode => {
+                            info.response_code_to_attribute();
+                            info.status_code = value.parse::<u16>().unwrap_or_default();
+                        }
+                        NativeTag::ResponseException => {
+                            info.custom_exception = Some(value.to_string())
+                        }
+                        NativeTag::ResponseResult => info.custom_result = Some(value.to_string()),
+                        // trace
+                        NativeTag::TraceId => info
+                            .trace_ids
+                            .merge_field(CUSTOM_FIELD_POLICY_PRIORITY + prio, value.to_string()),
+                        NativeTag::SpanId => {
+                            if CUSTOM_FIELD_POLICY_PRIORITY <= info.span_id.prio {
+                                let prev = mem::replace(
+                                    &mut info.span_id,
+                                    PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, value.to_string()),
+                                );
+                                if !prev.is_default() {
+                                    info.attributes.push(KeyVal {
+                                        key: APM_SPAN_ID_ATTR.to_string(),
+                                        val: prev.into_inner(),
+                                    });
+                                }
+                            }
+                        }
+                        NativeTag::HttpProxyClient => match info.client_ip.as_ref() {
+                            Some(client_ip) if client_ip.prio < CUSTOM_FIELD_POLICY_PRIORITY => (),
+                            _ => {
+                                info.client_ip = Some(PrioField::new(
+                                    CUSTOM_FIELD_POLICY_PRIORITY,
+                                    value.to_string(),
+                                ))
+                            }
+                        },
+                        NativeTag::XRequestId => {
+                            if matches!(
+                                info.msg_type,
+                                LogMessageType::Request | LogMessageType::Response
+                            ) {
+                                let x_req_id = match info.msg_type {
+                                    LogMessageType::Request => &mut info.x_request_id_0,
+                                    LogMessageType::Response => &mut info.x_request_id_1,
+                                    _ => unreachable!(),
+                                };
+                                if CUSTOM_FIELD_POLICY_PRIORITY <= x_req_id.prio {
+                                    *x_req_id = PrioField::new(
+                                        CUSTOM_FIELD_POLICY_PRIORITY,
+                                        value.to_string(),
+                                    );
+                                }
+                            }
+                        }
+                        NativeTag::BizType => {
+                            info.biz_type = value.parse::<u8>().unwrap_or_default()
+                        }
+                        NativeTag::BizCode => info.biz_code = value.to_string(),
+                        NativeTag::BizScenario => info.biz_scenario = value.to_string(),
+                    }
+                }
+                Op::AddAttribute(key, value) => {
+                    info.attributes.push(KeyVal {
+                        key: key.to_string(),
+                        val: value.to_string(),
+                    });
+                }
+                Op::AddMetric(key, value) => {
+                    info.metrics.push(MetricKeyVal {
+                        key: key.to_string(),
+                        val: value,
+                    });
+                }
+                Op::SavePayload(key) => {
+                    if let Some(l7_payload) = l7_payload {
+                        info.attributes.push(KeyVal {
+                            key: key.to_string(),
+                            val: String::from_utf8_lossy(l7_payload).to_string(),
+                        });
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -2514,16 +2335,6 @@ mod tests {
     use std::rc::Rc;
     use std::slice::from_raw_parts;
     use std::time::Duration;
-
-    cfg_if::cfg_if! {
-    if #[cfg(feature = "enterprise")] {
-            use enterprise_utils::l7::custom_policy::{
-                custom_field_policy::{Policy, PolicyMap, ExtraField},
-                enums::{FieldType, MatchType},
-            };
-            use public::segment_map::{SegmentMap, SegmentBuilder};
-        }
-    }
 
     use super::*;
 
@@ -2846,10 +2657,6 @@ mod tests {
                     param,
                     &mut info,
                     #[cfg(feature = "enterprise")]
-                    &mut HashMap::new(),
-                    #[cfg(feature = "enterprise")]
-                    None,
-                    #[cfg(feature = "enterprise")]
                     None,
                 );
                 assert_eq!(res.is_ok(), false);
@@ -2886,10 +2693,6 @@ mod tests {
                 &payload,
                 param,
                 &mut info,
-                #[cfg(feature = "enterprise")]
-                &mut HashMap::new(),
-                #[cfg(feature = "enterprise")]
-                None,
                 #[cfg(feature = "enterprise")]
                 None,
             );
@@ -2978,10 +2781,6 @@ mod tests {
             &payload,
             &param,
             &mut HttpInfo::default(),
-            #[cfg(feature = "enterprise")]
-            &mut HashMap::new(),
-            #[cfg(feature = "enterprise")]
-            None,
             #[cfg(feature = "enterprise")]
             None,
         );
@@ -3349,345 +3148,5 @@ mod tests {
             &param
         ));
         assert!(parser.check_payload("GET / HTTP/1.1\r\n\r\n".as_bytes(), &param));
-    }
-
-    #[cfg(feature = "enterprise")]
-    fn get_extra_field_config() -> HashMap<NativeTag, ExtraField> {
-        // 这个 hashmap 的 key 没有特殊含义，只是方便用 map[key] 取对应的 value 做单测
-        HashMap::from([
-            (
-                NativeTag::HttpProxyClient,
-                ExtraField {
-                    field_match_type: MatchType::String(false),
-                    field_match_keyword: "client".into(),
-                    rewrite_native_tag: Some(NativeTag::HttpProxyClient),
-                    ..Default::default()
-                },
-            ),
-            (
-                NativeTag::RequestId,
-                ExtraField {
-                    field_match_type: MatchType::String(false),
-                    field_match_keyword: "user_id".into(),
-                    rewrite_native_tag: Some(NativeTag::RequestId),
-                    attribute_name: Some("user_id".into()),
-                    ..Default::default()
-                },
-            ),
-            (
-                NativeTag::XRequestId,
-                ExtraField {
-                    field_match_type: MatchType::String(true),
-                    field_match_keyword: "x-request-id".into(),
-                    rewrite_native_tag: Some(NativeTag::XRequestId),
-                    ..Default::default()
-                },
-            ),
-            (
-                NativeTag::TraceId,
-                ExtraField {
-                    field_match_type: MatchType::String(true),
-                    field_match_keyword: "trace_id".into(),
-                    rewrite_native_tag: Some(NativeTag::TraceId),
-                    subfield_match_keyword: Some("trace_id".into()),
-                    separator_between_subfield_key_and_value: Some("=".into()),
-                    separator_between_subfield_kv_pair: Some(";".into()),
-                    ..Default::default()
-                },
-            ),
-            (
-                NativeTag::SpanId,
-                ExtraField {
-                    field_match_type: MatchType::String(false),
-                    field_match_keyword: "span_id".into(),
-                    rewrite_native_tag: Some(NativeTag::SpanId),
-                    ..Default::default()
-                },
-            ),
-            (
-                NativeTag::ResponseException,
-                ExtraField {
-                    field_match_type: MatchType::String(true),
-                    field_match_keyword: "Field_from_json".into(),
-                    attribute_name: Some("Field_from_json".into()),
-                    ..Default::default()
-                },
-            ),
-            (
-                NativeTag::ResponseStatus,
-                ExtraField {
-                    field_match_type: MatchType::String(true),
-                    field_match_keyword: "metric_from_xml".into(),
-                    metric_name: Some("metric_from_xml".into()),
-                    ..Default::default()
-                },
-            ),
-        ])
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn test_extra_field_policy() {
-        let mut parser = HttpLog::new_v1();
-        let mut info = HttpInfo::default();
-        info.proto = L7Protocol::Http1;
-        info.msg_type = LogMessageType::Request;
-
-        let rewrite_extra_fields = get_extra_field_config();
-        let trace_id_ignore_case = ExtraField {
-            field_match_type: MatchType::String(true),
-            field_match_keyword: "trace_id".into(),
-            rewrite_native_tag: Some(NativeTag::TraceId),
-            ..Default::default()
-        };
-        let span_id_ignore_case = ExtraField {
-            field_match_type: MatchType::String(true),
-            field_match_keyword: "span_id".into(),
-            rewrite_native_tag: Some(NativeTag::SpanId),
-            ..Default::default()
-        };
-
-        let config: L7LogDynamicConfig = L7LogDynamicConfigBuilder {
-            proxy_client: vec![],
-            x_request_id: vec!["x-request-id".into()],
-            trace_types: vec!["trace_id".into()],
-            span_types: vec!["span_id".into()],
-            extra_field_policies: HashMap::from([(
-                L7ProtocolEnum::L7Protocol(L7Protocol::Http1),
-                PolicyMap {
-                    policies: vec![Policy {
-                        from_req_key: HashMap::from([
-                            (
-                                FieldType::HttpUrl,
-                                HashMap::from([
-                                    (
-                                        "client".into(),
-                                        vec![rewrite_extra_fields[&NativeTag::HttpProxyClient]
-                                            .clone()],
-                                    ),
-                                    (
-                                        "span_id".into(),
-                                        vec![rewrite_extra_fields[&NativeTag::SpanId].clone()],
-                                    ),
-                                    (
-                                        "user_id".into(),
-                                        vec![rewrite_extra_fields[&NativeTag::RequestId].clone()],
-                                    ),
-                                ]),
-                            ),
-                            (
-                                FieldType::Header,
-                                HashMap::from([
-                                    (
-                                        "x-request-id".into(),
-                                        vec![rewrite_extra_fields[&NativeTag::XRequestId].clone()],
-                                    ),
-                                    ("trace_id".into(), vec![trace_id_ignore_case]),
-                                    ("span_id".into(), vec![span_id_ignore_case]),
-                                ]),
-                            ),
-                        ]),
-                        ..Default::default()
-                    }],
-                    indices: SegmentBuilder::new().merge_segments(),
-                },
-            )]),
-            ..Default::default()
-        }
-        .into();
-
-        let mut tags = HashMap::new();
-        info.path = "/getuser?user_id=456789&client=192.168.1.1&span_id=01".into();
-        let policy = config
-            .extra_field_policies
-            .get(&L7ProtocolEnum::L7Protocol(L7Protocol::Http1));
-        let http1_policy = &policy.unwrap().policies;
-        parser.on_http_url(
-            &mut info,
-            PacketDirection::ClientToServer,
-            &mut tags,
-            Some(http1_policy),
-            Some(&vec![0usize; 1]),
-        );
-        info.merge_policy_tags_to_http(&mut tags);
-        assert_eq!(info.span_id.field, "01");
-        assert_eq!(info.stream_id, Some(456789));
-        assert_eq!(
-            info.client_ip
-                .as_ref()
-                .unwrap_or(&PrioField::default())
-                .field,
-            "192.168.1.1"
-        );
-        for attr in info.attributes.iter() {
-            if attr.key == "user_id" {
-                assert_eq!(attr.val, "456789");
-            }
-        }
-
-        let _ = parser.on_header_extra(
-            &mut info,
-            PacketDirection::ClientToServer,
-            &mut tags,
-            Some(http1_policy),
-            Some(&vec![0usize; 1]),
-            b"X-Request-Id",
-            b"xreqid",
-        );
-        info.merge_policy_tags_to_http(&mut tags);
-        assert_eq!(info.x_request_id_0.field, "xreqid");
-        let _ = parser.on_header_extra(
-            &mut info,
-            PacketDirection::ClientToServer,
-            &mut tags,
-            Some(http1_policy),
-            Some(&vec![0usize; 1]),
-            b"TRacE_Id",
-            b"test_parse_trace_id",
-        );
-        info.merge_policy_tags_to_http(&mut tags);
-        assert_eq!(info.trace_ids.highest(), "test_parse_trace_id");
-        let _ = parser.on_header_extra(
-            &mut info,
-            PacketDirection::ClientToServer,
-            &mut tags,
-            Some(http1_policy),
-            Some(&vec![0usize; 1]),
-            b"sPAn_id",
-            b"test_parse_span_id",
-        );
-        info.merge_policy_tags_to_http(&mut tags);
-        assert_eq!(info.span_id.field, "test_parse_span_id");
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn test_extra_field_policy_in_payload() {
-        let mut parser = HttpLog::new_v1();
-        fn get_new_info() -> HttpInfo {
-            let mut info = HttpInfo::default();
-            info.proto = L7Protocol::Http1;
-            info.msg_type = LogMessageType::Request;
-            info
-        }
-        let mut info = get_new_info();
-
-        let rewrite_extra_fields: Vec<ExtraField> =
-            get_extra_field_config().into_values().collect();
-        let config: L7LogDynamicConfig = L7LogDynamicConfigBuilder {
-            proxy_client: vec![],
-            x_request_id: vec!["x-request-id".into()],
-            trace_types: vec!["trace_id".into()],
-            span_types: vec!["span_id".into()],
-            extra_field_policies: HashMap::from([(
-                L7ProtocolEnum::L7Protocol(L7Protocol::Http1),
-                PolicyMap {
-                    policies: vec![
-                        Policy {
-                            from_req_body: HashMap::from([(
-                                FieldType::PayloadJson,
-                                rewrite_extra_fields.clone(),
-                            )]),
-                            ..Default::default()
-                        },
-                        Policy {
-                            from_req_body: HashMap::from([(
-                                FieldType::PayloadXml,
-                                rewrite_extra_fields,
-                            )]),
-                            ..Default::default()
-                        },
-                    ],
-                    indices: SegmentMap::default(),
-                },
-            )]),
-            ..Default::default()
-        }
-        .into();
-
-        let json_payload = r#"{"client": "192.168.1.1", "trace_id": "trace_id=test_parse_trace_id;x-request-id=xreqid","span_id": "test_parse_span_id", "user_id": "456789"}"#;
-        let random_payload = vec![0x1u8, 0x2, 0x3, 0x5, 0x7, 0xA, 0xC, 0x10, 0xDF];
-        let mut json_mixed_payload = Vec::new();
-        json_mixed_payload.extend(random_payload.clone());
-        json_mixed_payload.extend(json_payload.as_bytes());
-        json_mixed_payload.extend(random_payload.clone());
-
-        let mut tags = HashMap::new();
-        let policy = config
-            .extra_field_policies
-            .get(&L7ProtocolEnum::L7Protocol(L7Protocol::Http1));
-        let http1_policy = &policy.unwrap().policies;
-        parser.on_payload(
-            &mut info,
-            PacketDirection::ClientToServer,
-            &mut tags,
-            Some(http1_policy),
-            Some(&vec![0usize, 1usize]),
-            &json_mixed_payload.as_bytes(),
-        );
-        info.merge_policy_tags_to_http(&mut tags);
-        assert_eq!(info.span_id.field, "test_parse_span_id");
-        assert_eq!(info.stream_id, Some(456789));
-        assert_eq!(info.trace_ids.highest(), "test_parse_trace_id");
-        assert_eq!(
-            info.client_ip
-                .as_ref()
-                .unwrap_or(&PrioField::default())
-                .field,
-            "192.168.1.1"
-        );
-        for attr in info.attributes.iter() {
-            if attr.key == "user_id" {
-                assert_eq!(attr.val, "456789");
-            }
-        }
-
-        info = get_new_info();
-        let xml_payload = r#"<client>192.168.1.1</client><trace_id>trace_id=test_parse_trace_id;x-request-id=xreqid</trace_id><span_id>test_parse_span_id</span_id><user_id>456789</user_id>"#;
-        let mut xml_mixed_payload = Vec::new();
-        xml_mixed_payload.extend(random_payload.clone());
-        xml_mixed_payload.extend(xml_payload.as_bytes());
-        xml_mixed_payload.extend(random_payload.clone());
-
-        parser.on_payload(
-            &mut info,
-            PacketDirection::ClientToServer,
-            &mut tags,
-            Some(http1_policy),
-            Some(&vec![0usize, 1usize]),
-            &json_mixed_payload.as_bytes(),
-        );
-        info.merge_policy_tags_to_http(&mut tags);
-        assert_eq!(info.span_id.field, "test_parse_span_id");
-        assert_eq!(info.stream_id, Some(456789));
-        assert_eq!(info.trace_ids.highest(), "test_parse_trace_id");
-        assert_eq!(
-            info.client_ip
-                .as_ref()
-                .unwrap_or(&PrioField::default())
-                .field,
-            "192.168.1.1"
-        );
-        for attr in info.attributes.iter() {
-            if attr.key == "user_id" {
-                assert_eq!(attr.val, "456789");
-            }
-        }
-
-        info = get_new_info();
-        let mixed_payload = r#"{"txStartServNo": "hello", "sss": {"Field_from_json": "field_from_json_value"}}<saeawda><metric_From_XML>42</metric_From_XML></saeawda><FIELD_FROM_XML>field_from_xml</FIELD_FROM_XML>"#;
-        parser.on_payload(
-            &mut info,
-            PacketDirection::ClientToServer,
-            &mut tags,
-            Some(http1_policy),
-            Some(&vec![0usize, 1usize]),
-            &mixed_payload.as_bytes(),
-        );
-        info.merge_policy_tags_to_http(&mut tags);
-        assert!(info.attributes.len() > 0);
-        assert!(info.metrics.len() > 0);
-        assert_eq!(info.attributes[0].val, "field_from_json_value");
-        assert_eq!(info.metrics[0].val, 42.0f32);
     }
 }
