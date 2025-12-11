@@ -253,7 +253,7 @@ impl FastCGIInfo {
                 if config.is_span_id(key) {
                     for (i, span) in config.span_types.iter().enumerate() {
                         let prio = i as u8 + BASE_FIELD_PRIORITY;
-                        if self.span_id.prio <= prio {
+                        if self.span_id.prio() <= prio {
                             break;
                         }
                         if !span.check(key) {
@@ -271,7 +271,7 @@ impl FastCGIInfo {
                 };
                 for (i, req_id) in config.x_request_id.iter().enumerate() {
                     let prio = i as u8 + BASE_FIELD_PRIORITY;
-                    if x_req_id.prio <= prio {
+                    if x_req_id.prio() <= prio {
                         break;
                     }
                     if req_id == key {
