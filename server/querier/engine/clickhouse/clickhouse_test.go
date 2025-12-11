@@ -350,7 +350,7 @@ var (
 		name:   "topk_enum",
 		db:     "flow_log",
 		input:  "select TopK(protocol,2) from l4_flow_log limit 2",
-		output: []string{"SELECT arrayStringConcat(tupleElement(`array_TopK_2(protocol)`,1),',') AS `TopK_2(protocol)`, arrayStringConcat(tupleElement(`array_TopK_2(protocol)`,2),',') AS `counts_TopK_2(protocol)`, topKIf(2, 3, 'counts')(dictGetOrDefault('flow_tag.int_enum_map', 'name_en', ('protocol',toUInt64(protocol)), protocol), dictGetOrDefault('flow_tag.int_enum_map', 'name_en', ('protocol',toUInt64(protocol)), protocol) != '') AS `array_TopK_2(protocol)` FROM flow_log.`l4_flow_log` LIMIT 2"},
+		output: []string{"SELECT arrayStringConcat(tupleElement(`array_TopK_2(protocol)`,1),',') AS `TopK_2(protocol)`, arrayStringConcat(tupleElement(`array_TopK_2(protocol)`,2),',') AS `counts_TopK_2(protocol)`, topK(2, 3, 'counts')(protocol) AS `array_TopK_2(protocol)` FROM flow_log.`l4_flow_log` LIMIT 2"},
 	}, {
 		name:   "select_enum",
 		db:     "flow_log",
