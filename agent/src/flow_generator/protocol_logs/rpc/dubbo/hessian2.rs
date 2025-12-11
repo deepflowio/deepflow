@@ -37,8 +37,8 @@ if #[cfg(feature = "enterprise")] {
         };
         use enterprise_utils::l7::custom_policy::{
             custom_field_policy::{enums::{Op, Operation, PayloadType, Source}, Store},
-            enums::NativeTag,
         };
+        use public::l7_protocol::NativeTag;
     }
 }
 
@@ -174,7 +174,7 @@ pub fn get_req_body_info(
         }
 
         decode_span_id(&payload[para_index..], &span_type, info);
-        if info.span_id.field.len() != 0 {
+        if info.span_id.get().len() != 0 {
             break;
         }
     }
@@ -210,7 +210,7 @@ fn apply_custom_field_policies(
         param.direction.into(),
         Source::Payload(PayloadType::HESSIAN2, payload),
     );
-    for Operation { op, prio } in store.into_iter_with(policies) {
+    for Operation { op, prio } in store.into_iter_with(policies, &*info) {
         match op {
             Op::RewriteResponseStatus(status) => {
                 info.status_code.replace(status as u32 as i32);
@@ -235,6 +235,7 @@ fn apply_custom_field_policies(
                     }
                     // res
                     NativeTag::ResponseCode => info.status_code = value.parse::<i32>().ok(),
+                    NativeTag::ResponseStatus => (),
                     NativeTag::ResponseException => info.custom_exception = Some(value.to_string()),
                     NativeTag::ResponseResult => info.custom_result = Some(value.to_string()),
                     // trace info
@@ -242,7 +243,7 @@ fn apply_custom_field_policies(
                         .trace_ids
                         .merge_field(CUSTOM_FIELD_POLICY_PRIORITY + prio, value.to_string()),
                     NativeTag::SpanId => {
-                        if CUSTOM_FIELD_POLICY_PRIORITY < info.span_id.prio {
+                        if CUSTOM_FIELD_POLICY_PRIORITY < info.span_id.prio() {
                             let old = std::mem::replace(
                                 &mut info.span_id,
                                 PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, value.to_string()),
@@ -263,7 +264,7 @@ fn apply_custom_field_policies(
                             _ => return,
                         };
                         match x_req_id {
-                            Some(old) if old.prio < CUSTOM_FIELD_POLICY_PRIORITY => (),
+                            Some(old) if old.prio() < CUSTOM_FIELD_POLICY_PRIORITY => (),
                             _ => {
                                 *x_req_id = Some(PrioField::new(
                                     CUSTOM_FIELD_POLICY_PRIORITY,
@@ -272,6 +273,24 @@ fn apply_custom_field_policies(
                             }
                         }
                     }
+                    NativeTag::XRequestId0 => match info.x_request_id_0.as_ref() {
+                        Some(old) if old.prio() < CUSTOM_FIELD_POLICY_PRIORITY => (),
+                        _ => {
+                            info.x_request_id_0 = Some(PrioField::new(
+                                CUSTOM_FIELD_POLICY_PRIORITY,
+                                value.to_string(),
+                            ));
+                        }
+                    },
+                    NativeTag::XRequestId1 => match info.x_request_id_1.as_ref() {
+                        Some(old) if old.prio() < CUSTOM_FIELD_POLICY_PRIORITY => (),
+                        _ => {
+                            info.x_request_id_1 = Some(PrioField::new(
+                                CUSTOM_FIELD_POLICY_PRIORITY,
+                                value.to_string(),
+                            ));
+                        }
+                    },
                     NativeTag::BizType => info.biz_type = value.parse::<u8>().unwrap_or_default(),
                     NativeTag::BizCode => info.biz_code = value.to_string(),
                     NativeTag::BizScenario => info.biz_scenario = value.to_string(),

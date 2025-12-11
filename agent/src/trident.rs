@@ -2827,6 +2827,7 @@ impl AgentComponents {
         let ebpf_dispatcher_id = dispatcher_components.len();
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let mut ebpf_dispatcher_component = None;
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         let is_kernel_ebpf_meltdown = crate::utils::guard::is_kernel_ebpf_meltdown();
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if !config_handler.ebpf().load().ebpf.disabled

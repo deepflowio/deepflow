@@ -15,6 +15,7 @@
  */
 
 use std::{
+    borrow::{Borrow, Cow},
     cell::OnceCell,
     collections::{HashMap, HashSet},
     mem, str,
@@ -25,7 +26,8 @@ use hpack::Decoder;
 use nom::{AsBytes, ParseTo};
 use serde::Serialize;
 
-use public::l7_protocol::L7ProtocolChecker;
+use public::l7_protocol::{Field, FieldSetter, L7Log, L7ProtocolChecker};
+use public_derive::L7Log;
 
 use super::{
     consts::*,
@@ -63,8 +65,8 @@ if #[cfg(feature = "enterprise")] {
                 enums::{Op, Operation, PayloadType, Source},
                 PolicySlice, Store,
             },
-            enums::NativeTag,
         };
+        use public::l7_protocol::NativeTag;
     }
 }
 
@@ -220,7 +222,11 @@ impl Serialize for Method {
     }
 }
 
-#[derive(Serialize, Debug, Default, Clone)]
+#[derive(L7Log, Serialize, Debug, Default, Clone)]
+#[l7_log(version.getter = "HttpInfo::get_version", version.setter = "HttpInfo::set_version")]
+#[l7_log(request_type.getter = "HttpInfo::get_method", request_type.setter = "HttpInfo::set_method")]
+#[l7_log(endpoint.getter = "HttpInfo::get_endpoint", endpoint.setter = "HttpInfo::set_endpoint")]
+#[l7_log(trace_id.getter = "HttpInfo::get_trace_id", trace_id.setter = "HttpInfo::set_trace_id")]
 pub struct HttpInfo {
     // Offset for HTTP2 HEADERS:
     // Example:
@@ -249,6 +255,7 @@ pub struct HttpInfo {
     #[serde(skip)]
     raw_data_type: L7ProtoRawDataType,
 
+    #[l7_log(request_id)]
     #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
     pub stream_id: Option<u32>,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -262,15 +269,18 @@ pub struct HttpInfo {
 
     #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
     pub method: Method,
+    #[l7_log(request_resource)]
     #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub path: String,
+    #[l7_log(request_domain)]
     #[serde(rename = "request_domain", skip_serializing_if = "value_is_default")]
     pub host: String,
     #[serde(rename = "user_agent", skip_serializing_if = "Option::is_none")]
     pub user_agent: Option<String>,
     #[serde(rename = "referer", skip_serializing_if = "Option::is_none")]
     pub referer: Option<String>,
-    #[serde(rename = "http_proxy_client", skip_serializing_if = "Option::is_none")]
+    #[l7_log(http_proxy_client)]
+    #[serde(rename = "http_proxy_client", skip_serializing_if = "value_is_default")]
     pub client_ip: Option<PrioField<String>>,
     #[serde(skip_serializing_if = "value_is_default")]
     pub x_request_id_0: PrioField<String>,
@@ -283,8 +293,10 @@ pub struct HttpInfo {
     pub resp_content_length: Option<u32>,
 
     // status_code == 0 means None
+    #[l7_log(response_code)]
     #[serde(rename = "response_code", skip_serializing_if = "value_is_default")]
     pub status_code: u16,
+    #[l7_log(response_status)]
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -292,7 +304,9 @@ pub struct HttpInfo {
 
     endpoint: Option<String>,
     // set by wasm plugin
+    #[l7_log(response_result)]
     custom_result: Option<String>,
+    #[l7_log(response_exception)]
     custom_exception: Option<String>,
 
     captured_request_byte: u32,
@@ -318,6 +332,77 @@ pub struct HttpInfo {
 
     #[serde(skip_serializing_if = "value_is_default")]
     is_async: bool,
+}
+
+impl L7ProtocolInfoInterface for HttpInfo {
+    fn session_id(&self) -> Option<u32> {
+        self.stream_id
+    }
+
+    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
+        if let L7ProtocolInfo::HttpInfo(other) = other {
+            return self.merge(other);
+        }
+        Ok(())
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        Some(AppProtoHead {
+            proto: self.proto,
+            msg_type: self.msg_type,
+            rrt: self.rrt,
+        })
+    }
+
+    fn is_tls(&self) -> bool {
+        self.is_tls
+    }
+
+    fn skip_send(&self) -> bool {
+        // filter the empty data from go http uprobe.
+        self.raw_data_type == L7ProtoRawDataType::GoHttp2Uprobe && self.is_empty()
+    }
+
+    fn need_merge(&self) -> bool {
+        match self.raw_data_type {
+            L7ProtoRawDataType::GoHttp2Uprobe => true,
+            _ => false,
+        }
+    }
+
+    fn is_req_resp_end(&self) -> (bool, bool) {
+        (self.is_req_end, self.is_resp_end)
+    }
+
+    fn get_endpoint(&self) -> Option<String> {
+        match L7Log::get_endpoint(self) {
+            Field::Str(s) => Some(s.into_owned()),
+            _ => None,
+        }
+    }
+
+    fn tcp_seq_offset(&self) -> u32 {
+        self.headers_offset.unwrap_or_default()
+    }
+
+    fn get_request_domain(&self) -> String {
+        match L7Log::get_request_domain(self) {
+            Field::Str(s) => s.into_owned(),
+            _ => String::new(),
+        }
+    }
+
+    fn get_request_resource_length(&self) -> usize {
+        self.path.len()
+    }
+
+    fn is_on_blacklist(&self) -> bool {
+        self.is_on_blacklist
+    }
+
+    fn get_biz_type(&self) -> u8 {
+        self.biz_type
+    }
 }
 
 impl HttpInfo {
@@ -429,82 +514,7 @@ impl HttpInfo {
             self.is_async = is_async;
         }
     }
-}
 
-impl L7ProtocolInfoInterface for HttpInfo {
-    fn session_id(&self) -> Option<u32> {
-        self.stream_id
-    }
-
-    fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
-        if let L7ProtocolInfo::HttpInfo(other) = other {
-            return self.merge(other);
-        }
-        Ok(())
-    }
-
-    fn app_proto_head(&self) -> Option<AppProtoHead> {
-        Some(AppProtoHead {
-            proto: self.proto,
-            msg_type: self.msg_type,
-            rrt: self.rrt,
-        })
-    }
-
-    fn is_tls(&self) -> bool {
-        self.is_tls
-    }
-
-    fn skip_send(&self) -> bool {
-        // filter the empty data from go http uprobe.
-        self.raw_data_type == L7ProtoRawDataType::GoHttp2Uprobe && self.is_empty()
-    }
-
-    fn need_merge(&self) -> bool {
-        match self.raw_data_type {
-            L7ProtoRawDataType::GoHttp2Uprobe => true,
-            _ => false,
-        }
-    }
-
-    fn is_req_resp_end(&self) -> (bool, bool) {
-        (self.is_req_end, self.is_resp_end)
-    }
-
-    fn get_endpoint(&self) -> Option<String> {
-        if self.is_grpc() {
-            if self.path.is_empty() {
-                None
-            } else {
-                Some(self.path.clone())
-            }
-        } else {
-            self.endpoint.clone()
-        }
-    }
-
-    fn tcp_seq_offset(&self) -> u32 {
-        self.headers_offset.unwrap_or_default()
-    }
-
-    fn get_request_domain(&self) -> String {
-        self.host.clone()
-    }
-
-    fn get_request_resource_length(&self) -> usize {
-        self.path.len()
-    }
-
-    fn is_on_blacklist(&self) -> bool {
-        self.is_on_blacklist
-    }
-
-    fn get_biz_type(&self) -> u8 {
-        self.biz_type
-    }
-}
-
-impl HttpInfo {
     pub fn merge(&mut self, other: &mut Self) -> Result<()> {
         let other_is_grpc = other.is_grpc();
 
@@ -645,6 +655,77 @@ impl HttpInfo {
 
         false
     }
+
+    fn get_version(&self) -> Field {
+        Field::Str(Cow::Borrowed(&self.version.as_str()))
+    }
+
+    fn set_version(&mut self, version: FieldSetter) {
+        match version.into_inner() {
+            Field::Str(s) => self.version = Version::try_from(s.borrow()).unwrap_or_default(),
+            _ => self.version = Version::Unknown,
+        }
+    }
+
+    fn get_method(&self) -> Field {
+        Field::Str(Cow::Borrowed(self.method.as_str()))
+    }
+
+    fn set_method(&mut self, method: FieldSetter) {
+        match method.into_inner() {
+            Field::Str(s) => self.method = Method::try_from(s.borrow()).unwrap_or_default(),
+            _ => self.method = Method::None,
+        }
+    }
+
+    fn get_endpoint(&self) -> Field {
+        if self.is_grpc() {
+            if self.path.is_empty() {
+                Field::None
+            } else {
+                Field::Str(Cow::Borrowed(&self.path))
+            }
+        } else {
+            match self.endpoint.as_ref() {
+                Some(s) if !s.is_empty() => Field::Str(Cow::Borrowed(s)),
+                _ => Field::None,
+            }
+        }
+    }
+
+    fn set_endpoint(&mut self, endpoint: FieldSetter) {
+        match endpoint.into_inner() {
+            Field::Int(_) => return,
+            Field::Str(s) if !s.is_empty() => {
+                if self.is_grpc() {
+                    self.path = s.into_owned();
+                } else {
+                    self.endpoint = Some(s.into_owned());
+                }
+            }
+            _ => {
+                if self.is_grpc() {
+                    self.path = String::new();
+                } else {
+                    self.endpoint = None;
+                }
+            }
+        }
+    }
+
+    fn get_trace_id(&self) -> Field {
+        Field::Str(Cow::Borrowed(&self.trace_ids.highest()))
+    }
+
+    fn set_trace_id(&mut self, trace_id: FieldSetter) {
+        let (prio, trace_id) = (trace_id.prio(), trace_id.into_inner());
+        match trace_id {
+            Field::Str(s) => {
+                self.trace_ids.merge_field(prio, s.into_owned());
+            }
+            _ => return,
+        }
+    }
 }
 
 impl From<HttpInfo> for L7ProtocolSendLog {
@@ -728,7 +809,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 request_id: f.stream_id,
                 x_request_id_0: Some(f.x_request_id_0.into_inner()),
                 x_request_id_1: Some(f.x_request_id_1.into_inner()),
-                client_ip: f.client_ip.map(|p| p.into_inner()),
+                client_ip: f.client_ip.map(|ip| ip.into_inner()),
                 user_agent: f.user_agent,
                 referer: f.referer,
                 rpc_service: f.service_name,
@@ -771,7 +852,7 @@ impl From<&HttpInfo> for LogCache {
             } else {
                 None
             },
-            endpoint: info.get_endpoint(),
+            endpoint: L7ProtocolInfoInterface::get_endpoint(info),
             ..Default::default()
         }
     }
@@ -868,6 +949,7 @@ impl L7ProtocolParserInterface for HttpLog {
                     ..Default::default()
                 };
 
+                #[allow(unused_variables)]
                 let l7_payload = self.parse_http_v1(
                     payload,
                     param,
@@ -1234,7 +1316,6 @@ impl HttpLog {
     // Note: Windows is compiled using Rust 1.75.0 and does not support the APIs added in the higher
     // version of Rust.
     #[cfg(target_os = "windows")]
-    #[cfg(feature = "enterprise")]
     pub const fn trim_ascii_start(bytes: &[u8]) -> &[u8] {
         let mut bytes = bytes;
         // Note: A pattern matching based approach (instead of indexing) allows
@@ -1752,7 +1833,7 @@ impl HttpLog {
         if config.is_span_id(key) {
             for (i, span) in config.span_types.iter().enumerate() {
                 let prio = i as u8 + BASE_FIELD_PRIORITY;
-                if info.span_id.prio <= prio {
+                if info.span_id.prio() <= prio {
                     break;
                 }
                 if !span.check(key) {
@@ -1770,7 +1851,7 @@ impl HttpLog {
         };
         for (i, req_id) in config.x_request_id.iter().enumerate() {
             let prio = i as u8 + BASE_FIELD_PRIORITY;
-            if x_req_id.prio <= prio {
+            if x_req_id.prio() <= prio {
                 break;
             }
             if req_id == key {
@@ -1783,7 +1864,7 @@ impl HttpLog {
             for (i, pc) in config.proxy_client.iter().enumerate() {
                 let prio = i as u8 + BASE_FIELD_PRIORITY;
                 match info.client_ip.as_ref() {
-                    Some(p) if p.prio <= prio => break,
+                    Some(p) if p.prio() <= prio => break,
                     _ => (),
                 }
                 if pc == key {
@@ -1847,7 +1928,7 @@ impl HttpLog {
             return;
         };
 
-        for Operation { op, prio } in self.custom_field_store.drain_with(policies) {
+        for Operation { op, prio } in self.custom_field_store.drain_with(policies, &*info) {
             match op {
                 Op::RewriteResponseStatus(status) => info.status_code = status as u32 as u16,
                 Op::RewriteNativeTag(tag, value) => {
@@ -1870,6 +1951,7 @@ impl HttpLog {
                             info.response_code_to_attribute();
                             info.status_code = value.parse::<u16>().unwrap_or_default();
                         }
+                        NativeTag::ResponseStatus => (),
                         NativeTag::ResponseException => {
                             info.custom_exception = Some(value.to_string())
                         }
@@ -1879,7 +1961,7 @@ impl HttpLog {
                             .trace_ids
                             .merge_field(CUSTOM_FIELD_POLICY_PRIORITY + prio, value.to_string()),
                         NativeTag::SpanId => {
-                            if CUSTOM_FIELD_POLICY_PRIORITY <= info.span_id.prio {
+                            if CUSTOM_FIELD_POLICY_PRIORITY <= info.span_id.prio() {
                                 let prev = mem::replace(
                                     &mut info.span_id,
                                     PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, value.to_string()),
@@ -1893,7 +1975,9 @@ impl HttpLog {
                             }
                         }
                         NativeTag::HttpProxyClient => match info.client_ip.as_ref() {
-                            Some(client_ip) if client_ip.prio < CUSTOM_FIELD_POLICY_PRIORITY => (),
+                            Some(client_ip) if client_ip.prio() < CUSTOM_FIELD_POLICY_PRIORITY => {
+                                ()
+                            }
                             _ => {
                                 info.client_ip = Some(PrioField::new(
                                     CUSTOM_FIELD_POLICY_PRIORITY,
@@ -1911,13 +1995,17 @@ impl HttpLog {
                                     LogMessageType::Response => &mut info.x_request_id_1,
                                     _ => unreachable!(),
                                 };
-                                if CUSTOM_FIELD_POLICY_PRIORITY <= x_req_id.prio {
-                                    *x_req_id = PrioField::new(
-                                        CUSTOM_FIELD_POLICY_PRIORITY,
-                                        value.to_string(),
-                                    );
-                                }
+                                x_req_id
+                                    .set_with(CUSTOM_FIELD_POLICY_PRIORITY, || value.to_string());
                             }
+                        }
+                        NativeTag::XRequestId0 => {
+                            info.x_request_id_0
+                                .set_with(CUSTOM_FIELD_POLICY_PRIORITY, || value.to_string());
+                        }
+                        NativeTag::XRequestId1 => {
+                            info.x_request_id_1
+                                .set_with(CUSTOM_FIELD_POLICY_PRIORITY, || value.to_string());
                         }
                         NativeTag::BizType => {
                             info.biz_type = value.parse::<u8>().unwrap_or_default()
@@ -2967,7 +3055,10 @@ mod tests {
             PacketDirection::ClientToServer,
             &mut info,
         );
-        assert_eq!(info.client_ip.as_ref().unwrap().field, "172.1.23.41");
+        assert_eq!(
+            info.client_ip.as_ref().map(|ip| ip.get().as_str()),
+            Some("172.1.23.41")
+        );
         let _ = parser.on_header(
             &config,
             b"X_Forwarded_For",
@@ -2975,7 +3066,10 @@ mod tests {
             PacketDirection::ClientToServer,
             &mut info,
         );
-        assert_eq!(info.client_ip.as_ref().unwrap().field, "172.1.23.42");
+        assert_eq!(
+            info.client_ip.as_ref().map(|ip| ip.get().as_str()),
+            Some("172.1.23.42")
+        );
         let _ = parser.on_header(
             &config,
             b"Client",
@@ -2983,7 +3077,10 @@ mod tests {
             PacketDirection::ClientToServer,
             &mut info,
         );
-        assert_eq!(info.client_ip.as_ref().unwrap().field, "172.1.23.42");
+        assert_eq!(
+            info.client_ip.as_ref().map(|ip| ip.get().as_str()),
+            Some("172.1.23.42")
+        );
 
         let _ = parser.on_header(
             &config,
@@ -2992,7 +3089,7 @@ mod tests {
             PacketDirection::ClientToServer,
             &mut info,
         );
-        assert_eq!(info.x_request_id_0.field, "123");
+        assert_eq!(info.x_request_id_0.get(), "123");
         let _ = parser.on_header(
             &config,
             b"X_Request_ID",
@@ -3000,7 +3097,7 @@ mod tests {
             PacketDirection::ClientToServer,
             &mut info,
         );
-        assert_eq!(info.x_request_id_0.field, "456");
+        assert_eq!(info.x_request_id_0.get(), "456");
         let _ = parser.on_header(
             &config,
             b"x-request-id",
@@ -3008,7 +3105,7 @@ mod tests {
             PacketDirection::ClientToServer,
             &mut info,
         );
-        assert_eq!(info.x_request_id_0.field, "456");
+        assert_eq!(info.x_request_id_0.get(), "456");
 
         let _ = parser.on_header(
             &config,
@@ -3033,7 +3130,7 @@ mod tests {
             &mut info,
         );
         assert_eq!(info.trace_ids.highest(), "b3traceid");
-        assert_eq!(info.span_id.field, "span");
+        assert_eq!(info.span_id.get(), "span");
     }
 
     #[test]
