@@ -1,0 +1,5 @@
+error: Duplicated field attribute
+  --> tests/l7_protocol/duplicated_fields.rs:39:14
+   |
+39 |     #[l7_log(endpoint)]
+   |              ^^^^^^^^
