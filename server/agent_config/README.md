@@ -8972,6 +8972,7 @@ Example:
       metric_name: "xyz" # This field will appear in calling log as metrics.xyz. Default is empty.
       rewrite_native_tag:
         # Fill one of the following fields to overwrite the corresponding value
+        # Note: This requires support in the corresponding protocol, otherwise the configuration will not take effect
         # - version
         # - request_type
         # - request_domain
@@ -8984,6 +8985,8 @@ Example:
         # - trace_id
         # - span_id
         # - x_request_id
+        # - x_request_id_0
+        # - x_request_id_1
         # - http_proxy_client
         # - biz_type
         # - biz_code
@@ -9014,6 +9017,7 @@ Example:
       priority: 0
   compound_fields:
   - format: "{field1_name}-{field2_name}" # Output format. field1_name and field2_name are the configured field names
+                                          # Native tags can also be used as an input field, but note that the configured fields take precedence.
     output: # Configure as described in "output" section of "fields"
       attribute_name: "xyz"
       metric_name: "xyz"

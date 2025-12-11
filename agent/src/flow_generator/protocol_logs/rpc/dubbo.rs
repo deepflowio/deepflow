@@ -17,9 +17,12 @@
 mod consts;
 mod hessian2;
 
-use std::mem::replace;
+use std::{borrow::Cow, mem::replace};
 
 use serde::Serialize;
+
+use public::l7_protocol::{Field, FieldSetter, L7Log};
+use public_derive::L7Log;
 
 use crate::{
     common::{
@@ -68,7 +71,9 @@ const FASTJSON2_SERIALIZATION_ID: u8 = 23;
 const KRYO_SERIALIZATION2_ID: u8 = 25;
 const CUSTOM_MESSAGE_PACK_ID: u8 = 31;
 
-#[derive(Serialize, Debug, Default, Clone)]
+#[derive(L7Log, Serialize, Debug, Default, Clone)]
+#[l7_log(request_type.skip = "true")]
+#[l7_log(trace_id.getter = "DubboInfo::get_trace_id", trace_id.setter = "DubboInfo::set_trace_id")]
 pub struct DubboInfo {
     #[serde(skip)]
     msg_type: LogMessageType,
@@ -90,12 +95,15 @@ pub struct DubboInfo {
     // req
     #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
     pub req_msg_size: Option<u32>,
+    #[l7_log(version)]
     #[serde(rename = "version", skip_serializing_if = "value_is_default")]
     pub dubbo_version: String,
+    #[l7_log(request_domain)]
     #[serde(rename = "request_domain", skip_serializing_if = "value_is_default")]
     pub service_name: String,
     #[serde(skip)]
     pub service_version: String,
+    #[l7_log(request_resource)]
     #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub method_name: String,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -106,14 +114,17 @@ pub struct DubboInfo {
     pub span_id: PrioField<String>,
     #[serde(rename = "x_request_id_0", skip_serializing_if = "Option::is_none")]
     pub x_request_id_0: Option<PrioField<String>>,
+    #[l7_log(http_proxy_client)]
     #[serde(rename = "http_proxy_client", skip_serializing_if = "Option::is_none")]
     pub client_ip: Option<String>,
 
     // resp
     #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
     pub resp_msg_size: Option<u32>,
+    #[l7_log(response_status)]
     #[serde(rename = "response_status")]
     pub resp_status: L7ResponseStatus,
+    #[l7_log(response_code)]
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub status_code: Option<i32>,
     #[serde(rename = "x_request_id_1", skip_serializing_if = "Option::is_none")]
@@ -125,7 +136,9 @@ pub struct DubboInfo {
     rrt: u64,
 
     // set by wasm plugin
+    #[l7_log(response_result)]
     custom_result: Option<String>,
+    #[l7_log(response_exception)]
     custom_exception: Option<String>,
 
     #[serde(skip)]
@@ -218,13 +231,12 @@ impl DubboInfo {
     }
 
     fn set_span_id(&mut self, span_id: String, trace_type: &TraceType) {
-        if self.span_id.prio <= BASE_FIELD_PRIORITY {
-            return;
-        }
-        self.span_id = match trace_type.decode_span_id(&span_id) {
-            Some(id) => PrioField::new(BASE_FIELD_PRIORITY, id.to_string()),
-            None => PrioField::new(BASE_FIELD_PRIORITY, span_id),
-        }
+        self.span_id.set_with(BASE_FIELD_PRIORITY, || {
+            match trace_type.decode_span_id(&span_id) {
+                Some(id) => id.to_string(),
+                None => span_id,
+            }
+        });
     }
 
     // when response_code is overwritten, put it into the attributes.
@@ -305,6 +317,20 @@ impl DubboInfo {
                     .unwrap_or_default();
         }
     }
+
+    fn get_trace_id(&self) -> Field {
+        Field::Str(Cow::Borrowed(&self.trace_ids.highest()))
+    }
+
+    fn set_trace_id(&mut self, trace_id: FieldSetter) {
+        let (prio, trace_id) = (trace_id.prio(), trace_id.into_inner());
+        match trace_id {
+            Field::Str(s) => {
+                self.trace_ids.merge_field(prio, s.into_owned());
+            }
+            _ => return,
+        }
+    }
 }
 
 impl L7ProtocolInfoInterface for DubboInfo {
@@ -332,11 +358,17 @@ impl L7ProtocolInfoInterface for DubboInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        self.endpoint.clone()
+        match L7Log::get_endpoint(self) {
+            Field::Str(s) => Some(s.into_owned()),
+            _ => None,
+        }
     }
 
     fn get_request_domain(&self) -> String {
-        self.service_name.clone()
+        match L7Log::get_request_domain(self) {
+            Field::Str(s) => s.into_owned(),
+            _ => String::new(),
+        }
     }
 
     fn get_request_resource_length(&self) -> usize {
@@ -443,7 +475,7 @@ impl From<&DubboInfo> for LogCache {
             msg_type: info.msg_type,
             resp_status: info.resp_status,
             on_blacklist: info.is_on_blacklist,
-            endpoint: info.get_endpoint(),
+            endpoint: L7ProtocolInfoInterface::get_endpoint(info),
             ..Default::default()
         }
     }
@@ -635,7 +667,7 @@ mod kryo {
             }
 
             decode_span_id(&payload[offset..], &span_type, info);
-            if info.span_id.field.len() != 0 {
+            if info.span_id.get().len() != 0 {
                 break;
             }
         }
@@ -838,7 +870,7 @@ mod fastjson2 {
             }
 
             decode_span_id(&payload[offset..], &span_type, info);
-            if info.span_id.field.len() != 0 {
+            if info.span_id.get().len() != 0 {
                 break;
             }
         }

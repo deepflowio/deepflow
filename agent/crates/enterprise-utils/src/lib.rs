@@ -60,7 +60,7 @@ pub mod l7 {
                 #[derive(Clone, Debug, PartialEq)]
                 pub enum Op {
                     RewriteResponseStatus(public::enums::L7ResponseStatus),
-                    RewriteNativeTag(crate::l7::custom_policy::enums::NativeTag, Arc<String>),
+                    RewriteNativeTag(public::l7_protocol::NativeTag, Arc<String>),
                     AddAttribute(Arc<String>, Arc<String>),
                     AddMetric(Arc<String>, f32),
                     SavePayload(Arc<String>),
@@ -119,17 +119,19 @@ pub mod l7 {
                     unimplemented!()
                 }
 
-                pub fn into_iter_with(
+                pub fn into_iter_with<L: public::l7_protocol::L7Log>(
                     self,
                     _: PolicySlice,
+                    _: &L,
                 ) -> impl Iterator<Item = enums::Operation> {
                     std::iter::empty()
                 }
 
-                pub fn drain_with(
+                pub fn drain_with<L: public::l7_protocol::L7Log>(
                     &mut self,
                     _: PolicySlice,
-                ) -> impl Iterator<Item = enums::Operation> + use<'_> {
+                    _: &L,
+                ) -> impl Iterator<Item = enums::Operation> + use<L> {
                     std::iter::empty()
                 }
             }
@@ -213,6 +215,12 @@ pub mod l7 {
                 }
             }
 
+            impl From<public::enums::PacketDirection> for TrafficDirection {
+                fn from(_: public::enums::PacketDirection) -> Self {
+                    unimplemented!()
+                }
+            }
+
             #[derive(Clone, Copy, Debug, Default, Deserialize, Hash, PartialEq, Eq, PartialOrd)]
             pub enum FieldType {
                 #[default]
@@ -224,38 +232,6 @@ pub mod l7 {
                 DubboPayloadMapString,
                 PayloadHessian2,
                 SqlInsertionColumn,
-            }
-
-            #[derive(
-                Clone,
-                Copy,
-                Debug,
-                strum::AsRefStr,
-                strum::EnumString,
-                strum::Display,
-                strum::IntoStaticStr,
-                Hash,
-                PartialEq,
-                Eq,
-            )]
-            #[strum(serialize_all = "snake_case", ascii_case_insensitive)]
-            pub enum NativeTag {
-                Version,
-                RequestType,
-                RequestDomain,
-                RequestResource,
-                RequestId,
-                Endpoint,
-                ResponseCode,
-                ResponseException,
-                ResponseResult,
-                TraceId,
-                SpanId,
-                XRequestId,
-                HttpProxyClient,
-                BizType,
-                BizCode,
-                BizScenario,
             }
         }
     }

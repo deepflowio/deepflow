@@ -18,6 +18,7 @@ mod comment_parser;
 mod consts;
 
 use std::{
+    borrow::Cow,
     cell::Cell,
     io::Read,
     str::{self, SplitWhitespace},
@@ -56,14 +57,16 @@ use crate::{
     },
     utils::bytes,
 };
-use public::l7_protocol::L7ProtocolChecker;
+use public::l7_protocol::{Field, FieldSetter, L7Log, L7ProtocolChecker};
+use public_derive::L7Log;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
         use enterprise_utils::l7::custom_policy::{
             custom_field_policy::{PolicySlice, Store, enums::{Op, Operation, Source}},
-            enums::{NativeTag, TrafficDirection},
+            enums::TrafficDirection,
         };
+        use public::l7_protocol::NativeTag;
 
         use crate::flow_generator::protocol_logs::CUSTOM_FIELD_POLICY_PRIORITY;
     }
@@ -126,18 +129,30 @@ impl From<Error> for error::Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Serialize, Debug, Default, Clone)]
+#[derive(L7Log, Serialize, Debug, Default, Clone)]
+#[l7_log(request_type.getter = "MysqlInfo::get_command")]
+#[l7_log(request_domain.skip = "true")]
+#[l7_log(trace_id.getter = "MysqlInfo::get_trace_id", trace_id.setter = "MysqlInfo::set_trace_id")]
+#[l7_log(response_result.skip = "true")]
+#[l7_log(x_request_id.skip = "true")]
+#[l7_log(http_proxy_client.skip = "true")]
+#[l7_log(biz_type.skip = "true")]
+#[l7_log(biz_code.skip = "true")]
+#[l7_log(biz_scenario.skip = "true")]
 pub struct MysqlInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
 
     // Server Greeting
+    #[l7_log(version)]
     #[serde(rename = "version", skip_serializing_if = "value_is_default")]
     pub protocol_version: u8,
     // request
+    #[l7_log(request_type)]
     #[serde(rename = "request_type")]
     pub command: u8,
+    #[l7_log(request_resource)]
     #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub context: String,
     // response
@@ -146,11 +161,13 @@ pub struct MysqlInfo {
     pub error_code: Option<i32>,
     #[serde(rename = "sql_affected_rows", skip_serializing_if = "value_is_default")]
     pub affected_rows: u64,
+    #[l7_log(response_exception)]
     #[serde(
         rename = "response_execption",
         skip_serializing_if = "value_is_default"
     )]
     pub error_message: String,
+    #[l7_log(response_status)]
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
     pub endpoint: Option<String>,
@@ -159,6 +176,7 @@ pub struct MysqlInfo {
     // This field is extracted in the following message:
     // 1. Response message corresponding to COM_STMT_PREPARE request
     // 2. COM_STMT_EXECUTE request message
+    #[l7_log(request_id)]
     statement_id: u32,
 
     captured_request_byte: u32,
@@ -214,7 +232,10 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        self.endpoint.clone()
+        match L7Log::get_endpoint(self) {
+            Field::Str(s) => Some(s.into_owned()),
+            _ => None,
+        }
     }
 }
 
@@ -501,6 +522,27 @@ impl MysqlInfo {
                 || t.request_type.is_on_blacklist(self.get_command_str());
         }
     }
+
+    fn get_command(&self) -> Field {
+        Field::Str(Cow::Borrowed(self.get_command_str()))
+    }
+
+    fn get_trace_id(&self) -> Field {
+        if let Some(trace_id) = self.trace_ids.first() {
+            return Field::Str(Cow::Borrowed(trace_id));
+        }
+        Field::None
+    }
+
+    fn set_trace_id(&mut self, trace_id: FieldSetter) {
+        let (prio, trace_id) = (trace_id.prio(), trace_id.into_inner());
+        match trace_id {
+            Field::Str(s) => {
+                self.trace_ids.push(prio, s);
+            }
+            _ => return,
+        }
+    }
 }
 
 impl From<MysqlInfo> for L7ProtocolSendLog {
@@ -581,7 +623,7 @@ impl From<&MysqlInfo> for LogCache {
             msg_type: info.msg_type,
             resp_status: info.status,
             on_blacklist: info.is_on_blacklist,
-            endpoint: info.endpoint.clone(),
+            endpoint: L7ProtocolInfoInterface::get_endpoint(info),
             ..Default::default()
         }
     }
@@ -1357,7 +1399,7 @@ impl MysqlLog {
         let Some(policies) = policies else {
             return;
         };
-        for Operation { op, prio } in self.custom_field_store.drain_with(policies) {
+        for Operation { op, prio } in self.custom_field_store.drain_with(policies, &*info) {
             match op {
                 Op::RewriteResponseStatus(status) => {
                     info.status = status;

@@ -1181,7 +1181,7 @@ impl<'a> MetaPacket<'a> {
             if data.l7_protocol_hint == SOCK_DATA_HTTP2
                 || data.l7_protocol_hint == SOCK_DATA_TLS_HTTP2
             {
-                packet.lookup_key.direction = PacketDirection::from(data.msg_type);
+                packet.lookup_key.direction = Self::parse_direction(data.msg_type);
                 match data.msg_type {
                     MSG_REQUEST_END => packet.is_request_end = true,
                     MSG_RESPONSE_END => packet.is_response_end = true,
@@ -1190,6 +1190,20 @@ impl<'a> MetaPacket<'a> {
             }
         }
         return Ok(packet);
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[inline]
+    fn parse_direction(msg_type: u8) -> PacketDirection {
+        match msg_type {
+            crate::ebpf::MSG_REQUEST | crate::ebpf::MSG_REQUEST_END => {
+                PacketDirection::ClientToServer
+            }
+            crate::ebpf::MSG_RESPONSE | crate::ebpf::MSG_RESPONSE_END => {
+                PacketDirection::ServerToClient
+            }
+            _ => panic!("ebpf direction({}) unknown.", msg_type),
+        }
     }
 
     #[inline]
