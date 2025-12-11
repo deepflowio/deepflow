@@ -531,12 +531,14 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 			return NULL;
 		}
 		symbol_t key = {};
-		while (bpf_get_next_key(map->fd, &key, &symbols[n_symbols]) == 0) {
-			int ret = bpf_lookup_elem(map->fd, &key, &symbol_ids[n_symbols]);
-			key = symbols[n_symbols];
+		symbol_t next_key = {};
+		while (bpf_get_next_key(map->fd, &key, &next_key) == 0 && n_symbols < MAX_SYMBOL_NUM) {
+			int ret = bpf_lookup_elem(map->fd, &next_key, &symbol_ids[n_symbols]);
 			if (ret == 0) {
+				symbols[n_symbols] = next_key;
 				n_symbols++;
 			}
+			key = next_key;
 		}
 	}
 
