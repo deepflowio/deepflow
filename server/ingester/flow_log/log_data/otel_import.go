@@ -144,7 +144,7 @@ func skywalkingGetParentSpanIdFromLinks(links []*v1.Span_Link) string {
 	return ""
 }
 
-func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue, links []*v1.Span_Link, cfg *flowlogCfg.Config) {
+func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue, links []*v1.Span_Link, cfg *flowlogCfg.Config, platformData *grpc.PlatformInfoTable) {
 	h.IsIPv4 = true
 	sw8SegmentId := ""
 	attributeNames, attributeValues := []string{}, []string{}
@@ -152,6 +152,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 	isHttp := false
 	httpURL := ""
 	hasPeerAddress := false
+	podName := ""
 	for i, attr := range append(spanAttributes, resAttributes...) {
 		key := attr.GetKey()
 		value := attr.GetValue()
@@ -238,6 +239,8 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 						h.IP60 = ip
 					}
 				}
+			case "k8s.pod.name":
+				podName = value.GetStringValue()
 			case "http.scheme", "db.system", "rpc.system", "messaging.system", "messaging.protocol":
 				h.L7ProtocolStr = value.GetStringValue()
 			case "http.flavor":
@@ -318,6 +321,29 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 		}
 	}
 
+	// 'app.host.ip' 在过了 LB/gateway 的情况下，获取到的可能是「上一跳的主机 IP」
+	// 特别的，如果包含了 'k8s.pod.name' 这个 tag，它对应的 IP 信息一定是最准确的，可以覆盖掉 `app.host.ip'
+	if podName != "" {
+		podInfo := platformData.QueryPodInfo(h.OrgId, h.VtapID, podName)
+		if podInfo != nil {
+			ip := net.ParseIP(podInfo.Ip)
+			if ip4 := ip.To4(); ip4 != nil {
+				if h.TapSide == "c-app" {
+					h.IP40 = utils.IpToUint32(ip4)
+				} else {
+					h.IP41 = utils.IpToUint32(ip4)
+				}
+			} else {
+				h.IsIPv4 = false
+				if h.TapSide == "c-app" {
+					h.IP60 = ip
+				} else {
+					h.IP61 = ip
+				}
+			}
+		}
+	}
+
 	h.L7Protocol, h.IsTLS = ParseL7Protocol(h.L7ProtocolStr, h.Version)
 	h.AttributeNames = attributeNames
 	h.AttributeValues = attributeValues
@@ -352,7 +378,7 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 		h.Events = string(eventsJSON)
 	}
 
-	h.fillAttributes(l.GetAttributes(), resAttributes, l.GetLinks(), cfg)
+	h.fillAttributes(l.GetAttributes(), resAttributes, l.GetLinks(), cfg, platformData)
 	// 优先匹配http的响应码
 	if h.responseCode != 0 {
 		h.ResponseStatus = uint8(HttpCodeToResponseStatus(h.responseCode))
