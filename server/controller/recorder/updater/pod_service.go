@@ -135,9 +135,9 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*met
 		Selector:         cloudItem.Selector,
 		ExternalIP:       cloudItem.ExternalIP,
 		ServiceClusterIP: cloudItem.ServiceClusterIP,
-		Metadata:         string(yamlMetadata),
+		Metadata:         yamlMetadata,
 		MetadataHash:     cloudItem.MetadataHash,
-		Spec:             string(yamlSpec),
+		Spec:             yamlSpec,
 		SpecHash:         cloudItem.SpecHash,
 		PodIngressID:     podIngressID,
 		PodNamespaceID:   podNamespaceID,
@@ -205,26 +205,36 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 	if diffBase.MetadataHash != cloudItem.MetadataHash {
 		mapInfo["metadata_hash"] = cloudItem.MetadataHash
 
-		yamlMetadata, err := yaml.JSONToYAML([]byte(cloudItem.Metadata))
+		yamlMetadataBytes, err := yaml.JSONToYAML([]byte(cloudItem.Metadata))
 		if err != nil {
 			log.Errorf("failed to convert %s metadata JSON (data: %v) to YAML: %s", s.resourceType, cloudItem.Metadata, s.metadata.LogPrefixes)
 			return nil, nil, false
 		}
-		mapInfo["metadata"] = string(yamlMetadata)
-		structInfo.Metadata.Set(diffBase.Metadata, string(yamlMetadata))
+		if compressedBytes, err := metadbmodel.AutoCompressedBytes(yamlMetadataBytes).Value(); err != nil {
+			log.Errorf("failed to compress %s YAML data: %v: %s", s.resourceType, yamlMetadataBytes, err.Error(), s.metadata.LogPrefixes)
+			return nil, nil, false
+		} else {
+			mapInfo["compressed_metadata"] = compressedBytes
+		}
+		structInfo.Metadata.Set(diffBase.Metadata, string(yamlMetadataBytes))
 	} else {
 		structInfo.Metadata.Set(diffBase.Metadata, diffBase.Metadata) // set for resource event, because it publish combined config of metadata and spec
 	}
 	if diffBase.SpecHash != cloudItem.SpecHash {
 		mapInfo["spec_hash"] = cloudItem.SpecHash
 
-		yamlSpec, err := yaml.JSONToYAML([]byte(cloudItem.Spec))
+		yamlSpecBytes, err := yaml.JSONToYAML([]byte(cloudItem.Spec))
 		if err != nil {
 			log.Errorf("failed to convert %s spec JSON (data: %v) to YAML: %s", s.resourceType, cloudItem.Spec, s.metadata.LogPrefixes)
 			return nil, nil, false
 		}
-		mapInfo["spec"] = string(yamlSpec)
-		structInfo.Spec.Set(diffBase.Spec, string(yamlSpec))
+		if compressedBytes, err := metadbmodel.AutoCompressedBytes(yamlSpecBytes).Value(); err != nil {
+			log.Errorf("failed to compress %s YAML data: %v: %s", s.resourceType, yamlSpecBytes, err.Error(), s.metadata.LogPrefixes)
+			return nil, nil, false
+		} else {
+			mapInfo["compressed_spec"] = compressedBytes
+		}
+		structInfo.Spec.Set(diffBase.Spec, string(yamlSpecBytes))
 	} else {
 		structInfo.Spec.Set(diffBase.Spec, diffBase.Spec) // set for resource event, because it publish combined config of metadata and spec
 	}

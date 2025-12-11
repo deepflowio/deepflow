@@ -76,7 +76,7 @@ func (c *ConfigMap) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 		eventapi.TagVPCID(item.VPCID),
 		eventapi.TagAttributes(
 			[]string{eventapi.AttributeNameConfigName, eventapi.AttributeNameConfig, eventapi.AttributeNameConfigDiff},
-			[]string{item.Name, item.Data, diff}),
+			[]string{item.Name, string(item.Data), diff}),
 	}
 
 	c.enqueueIfInsertIntoMetadbFailed(
