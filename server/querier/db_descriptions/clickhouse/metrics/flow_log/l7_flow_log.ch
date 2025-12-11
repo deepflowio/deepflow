@@ -19,6 +19,6 @@ error_ratio          , 异常比例                , %    , `异常 / 响应`
 client_error_ratio   , 客户端异常比例          , %    , `客户端异常 / 响应`
 server_error_ratio   , 服务端异常比例          , %    , `服务端异常 / 响应`
 
-response_duration    , 响应时延                , 微秒 , 响应与请求的时间差
+response_duration    , 响应时延                , us , 响应与请求的时间差
 
 row                  , 行数                    , 个   ,
