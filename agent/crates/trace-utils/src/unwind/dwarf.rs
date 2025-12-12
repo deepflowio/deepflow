@@ -389,7 +389,11 @@ pub fn read_unwind_entries(data: &[u8]) -> Result<Vec<UnwindEntry>> {
 
         if max_executable_addr > last_dwarf_pc {
             // Add synthetic entry at max_executable_addr using last available rules
-            if let Some(last_entry) = unwind_entries.iter().rev().find(|e| e.cfa_type != CfaType::NoEntry) {
+            if let Some(last_entry) = unwind_entries
+                .iter()
+                .rev()
+                .find(|e| e.cfa_type != CfaType::NoEntry)
+            {
                 let mut extended_entry = *last_entry;
                 extended_entry.pc = max_executable_addr;
                 unwind_entries.push(extended_entry);
