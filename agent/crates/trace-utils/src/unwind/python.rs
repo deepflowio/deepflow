@@ -635,13 +635,38 @@ pub unsafe extern "C" fn merge_python_stacks(
             "{};{};{}",
             i_trace, INCOMPLETE_PYTHON_STACK, u_trace
         );
-    } else if n_py_frames == n_eval_frames {
-        // no native stack
-        let _ = write!(&mut trace, "{}", i_trace);
-    } else if n_py_frames == n_eval_frames - 1 {
+    } else if n_eval_frames == n_py_frames + 1 {
         // python calls native, just put everything after the last _PyEval on top of python frames (including the semicolon)
         let loc = u_trace.rfind(PYEVAL_FNAME).unwrap() + PYEVAL_FNAME.len();
         let _ = write!(&mut trace, "{}{}", i_trace, &u_trace[loc..]);
+    } else if n_eval_frames <= n_py_frames {
+        // Python frames >= PyEval frames: This happens due to Python 3.10+ optimizations.
+        // Some calls (especially special methods like __call__, _call_impl) use vectorcall
+        // protocol or _PyObject_MakeTpCall which creates a PyFrameObject but bypasses
+        // the full _PyEval_EvalFrameDefault execution path.
+        // PyTorch's nn.Module.__call__ chain is a common case that triggers this.
+        // Strategy: Use Python interpreter stack as the authoritative call chain, append
+        // native frames after the last _PyEval_EvalFrameDefault (the C extension code).
+        let last_pyeval_loc = u_trace.rfind(PYEVAL_FNAME)
+            .or_else(|| u_trace.rfind(LIB_PYEVAL_FNAME));
+
+        if let Some(loc) = last_pyeval_loc {
+            let after_pyeval = &u_trace[loc + PYEVAL_FNAME.len()..];
+            // Check if there are non-empty frames after the last PyEval
+            let has_native_frames = after_pyeval.split(';')
+                .any(|frame| !frame.is_empty() && frame != PYEVAL_FNAME && frame != LIB_PYEVAL_FNAME);
+
+            if has_native_frames {
+                // Append only the C extension frames (after last PyEval) to Python stack
+                let _ = write!(&mut trace, "{}{}", i_trace, after_pyeval);
+            } else {
+                // No C frames after Python - just use Python stack
+                let _ = write!(&mut trace, "{}", i_trace);
+            }
+        } else {
+            // This shouldn't happen if n_eval_frames > 0, but handle gracefully
+            let _ = write!(&mut trace, "{}", i_trace);
+        }
     } else {
         let _ = write!(
             &mut trace,
