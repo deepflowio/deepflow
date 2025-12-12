@@ -34,14 +34,16 @@ type Config struct {
 }
 
 type TraceMapConfig struct {
-	MaxTracePerIteration   uint64  `default:"100000" yaml:"max_trace_per_iteration"`
-	BatchTracesCountMax    uint64  `default:"1000" yaml:"batch_traces_count_max"`
-	TraceIdQueryIterations uint64  `default:"8" yaml:"trace_id_query_iterations"`
-	TraceQueryDelta        uint64  `default:"300" yaml:"trace_query_delta"`
-	WriteInterval          int     `default:"60" yaml:"write_interval"`
-	WriteBatchSize         int     `default:"1000" yaml:"write_batch_size"`
-	Querier                Querier `yaml:"querier"`
-	DebugSqlLenMax         int     `default:"1000" yaml:"debug_sql_len_max"`
+	MaxTracePerIteration      uint64  `default:"100000" yaml:"max_trace_per_iteration"`
+	BatchTracesCountMax       uint64  `default:"1000" yaml:"batch_traces_count_max"`
+	TraceIdQueryIterations    uint64  `default:"8" yaml:"trace_id_query_iterations"`
+	TraceQueryDelta           uint64  `default:"300" yaml:"trace_query_delta"`
+	TraceTreeCacheDelay       uint32  `default:"120" yaml:"trace_tree_cache_delay"`
+	WriteInterval             int     `default:"60" yaml:"write_interval"`
+	WriteBatchSize            int     `default:"1000" yaml:"write_batch_size"`
+	Querier                   Querier `yaml:"querier"`
+	DebugSqlLenMax            int     `default:"1000" yaml:"debug_sql_len_max"`
+	MultiTraceIdMaxIterations int     `default:"30" yaml:"multi_trace_id_max_iterations"`
 }
 
 type Querier struct {
