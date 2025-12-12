@@ -647,14 +647,16 @@ pub unsafe extern "C" fn merge_python_stacks(
         // PyTorch's nn.Module.__call__ chain is a common case that triggers this.
         // Strategy: Use Python interpreter stack as the authoritative call chain, append
         // native frames after the last _PyEval_EvalFrameDefault (the C extension code).
-        let last_pyeval_loc = u_trace.rfind(PYEVAL_FNAME)
+        let last_pyeval_loc = u_trace
+            .rfind(PYEVAL_FNAME)
             .or_else(|| u_trace.rfind(LIB_PYEVAL_FNAME));
 
         if let Some(loc) = last_pyeval_loc {
             let after_pyeval = &u_trace[loc + PYEVAL_FNAME.len()..];
             // Check if there are non-empty frames after the last PyEval
-            let has_native_frames = after_pyeval.split(';')
-                .any(|frame| !frame.is_empty() && frame != PYEVAL_FNAME && frame != LIB_PYEVAL_FNAME);
+            let has_native_frames = after_pyeval.split(';').any(|frame| {
+                !frame.is_empty() && frame != PYEVAL_FNAME && frame != LIB_PYEVAL_FNAME
+            });
 
             if has_native_frames {
                 // Append only the C extension frames (after last PyEval) to Python stack

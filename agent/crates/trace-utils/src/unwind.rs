@@ -71,7 +71,11 @@ fn calculate_bias(data: &[u8], m: &MemoryArea) -> Option<u64> {
             // bias = process_vaddr - elf_vaddr
             // Use mx_start (executable section start) if available, otherwise m_start
             // This handles merged memory areas where m_start may be from a different segment
-            let process_vaddr = if m.mx_start != 0 { m.mx_start } else { m.m_start };
+            let process_vaddr = if m.mx_start != 0 {
+                m.mx_start
+            } else {
+                m.m_start
+            };
             let bias = process_vaddr.wrapping_sub(elf_vaddr);
             return Some(bias);
         }
@@ -147,8 +151,13 @@ impl UnwindTable {
                         use std::io::{Read, Seek, SeekFrom};
                         let mut buf = vec![0u8; size];
                         if file.seek(SeekFrom::Start(m.m_start)).is_ok()
-                            && file.read_exact(&mut buf).is_ok() {
-                            trace!("loaded vdso from process memory at {:#x}, size={}", m.m_start, size);
+                            && file.read_exact(&mut buf).is_ok()
+                        {
+                            trace!(
+                                "loaded vdso from process memory at {:#x}, size={}",
+                                m.m_start,
+                                size
+                            );
                             buf
                         } else {
                             debug!("failed to read vdso from process#{pid} memory");
@@ -192,9 +201,8 @@ impl UnwindTable {
                     // using ELF program headers for the current process mapping
                     if shard_list.entries[shard_list.len as usize].offset != 0 {
                         shard_list.entries[shard_list.len as usize].offset =
-                            calculate_bias(&data, &m).unwrap_or_else(|| {
-                                m.m_start.wrapping_sub(m.offset)
-                            });
+                            calculate_bias(&data, &m)
+                                .unwrap_or_else(|| m.m_start.wrapping_sub(m.offset));
                     }
                     shard_list.len += 1;
                 }
@@ -247,8 +255,15 @@ impl UnwindTable {
                     path.display(),
                     entries.len()
                 );
-                let object_info =
-                    self.split_into_shards(pid, &m, &data, &entries, max_pc, &mut shard_list, is_pic);
+                let object_info = self.split_into_shards(
+                    pid,
+                    &m,
+                    &data,
+                    &entries,
+                    max_pc,
+                    &mut shard_list,
+                    is_pic,
+                );
                 shard_count += object_info.shards.len();
                 self.object_cache.insert(digest, object_info);
                 continue;
@@ -301,7 +316,10 @@ impl UnwindTable {
             // For PIC/PIE executables, we need to calculate: bias = process_vaddr - elf_vaddr
             shard_info.offset = if is_pic {
                 calculate_bias(&data, &m).unwrap_or_else(|| {
-                    warn!("process#{pid} failed to calculate bias for {}, using fallback", path.display());
+                    warn!(
+                        "process#{pid} failed to calculate bias for {}, using fallback",
+                        path.display()
+                    );
                     m.m_start.wrapping_sub(m.offset)
                 })
             } else {
@@ -450,7 +468,10 @@ impl UnwindTable {
         // Pre-calculate bias for all shards in this object
         let bias = if is_pic {
             calculate_bias(data, m).unwrap_or_else(|| {
-                warn!("process#{pid} failed to calculate bias for {}, using fallback", m.path);
+                warn!(
+                    "process#{pid} failed to calculate bias for {}, using fallback",
+                    m.path
+                );
                 m.m_start.wrapping_sub(m.offset)
             })
         } else {
