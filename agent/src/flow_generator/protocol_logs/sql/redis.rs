@@ -75,6 +75,7 @@ pub struct RedisInfo {
     pub error: Vec<u8>, // '-'
     #[serde(rename = "response_status")]
     pub resp_status: L7ResponseStatus,
+    pub response_result: Vec<u8>,
 
     captured_request_byte: u32,
     captured_response_byte: u32,
@@ -129,6 +130,7 @@ impl RedisInfo {
     pub fn merge(&mut self, other: &mut Self) -> Result<()> {
         std::mem::swap(&mut self.status, &mut other.status);
         std::mem::swap(&mut self.error, &mut other.error);
+        std::mem::swap(&mut self.response_result, &mut other.response_result);
         self.resp_status = other.resp_status;
         self.captured_response_byte = other.captured_response_byte;
         if other.is_on_blacklist {
@@ -167,6 +169,11 @@ impl fmt::Display for RedisInfo {
         )?;
         write!(
             f,
+            "response_result: {:?}, ",
+            str::from_utf8(&self.response_result).unwrap_or_default()
+        )?;
+        write!(
+            f,
             "error: {:?} }}",
             str::from_utf8(&self.error).unwrap_or_default()
         )
@@ -191,6 +198,7 @@ impl From<RedisInfo> for L7ProtocolSendLog {
             resp: L7Response {
                 status: f.resp_status,
                 exception: String::from_utf8_lossy(f.error.as_slice()).to_string(),
+                result: String::from_utf8_lossy(f.response_result.as_slice()).to_string(),
                 ..Default::default()
             },
             flags,
@@ -291,6 +299,9 @@ impl RedisLog {
 
         if context.is_empty() {
             return;
+        }
+        if let Some(index) = context.iter().position(|&x| x == b' ' ) {
+            info.response_result = context[..index].to_vec();
         }
         match context[0] {
             b'+' => info.status = context,
