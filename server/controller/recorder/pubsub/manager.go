@@ -51,7 +51,6 @@ func GetManager() *Manager {
 
 				// ResourcePubSub
 				PubSubTypeAZ:                          NewAZ(),
-				PubSubTypeRegion:                      NewRegion(),
 				PubSubTypeSubDomain:                   NewSubDomain(),
 				PubSubTypeHost:                        NewHost(),
 				PubSubTypeVM:                          NewVM(),
