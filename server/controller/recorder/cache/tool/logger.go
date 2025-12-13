@@ -87,6 +87,14 @@ func cacheLaunchServerByIDNotFound(resource string, id int) string {
 	return fmt.Sprintf("cache %s launch server (id: %d) not found", resource, id)
 }
 
+func collectionNotFoundByLcuuid(resource, lcuuid string) string {
+	return fmt.Sprintf("cache %s (lcuuid: %s) not found", resource, lcuuid)
+}
+
+func collectionNotFoundByID(resource string, id int) string {
+	return fmt.Sprintf("cache %s (id: %d) not found", resource, id)
+}
+
 type LogController struct {
 	// controll log level, set info when triggered by resource change event, set debug when called by timing cache refresh
 	level logging.Level

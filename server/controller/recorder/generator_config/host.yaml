@@ -1,0 +1,30 @@
+name: host
+public_name: Host
+cache_tool:
+  enabled: true
+  fields:
+  - name: lcuuid
+    public_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: id
+    public_name: ID
+    type: int
+  - name: name
+    public_name: Name
+    type: string
+  - name: regionID
+    public_name: Region
+    type: int
+    ref: Region
+  - name: azID
+    public_name: AZ
+    type: int
+    ref: AZ
+  - name: ip
+    public_name: IP
+    type: string
+  key_fields:
+  - name: ip
+    public_name: IP
+    type: string
