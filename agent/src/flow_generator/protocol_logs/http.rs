@@ -1435,7 +1435,10 @@ impl HttpLog {
             info.req_content_length = content_length;
         }
 
-        let l7_payload = match payload.windows(V1_HEADER_END.len()).position(|w| w == V1_HEADER_END) {
+        let l7_payload = match payload
+            .windows(V1_HEADER_END.len())
+            .position(|w| w == V1_HEADER_END)
+        {
             Some(pos) => &payload[pos + V1_HEADER_END.len()..],
             None => &payload[payload.len()..],
         };
