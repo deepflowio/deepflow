@@ -23,6 +23,7 @@
 #include "config.h"
 #include "bpf_base.h"
 #include "common.h"
+#include "include/perf_profiler.h"
 #include "kernel.h"
 #include "bpf_endian.h"
 #include "perf_profiler.h"
@@ -88,15 +89,25 @@ typedef struct {
 #ifdef LINUX_VER_5_2_PLUS
 typedef __u64 __raw_stack[PERF_MAX_STACK_DEPTH];
 
+// Forward declare stack_t for map definition
+typedef struct {
+	__u8 len;
+	__u64 addrs[PERF_MAX_STACK_DEPTH];
+	__u8 frame_types[PERF_MAX_STACK_DEPTH];
+	__u64 extra_data_a[PERF_MAX_STACK_DEPTH];
+	__u64 extra_data_b[PERF_MAX_STACK_DEPTH];
+} stack_t;
+
 /*
- * Stack map for dwarf stacks.
+ * Stack map for interpreter stacks (Python, PHP, V8).
+ * Now uses stack_t to store frame_types and extra_data.
  * Due to the limitation of the number of eBPF instruction in kernel, this
  * feature is suitable for Linux5.2+
  *
  * Map sizes are configured in user space program
  */
-MAP_HASH(custom_stack_map_a, __u32, __raw_stack, 1, FEATURE_FLAG_DWARF_UNWINDING)
-MAP_HASH(custom_stack_map_b, __u32, __raw_stack, 1, FEATURE_FLAG_DWARF_UNWINDING)
+MAP_HASH(custom_stack_map_a, __u32, stack_t, 1, FEATURE_FLAG_DWARF_UNWINDING)
+MAP_HASH(custom_stack_map_b, __u32, stack_t, 1, FEATURE_FLAG_DWARF_UNWINDING)
 
 /*
  * The following maps are used for DWARF based unwinding
@@ -116,9 +127,69 @@ MAP_HASH(unwind_entry_shard_table, __u32, unwind_entry_shard_t, 1, FEATURE_FLAG_
  */
 MAP_ARRAY(unwind_sysinfo, __u32, unwind_sysinfo_t, 1, FEATURE_FLAG_DWARF_UNWINDING)
 
-MAP_HASH(python_tstate_addr_map, __u32, __u64, 65536, FEATURE_FLAG_PROFILE)
-MAP_HASH(python_unwind_info_map, __u32, python_unwind_info_t, 65536, FEATURE_FLAG_PROFILE)
-MAP_HASH(python_offsets_map, __u8, python_offsets_t, 1, FEATURE_FLAG_PROFILE)
+/*
+ * Interpreter Unwinding Maps
+ *
+ * These maps store per-process unwinding information for different interpreters.
+ *
+ * Data lifecycle:
+ *   - Added:   When a process is detected as an interpreter (PHP/Python/V8)
+ *              via is_*_process() check and *_unwind_table_load() call
+ *   - Removed: When the process exits, via process_execute_event()
+ *              calling *_unwind_table_unload()
+ *
+ * Memory allocation (BPF_MAP_TYPE_HASH with pre-allocation):
+ *   - At map creation: All max_entries elements are pre-allocated by the kernel
+ *     (Note: perf_event programs cannot use BPF_F_NO_PREALLOC, must pre-allocate)
+ *   - At runtime: Entries are marked as used/unused, no dynamic allocation
+ *   - At cleanup: Entries are marked as free, but memory remains allocated
+ *
+ * Total memory usage (pre-allocated at map creation):
+ *   All interpreter maps:     ~17-20 MB (pre-allocated for 65536 processes)
+ *   Python maps only:         ~6.1 MB (when only Python profiling enabled)
+ *   PHP maps only:            ~5.2 MB (when only PHP profiling enabled)
+ *   V8/Node.js maps only:     ~6.4 MB (when only V8 profiling enabled)
+ *   Per-process overhead:     ~94 bytes (largest: v8_proc_info_t)
+ *   Empty vs Full:            Same memory footprint (all pre-allocated)
+ *
+ * Feature flags control (FEATURE_FLAG_PROFILE_PYTHON/PHP/V8):
+ *   - Maps are only created if corresponding language profiling is enabled
+ *   - Configuration: ebpf.profile.languages.{python,php,nodejs}_disabled
+ *   - Disabling unused languages can save ~5-6 MB per language
+ *
+ * Capacity and configuration:
+ *   - *_unwind_info_map: 65536 max entries (supports large-scale containerized environments)
+ *   - *_offsets_map: Small fixed size (version-specific offset tables, shared across processes)
+ *   - Map capacity: hardcoded in BPF code (not runtime configurable)
+ *   - Language enable/disable: runtime configurable via agent config
+ *   - To increase capacity, modify max_entries below and rebuild
+ */
+
+// Python: stores thread state address for stack unwinding
+// - python_tstate_addr_map: key=PID, value=thread_state_address (per-thread)
+//   Pre-allocated: 65536 * (4 + 8 + 32) ≈ 2.8 MB (htab_elem overhead included)
+// - python_unwind_info_map: key=PID, value=python_unwind_info_t (per-process)
+//   Pre-allocated: 65536 * (4 + 16 + 32) ≈ 3.3 MB (htab_elem overhead included)
+// - python_offsets_map: key=offsets_id, value=python_offsets_t (per-version, reference counted)
+//   Supports 1 Python version at a time (upgrades replace entry)
+//   Pre-allocated: 1 * (1 + 216 + 32) ≈ 249 bytes
+MAP_HASH(python_tstate_addr_map, __u32, __u64, 65536, FEATURE_FLAG_PROFILE_PYTHON)
+MAP_HASH(python_unwind_info_map, __u32, python_unwind_info_t, 65536, FEATURE_FLAG_PROFILE_PYTHON)
+MAP_HASH(python_offsets_map, __u8, python_offsets_t, 1, FEATURE_FLAG_PROFILE_PYTHON)
+
+// PHP: stores executor_globals address, JIT info, and execute_ex range
+// - php_unwind_info_map: key=PID, value=php_unwind_info_t (per-process)
+//   Pre-allocated: 65536 * (4 + 40 + 32) ≈ 4.9 MB (htab_elem overhead included)
+// - php_offsets_map: key=offsets_id (0-3), value=php_offsets_t (per-version, reference counted)
+//   Supports up to 4 different PHP versions simultaneously
+//   Pre-allocated: 4 * (1 + 48 + 32) ≈ 324 bytes
+MAP_HASH(php_unwind_info_map, __u32, php_unwind_info_t, 65536, FEATURE_FLAG_PROFILE_PHP)
+MAP_HASH(php_offsets_map, __u8, php_offsets_t, 4, FEATURE_FLAG_PROFILE_PHP)
+
+// V8/Node.js: stores isolate info and V8 internal structure offsets
+// - key=PID, value=v8_proc_info_t (per-process, includes version-specific offsets)
+//   Pre-allocated: 65536 * (4 + 64 + 32) ≈ 6.4 MB (htab_elem overhead included)
+MAP_HASH(v8_unwind_info_map, __u32, v8_proc_info_t, 65536, FEATURE_FLAG_PROFILE_V8)
 
 struct bpf_map_def SEC("maps") __symbol_table = {
     .type = BPF_MAP_TYPE_LRU_HASH,
@@ -135,10 +206,7 @@ typedef struct {
 	__u64 bp;
 } regs_t;
 
-typedef struct {
-	__u8 len;
-	__u64 addrs[PERF_MAX_STACK_DEPTH];
-} stack_t;
+// Note: stack_t is defined earlier (line 91-96) for use in custom_stack_map
 
 typedef struct {
 	struct stack_trace_key_t key;
@@ -158,6 +226,16 @@ typedef struct {
 	void *luajit_frame;
 	void *luajit_bot;
 	__s32 luajit_skip_depth;
+
+	void *php_execute_data_ptr;
+	__u8 php_offsets_id;
+	__u64 php_jit_return_address; // JIT return address for PHP 8+ mixed stacks
+	__u8 php_has_jit;
+	__u8 php_jit_retry_done;      // Flag to prevent infinite retry loop
+	__u8 _php_reserved_pad[6];
+
+	__u64 php_execute_ex_start;   // execute_ex start (abs addr)
+	__u64 php_execute_ex_end;     // execute_ex end (exclusive)
 } unwind_state_t;
 
 /*
@@ -166,14 +244,37 @@ typedef struct {
 static inline __attribute__ ((always_inline))
 void reset_unwind_state(unwind_state_t * state)
 {
+	// Use __builtin_memset for struct members to efficiently zero out data
 	__builtin_memset(&state->key, 0, sizeof(struct stack_trace_key_t));
 	state->runs = 0;
 	__builtin_memset(&state->regs, 0, sizeof(regs_t));
-	__builtin_memset(&state->stack, 0, sizeof(stack_t));
-	__builtin_memset(&state->intp_stack, 0, sizeof(stack_t));
+
+	// Clear stack_t arrays to prevent stale data from being processed
+	// Use memset for each member separately to avoid verifier issues with large structs
+	state->stack.len = 0;
+	__builtin_memset(state->stack.addrs, 0, sizeof(state->stack.addrs));
+	__builtin_memset(state->stack.frame_types, 0, sizeof(state->stack.frame_types));
+	__builtin_memset(state->stack.extra_data_a, 0, sizeof(state->stack.extra_data_a));
+	__builtin_memset(state->stack.extra_data_b, 0, sizeof(state->stack.extra_data_b));
+
+	state->intp_stack.len = 0;
+	__builtin_memset(state->intp_stack.addrs, 0, sizeof(state->intp_stack.addrs));
+	__builtin_memset(state->intp_stack.frame_types, 0, sizeof(state->intp_stack.frame_types));
+	__builtin_memset(state->intp_stack.extra_data_a, 0, sizeof(state->intp_stack.extra_data_a));
+	__builtin_memset(state->intp_stack.extra_data_b, 0, sizeof(state->intp_stack.extra_data_b));
+
+	state->py_frame_ptr = NULL;
+	state->py_offsets_id = 0;
 	state->luajit_frame = NULL;
 	state->luajit_bot = NULL;
 	state->luajit_skip_depth = 0;
+	state->php_execute_data_ptr = NULL;
+	state->php_offsets_id = 0;
+	state->php_jit_return_address = 0;
+	state->php_has_jit = 0;
+	state->php_jit_retry_done = 0;
+	state->php_execute_ex_start = 0;
+	state->php_execute_ex_end = 0;
 }
 
 MAP_PERARRAY(heap, __u32, unwind_state_t, 1, FEATURE_FLAG_PROFILE_ONCPU | FEATURE_FLAG_PROFILE_OFFCPU | FEATURE_FLAG_PROFILE_MEMORY | FEATURE_DWARF_UNWINDING)
@@ -185,6 +286,16 @@ int pre_python_unwind(void *ctx, unwind_state_t * state,
 static inline __attribute__ ((always_inline))
 int pre_lua_unwind(void *ctx, unwind_state_t * state,
 		   map_group_t * maps, int jmp_idx);
+
+static inline __attribute__ ((always_inline))
+int pre_php_unwind(void *ctx, unwind_state_t * state,
+		 map_group_t *maps, int jmp_idx,
+		 php_unwind_info_t *php_unwind_info);
+
+static inline __attribute__ ((always_inline))
+int pre_v8_unwind(void *ctx, unwind_state_t * state,
+		 map_group_t *maps, int jmp_idx,
+		 v8_proc_info_t *v8_unwind_info);
 
 #else
 
@@ -301,14 +412,28 @@ static __always_inline void lua_state_stack_pop(__u64 id)
  */
 MAP_ARRAY(profiler_state_map, __u32, __u64, PROFILER_CNT, FEATURE_FLAG_PROFILE_ONCPU)
 #ifdef LINUX_VER_5_2_PLUS
+// Add a frame to the stack with optional extra data
+// frame_type: FRAME_TYPE_NORMAL, FRAME_TYPE_V8, etc.
+// addr: primary address (or pointer_and_type for V8)
+// extra_a, extra_b: additional data (for V8: delta_or_marker, return_address)
 static inline __attribute__ ((always_inline))
-void add_frame(stack_t * stack, __u64 frame)
+void add_frame_ex(stack_t * stack, __u8 frame_type, __u64 addr, __u64 extra_a, __u64 extra_b)
 {
 	__u8 len = stack->len;
 	if (len >= 0 && len < PERF_MAX_STACK_DEPTH) {
-		stack->addrs[len] = frame;
+		stack->addrs[len] = addr;
+		stack->frame_types[len] = frame_type;
+		stack->extra_data_a[len] = extra_a;
+		stack->extra_data_b[len] = extra_b;
 		stack->len++;
 	}
+}
+
+// Legacy add_frame for Python/Dwarf compatibility (encodes data in single u64)
+static inline __attribute__ ((always_inline))
+void add_frame(stack_t * stack, __u64 frame)
+{
+	add_frame_ex(stack, FRAME_TYPE_NORMAL, frame, 0, 0);
 }
 
 static inline __u32 rol32(__u32 word, unsigned int shift)
@@ -370,6 +495,8 @@ static inline __attribute__ ((always_inline))
 __u32 hash_stack(stack_t * stack, __u32 initval)
 {
 	__u32 *k = (__u32 *) stack->addrs;
+	__u32 *ka = (__u32 *) stack->extra_data_a;
+	__u32 *kb = (__u32 *) stack->extra_data_b;
 	__u32 length = stack->len * sizeof(__u64) / sizeof(__u32);
 
 	__u32 a, b, c;
@@ -384,18 +511,30 @@ __u32 hash_stack(stack_t * stack, __u32 initval)
 			break;
 		}
 		a += k[offset];
+		a += ka[offset];
+		a += kb[offset];
 		b += k[offset + 1];
+		b += ka[offset + 1];
+		b += kb[offset + 1];
 		c += k[offset + 2];
+		c += ka[offset + 2];
+		c += kb[offset + 2];
 		__jhash_mix(a, b, c);
 	}
 
 	switch (length - offset) {
 	case 3:
 		c += k[offset + 2];
+		c += ka[offset + 2];
+		c += kb[offset + 2];
 	case 2:
 		b += k[offset + 1];
-	case 1:
-		a += k[offset + 0];
+		b += ka[offset + 1];
+		b += kb[offset + 1];
+		case 1:
+		a += k[offset];
+		a += ka[offset];
+		a += kb[offset];
 		__jhash_final(a, b, c);
 	case 0:		/* Nothing left to add */
 		break;
@@ -430,8 +569,9 @@ __u32 get_stackid(struct bpf_map_def *stack_map, stack_t * stack)
 	}
 
 	__u32 id = hash_stack(stack, 0) & (STACK_MAP_ENTRIES - 1);
+	// Store the complete stack_t structure (not just addrs) to preserve frame_types and extra_data
 	int ret =
-	    bpf_map_update_elem(stack_map, &id, stack->addrs, BPF_NOEXIST);
+	    bpf_map_update_elem(stack_map, &id, stack, BPF_NOEXIST);
 	if (ret == 0) {
 		return id;
 	}
@@ -439,20 +579,31 @@ __u32 get_stackid(struct bpf_map_def *stack_map, stack_t * stack)
 		return ret;
 	}
 
-	__u64 *addrs = bpf_map_lookup_elem(stack_map, &id);
-	if (!addrs) {
+	// On collision, check if the existing stack matches
+	stack_t *existing = bpf_map_lookup_elem(stack_map, &id);
+	if (!existing) {
 		return -EEXIST;
 	}
 
+	// Compare stacks properly (not just addrs array)
 	int i;
 #pragma unroll
 	for (i = 0; i < PERF_MAX_STACK_DEPTH && i < stack->len; i++) {
-		if (addrs[i] != stack->addrs[i]) {
+		if (existing->addrs[i] != stack->addrs[i]) {
+			return -EEXIST;
+		}
+		if (existing->frame_types[i] != stack->frame_types[i]) {
+			return -EEXIST;
+		}
+		if (existing->extra_data_a[i] != stack->extra_data_a[i]) {
+			return -EEXIST;
+		}
+		if (existing->extra_data_b[i] != stack->extra_data_b[i]) {
 			return -EEXIST;
 		}
 	}
 
-	if (i == PERF_MAX_STACK_DEPTH || addrs[i] == 0) {
+	if (i == PERF_MAX_STACK_DEPTH || existing->addrs[i] == 0) {
 		return id;
 	}
 	return -EEXIST;
@@ -579,10 +730,17 @@ int collect_stack_and_send_output(struct pt_regs *ctx,
 	}
 
 	if (key->flags & STACK_TRACE_FLAGS_DWARF && stack != NULL) {
-		key->userstack = get_stackid(stack_map, stack);
+		if (stack->len > 0) {
+			key->userstack = get_stackid(stack_map, stack);
+		} else {
+			// DWARF unwinding failed (likely JIT code with no debug info)
+			// Clear DWARF flag to allow fallback to FP-based unwinding via bpf_get_stackid()
+			key->flags &= ~STACK_TRACE_FLAGS_DWARF;
+		}
 	}
 
 	if (intp_stack != NULL && intp_stack->len > 0) {
+		// Reuse stack_map (custom_stack_map_a/b) for interpreter stack
 		key->intpstack = get_stackid(stack_map, intp_stack);
 	}
 #endif
@@ -740,6 +898,18 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 		pre_lua_unwind(ctx, state, &oncpu_maps, PROG_LUA_UNWIND_PE_IDX);
 	}
 
+	php_unwind_info_t *php_unwind_info =
+	    php_unwind_info_map__lookup(&state->key.tgid);
+	if (php_unwind_info != NULL) {
+		pre_php_unwind(ctx, state, &oncpu_maps, PROG_DWARF_UNWIND_BEFORE_PHP_PE_IDX, php_unwind_info);
+	}
+
+	v8_proc_info_t *v8_unwind_info =
+	    v8_unwind_info_map__lookup(&state->key.tgid);
+	if (v8_unwind_info != NULL) {
+		pre_v8_unwind(ctx, state, &oncpu_maps, PROG_DWARF_UNWIND_BEFORE_V8_PE_IDX, v8_unwind_info);
+	}
+
 	process_shard_list_t *shard_list =
 	    process_shard_list_table__lookup(&key->tgid);
 	if (shard_list != NULL) {
@@ -747,10 +917,10 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 
 		int ret =
 		    get_usermode_regs((struct pt_regs *)&ctx->regs,
-				      &state->regs);
+		                      &state->regs);
 		if (ret == 0) {
 			bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map),
-				      PROG_DWARF_UNWIND_PE_IDX);
+			              PROG_DWARF_UNWIND_PE_IDX);
 		}
 		__sync_fetch_and_add(error_count_ptr, 1);
 		return 0;
@@ -967,6 +1137,27 @@ PROGPE(dwarf_unwind) (struct bpf_perf_event_data * ctx) {
 
 	dwarf_unwind(ctx, state, &oncpu_maps, PROG_DWARF_UNWIND_PE_IDX);
 
+	// After DWARF unwinding, check if this is a PHP process
+	// If yes, tail call to PHP unwinder to collect interpreter frames
+	php_unwind_info_t *php_info = php_unwind_info_map__lookup(&state->key.tgid);
+	if (php_info != NULL) {
+		// Reset runs counter for PHP unwinding
+		state->runs = 0;
+		bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map),
+			      PROG_PHP_UNWIND_PE_IDX);
+	}
+
+	// After DWARF unwinding, check if this is a V8 process
+	// If yes, tail call to V8 unwinder to collect interpreter frames
+	v8_proc_info_t *v8_info = v8_unwind_info_map__lookup(&state->key.tgid);
+	if (v8_info != NULL) {
+		// Reset runs counter for V8 unwinding
+		state->runs = 0;
+		bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map),
+			      PROG_V8_UNWIND_PE_IDX);
+	}
+
+	// Not an interpreter process or tail call failed, go to output
 	bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map),
 		      PROG_ONCPU_OUTPUT_PE_IDX);
 	return 0;
@@ -1180,6 +1371,655 @@ PROGPE(python_unwind) (struct bpf_perf_event_data * ctx) {
 		return 0;
 	}
 
+	bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map),
+		      PROG_ONCPU_OUTPUT_PE_IDX);
+	return 0;
+}
+// Helper function to detect if PC is at the JIT return point within execute_ex.
+//
+// This handles an edge case in JIT detection: when PC is inside execute_ex but
+// at the exact instruction right after the JMP that calls JIT code. At this point,
+// the code just returned from JIT and may need special handling (e.g., ARM64 SP
+// adjustment).
+//
+// Note: The primary JIT detection is done via `!pc_in_execute_ex` check in
+// php_unwind(). This function only supplements that for the boundary case.
+static inline __attribute__ ((always_inline))
+bool is_php_jit_frame(unwind_state_t *state, void *current_pc) {
+	// If no JIT return address is configured, no JIT support available
+	if (state->php_jit_return_address == 0) {
+		return false;
+	}
+
+	// Check if PC is at the JIT return address (instruction after JMP in execute_ex)
+	// This indicates we just returned from JIT code execution
+	return (__u64)current_pc == state->php_jit_return_address;
+}
+
+// Common function for DWARF unwinding before interpreter (PHP/V8) unwinding.
+// If DWARF info is available, perform native stack unwinding first.
+// Otherwise, fall back directly to interpreter unwinder.
+static inline __attribute__ ((always_inline))
+int dwarf_unwind_before_interp(void *ctx, int fallback_jmp_idx) {
+	__u32 count_idx = ERROR_IDX;
+	__u64 *error_count_ptr = profiler_state_map__lookup(&count_idx);
+
+	if (error_count_ptr == NULL) {
+		__u64 err_val = 1;
+		profiler_state_map__update(&count_idx, &err_val);
+		return -1;
+	}
+
+	__u32 zero = 0;
+	unwind_state_t *state = heap__lookup(&zero);
+	if (state == NULL) {
+		return 0;
+	}
+
+	// Check if DWARF unwinding is available
+	process_shard_list_t *shard_list =
+	    process_shard_list_table__lookup(&state->key.tgid);
+	if (shard_list != NULL) {
+		// DWARF unwinding is available, try to unwind native frames first
+		state->key.flags |= STACK_TRACE_FLAGS_DWARF;
+		state->runs = 0;
+
+		// Tail call to DWARF unwinder
+		bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map),
+			      PROG_DWARF_UNWIND_PE_IDX);
+		__sync_fetch_and_add(error_count_ptr, 1);
+		return 0;
+	}
+
+	// No DWARF unwinding, go directly to interpreter unwinder
+	bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map), fallback_jmp_idx);
+	return 0;
+}
+
+static inline __attribute__ ((always_inline))
+int pre_php_unwind(void *ctx, unwind_state_t * state,
+		 map_group_t *maps, int jmp_idx,
+		 php_unwind_info_t *php_unwind_info) {
+	if (php_unwind_info == NULL) {
+        return 0;
+	}
+	state->php_offsets_id = php_unwind_info->offsets_id;
+	state->php_has_jit = php_unwind_info->has_jit;
+
+	php_offsets_t *php_offsets =
+	    php_offsets_map__lookup(&state->php_offsets_id);
+	if (php_offsets == NULL) {
+        return 0;
+	}
+
+	void *execute_data_ptr;
+	if (bpf_probe_read_user(&execute_data_ptr, sizeof(execute_data_ptr),
+	     (void *)php_unwind_info->executor_globals_address + php_offsets->executor_globals.current_execute_data) != 0) {
+        return 0;
+	}
+
+	state->php_execute_data_ptr = execute_data_ptr;
+	// Store JIT return address for PHP 8+ JIT unwinding
+	// This enables detection and proper handling of mixed interpreter/JIT stacks
+	state->php_jit_return_address = php_unwind_info->jit_return_address;
+	// Record execute_ex range for lightweight JIT detection
+	state->php_execute_ex_start = php_unwind_info->execute_ex_start;
+	state->php_execute_ex_end   = php_unwind_info->execute_ex_end;
+
+	// Get user-mode registers
+	int ret = get_usermode_regs((struct pt_regs *)ctx, &state->regs);
+	if (ret != 0) {
+		return 0;
+	}
+
+	bpf_tail_call(ctx, maps->progs_jmp, jmp_idx);
+	return 0;
+}
+
+static inline __attribute__ ((always_inline))
+int php_unwind(void *ctx, unwind_state_t * state,
+		 map_group_t *maps, int jmp_idx) {
+	if (state->php_execute_data_ptr == NULL) {
+		goto output;
+	}
+
+	php_offsets_t *php_offsets =
+	    php_offsets_map__lookup(&state->php_offsets_id);
+	if (php_offsets == NULL) {
+		goto output;
+	}
+
+	// JIT detection: PHP 8+ JIT code runs outside execute_ex function.
+	// Primary detection: check if PC is outside the execute_ex address range.
+	// Edge case: PC may be at the JIT return point (just after JMP instruction
+	// in execute_ex), which is_php_jit_frame() handles.
+	__u64 ip = state->regs.ip;
+	bool pc_in_execute_ex = (state->php_execute_ex_start != 0 &&
+					 state->php_execute_ex_end != 0 &&
+					 ip >= state->php_execute_ex_start &&
+					 ip < state->php_execute_ex_end);
+	bool sample_is_jit = state->php_has_jit &&
+	    (!pc_in_execute_ex || is_php_jit_frame(state, (void *)ip));
+
+#if defined(__aarch64__)
+	// On ARM64 we need to adjust the stack pointer if we entered from JIT code.
+	// This is only a problem on ARM64 where SP/FP are used for unwinding.
+	// This is necessary because:
+	// a) The PHP VM jumps into code by default. This is equivalent to having an inner frame.
+	// b) The PHP VM allocates some space for alignment purposes and saving registers.
+	// c) The amount and alignment of this space can change in hard-to-detect ways.
+	// Given that there's no guarantee that anything pushed to the stack is useful, we
+	// simply ignore it. There may be a return address in some modes, but this is hard to detect
+	// consistently.
+	// Note: If BP is 0 or invalid, SP will be set accordingly. Subsequent DWARF unwinding
+	// will fail gracefully when bpf_probe_read_user() attempts to read from invalid address.
+	if (sample_is_jit) {
+		state->regs.sp = state->regs.bp;
+	}
+#endif
+
+#pragma unroll
+	for (int i = 0; i < STACK_FRAMES_PER_RUN; i++) {
+		// Read zend_execute_data->function
+		void *zend_function_ptr;
+		if (bpf_probe_read_user(&zend_function_ptr, sizeof(zend_function_ptr),
+					state->php_execute_data_ptr + php_offsets->execute_data.function) != 0) {
+			goto output;
+		}
+
+		if (zend_function_ptr == NULL) {
+			goto output;
+		}
+
+		// Mark only the top PHP frame as JIT when native PC is outside execute_ex
+		bool is_jit_frame = sample_is_jit && (i == 0);
+
+		// Read line number directly from zend_execute_data->opline->lineno
+		// This avoids the 96-byte symbol_t stack allocation and unnecessary symbol extraction
+		void *opline_ptr = NULL;
+		__u32 lineno = 0;
+		if (bpf_probe_read_user(&opline_ptr, sizeof(opline_ptr),
+					state->php_execute_data_ptr + php_offsets->execute_data.opline) == 0 && opline_ptr) {
+			bpf_probe_read_user(&lineno, sizeof(lineno),
+					    opline_ptr + php_offsets->op.lineno);
+		}
+
+		// Read type_info from zend_execute_data->This.u1.type_info
+		__u32 type_info = 0;
+		bpf_probe_read_user(&type_info, sizeof(type_info),
+				    state->php_execute_data_ptr + php_offsets->execute_data.this_type_info);
+
+		// Use add_frame_ex to store complete PHP frame information
+		// addr: zend_function pointer (for symbolization)
+		// frame_type: FRAME_TYPE_PHP
+		// extra_data_a: packed (type_info << 32) | lineno for top-level code detection
+		// extra_data_b: JIT flag (1 for JIT, 0 for interpreted)
+		__u64 jit_flag = is_jit_frame ? 1 : 0;
+		__u64 lineno_and_type = (((__u64)type_info) << 32) | lineno;
+
+		add_frame_ex(&state->intp_stack, FRAME_TYPE_PHP,
+			     (__u64)zend_function_ptr, lineno_and_type, jit_flag);
+
+		// Move to previous execute_data
+		if (bpf_probe_read_user(&state->php_execute_data_ptr, sizeof(void *),
+					state->php_execute_data_ptr + php_offsets->execute_data.prev_execute_data) != 0) {
+			goto output;
+		}
+
+		if (!state->php_execute_data_ptr) {
+			goto output;
+		}
+	}
+
+	if (++state->runs < UNWIND_PROG_MAX_RUN) {
+		bpf_tail_call(ctx, maps->progs_jmp, jmp_idx);
+	}
+
+output:
+	return 0;
+}
+
+// eBPF Program Entry: DWARF Unwind Before PHP
+// This program performs DWARF unwinding before PHP interpreter unwinding
+// to capture the complete native stack trace
+PROGPE(dwarf_unwind_before_php) (struct bpf_perf_event_data *ctx) {
+	return dwarf_unwind_before_interp(ctx, PROG_PHP_UNWIND_PE_IDX);
+}
+
+PROGPE(php_unwind) (struct bpf_perf_event_data * ctx) {
+	__u32 count_idx;
+
+	count_idx = ERROR_IDX;
+	__u64 *error_count_ptr = profiler_state_map__lookup(&count_idx);
+
+	if (error_count_ptr == NULL) {
+		count_idx = ERROR_IDX;
+		__u64 err_val = 1;
+		profiler_state_map__update(&count_idx, &err_val);
+		return -1;
+	}
+
+	__u32 zero = 0;
+	unwind_state_t *state = heap__lookup(&zero);
+	if (state == NULL) {
+		return 0;
+	}
+
+	php_unwind(ctx, state, &oncpu_maps, PROG_PHP_UNWIND_PE_IDX);
+
+	// bpf_debug("[PHP_UNWIND] stack.len=%d intp_stack.len=%d has_jit=%d",
+	//	state->stack.len, state->intp_stack.len, state->php_has_jit);
+	// bpf_debug("[PHP_UNWIND] jit_ret_addr=0x%llx retry_done=%d",
+	//	state->php_jit_return_address, state->php_jit_retry_done);
+
+	// If DWARF unwinding failed (state->stack.len == 0, likely JIT code) and we haven't retried yet,
+	// retry DWARF unwinding from JIT return address (inside execute_ex)
+	if (state->stack.len == 0 && state->php_has_jit &&
+	    state->php_jit_return_address != 0 && !state->php_jit_retry_done) {
+
+		// Check if DWARF information is available for this process
+		process_shard_list_t *shard_list =
+		    process_shard_list_table__lookup(&state->key.tgid);
+
+		if (shard_list != NULL) {
+			// Set IP to JIT return address (inside execute_ex interpreter loop)
+			// This address has DWARF debug info and can be unwound successfully
+			// bpf_debug("[PHP_JIT_RETRY] Retrying DWARF from IP 0x%llx -> 0x%llx",
+			//	state->regs.ip, state->php_jit_return_address);
+
+			state->regs.ip = state->php_jit_return_address;
+			state->php_jit_retry_done = 1;  // Prevent infinite retry loop
+			state->key.flags |= STACK_TRACE_FLAGS_DWARF;
+
+			// Retry DWARF unwinding from the new IP
+			bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map), PROG_DWARF_UNWIND_PE_IDX);
+			return 0;  // tail call succeeded
+		}
+	}
+
+	if (state->stack.len == 0) {
+		// If no retry or retry not needed, clear DWARF flag for fallback to FP unwinding
+		state->key.flags &= ~STACK_TRACE_FLAGS_DWARF;
+	}
+	bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map),
+		      PROG_ONCPU_OUTPUT_PE_IDX);
+	return 0;
+}
+
+// Verify V8 HeapObject tag and extract pointer
+static inline __attribute__((always_inline))
+__u64 v8_verify_pointer(__u64 maybe_pointer) {
+	// V8 HeapObject tag: lower 2 bits must be 0x1
+	if ((maybe_pointer & V8_HEAP_OBJECT_TAG_MASK) != V8_HEAP_OBJECT_TAG) {
+		return 0;
+	}
+	return maybe_pointer & ~V8_HEAP_OBJECT_TAG_MASK;
+}
+
+// Read and verify a V8 tagged pointer from memory
+static inline __attribute__((always_inline))
+__u64 v8_read_object_ptr(__u64 addr) {
+	__u64 maybe_pointer = 0;
+	if (bpf_probe_read_user(&maybe_pointer, sizeof(maybe_pointer), (void *)addr)) {
+		return 0;
+	}
+	return v8_verify_pointer(maybe_pointer);
+}
+
+// Verify and parse V8 SMI (Small Integer) value
+// SMI tag: lower 1 bit must be 0x0, value is in upper bits
+static inline __attribute__((always_inline))
+__u64 v8_parse_smi(__u64 maybe_smi, __u64 def_value) {
+	// V8 SMI tag: lower 1 bit is 0
+	if ((maybe_smi & V8_SMI_TAG_MASK) != V8_SMI_TAG) {
+		return def_value;
+	}
+	// Shift right by 32 bits (on 64-bit systems, SMI is upper 32 bits)
+	return maybe_smi >> V8_SMI_VALUE_SHIFT;
+}
+
+// Read object type from HeapObject
+// Returns type ID, or 0 on error
+static inline __attribute__((always_inline))
+__u16 v8_read_object_type(v8_proc_info_t *vi, __u64 obj_addr) {
+	if (!obj_addr) {
+		return 0;
+	}
+
+	// Read Map pointer from HeapObject
+	__u64 map = v8_read_object_ptr(obj_addr + vi->off_HeapObject_map);
+	if (!map) {
+		return 0;
+	}
+
+	// Read instance_type from Map (offset 0xc in Map object)
+	__u16 type = 0;
+	if (bpf_probe_read_user(&type, sizeof(type), (void *)(map + V8_OFF_MAP_INSTANCE_TYPE))) {
+		return 0;
+	}
+
+	return type;
+}
+
+// V8 frame unwinding - store SFI pointer for user-space symbolization
+// eBPF: read JSFunction -> SFI, store SFI address
+// User-space: read SFI -> function name
+// Stores pointer_and_type and delta_or_marker as separate values in extra_data
+static inline __attribute__((always_inline))
+int unwind_one_v8_frame(unwind_state_t *state, v8_proc_info_t *vi,
+                        bool is_top_frame) {
+	__u64 sp = state->regs.sp;
+	__u64 fp = state->regs.bp;
+	__u64 pc = state->regs.ip;
+	__u64 fp_marker = 0;
+	__u64 fp_function = 0;
+	__u64 fp_bytecode_offset = 0;
+	__u64 new_fp = 0;
+	__u64 ret_addr = 0;
+	__u64 jsfunc = 0;
+	__u64 sfi = 0;
+	__u64 code = 0;
+	__u16 jsfunc_type = 0;
+
+	// OpenTelemetry encoding: lower 3 bits = type, rest = pointer
+	__u64 pointer_and_type = 0;
+	__u64 delta_or_marker = 0;
+	bool be_not_marker = false;
+
+	int frame_idx = state->intp_stack.len;
+	// bpf_debug("[V8 eBPF] Frame#%d", frame_idx);
+	// bpf_debug("[V8 eBPF] fp=0x%lx sp=0x%lx, pc=0x%lx", fp, sp, pc);
+	__sync_fetch_and_add(&vi->unwinding_attempted, 1);
+
+	// Validate frame pointer
+	if (fp < sp || fp >= sp + V8_MAX_FRAME_SIZE) {
+		// bpf_debug("[V8 eBPF] Invalid FP: fp=0x%lx sp=0x%lx", fp, sp);
+		__sync_fetch_and_add(&vi->unwinding_failed, 1);
+		return -1;
+	}
+
+	// Read frame context
+	if (bpf_probe_read_user(&fp_marker, sizeof(fp_marker), (void *)(fp + vi->fp_marker)) ||
+	    bpf_probe_read_user(&fp_function, sizeof(fp_function), (void *)(fp + vi->fp_function)) ||
+	    bpf_probe_read_user(&fp_bytecode_offset, sizeof(fp_bytecode_offset), (void *)(fp + vi->fp_bytecode_offset))) {
+		// bpf_debug("[V8 eBPF] Read FP context failed", 0);
+		__sync_fetch_and_add(&vi->unwinding_failed, 1);
+		return -1;
+	}
+
+	// bpf_debug("[V8 eBPF] marker=0x%lx func=0x%lx bytecode=0x%lx",
+	// 	fp_marker, fp_function, fp_bytecode_offset);
+
+	// Check for Stub/Entry/Internal frames (SMI marker)
+	// Note: V8 frame markers use special encoding (shift=1, not full SMI shift=32)
+	if ((fp_marker & V8_SMI_TAG_MASK) == V8_SMI_TAG) {
+		// Stub frame: type 0x0
+		// Frame marker uses V8_SmiTagShift=1 (not V8_SmiValueShift=32)
+		pointer_and_type = V8_MAKE_PTR(V8_TYPE_MARKER, fp);
+		delta_or_marker = fp_marker >> V8_SMI_TAG_SHIFT;
+		// Note: when fp_function is zero, the delta_or_marker is not valid
+		if (delta_or_marker > 0 && delta_or_marker < 32 && fp_function != 0) {
+			add_frame_ex(&state->intp_stack, FRAME_TYPE_V8, pointer_and_type, delta_or_marker, 0);
+			// bpf_debug("[V8 eBPF] Added stub marker 0x%lx", delta_or_marker);
+			goto unwind_frame;
+		}
+		be_not_marker = true;
+		// bpf_debug("[V8 eBPF] Not a stub marker");
+	}
+
+	// Validate JSFunction object
+	jsfunc = v8_verify_pointer(fp_function);
+	jsfunc_type = v8_read_object_type(vi, jsfunc);
+	if (jsfunc_type < vi->type_JSFunction_first || jsfunc_type > vi->type_JSFunction_last) {
+		// bpf_debug("[V8 eBPF] Not a JSFunction: type=0x%x", jsfunc_type);
+		// Not a V8 frame, continue unwinding with frame pointer
+		// This handles native frames before entering V8 code
+		if (be_not_marker && frame_idx != 0) {
+			return -1;
+		}
+		goto unwind_frame;
+	}
+
+	// bpf_debug("[V8 eBPF] Valid JSFunction: type=0x%x", jsfunc_type);
+
+	// Read and validate SharedFunctionInfo
+	sfi = v8_read_object_ptr(jsfunc + vi->off_JSFunction_shared);
+	if (v8_read_object_type(vi, sfi) != vi->type_SharedFunctionInfo) {
+		// bpf_debug("[V8 eBPF] No SharedFunctionInfo: ptr=0x%lx", sfi);
+		// No valid SFI, try Code object directly
+		code = v8_read_object_ptr(jsfunc + vi->off_JSFunction_code);
+		if (code && v8_read_object_type(vi, code) == vi->type_Code) {
+			pointer_and_type = V8_TYPE_NATIVE_CODE | code;
+			delta_or_marker = 0;
+			add_frame_ex(&state->intp_stack, FRAME_TYPE_V8, pointer_and_type, delta_or_marker, 0);
+			// bpf_debug("[V8 eBPF] Added native frame (Code only)");
+		}
+		goto unwind_frame;
+	}
+
+	// bpf_debug("[V8 eBPF] Valid SFI: addr=0x%lx", sfi);
+
+	// Check if bytecode or native
+	delta_or_marker = v8_parse_smi(fp_bytecode_offset, 0);
+	if (delta_or_marker != 0) {
+		// Bytecode frame: type 0x1, SFI pointer, bytecode offset
+		pointer_and_type = V8_TYPE_BYTECODE | sfi;
+		add_frame_ex(&state->intp_stack, FRAME_TYPE_V8, pointer_and_type, delta_or_marker, 0);
+		// bpf_debug("[V8 eBPF] Added bytecode frame, delta=0x%lx", delta_or_marker);
+		goto unwind_frame;
+	}
+
+	// Native code - start with SFI
+	pointer_and_type = V8_TYPE_NATIVE_SFI | sfi;
+	delta_or_marker = 0;
+
+	// Try to get Code object for better info
+	// Note: In V8 11.x, JSFunction.code may point to CodeDataContainer or other wrapper types
+	// We don't check the type, just try to read the fields
+	code = v8_read_object_ptr(jsfunc + vi->off_JSFunction_code);
+	// bpf_debug("[V8 eBPF] jsfunc=0x%lx code=0x%lx", jsfunc, code);
+	// bpf_debug("[V8 eBPF] Offsets: instruction_start=%u instruction_size=%u flags=%u",
+	// 	 vi->off_Code_instruction_start, vi->off_Code_instruction_size, vi->off_Code_flags);
+	// bpf_debug("[V8 eBPF] Masks: codekind_mask=0x%x codekind_shift=%u",
+	// 	 vi->codekind_mask, vi->codekind_shift);
+	if (code) {
+		// Read Code object details to calculate PC offset
+		__u64 code_start = 0;
+		__u32 code_size = 0;
+		__u32 code_flags = 0;
+
+		// Read instruction_size and flags
+		if (bpf_probe_read_user(&code_size, sizeof(code_size),
+			(void *)(code + vi->off_Code_instruction_size)) == 0 &&
+		    bpf_probe_read_user(&code_flags, sizeof(code_flags),
+			(void *)(code + vi->off_Code_flags)) == 0) {
+
+			// V8 version-specific (v11.1.204) instruction_start handling
+			if (vi->v8_version >= 11010204) {
+				// V8 11.1.204+: instruction_start is a pointer field
+				bpf_probe_read_user(&code_start, sizeof(code_start),
+					(void *)(code + vi->off_Code_instruction_start));
+			} else {
+				// V8 < 11.1.204: instruction_start is an offset from Code object base
+				// code_start = code_address + instruction_start_offset
+				code_start = code + vi->off_Code_instruction_start;
+			}
+
+			// bpf_debug("[V8 eBPF] Read code_start=0x%lx size=%u flags=0x%x",
+			// 	 code_start, code_size, code_flags);
+
+			// Extract CodeKind from flags
+			__u8 code_kind = (code_flags & vi->codekind_mask) >> vi->codekind_shift;
+			// bpf_debug("[V8 eBPF] Extracted code_kind=%u", code_kind);
+
+			// Check if PC is within Code object's code range
+			if (pc >= code_start && pc < code_start + code_size) {
+				// Calculate PC offset
+				__u32 pc_offset = (__u32)(pc - code_start);
+
+				// Create cookie: (code_size << 4) | code_kind
+				__u32 cookie = (code_size << 4) | code_kind;
+
+				// Encode: PC offset (low 32 bits) + cookie (high 32 bits)
+				// V8_LINE_COOKIE_SHIFT = 32
+				delta_or_marker = pc_offset | ((__u64)cookie << 32);
+
+				// Code matches RIP, report it.
+				if (code_kind == vi->codekind_baseline) {
+					// Baseline Code does not have backpointer to SFI, so give the JSFunc.
+					pointer_and_type = V8_TYPE_NATIVE_JSFUNC | jsfunc;
+				} else {
+					pointer_and_type = V8_TYPE_NATIVE_CODE | code;
+				}
+
+				// bpf_debug("[V8 eBPF] Code object: start=0x%lx size=%u kind=%u",
+				// 	 code_start, code_size, code_kind);
+				// bpf_debug("[V8 eBPF] PC offset=0x%x cookie=0x%x delta=0x%lx",
+				// 	 pc_offset, cookie, delta_or_marker);
+			// } else {
+				// bpf_debug("[V8 eBPF] PC 0x%lx outside Code range [0x%lx, 0x%lx)",
+				// 	 pc, code_start, code_start + code_size);
+			}
+		// } else {
+			// bpf_debug("[V8 eBPF] Failed to read Code object fields");
+		}
+	// } else {
+		// bpf_debug("[V8 eBPF] No Code object from JSFunction");
+	}
+
+	// bpf_debug("[V8 eBPF] Final: type=%llu ptr=0x%lx delta=0x%lx",
+	// 	 pointer_and_type & V8_FILE_TYPE_MASK,
+	// 	 pointer_and_type & ~V8_FILE_TYPE_MASK,
+	// 	 delta_or_marker);
+	// Pass SFI in extra_data_b as fallback for cases where Code has no DeoptimizationData
+	add_frame_ex(&state->intp_stack, FRAME_TYPE_V8, pointer_and_type, delta_or_marker, sfi);
+	// bpf_debug("[V8 eBPF] Added native frame with SFI=0x%lx", sfi);
+
+	// FIXME: lack pc recovery logic
+
+unwind_frame:
+	// Unwind using frame pointer
+	// FIXME: the following 8 and 16 should be replaced due to 64-bit or 32-bit diff
+	if (bpf_probe_read_user(&new_fp, sizeof(new_fp), (void *)fp) ||
+	    bpf_probe_read_user(&ret_addr, sizeof(ret_addr), (void *)(fp + 8))) {
+		// bpf_debug("[V8 eBPF] Read next FP failed at frame=%d", frame_idx);
+		__sync_fetch_and_add(&vi->unwinding_failed, 1);
+		return -1;
+	}
+
+	if (new_fp <= fp) {
+		// bpf_debug("[V8 eBPF] Invalid next FP=0x%lx (curr=0x%lx)", new_fp, fp);
+		__sync_fetch_and_add(&vi->unwinding_failed, 1);
+		return -1;
+	}
+
+	state->regs.bp = new_fp;
+	state->regs.ip = ret_addr;
+	state->regs.sp = fp + 16;
+
+	// ARM64-specific: JS Entry Frame stores additional callee-saved registers
+	// before the FP/LR pair. When unwinding from Entry Frame (marker 0 or 1),
+	// we need to adjust SP to skip these registers.
+	// See: https://chromium.googlesource.com/v8/v8/+/main/src/execution/arm64/frame-constants-arm64.h
+	if (pointer_and_type == V8_MAKE_PTR(V8_TYPE_MARKER, fp) && delta_or_marker == 1) {
+		state->regs.sp += V8_ENTRYFRAME_CALLEE_SAVED_REGS_BEFORE_FP_LR_PAIR * sizeof(__u64);
+		// bpf_debug("[V8 eBPF] ARM64 Entry Frame: adjusted SP by %d bytes",
+		//           V8_ENTRYFRAME_CALLEE_SAVED_REGS_BEFORE_FP_LR_PAIR * sizeof(__u64));
+	}
+
+	// bpf_debug("[V8 eBPF] Unwound to fp=0x%lx ret=0x%lx", new_fp, ret_addr);
+	__sync_fetch_and_add(&vi->unwinding_success, 1);
+	return 0;
+}
+
+// V8 stack unwinding preprocessing function
+static inline __attribute__((always_inline))
+int pre_v8_unwind(void *ctx, unwind_state_t *state,
+                  map_group_t *maps, int jmp_idx,
+                  v8_proc_info_t *v8_unwind_info) {
+	if (v8_unwind_info == NULL) {
+		return 0;
+	}
+
+	// Get user-mode registers
+	int ret = get_usermode_regs((struct pt_regs *)ctx, &state->regs);
+	if (ret != 0) {
+		return 0;
+	}
+
+	// Tail call to DWARF unwinding before V8
+	// This will first unwind native frames, then proceed to V8 interpreter frames
+	bpf_tail_call(ctx, maps->progs_jmp, jmp_idx);
+	return 0;
+}
+
+// V8 stack unwinding function (unified, following Python/PHP pattern)
+static inline __attribute__((always_inline))
+int v8_unwind(void *ctx, unwind_state_t *state,
+              map_group_t *maps, int jmp_idx) {
+	v8_proc_info_t *vi = v8_unwind_info_map__lookup(&state->key.tgid);
+	if (!vi) {
+		goto output;
+	}
+
+	// Debug: Log V8ProcInfo values from map
+	// bpf_debug("[V8 eBPF] === Starting V8 Unwind for pid=%d ===", state->key.tgid);
+	// bpf_debug("[V8 eBPF] V8 version=%u", vi->v8_version);
+	// bpf_debug("[V8 eBPF] fp_function=%d fp_marker=%d JSFunction.shared=%d",
+	// 	vi->fp_function, vi->fp_marker, vi->off_JSFunction_shared);
+
+	// Unwind up to V8_FRAMES_PER_RUN frames per run
+	#pragma unroll
+	for (int i = 0; i < V8_FRAMES_PER_RUN; i++) {
+		if (unwind_one_v8_frame(state, vi, i == 0) != 0) {
+			// Unwinding stopped (invalid frame or stack exhausted)
+			goto output;
+		}
+	}
+	// bpf_debug("[V8 eBPF] Unwind done: %d frames collected", state->intp_stack.len);
+	if (++state->runs < UNWIND_PROG_MAX_RUN) {
+		bpf_tail_call(ctx, maps->progs_jmp, jmp_idx);
+	}
+
+output:
+	return 0;
+}
+
+// eBPF Program Entry: DWARF Unwind Before V8
+// This program first tries to unwind native stack frames before V8 interpreter frames
+PROGPE(dwarf_unwind_before_v8) (struct bpf_perf_event_data *ctx) {
+	return dwarf_unwind_before_interp(ctx, PROG_V8_UNWIND_PE_IDX);
+}
+
+// eBPF Program Entry: V8 Unwind
+PROGPE(v8_unwind) (struct bpf_perf_event_data *ctx) {
+	__u32 count_idx;
+
+	count_idx = ERROR_IDX;
+	__u64 *error_count_ptr = profiler_state_map__lookup(&count_idx);
+
+	if (error_count_ptr == NULL) {
+		count_idx = ERROR_IDX;
+		__u64 err_val = 1;
+		profiler_state_map__update(&count_idx, &err_val);
+		return -1;
+	}
+
+	__u32 zero = 0;
+	unwind_state_t *state = heap__lookup(&zero);
+	if (state == NULL) {
+		return 0;
+	}
+
+	// V8 unwinding (may tail-call itself for deep stacks)
+	v8_unwind(ctx, state, &oncpu_maps, PROG_V8_UNWIND_PE_IDX);
+
+	// After V8 unwinding, collect native stack using FP-based unwinding (bpf_get_stackid)
+	// This provides the same complete stack as before V8 was loaded
+	// DO NOT use DWARF unwinding as it may fail on JIT code
+	// Don't set STACK_TRACE_FLAGS_DWARF - let collect_stack_and_send_output use bpf_get_stackid()
+	state->key.flags &= ~STACK_TRACE_FLAGS_DWARF;
+	// No DWARF, go directly to output, so as to use perf-generated native stack
 	bpf_tail_call(ctx, &NAME(cp_progs_jmp_pe_map),
 		      PROG_ONCPU_OUTPUT_PE_IDX);
 	return 0;

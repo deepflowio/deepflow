@@ -711,8 +711,20 @@ void build_prog_jump_tables(struct bpf_tracer *tracer)
 			   PROG_PYTHON_UNWIND_FOR_PE,
 			   PROG_PYTHON_UNWIND_PE_IDX);
 	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
-		   	   PROG_LUA_UNWIND_FOR_PE,
-		   	   PROG_LUA_UNWIND_PE_IDX);
+			   PROG_LUA_UNWIND_FOR_PE,
+			   PROG_LUA_UNWIND_PE_IDX);
+	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
+			   PROG_PHP_UNWIND_FOR_PE,
+			   PROG_PHP_UNWIND_PE_IDX);
+	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
+			   PROG_V8_UNWIND_FOR_PE,
+			   PROG_V8_UNWIND_PE_IDX);
+	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
+			   PROG_DWARF_UNWIND_BEFORE_PHP_FOR_PE,
+			   PROG_DWARF_UNWIND_BEFORE_PHP_PE_IDX);
+	insert_prog_to_map(tracer, MAP_CP_PROGS_JMP_PE_NAME,
+			   PROG_DWARF_UNWIND_BEFORE_V8_FOR_PE,
+			   PROG_DWARF_UNWIND_BEFORE_V8_PE_IDX);
 	extended_prog_jump_tables(tracer);
 }
 

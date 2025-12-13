@@ -31,6 +31,12 @@ pub enum Error {
     BadInterpreterType(u32, &'static str),
     #[error("Process#{0} {1} v{2} not supported")]
     BadInterpreterVersion(u32, &'static str, Version),
+    #[error("Process#{0} not found or not accessible")]
+    ProcessNotFound(u32),
+    #[error("Invalid pointer address: 0x{0:x}")]
+    InvalidPointer(u64),
+    #[error("Invalid or corrupted data")]
+    InvalidData,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -122,6 +122,12 @@ pub const FEATURE_PROFILE_MEMORY: c_int = 6;
 pub const FEATURE_SOCKET_TRACER: c_int = 7;
 #[allow(dead_code)]
 pub const FEATURE_DWARF_UNWINDING: c_int = 8;
+#[allow(dead_code)]
+pub const FEATURE_PROFILE_PYTHON: c_int = 9;
+#[allow(dead_code)]
+pub const FEATURE_PROFILE_PHP: c_int = 10;
+#[allow(dead_code)]
+pub const FEATURE_PROFILE_V8: c_int = 11;
 
 //追踪器当前状态
 #[allow(dead_code)]
