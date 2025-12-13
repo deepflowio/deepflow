@@ -18,6 +18,8 @@ pub mod remote_exec {
         ParamNotFound(String),
         #[error("param `{0}` is invalid")]
         ParamInvalid(String),
+        #[error("kubernetes failed with {0}")]
+        KubeError(#[from] kube::Error),
         #[error("serialize failed with {0}")]
         SerializeError(#[from] serde_json::Error),
         #[error("transparent")]
