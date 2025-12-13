@@ -183,8 +183,6 @@ func (d *domain) getUpdatersInOrder(cloudData cloudmodel.Resource) []updater.Res
 	ip.GetWANIP().RegisterListener(listener.NewWANIP(d.cache))
 
 	return []updater.ResourceUpdater{
-		updater.NewRegion(d.cache, cloudData.Regions).RegisterListener(
-			listener.NewRegion(d.cache)),
 		updater.NewAZ(d.cache, cloudData.AZs).RegisterListener(
 			listener.NewAZ(d.cache)),
 		updater.NewSubDomain(d.cache, cloudData.SubDomains).RegisterListener(
