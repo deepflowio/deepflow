@@ -56,6 +56,9 @@ PerfData {
     synack: 0,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 1th perf data:
@@ -116,6 +119,9 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 2th perf data:
@@ -176,6 +182,9 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 3th perf data:
@@ -236,6 +245,9 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 4th perf data:
@@ -296,6 +308,9 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 5th perf data:
@@ -356,6 +371,9 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 6th perf data:
@@ -416,6 +434,9 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 7th perf data:
@@ -476,6 +497,9 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 0,
     updated: true,
 }
 8th perf data:
@@ -536,6 +560,9 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 1,
     updated: true,
 }
 9th perf data:
@@ -596,6 +623,9 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 1,
     updated: true,
 }
 10th perf data:
@@ -656,6 +686,9 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 1,
     updated: true,
 }
 11th perf data:
@@ -716,6 +749,9 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 1,
     updated: true,
 }
 12th perf data:
@@ -776,6 +812,9 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 2,
     updated: true,
 }
 13th perf data:
@@ -836,5 +875,8 @@ PerfData {
     synack: 1,
     retrans_syn: 0,
     retrans_synack: 0,
+    ooo_0: 0,
+    ooo_1: 0,
+    fin_count: 2,
     updated: true,
 }
