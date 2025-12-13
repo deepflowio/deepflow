@@ -116,9 +116,15 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		conditionStatus := []string{}
 		for i := range conditions.MustArray() {
 			cData := conditions.GetIndex(i).MustMap()
-			cType := cData["type"].(string)
+			cType, ok := cData["type"].(string)
+			if !ok {
+				continue
+			}
 			if cType == "Ready" {
-				cStatus := cData["status"].(string)
+				cStatus, ok := cData["status"].(string)
+				if !ok {
+					continue
+				}
 				conditionStatus = append(conditionStatus, cStatus)
 			}
 		}
