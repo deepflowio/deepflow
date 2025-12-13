@@ -3448,7 +3448,6 @@ dependencies = [
  "futures",
  "ipnet",
  "k8s-openapi 0.24.0",
- "kube",
  "libc",
  "log 0.4.22",
  "neli",
