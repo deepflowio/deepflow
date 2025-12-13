@@ -33,6 +33,7 @@ tonic.workspace = true
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 k8s-openapi.workspace = true
+kube = { workspace = true, features = ["client"] }
 neli = "0.6.4"
 nix = "0.23"
 
