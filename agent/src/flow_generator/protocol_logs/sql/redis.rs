@@ -17,6 +17,7 @@
 use std::{cell::OnceCell, collections::HashMap, fmt, str};
 
 use serde::{Serialize, Serializer};
+use strum_macros::Display;
 
 use super::{
     super::{value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType},
@@ -42,6 +43,72 @@ use crate::{
 };
 
 const SEPARATOR_SIZE: usize = 2;
+
+#[derive(Clone, Display, Debug, Default)]
+enum ResponseType {
+    #[strum(serialize = "Unknown redis format")]
+    #[default]
+    Unknown,
+    #[strum(serialize = "+ Simple string")]
+    String,
+    #[strum(serialize = "- Simple error")]
+    Error,
+    #[strum(serialize = ": Integer")]
+    Integer,
+    #[strum(serialize = "$ Bulk string")]
+    BulkString,
+    #[strum(serialize = "* Array")]
+    Array,
+    #[strum(serialize = "_ Nulls")]
+    Null,
+    #[strum(serialize = "# Boolean")]
+    Boolean,
+    #[strum(serialize = ", Double")]
+    Double,
+    #[strum(serialize = "( Big number")]
+    BigNumber,
+    #[strum(serialize = "! Bulk error")]
+    BulkError,
+    #[strum(serialize = "= Verbatim string")]
+    VerbatimString,
+    #[strum(serialize = "% Map")]
+    Map,
+    #[strum(serialize = "~ Set")]
+    Set,
+    #[strum(serialize = "> Push")]
+    Push,
+}
+
+impl Serialize for ResponseType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl From<u8> for ResponseType {
+    fn from(value: u8) -> Self {
+        match value {
+            b'+' => ResponseType::String,
+            b'-' => ResponseType::Error,
+            b':' => ResponseType::Integer,
+            b'$' => ResponseType::BulkString,
+            b'*' => ResponseType::Array,
+            b'_' => ResponseType::Null,
+            b'#' => ResponseType::Boolean,
+            b',' => ResponseType::Double,
+            b'(' => ResponseType::BigNumber,
+            b'!' => ResponseType::BulkError,
+            b'=' => ResponseType::VerbatimString,
+            b'%' => ResponseType::Map,
+            b'~' => ResponseType::Set,
+            b'>' => ResponseType::Push,
+            _ => ResponseType::Unknown,
+        }
+    }
+}
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct RedisInfo {
@@ -75,6 +142,7 @@ pub struct RedisInfo {
     pub error: Vec<u8>, // '-'
     #[serde(rename = "response_status")]
     pub resp_status: L7ResponseStatus,
+    response_result: ResponseType,
 
     captured_request_byte: u32,
     captured_response_byte: u32,
@@ -129,6 +197,7 @@ impl RedisInfo {
     pub fn merge(&mut self, other: &mut Self) -> Result<()> {
         std::mem::swap(&mut self.status, &mut other.status);
         std::mem::swap(&mut self.error, &mut other.error);
+        std::mem::swap(&mut self.response_result, &mut other.response_result);
         self.resp_status = other.resp_status;
         self.captured_response_byte = other.captured_response_byte;
         if other.is_on_blacklist {
@@ -165,6 +234,7 @@ impl fmt::Display for RedisInfo {
             "status: {:?}, ",
             str::from_utf8(&self.status).unwrap_or_default()
         )?;
+        write!(f, "response_result: {:?}, ", &self.response_result)?;
         write!(
             f,
             "error: {:?} }}",
@@ -191,6 +261,7 @@ impl From<RedisInfo> for L7ProtocolSendLog {
             resp: L7Response {
                 status: f.resp_status,
                 exception: String::from_utf8_lossy(f.error.as_slice()).to_string(),
+                result: f.response_result.to_string(),
                 ..Default::default()
             },
             flags,
@@ -283,12 +354,12 @@ impl RedisLog {
         self.has_request = true;
     }
 
-    fn fill_response(&mut self, context: Vec<u8>, info: &mut RedisInfo) {
+    fn fill_response(&mut self, context: (Vec<u8>, ResponseType), info: &mut RedisInfo) {
         info.msg_type = LogMessageType::Response;
         self.has_request = false;
-
+        let (context, response_type) = context;
         info.resp_status = L7ResponseStatus::Ok;
-
+        info.response_result = response_type;
         if context.is_empty() {
             return;
         }
@@ -607,7 +678,7 @@ mod stringifier {
         }
     }
 
-    pub fn decode(payload: &[u8], strict: bool) -> Result<Vec<u8>> {
+    pub fn decode(payload: &[u8], strict: bool) -> Result<(Vec<u8>, ResponseType)> {
         if payload.is_empty() {
             return Err(Error::RedisLogParseFailed);
         }
@@ -619,7 +690,7 @@ mod stringifier {
             (_, Err(Error::RedisLogParseFailed)) | (true, Err(Error::RedisLogParsePartial)) => {
                 Err(Error::RedisLogParseFailed)
             }
-            _ => Ok(output),
+            _ => Ok((output, ResponseType::from(payload[0]))),
         }
     }
 }
@@ -1172,7 +1243,10 @@ mod tests {
         for (input, expected) in testcases.iter() {
             let output = stringifier::decode(&input.0.as_bytes(), input.1);
             assert_eq!(
-                output.ok().as_ref().and_then(|vs| str::from_utf8(vs).ok()),
+                output
+                    .ok()
+                    .as_ref()
+                    .and_then(|vs| str::from_utf8(&vs.0).ok()),
                 *expected,
                 "testcase input '{}' failed",
                 str::from_utf8(input.0.as_bytes()).unwrap().escape_default()

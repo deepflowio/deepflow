@@ -1,2 +1,2 @@
-RedisInfo { request: "LRANGE mylist 0 299", request_type: "LRANGE", status: "", error: "" } is_redis: true
-RedisInfo { request: "", request_type: "", status: "", error: "" } is_redis: true
+RedisInfo { request: "LRANGE mylist 0 299", request_type: "LRANGE", status: "", response_result: Unknown, error: "" } is_redis: true
+RedisInfo { request: "", request_type: "", status: "", response_result: Array, error: "" } is_redis: true
