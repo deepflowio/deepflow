@@ -387,11 +387,11 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
  * Shared native resolver for both the C stringifier and the Rust Lua decoder.
  * Lua’s logical stack may include TAG_CFUNC frames (Lua→C calls). Rust calls 
  * this helper to resolve those native PCs using the same symbol cache.
+ * the void *tracer_handle should be struct bpf_tracer *
  */
 char *resolve_addr(void *tracer_handle, uint32_t pid, bool is_start_idx,
 			  u64 address, bool is_create, void *info_p)
 {
-	struct bpf_tracer *t = tracer_handle;
 	pid_t pid_signed = (pid_t)pid;
 
 	ASSERT(pid_signed >= 0);
@@ -852,7 +852,6 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 
 	bool has_intpstack = v->intpstack > 0;
 	bool is_lua = false;
-	bool is_python = false;
 
 	if (has_intpstack) {
 		i_trace_str = folded_stack_trace_string(t, v->intpstack, v->tgid,
@@ -862,16 +861,10 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 							ignore_libs, true);
 		if (i_trace_str != NULL) {
 			is_lua = is_lua_process((uint32_t)v->tgid);
-			is_python = (!is_lua) && is_python_process((uint32_t)v->tgid);
-		}
-
-		if (i_trace_str != NULL) {
-			if (is_python) {
-				len += strlen(i_trace_str)
-					+ strlen(INCOMPLETE_PYTHON_STACK)
-					+ 2;
-			} else {
+			if (is_lua) {
 				len += strlen(i_trace_str) + 1;
+			} else {
+				len += strlen(i_trace_str) + strlen(INCOMPLETE_PYTHON_STACK) + 2;
 			}
 		} else {
 			len += strlen(i_err_tag);
@@ -890,7 +883,7 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		if (is_lua) {
 			offset += merge_lua_stacks(trace_str + offset, len - offset,
 						   u_trace_str, i_trace_str);
-		} else if (is_python) {
+		} else {
 			offset += merge_python_stacks(trace_str + offset, len - offset, i_trace_str, u_trace_str);
 		}
 	} else if (i_trace_str) {
