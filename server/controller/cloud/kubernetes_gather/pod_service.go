@@ -17,10 +17,10 @@
 package kubernetes_gather
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 
-	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand"
@@ -41,51 +41,59 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 	servicesArrays = append(servicesArrays, k.k8sInfo["*v1.ServiceRule"])
 	for i, servicesArray := range servicesArrays {
 		for _, s := range servicesArray {
-			sData, sErr := simplejson.NewJson([]byte(s))
+			sRaw := json.RawMessage(s)
+			sData, sErr := rawMessageToMap(sRaw)
 			if sErr != nil {
 				err = sErr
-				log.Errorf("service initialization simplejson error: (%s)", sErr.Error(), logger.NewORGPrefix(k.orgID))
+				log.Errorf("service initialization json error: (%s)", sErr.Error(), logger.NewORGPrefix(k.orgID))
 				return
 			}
-			metaData, ok := sData.CheckGet("metadata")
+			metaData, ok := getJSONMap(sData, "metadata")
 			if !ok {
 				log.Info("service metadata not found", logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			uID := metaData.Get("uid").MustString()
+			uID := getJSONString(metaData, "uid")
 			if uID == "" {
 				log.Info("service uid not found", logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			name := metaData.Get("name").MustString()
+			name := getJSONString(metaData, "name")
 			if name == "" {
 				log.Infof("service (%s) name not found", uID, logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			namespace := metaData.Get("namespace").MustString()
+			namespace := getJSONString(metaData, "namespace")
 			namespaceLcuuid, ok := k.namespaceToLcuuid[namespace]
 			if !ok {
 				log.Infof("service (%s) namespace not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			spec := sData.Get("spec")
-			selector := spec.Get("selector").MustMap()
-			if len(selector) == 0 {
+			spec, _ := getJSONMap(sData, "spec")
+			if spec == nil {
+				log.Infof("service (%s) spec not found", name, logger.NewORGPrefix(k.orgID))
+				continue
+			}
+			selector, ok := getJSONMap(spec, "selector")
+			if !ok || len(selector) == 0 {
 				log.Infof("service (%s) selector not found", name, logger.NewORGPrefix(k.orgID))
 				continue
 			}
 			selectorSlice := cloudcommon.GenerateCustomTag(selector, nil, 0, ":")
-			specTypeString := spec.Get("type").MustString()
+			specTypeString := interfaceToString(spec["type"])
 			specType, ok := serviceTypes[specTypeString]
 			if !ok {
 				log.Infof("service (%s) type (%s) not support", name, specTypeString, logger.NewORGPrefix(k.orgID))
 				continue
 			}
-			clusterIP := spec.Get("clusterIP").MustString()
+			clusterIP := interfaceToString(spec["clusterIP"])
 			if clusterIP == "None" {
 				clusterIP = ""
 			}
-			labels := metaData.Get("labels").MustMap()
+			labels, _ := getJSONMap(metaData, "labels")
+			if labels == nil {
+				labels = map[string]interface{}{}
+			}
 			switch i {
 			case 1:
 				if v, ok := labels[cloudcommon.SVC_RULE_RESOURCE_NAME]; ok {
@@ -94,14 +102,23 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				}
 			}
 
-			annotations := metaData.Get("annotations")
+			annotations, _ := getJSONMap(metaData, "annotations")
 			annotationString := expand.GetAnnotation(annotations, k.annotationRegex, k.customTagLenMax)
 
 			externalIPs := []string{}
-			svcIngress := sData.GetPath("status", "loadBalancer", "ingress")
-			for i := range svcIngress.MustArray() {
-				ingress := svcIngress.GetIndex(i)
-				externalIPs = append(externalIPs, ingress.Get("ip").MustString())
+			if loadBalancer := getJSONPath(sData, "status", "loadBalancer"); loadBalancer != nil {
+				if svcIngress, ok := getJSONArray(loadBalancer, "ingress"); ok {
+					for _, ingressInterface := range svcIngress {
+						ingress, ok := ingressInterface.(map[string]interface{})
+						if !ok {
+							continue
+						}
+						ip := interfaceToString(ingress["ip"])
+						if ip != "" {
+							externalIPs = append(externalIPs, ip)
+						}
+					}
+				}
 			}
 			uLcuuid := common.IDGenerateUUID(k.orgID, uID)
 			metaDataStr := k.simpleJsonMarshal(metaData)
@@ -125,19 +142,30 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				RegionLcuuid:       k.RegionUUID,
 				PodClusterLcuuid:   k.podClusterLcuuid,
 			}
-			specPorts := sData.Get("spec").Get("ports")
+			specPorts, _ := getJSONArray(spec, "ports")
+			if len(specPorts) == 0 {
+				log.Infof("service (%s) ports not found", name, logger.NewORGPrefix(k.orgID))
+				continue
+			}
 			var hasPodGroup bool
-			for i := range specPorts.MustArray() {
+			for _, portInterface := range specPorts {
+				port, ok := portInterface.(map[string]interface{})
+				if !ok {
+					continue
+				}
 				podGroupLcuuids := mapset.NewSet()
-				labels, fErr := metaData.Get("annotations").Get("field.cattle.io/targetWorkloadIds").String()
-				if fErr == nil && labels != "[]" && labels != "null" {
-					labelArray, lErr := simplejson.NewJson([]byte(labels))
-					if lErr != nil {
-						log.Infof("service annotation (%s) init json error: (%s)", labels, lErr.Error(), logger.NewORGPrefix(k.orgID))
+				workloadIDs := ""
+				if annotations != nil {
+					workloadIDs = interfaceToString(annotations["field.cattle.io/targetWorkloadIds"])
+				}
+				if workloadIDs != "" && workloadIDs != "[]" && workloadIDs != "null" {
+					var workloadList []string
+					if err := json.Unmarshal([]byte(workloadIDs), &workloadList); err != nil {
+						log.Infof("service annotation (%s) init json error: (%s)", workloadIDs, err.Error(), logger.NewORGPrefix(k.orgID))
 						continue
 					}
-					for i := range labelArray.MustArray() {
-						if groupLcuuids, ok := k.nsLabelToGroupLcuuids[namespace+labelArray.GetIndex(i).MustString()]; ok {
+					for _, workload := range workloadList {
+						if groupLcuuids, ok := k.nsLabelToGroupLcuuids[namespace+workload]; ok {
 							if groupLcuuids.Cardinality() > 0 {
 								podGroupLcuuids = podGroupLcuuids.Union(groupLcuuids)
 							}
@@ -147,9 +175,9 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 
 				groupLcuuidsList := []mapset.Set{}
 				for key, v := range selector {
-					vString, ok := v.(string)
-					if !ok {
-						vString = ""
+					vString := ""
+					if str, ok := v.(string); ok {
+						vString = str
 					}
 					nsLabel := namespace + key + "_" + vString
 					groupLcuuids, ok := k.nsLabelToGroupLcuuids[nsLabel]
@@ -160,8 +188,8 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				}
 
 				// support OpenGaussCluster
-				if ogcName, ok := sData.GetPath("spec", "selector").CheckGet("opengauss.cluster"); ok {
-					nsLabel := namespace + "statefulset:" + namespace + ":" + ogcName.MustString()
+				if ogcName := interfaceToString(selector["opengauss.cluster"]); ogcName != "" {
+					nsLabel := namespace + "statefulset:" + namespace + ":" + ogcName
 					if groupLcuuids, ok := k.nsLabelToGroupLcuuids[nsLabel]; ok {
 						if groupLcuuids.Cardinality() > 0 {
 							podGroupLcuuids = podGroupLcuuids.Union(groupLcuuids)
@@ -205,26 +233,37 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 					if !ok {
 						continue
 					}
-					for name, port := range targetPorts {
-						targetNameToPorts[name] = append(targetNameToPorts[name], port)
+					for name, portVal := range targetPorts {
+						targetNameToPorts[name] = append(targetNameToPorts[name], portVal)
 					}
 				}
-				port := specPorts.GetIndex(i)
 				targetPorts := []int{}
-				targetPortTBD := port.Get("targetPort")
-				targetPorts = targetNameToPorts[targetPortTBD.MustString()]
+				targetPortValue, ok := port["targetPort"]
 				if len(targetPorts) == 0 {
-					if targetPortTBD.MustInt() == 0 {
+					targetPortName := ""
+					if ok {
+						targetPortName = interfaceToString(targetPortValue)
+					}
+					if targetPortName != "" {
+						targetPorts = targetNameToPorts[targetPortName]
+					}
+				}
+				if len(targetPorts) == 0 {
+					targetPortInt := 0
+					if ok {
+						targetPortInt = interfaceToInt(targetPortValue)
+					}
+					if targetPortInt == 0 {
 						log.Infof("service (%s) targetPort not match", name, logger.NewORGPrefix(k.orgID))
 						continue
 					}
-					targetPorts = append(targetPorts, targetPortTBD.MustInt())
+					targetPorts = append(targetPorts, targetPortInt)
 				}
 				nameToPort := map[string]int{}
-				portName := port.Get("name").MustString()
-				portInt := port.Get("port").MustInt()
-				portProtocol := port.Get("protocol").MustString()
-				portNodePort := port.Get("nodePort").MustInt()
+				portName := interfaceToString(port["name"])
+				portInt := interfaceToInt(port["port"])
+				portProtocol := interfaceToString(port["protocol"])
+				portNodePort := interfaceToInt(port["nodePort"])
 				nameToPort[portName] = portInt
 				uidToName := map[string]map[string]int{}
 				uidToName[uLcuuid] = nameToPort
