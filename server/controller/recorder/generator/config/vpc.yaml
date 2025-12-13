@@ -1,0 +1,12 @@
+name: vpc
+public_name: VPC
+cache_tool:
+  enabled: true
+  fields:
+  - name: lcuuid
+    public_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: id
+    public_name: ID
+    type: int

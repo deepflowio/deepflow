@@ -1,0 +1,23 @@
+name: lb
+public_name: LB
+cache_tool:
+  enabled: true
+  fields:
+  - name: lcuuid
+    public_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: id
+    public_name: ID
+    type: int
+  - name: name
+    public_name: Name
+    type: string
+  - name: regionID
+    public_name: RegionID
+    type: int
+    ref: Region
+    db_field_name: Region
+  - name: vpcID
+    public_name: VPCID
+    type: int
