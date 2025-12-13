@@ -53,7 +53,7 @@ func ToLoggable(do bool, data interface{}) interface{} {
 	}
 	if dict, ok := data.(map[string]interface{}); ok {
 		// copy dict except for these keys
-		keysToRemove := []string{"data", "metadata", "spec"}
+		keysToRemove := []string{"compressed_data", "compressed_metadata", "compressed_spec"}
 		newDict := make(map[string]interface{})
 		for k, v := range dict {
 			skip := false

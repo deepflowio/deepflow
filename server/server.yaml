@@ -471,6 +471,10 @@ querier:
     # Trace Tree 批次写入大小
     write_batch_size: 1000
     debug_sql_len_max: 1000
+    # 多 trace_id 场景下，允许迭代找出互相关联的 trace_id 的最大迭代次数，注意区别上面的 trace_id_query_iterations
+    multi_trace_id_max_iterations: 30
+	# 检测请求距离现在的时间，如果小于这个时间不要记录 TraceTree (目前用于 async flow 上报了请求还没响应的场景), unit: s
+    trace_tree_cache_delay: 120
 
   # deepflow-app相关配置
   deepflow-app:

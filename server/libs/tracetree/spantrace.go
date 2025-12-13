@@ -28,7 +28,8 @@ import (
 
 const SPAN_TRACE_VERSION_0x12 = 0x12 // before 20251027
 const SPAN_TRACE_VERSION_0x13 = 0x13 // before 20251108
-const SPAN_TRACE_VERSION = 0x14
+const SPAN_TRACE_VERSION_0x14 = 0x14 // before 20251211
+const SPAN_TRACE_VERSION = 0x15
 
 type SpanTrace struct {
 	QuerierRegion string // not store, easy to use when calculating
@@ -80,6 +81,7 @@ type SpanTrace struct {
 	ResponseCode     uint32
 	ResponseStatus   uint8
 	Type             uint8
+	IsAsync          uint8
 }
 
 func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
@@ -139,6 +141,7 @@ func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
 	t.ResponseCode = decoder.ReadVarintU32()
 	t.ResponseStatus = decoder.ReadU8()
 	t.Type = decoder.ReadU8()
+	t.IsAsync = decoder.ReadU8()
 	if decoder.Failed() {
 		return fmt.Errorf("span trace decode failed, offset is %d, buf length is %d ", decoder.Offset(), len(decoder.Bytes()))
 	}
