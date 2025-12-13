@@ -22,17 +22,90 @@ mod l7_protocol;
 /// Usage of derive macro `L7Log`:
 ///
 /// ```rust
-/// use public_derive::L7Log;
-/// use public::l7_protocol::Field;
+/// // omitting imports
 ///
 /// #[derive(L7Log)]
-/// #[l7_log(endpoint.getter = "get_endpoint", endpoint.setter = "set_endpoint")]
 /// struct MyStruct {
-///     #[l7_log(endpoint, setter = "set_endpoint", getter = "get_endpoint")]
-///     ep: Field,
+///     version: String,
+///     request_type: String,
+///     request_domain: String,
+///     request_resource: String,
+///     request_id: usize,
+///     endpoint: String,
+///     response_code: usize,
+///     response_status: public::enums::L7ResponseStatus,
+///     response_exception: String,
+///     response_result: String,
+///     trace_id: String,
+///     span_id: String,
+///     x_request_id: String,
+///     http_proxy_client: String,
+///     biz_type: String,
+///     biz_code: String,
+///     biz_scenario: String,
 /// }
 /// ```
-
+///
+/// Deriving `L7Log` will automatically generate getters and setters for all fields in `L7Log` trait.
+///
+/// Field types supported are:
+/// - For `response_status`:
+///   - L7ResponseStatus
+///   - Option<L7ResponseStatus>
+/// - For other fields:
+///   - String
+///   - i8, i16, i32, i64, isize, u8, u16, u32, u64, usize
+///   - Option<T> for all previous types
+///   - PrioField<T> for all previous types
+///   - Option<PrioField<T>> for all previous types
+///   - PrioField<Option<T>> for all previous types
+///
+/// For types that are not in the list, custom getters and setters can be specified as follows:
+///
+/// ```rust
+/// // omitting imports
+///
+/// #[derive(L7Log)]
+/// #[l7_log(endpoint.getter = "MyStruct::get_endpoint", endpoint.setter = "MyStruct::set_endpoint")]
+/// struct MyStruct {
+///     endpoint: Endpoint,
+/// }
+///
+/// impl MyStruct {
+///     fn get_endpoint(&self) -> Field<'_> {
+///         // construct Field from your own data
+///     }
+///
+///     fn set_endpoint(&mut self, field: FieldSetter<'_>) {
+///         // set your own data from Field
+///     }
+/// }
+/// ```
+///
+/// Fields can also be renamed by using `l7_log` attribute.
+///
+/// ```rust
+/// // omitting imports
+///
+/// #[derive(L7Log)]
+/// struct MyStruct {
+///     #[l7_log(response_code)]
+///     code: String,
+/// }
+/// ```
+///
+/// Fields can be skipped by using `l7_log` attribute.
+///
+/// ```rust
+/// // omitting imports
+///
+/// #[derive(L7Log)]
+/// #[l7_log(response_code.skip = "true")]
+/// struct MyStruct {
+/// }
+/// ```
+///
+/// Empty implementations of getters and setters for skipped fields will be generated.
 #[proc_macro_derive(L7Log, attributes(l7_log))]
 pub fn l7_log_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
