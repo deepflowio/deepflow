@@ -2079,9 +2079,9 @@ CREATE TABLE IF NOT EXISTS pod_service (
     selector            TEXT COMMENT 'separated by ,',
     external_ip         TEXT COMMENT 'separated by ,',
     service_cluster_ip  CHAR(64) DEFAULT '',
-    metadata            MEDIUMTEXT COMMENT 'yaml',
+    compressed_metadata MEDIUMBLOB COMMENT 'compressed yaml',
     metadata_hash       CHAR(64) DEFAULT '',
-    spec                MEDIUMTEXT COMMENT 'yaml',
+    compressed_spec     MEDIUMBLOB COMMENT 'compressed yaml',
     spec_hash           CHAR(64) DEFAULT '',
     pod_ingress_id      INTEGER DEFAULT NULL,
     pod_namespace_id    INTEGER DEFAULT NULL,
@@ -2127,9 +2127,9 @@ CREATE TABLE IF NOT EXISTS pod_group (
     type                INTEGER DEFAULT NULL COMMENT '1: Deployment 2: StatefulSet 3: ReplicationController',
     pod_num             INTEGER DEFAULT 1,
     label               TEXT COMMENT 'separated by ,',
-    metadata            MEDIUMTEXT COMMENT 'yaml',
+    compressed_metadata MEDIUMBLOB COMMENT 'compressed yaml',
     metadata_hash       CHAR(64) DEFAULT '',
-    spec                MEDIUMTEXT COMMENT 'yaml',
+    compressed_spec     MEDIUMBLOB COMMENT 'compressed yaml',
     spec_hash           CHAR(64) DEFAULT '',
     pod_namespace_id    INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,
@@ -2224,7 +2224,7 @@ TRUNCATE TABLE pod;
 CREATE TABLE IF NOT EXISTS config_map (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(256) NOT NULL,
-    data                MEDIUMTEXT COMMENT 'yaml',
+    compressed_data     MEDIUMBLOB COMMENT 'compressed yaml',
     data_hash           CHAR(64) DEFAULT '',
     pod_namespace_id    INTEGER NOT NULL,
     pod_cluster_id      INTEGER NOT NULL,
@@ -3368,7 +3368,7 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     name                    CHAR(128) NOT NULL,
     level                   TINYINT(1) NOT NULL COMMENT '0.low 1.middle 2.high',
     state                   TINYINT(1) DEFAULT 1 COMMENT '0.disabled 1.enabled',
-    app_type                TINYINT NOT NULL COMMENT '1-system 3-indicator 4-custom_biz_service',
+    app_type                TINYINT NOT NULL COMMENT '1-system 3-indicator 4-custom_biz_service 5-comb',
     sub_type                TINYINT(1) DEFAULT 1 COMMENT '1-指标量;20-组件状态;21-组件性能;22-自动删除;23-资源状态;24-平台信息',
     deleted                 TINYINT(1) DEFAULT 0 COMMENT '0-not deleted; 1-deleted',
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -3405,7 +3405,8 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     auto_service_0          VARCHAR(256) DEFAULT '',
     auto_service_id_1       INTEGER DEFAULT 0,
     auto_service_type_1     INTEGER DEFAULT 0,
-    auto_service_1          VARCHAR(256) DEFAULT ''
+    auto_service_1          VARCHAR(256) DEFAULT '',
+    comb_policy_lcuuids     TEXT
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_policy;
 

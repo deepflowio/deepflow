@@ -41,6 +41,7 @@ func SpanWithTraceIDColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),
 		ckdb.NewColumn("trace_id", ckdb.String),
+		ckdb.NewColumn("_trace_id_2", ckdb.String),
 		ckdb.NewColumn("search_index", ckdb.UInt64),
 		ckdb.NewColumn("encoded_span", ckdb.String),
 	}
@@ -122,6 +123,7 @@ func (t *SpanWithTraceID) Encode() {
 	}
 	encoder.WriteU8(t.ResponseStatus)
 	encoder.WriteU8(t.Type)
+	encoder.WriteU8(t.IsAsync)
 	t.EncodedSpan = encoder.Bytes()
 }
 
