@@ -27,7 +27,8 @@ var AllColumnRenames = [][]*ColumnRename{getColumnRenames(ColumnRename65)}
 var AllColumnDrops = [][]*ColumnDrop{getColumnDrops(nil)}
 var AllTableModTTLs = [][]*TableModTTL{}
 var AllTableRenames = []*TableRename{}
-var AllDatasourceAdds = [][]*ColumnDatasourceAdd{getColumnDatasourceAdds(ColumnDatasourceAdd65)}
+var AllDatasourceAdds = [][]*ColumnDatasourceAdd{}
+var AllTableRecreates = []*Tables{TableRecreates71}
 
 var ColumnAdd64 = []*ColumnAdds{
 	{
@@ -410,6 +411,42 @@ var ColumnAdd71 = []*ColumnAdds{
 		Tables:      []string{"alert_event", "alert_event_local"},
 		ColumnNames: []string{"trigger_threshold", "metric_unit", "metric_value_str"},
 		ColumnType:  ckdb.String,
+	},
+	{
+		Dbs: []string{"flow_metrics"},
+		Tables: []string{
+			"network.1s_local", "network.1s", "network.1m_local", "network.1m",
+			"network_map.1s_local", "network_map.1s", "network_map.1m_local", "network_map.1m",
+			"network.1h", "network.1d",
+			"network_map.1d", "network_map.1d",
+		},
+		ColumnNames: []string{"ooo_tx", "ooo_rx"},
+		ColumnType:  ckdb.UInt64,
+	},
+	{
+		Dbs: []string{"flow_metrics"},
+		Tables: []string{
+			"network.1h_agg", "network.1d_agg",
+			"network_map.1h_agg", "network_map.1d_agg",
+		},
+		ColumnNames: []string{"ooo_tx", "ooo_rx"},
+		ColumnType:  ckdb.UInt64,
+		IsMetrics:   true,
+		AggrFunc:    "sum",
+	},
+	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"ooo_tx", "ooo_rx", "fin_count", "init_ipid"},
+		ColumnType:  ckdb.UInt32,
+	},
+}
+
+var TableRecreates71 = &Tables{
+	Db: "flow_metrics",
+	Tables: []string{
+		"network.1h_local", "network.1h_mv",
+		"network.1d_local", "network.1d_mv",
 	},
 }
 

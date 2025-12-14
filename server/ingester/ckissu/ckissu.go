@@ -56,6 +56,7 @@ type Issu struct {
 	columnAdds         []*ColumnAdd
 	indexAdds          []*IndexAdd
 	columnDrops        []*ColumnDrop
+	tableRecreates     []*Tables
 	modTTLs            []*TableModTTL
 	datasourceInfo     map[string]*DatasourceInfo
 	Connections        common.DBs
@@ -125,6 +126,8 @@ type ColumnAdds struct {
 	ColumnNames  []string
 	ColumnType   ckdb.ColumnType
 	DefaultValue string
+	IsMetrics    bool
+	AggrFunc     string
 }
 
 type ColumnDrop struct {
@@ -171,6 +174,11 @@ type ColumnDatasourceAdd struct {
 	DefaultValue                                 string
 	IsMetrics                                    bool
 	IsSummable                                   bool
+}
+
+type Tables struct {
+	Db     string
+	Tables []string
 }
 
 func getTables(connect *sql.DB, db, tablePrefix string) ([]string, error) {
@@ -439,6 +447,8 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 		}
 	}
 
+	i.tableRecreates = AllTableRecreates
+
 	for _, v := range AllIndexAdds {
 		i.indexAdds = append(i.indexAdds, v...)
 	}
@@ -505,6 +515,38 @@ func (i *Issu) updateTablesForByConity() {
 		}
 	}
 	i.columnRenames = byconityRenames
+}
+
+// called in server/ingester/ingester/ingester.go, executed before Start()
+func (i *Issu) RunRecreateTables() error {
+	for _, tables := range i.tableRecreates {
+		db := tables.Db
+		for _, table := range tables.Tables {
+			i.DropTable(db, table)
+		}
+	}
+	return nil
+}
+
+func (i *Issu) DropTable(db, table string) {
+	for idx, connect := range i.Connections {
+		oldVersion, _ := i.getTableVersion(idx, "flow_metrics", "network_map.1m_local")
+		if strings.Compare(oldVersion, "v7.1.3.7") >= 0 || oldVersion == "" {
+			continue
+		}
+
+		sql := fmt.Sprintf("DROP TABLE IF EXISTS %s.\"%s\"", db, table)
+		log.Info("drop table: ", sql)
+		_, err := Exec(connect, sql)
+		if err != nil {
+			if strings.Contains(err.Error(), "doesn't exist") {
+				log.Infof("drop table: %s.%s error: %s", db, table, err)
+				continue
+			}
+			log.Error(err)
+			return
+		}
+	}
 }
 
 // called in server/ingester/ingester/ingester.go, executed before Start()
@@ -1079,6 +1121,8 @@ func getColumnAdds(columnAdds *ColumnAdds) []*ColumnAdd {
 					ColumnName:   clmn,
 					ColumnType:   columnAdds.ColumnType,
 					DefaultValue: columnAdds.DefaultValue,
+					IsMetrics:    columnAdds.IsMetrics,
+					AggrFunc:     columnAdds.AggrFunc,
 				})
 			}
 		}
@@ -1142,24 +1186,6 @@ func (i *Issu) addColumns(index int, orgIDPrefix string, connect *sql.DB) ([]*Co
 			return dones, err
 		}
 		dones = append(dones, add)
-	}
-
-	for _, tableName := range []string{
-		flow_metrics.NETWORK_1M.TableName(), flow_metrics.NETWORK_MAP_1M.TableName(),
-		flow_metrics.APPLICATION_1M.TableName(), flow_metrics.APPLICATION_MAP_1M.TableName()} {
-		datasourceInfos, err := i.getUserDefinedDatasourceInfos(connect, getOrgDatabase(ckdb.METRICS_DB, orgIDPrefix), strings.Split(tableName, ".")[0])
-		if err != nil {
-			log.Warning(err)
-			continue
-		}
-		for _, dsInfo := range datasourceInfos {
-			adds, err := i.addColumnDatasource(index, dsInfo, strings.Contains(tableName, "_map"), strings.Contains(tableName, "application"), strings.Contains(tableName, "network"))
-			if err != nil {
-				log.Warningf("add column datasource failed: %s", err)
-				return nil, nil
-			}
-			dones = append(dones, adds...)
-		}
 	}
 
 	return dones, nil
