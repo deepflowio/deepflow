@@ -149,6 +149,14 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 			// If there is a table name change, do the table name update first
 			err = issu.RunRenameTable(ds)
 			checkError(err)
+			err = issu.RunRecreateTables()
+			checkError(err)
+
+			err = issu.Start()
+			checkError(err)
+			// after issu execution is completed, should close it to prevent the connection from occupying memory.
+			issu.Close()
+			issu = nil
 		}
 
 		// platformData manager init
@@ -228,14 +236,6 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 			checkError(err)
 			cm.Start()
 			closers = append(closers, cm)
-
-			// 初始化建表完成,再执行issu
-			time.Sleep(time.Second)
-			err = issu.Start()
-			checkError(err)
-			// after issu execution is completed, should close it to prevent the connection from occupying memory.
-			issu.Close()
-			issu = nil
 		}
 	}
 	// receiver后启动，防止启动后收到数据无法处理，而上报异常日志

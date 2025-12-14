@@ -456,6 +456,7 @@ type FlowInfoBlock struct {
 	ColSignalSource         proto.ColUInt16
 	ColFlowId               proto.ColUInt64
 	ColAggregatedFlowIds    proto.ColStr
+	ColInitIpid             proto.ColUInt32
 	ColCaptureNetworkTypeId proto.ColUInt8
 	ColNatSource            proto.ColUInt8
 	ColCaptureNicType       proto.ColUInt8
@@ -488,6 +489,7 @@ func (b *FlowInfoBlock) Reset() {
 	b.ColSignalSource.Reset()
 	b.ColFlowId.Reset()
 	b.ColAggregatedFlowIds.Reset()
+	b.ColInitIpid.Reset()
 	b.ColCaptureNetworkTypeId.Reset()
 	b.ColNatSource.Reset()
 	b.ColCaptureNicType.Reset()
@@ -521,6 +523,7 @@ func (b *FlowInfoBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_SIGNAL_SOURCE, Data: &b.ColSignalSource},
 		proto.InputColumn{Name: ckdb.COLUMN_FLOW_ID, Data: &b.ColFlowId},
 		proto.InputColumn{Name: ckdb.COLUMN_AGGREGATED_FLOW_IDS, Data: &b.ColAggregatedFlowIds},
+		proto.InputColumn{Name: ckdb.COLUMN_INIT_IPID, Data: &b.ColInitIpid},
 		proto.InputColumn{Name: ckdb.COLUMN_CAPTURE_NETWORK_TYPE_ID, Data: &b.ColCaptureNetworkTypeId},
 		proto.InputColumn{Name: ckdb.COLUMN_NAT_SOURCE, Data: &b.ColNatSource},
 		proto.InputColumn{Name: ckdb.COLUMN_CAPTURE_NIC_TYPE, Data: &b.ColCaptureNicType},
@@ -562,6 +565,7 @@ func (n *FlowInfo) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColSignalSource.Append(n.SignalSource)
 	block.ColFlowId.Append(n.FlowID)
 	block.ColAggregatedFlowIds.Append(n.AggregatedFlowIDs)
+	block.ColInitIpid.Append(n.InitIpid)
 	block.ColCaptureNetworkTypeId.Append(n.TapType)
 	block.ColNatSource.Append(n.NatSource)
 	block.ColCaptureNicType.Append(n.TapPortType)
@@ -632,6 +636,9 @@ type MetricsBlock struct {
 	ColL7ServerError   proto.ColUInt32
 	ColL7ServerTimeout proto.ColUInt32
 	ColL7Error         proto.ColUInt32
+	ColOooTx           proto.ColUInt32
+	ColOooRx           proto.ColUInt32
+	ColFinCount        proto.ColUInt32
 }
 
 func (b *MetricsBlock) Reset() {
@@ -678,6 +685,9 @@ func (b *MetricsBlock) Reset() {
 	b.ColL7ServerError.Reset()
 	b.ColL7ServerTimeout.Reset()
 	b.ColL7Error.Reset()
+	b.ColOooTx.Reset()
+	b.ColOooRx.Reset()
+	b.ColFinCount.Reset()
 }
 
 func (b *MetricsBlock) ToInput(input proto.Input) proto.Input {
@@ -725,6 +735,9 @@ func (b *MetricsBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_L7_SERVER_ERROR, Data: &b.ColL7ServerError},
 		proto.InputColumn{Name: ckdb.COLUMN_L7_SERVER_TIMEOUT, Data: &b.ColL7ServerTimeout},
 		proto.InputColumn{Name: ckdb.COLUMN_L7_ERROR, Data: &b.ColL7Error},
+		proto.InputColumn{Name: ckdb.COLUMN_OOO_RX, Data: &b.ColOooRx},
+		proto.InputColumn{Name: ckdb.COLUMN_OOO_TX, Data: &b.ColOooTx},
+		proto.InputColumn{Name: ckdb.COLUMN_FIN_COUNT, Data: &b.ColFinCount},
 	)
 }
 
@@ -777,6 +790,9 @@ func (n *Metrics) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColL7ServerError.Append(n.L7ServerError)
 	block.ColL7ServerTimeout.Append(n.L7ServerTimeout)
 	block.ColL7Error.Append(n.L7Error)
+	block.ColOooTx.Append(n.OooTx)
+	block.ColOooRx.Append(n.OooRx)
+	block.ColFinCount.Append(n.FinCount)
 }
 
 type L4FlowLogBlock struct {

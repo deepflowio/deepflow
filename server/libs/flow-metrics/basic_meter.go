@@ -491,6 +491,8 @@ type Anomaly struct {
 	L7ClientError uint32 `json:"l7_client_error" category:"$metrics" sub:"application"`
 	L7ServerError uint32 `json:"l7_server_error" category:"$metrics" sub:"application"`
 	L7Timeout     uint32 `json:"l7_timeout" category:"$metrics" sub:"application"`
+	OooTx         uint64 `json:"ooo_tx" category:"$metrics"`
+	OooRx         uint64 `json:"ooo_rx" category:"$metrics"`
 }
 
 func (_ *Anomaly) Reverse() {
@@ -515,6 +517,9 @@ func (a *Anomaly) WriteToPB(p *pb.Anomaly) {
 	p.L7ClientError = a.L7ClientError
 	p.L7ServerError = a.L7ServerError
 	p.L7Timeout = a.L7Timeout
+
+	p.ClientOoo = a.OooTx
+	p.ServerOoo = a.OooRx
 }
 
 func (a *Anomaly) ReadFromPB(p *pb.Anomaly) {
@@ -543,6 +548,9 @@ func (a *Anomaly) ReadFromPB(p *pb.Anomaly) {
 	a.L7ClientError = p.L7ClientError
 	a.L7ServerError = p.L7ServerError
 	a.L7Timeout = p.L7Timeout
+
+	a.OooTx = p.ClientOoo
+	a.OooRx = p.ServerOoo
 }
 
 func (a *Anomaly) ConcurrentMerge(other *Anomaly) {
@@ -563,6 +571,9 @@ func (a *Anomaly) ConcurrentMerge(other *Anomaly) {
 	a.L7ClientError += other.L7ClientError
 	a.L7ServerError += other.L7ServerError
 	a.L7Timeout += other.L7Timeout
+
+	a.OooTx = other.OooTx
+	a.OooRx = other.OooRx
 }
 
 func (a *Anomaly) SequentialMerge(other *Anomaly) {
@@ -579,6 +590,7 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 		"tcp_timeout=",
 		"client_establish_fail=", "server_establish_fail=", "tcp_establish_fail=",
 		"l7_client_error=", "l7_server_error=", "l7_timeout=", "l7_error=",
+		"ooo_tx", "ooo_rx",
 	}
 	clientFail := a.ClientAckMiss + a.ClientSourcePortReuse + a.ClientEstablishReset
 	serverFail := a.ServerSynMiss + a.ServerReset + a.ServerQueueLack + a.ServerEstablishReset
@@ -591,6 +603,7 @@ func (a *Anomaly) MarshalTo(b []byte) int {
 		a.TCPTimeout,
 		clientFail, serverFail, clientFail + serverFail,
 		uint64(a.L7ClientError), uint64(a.L7ServerError), uint64(a.L7Timeout), uint64(a.L7ClientError + a.L7ServerError),
+		a.OooTx, a.OooRx,
 	}
 	return marshalKeyValues(b, fields, values)
 }
@@ -620,7 +633,11 @@ const (
 
 	ANOMALY_TRANSFER_FAIL
 	ANOMALY_RST_FAIL
+
+	ANOMALY_OOO_TX
+	ANOMALY_OOO_RX
 )
+
 const (
 	ANOMALY_L7_CLIENT_ERROR = iota
 	ANOMALY_L7_SERVER_ERROR
@@ -655,6 +672,9 @@ func AnomalyColumns() []*ckdb.Column {
 
 			ANOMALY_TRANSFER_FAIL: {"tcp_transfer_fail", "TCP传输失败次数"},
 			ANOMALY_RST_FAIL:      {"tcp_rst_fail", "TCP重置次数"},
+
+			ANOMALY_OOO_TX: {"ooo_tx", "Total client out of order times"},
+			ANOMALY_OOO_RX: {"ooo_rx", "Total server out of order times"},
 		}, ckdb.UInt64)
 
 	l7AnomalColumns := ckdb.NewColumnsWithComment(

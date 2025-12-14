@@ -106,6 +106,7 @@ const (
 	COLUMN_FILE_DIR                   = "file_dir"
 	COLUMN_FILE_NAME                  = "file_name"
 	COLUMN_FILE_TYPE                  = "file_type"
+	COLUMN_FIN_COUNT                  = "fin_count"
 	COLUMN_FLOW_ID                    = "flow_id"
 	COLUMN_AGGREGATED_FLOW_IDS        = "aggregated_flow_ids"
 	COLUMN_FLOW_LOAD                  = "flow_load"
@@ -117,6 +118,7 @@ const (
 	COLUMN_HOST_ID_1                  = "host_id_1"
 	COLUMN_HTTP_PROXY_CLIENT          = "http_proxy_client"
 	COLUMN_ID                         = "id"
+	COLUMN_INIT_IPID                  = "init_ipid"
 	COLUMN_IP4                        = "ip4"
 	COLUMN_IP4_0                      = "ip4_0"
 	COLUMN_IP4_1                      = "ip4_1"
@@ -177,6 +179,8 @@ const (
 	COLUMN_NEW_FLOW                   = "new_flow"
 	COLUMN_OBSERVATION_POINT          = "observation_point"
 	COLUMN_OFFSET                     = "offset"
+	COLUMN_OOO_TX                     = "ooo_tx"
+	COLUMN_OOO_RX                     = "ooo_rx"
 	COLUMN_PACKET                     = "packet"
 	COLUMN_PACKET_BATCH               = "packet_batch"
 	COLUMN_PACKET_COUNT               = "packet_count"
@@ -446,6 +450,7 @@ var ColumnNames = []string{
 	COLUMN_FILE_DIR,
 	COLUMN_FILE_NAME,
 	COLUMN_FILE_TYPE,
+	COLUMN_FIN_COUNT,
 	COLUMN_FLOW_ID,
 	COLUMN_AGGREGATED_FLOW_IDS,
 	COLUMN_FLOW_LOAD,
@@ -457,6 +462,7 @@ var ColumnNames = []string{
 	COLUMN_HOST_ID_1,
 	COLUMN_HTTP_PROXY_CLIENT,
 	COLUMN_ID,
+	COLUMN_INIT_IPID,
 	COLUMN_IP4,
 	COLUMN_IP4_0,
 	COLUMN_IP4_1,
@@ -517,6 +523,8 @@ var ColumnNames = []string{
 	COLUMN_NEW_FLOW,
 	COLUMN_OBSERVATION_POINT,
 	COLUMN_OFFSET,
+	COLUMN_OOO_TX,
+	COLUMN_OOO_RX,
 	COLUMN_PACKET,
 	COLUMN_PACKET_BATCH,
 	COLUMN_PACKET_COUNT,
