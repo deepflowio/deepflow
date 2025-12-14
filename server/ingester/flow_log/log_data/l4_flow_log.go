@@ -279,6 +279,7 @@ type FlowInfo struct {
 	FlowID       uint64 `json:"flow_id" category:"$tag" sub:"flow_info"`
 
 	AggregatedFlowIDs string
+	InitIpid          uint32 `json:"init_ipid" category:"$tag" sub:"flow_info"`
 
 	TapType     uint8  `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
 	NatSource   uint8  `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source"`
@@ -315,6 +316,7 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("signal_source", ckdb.UInt16),
 	ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 	ckdb.NewColumn("aggregated_flow_ids", ckdb.String).SetIndex(ckdb.IndexTokenbf),
+	ckdb.NewColumn("init_ipid", ckdb.UInt32).SetIndex(ckdb.IndexMinmax),
 	ckdb.NewColumn("capture_network_type_id", ckdb.UInt8),
 	ckdb.NewColumn("nat_source", ckdb.UInt8),
 	ckdb.NewColumn("capture_nic_type", ckdb.UInt8),
@@ -390,6 +392,10 @@ type Metrics struct {
 	L7ServerError   uint32 `json:"l7_server_error" category:"$metrics" sub:"application"`
 	L7ServerTimeout uint32 `json:"l7_server_timeout" category:"$metrics" sub:"application"`
 	L7Error         uint32 `json:"l7_error" category:"$metrics" sub:"application"`
+
+	OooTx    uint32 `json:"ooo_tx" category:"$metrics" sub:"tcp_slow"`
+	OooRx    uint32 `json:"ooo_rx" category:"$metrics" sub:"tcp_slow"`
+	FinCount uint32 `json:"fin_count" category:"$metrics" sub:"l4_throughput"`
 }
 
 var MetricsColumns = []*ckdb.Column{
@@ -442,6 +448,10 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("l7_server_error", ckdb.UInt32),
 	ckdb.NewColumn("l7_server_timeout", ckdb.UInt32),
 	ckdb.NewColumn("l7_error", ckdb.UInt32),
+
+	ckdb.NewColumn("ooo_tx", ckdb.UInt32),
+	ckdb.NewColumn("ooo_rx", ckdb.UInt32),
+	ckdb.NewColumn("fin_count", ckdb.UInt32),
 }
 
 func parseUint32EpcID(v uint32) int32 {
@@ -771,6 +781,7 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.SignalSource = uint16(f.SignalSource)
 	i.FlowID = f.FlowId
 	i.AggregatedFlowIDs = Uint64SliceToString(f.AggregatedFlowIds)
+	i.InitIpid = f.InitIpid
 	i.TapType = uint8(f.FlowKey.TapType)
 	var natSource datatype.NATSource
 	i.TapPort, i.TapPortType, natSource, _ = datatype.TapPort(f.FlowKey.TapPort).SplitToPortTypeTunnel()
@@ -853,13 +864,16 @@ func (m *Metrics) Fill(f *pb.Flow) {
 		if p.Tcp.CountsPeerTx != nil {
 			m.RetransTx = p.Tcp.CountsPeerTx.RetransCount
 			m.ZeroWinTx = p.Tcp.CountsPeerTx.ZeroWinCount
+			m.OooTx = p.Tcp.CountsPeerTx.OooCount
 		}
 		if p.Tcp.CountsPeerRx != nil {
 			m.RetransRx = p.Tcp.CountsPeerRx.RetransCount
 			m.ZeroWinRx = p.Tcp.CountsPeerRx.ZeroWinCount
+			m.OooRx = p.Tcp.CountsPeerRx.OooCount
 		}
 		m.SynCount = p.Tcp.SynCount
 		m.SynackCount = p.Tcp.SynackCount
+		m.FinCount = p.Tcp.FinCount
 		if m.SynCount > 0 {
 			m.RetransSyn = m.SynCount - 1
 		}

@@ -284,6 +284,8 @@ type AnomalyBlock struct {
 	ColL7ServerError           proto.ColUInt32
 	ColL7Timeout               proto.ColUInt32
 	ColL7Error                 proto.ColUInt32
+	ColOooTx                   proto.ColUInt64
+	ColOooRx                   proto.ColUInt64
 }
 
 func (b *AnomalyBlock) Reset() {
@@ -308,6 +310,8 @@ func (b *AnomalyBlock) Reset() {
 	b.ColL7ServerError.Reset()
 	b.ColL7Timeout.Reset()
 	b.ColL7Error.Reset()
+	b.ColOooTx.Reset()
+	b.ColOooRx.Reset()
 }
 
 func (b *AnomalyBlock) ToInput(input proto.Input) proto.Input {
@@ -333,6 +337,8 @@ func (b *AnomalyBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_L7_SERVER_ERROR, Data: &b.ColL7ServerError},
 		proto.InputColumn{Name: ckdb.COLUMN_L7_TIMEOUT, Data: &b.ColL7Timeout},
 		proto.InputColumn{Name: ckdb.COLUMN_L7_ERROR, Data: &b.ColL7Error},
+		proto.InputColumn{Name: ckdb.COLUMN_OOO_TX, Data: &b.ColOooTx},
+		proto.InputColumn{Name: ckdb.COLUMN_OOO_RX, Data: &b.ColOooRx},
 	)
 }
 
@@ -363,6 +369,8 @@ func (n *Anomaly) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColL7ServerError.Append(n.L7ServerError)
 	block.ColL7Timeout.Append(n.L7Timeout)
 	block.ColL7Error.Append(n.L7ClientError + n.L7ServerError)
+	block.ColOooTx.Append(n.OooTx)
+	block.ColOooRx.Append(n.OooRx)
 }
 
 type FlowLoadBlock struct {

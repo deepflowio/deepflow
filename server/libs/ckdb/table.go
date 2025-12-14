@@ -622,6 +622,9 @@ func (t *Table) MakeAggrLocalTableCreateSQL(orgID uint16, aggrInterval Aggregati
 		if strings.HasPrefix(c.Name, "_") || c.IgnoredInAggrTable {
 			continue
 		}
+		if c.Name == t.TimeKey {
+			c.Comment = t.Version
+		}
 		if c.GroupBy {
 			columns = append(columns, c.Name)
 			if !stringSliceHas(groupKeys, c.Name) {
