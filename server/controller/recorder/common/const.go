@@ -39,6 +39,7 @@ var UNCHECK_NETWORK_DOMAINS = []int{
 	ctrlrcommon.CLOUD_TOWER,
 	ctrlrcommon.FUSIONCOMPUTE,
 	ctrlrcommon.SCP,
+	ctrlrcommon.RUIJIE,
 }
 
 var DEVICE_TYPE_INT_TO_STR = map[int]string{
