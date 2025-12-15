@@ -60,25 +60,30 @@ use super::{
     RPC_RECONNECT_INTERVAL, RPC_RETRY_INTERVAL,
 };
 
-use crate::common::endpoint::EPC_INTERNET;
-use crate::common::policy::Acl;
-use crate::common::policy::{Cidr, Container, IpGroupData, PeerConnection};
-use crate::common::NORMAL_EXIT_WITH_RESTART;
-use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT};
-use crate::config::UserConfig;
-use crate::exception::ExceptionHandler;
-use crate::rpc::session::Session;
-use crate::trident::{self, AgentId, AgentState, ChangedConfig, RunningMode, State, VersionInfo};
 #[cfg(any(target_os = "linux"))]
 use crate::utils::environment::{get_current_k8s_image, get_k8s_namespace};
-use crate::utils::{
-    command::get_hostname,
-    environment::{
-        get_executable_path, is_tt_pod, running_in_container, running_in_k8s,
-        running_in_only_watch_k8s_mode, KubeWatchPolicy,
+use crate::{
+    common::{
+        endpoint::EPC_INTERNET,
+        policy::{Acl, Cidr, Container, IpGroupData, PeerConnection},
+        FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT,
+        NORMAL_EXIT_WITH_RESTART,
     },
-    stats,
+    config::UserConfig,
+    exception::ExceptionHandler,
+    platform,
+    rpc::session::Session,
+    trident::{self, AgentId, AgentState, ChangedConfig, RunningMode, State, VersionInfo},
+    utils::{
+        command::get_hostname,
+        environment::{
+            get_executable_path, is_tt_pod, running_in_container, running_in_k8s,
+            running_in_only_watch_k8s_mode, KubeWatchPolicy,
+        },
+        stats,
+    },
 };
+
 use public::{
     proto::agent::{
         self as pb, AgentIdentifier, AgentType, DynamicConfig, Exception, PacketCaptureType,
@@ -684,6 +689,65 @@ impl Synchronizer {
         self.max_memory.clone()
     }
 
+    fn is_excluded_ip_addr(ip_addr: IpAddr) -> bool {
+        if ip_addr.is_loopback() || ip_addr.is_unspecified() || ip_addr.is_multicast() {
+            return true;
+        }
+        match ip_addr {
+            IpAddr::V4(addr) => addr.is_link_local(),
+            // Ipv6Addr::is_unicast_link_local()是实验API无法使用
+            IpAddr::V6(addr) => is_unicast_link_local(&addr),
+        }
+    }
+
+    fn host_ips() -> Vec<String> {
+        #[cfg(target_os = "linux")]
+        let (links, addrs) = (
+            public::netns::link_list_in_netns(&public::netns::NsFile::Root),
+            public::netns::addr_list_in_netns(&public::netns::NsFile::Root),
+        );
+        #[cfg(any(target_os = "windows", target_os = "android"))]
+        let (links, addrs) = (
+            public::utils::net::link_list(),
+            public::utils::net::addr_list(),
+        );
+
+        let (links, addrs) = match (links, addrs) {
+            (Ok(links), Ok(addrs)) => (links, addrs),
+            (Err(e), _) => {
+                warn!("get links failed: {}", e);
+                return vec![];
+            }
+            (_, Err(e)) => {
+                warn!("get addrs failed: {}", e);
+                return vec![];
+            }
+        };
+        // find ignored interface indices
+        let filtered_indices: HashSet<u32> = links
+            .into_iter()
+            .filter_map(|link| {
+                if platform::IGNORED_INTERFACES.contains(&link.name.as_str()) {
+                    Some(link.if_index)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        addrs
+            .into_iter()
+            .filter_map(|addr| {
+                if Self::is_excluded_ip_addr(addr.ip_addr)
+                    || filtered_indices.contains(&addr.if_index)
+                {
+                    None
+                } else {
+                    Some(addr.ip_addr.to_string())
+                }
+            })
+            .collect()
+    }
+
     pub fn generate_sync_request(
         agent_id: &Arc<RwLock<AgentId>>,
         static_config: &Arc<StaticConfig>,
@@ -700,17 +764,6 @@ impl Synchronizer {
             .unwrap()
             .as_nanos();
         let boot_time = (boot_time as i64 + time_diff) / 1_000_000_000;
-
-        fn is_excluded_ip_addr(ip_addr: IpAddr) -> bool {
-            if ip_addr.is_loopback() || ip_addr.is_unspecified() || ip_addr.is_multicast() {
-                return true;
-            }
-            match ip_addr {
-                IpAddr::V4(addr) => addr.is_link_local(),
-                // Ipv6Addr::is_unicast_link_local()是实验API无法使用
-                IpAddr::V6(addr) => is_unicast_link_local(&addr),
-            }
-        }
 
         let agent_id = agent_id.read();
 
@@ -729,24 +782,7 @@ impl Synchronizer {
             ctrl_ip: Some(agent_id.ipmac.ip.to_string()),
             team_id: Some(agent_id.team_id.clone()),
             host: Some(status.hostname.clone()),
-            host_ips: {
-                #[cfg(target_os = "linux")]
-                let addrs = public::netns::addr_list_in_netns(&public::netns::NsFile::Root);
-                #[cfg(any(target_os = "windows", target_os = "android"))]
-                let addrs = public::utils::net::addr_list();
-
-                addrs.map_or(vec![], |xs| {
-                    xs.into_iter()
-                        .filter_map(|x| {
-                            if is_excluded_ip_addr(x.ip_addr) {
-                                None
-                            } else {
-                                Some(x.ip_addr.to_string())
-                            }
-                        })
-                        .collect()
-                })
-            },
+            host_ips: Self::host_ips(),
             cpu_num: Some(static_config.env.cpu_num),
             memory_size: Some(static_config.env.memory_size),
             arch: Some(static_config.env.arch.clone()),
