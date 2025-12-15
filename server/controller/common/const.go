@@ -313,6 +313,7 @@ const (
 	H3C               = 31
 	FUSIONCOMPUTE     = 32
 	SCP               = 33
+	RUIJIE            = 34
 
 	OPENSTACK_EN         = "openstack"
 	VSPHERE_EN           = "vsphere"
@@ -346,6 +347,7 @@ const (
 	H3C_EN               = "h3c"
 	FUSIONCOMPUTE_EN     = "fusioncompute"
 	SCP_EN               = "scp"
+	RUIJIE_EN            = "ruijie"
 
 	TENCENT_CH          = "腾讯云"
 	ALIYUN_CH           = "阿里云"
@@ -359,6 +361,7 @@ const (
 	SUGON_CH            = "曙光云"
 	VOLCENGINE_CH       = "火山云"
 	H3C_CH              = "华三云"
+	RUIJIE_CH           = "锐捷云"
 
 	OPENSTACK_CH     = "OpenStack"
 	VSPHERE_CH       = "vSphere"
