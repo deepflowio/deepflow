@@ -25,6 +25,7 @@ l4_byte_tx                  , L4 Payload TX           , Byte   ,
 l4_byte_rx                  , L4 Payload RX           , Byte   ,
 direction_score             , Direction Score         ,        , The higher the score, the higher the accuracy of the direction of the client and server. When the score is 255, the direction must be correct.
 log_count                   , Log Count               ,        ,
+fin_count                   , TCP FIN Packets         , Packet ,
 
 retrans_syn                 , SYN Retransmission        , Packet ,
 retrans_synack              , SYN-ACK Retransmission    , Packet ,
@@ -65,6 +66,9 @@ server_queue_lack           , Transfer - Server Queue Overflow , Flow ,
 tcp_timeout                 , Transfer - TCP Timeout           , Flow ,
 client_half_close_flow      , Close - Client Half Close        , Flow ,
 server_half_close_flow      , Close - Server Half Close        , Flow ,
+ooo                         , TCP Out-of-order                 , Packet ,
+ooo_tx                      , TCP TX Out-of-order              , Packet ,
+ooo_rx                      , TCP RX Out-of-order              , Packet ,
 
 rtt                         , Avg TCP Est. Delay          , us ,
 tls_rtt                     , Avg TLS Est. Delay          , us ,

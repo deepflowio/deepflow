@@ -60,6 +60,9 @@ server_queue_lack           , server_queue_lack         , counter    , TCP Error
 tcp_timeout                 , tcp_timeout               , counter    , TCP Error   , 111
 client_half_close_flow      , client_half_close_flow    , counter    , TCP Error   , 111
 server_half_close_flow      , server_half_close_flow    , counter    , TCP Error   , 111
+ooo                         ,                           , counter    , TCP Error   , 111
+ooo_tx                      , ooo_tx                    , counter    , TCP Error   , 111
+ooo_rx                      , ooo_rx                    , counter    , TCP Error   , 111
 
 rtt                         ,                           , delay      , Delay   , 111
 rtt_client                  ,                           , delay      , Delay   , 111
