@@ -716,3 +716,24 @@ impl PrioFields {
         self.0.first().map(|pf| pf.get().as_str()).unwrap_or("")
     }
 }
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "enterprise")] {
+        use log::warn;
+
+        use enterprise_utils::l7::custom_policy::custom_field_policy::enums::{Op, Operation};
+        use public::l7_protocol::{FieldSetter, L7Log};
+
+        pub fn auto_merge_custom_field<L: L7Log>(op: Operation, log: &mut L) {
+            let Operation { op, prio } = op;
+            match op {
+                Op::RewriteResponseStatus(status) => log.set_response_status(status),
+                Op::RewriteNativeTag(tag, value) => {
+                    let field = FieldSetter::new(CUSTOM_FIELD_POLICY_PRIORITY + prio, value.as_str().into());
+                    log.set(tag, field);
+                }
+                _ => warn!("Ignored operation {op:?} that is not supported by auto custom field merging"),
+            }
+        }
+    }
+}

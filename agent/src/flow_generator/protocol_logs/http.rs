@@ -59,14 +59,15 @@ use crate::{
 
 cfg_if::cfg_if! {
 if #[cfg(feature = "enterprise")] {
-        use crate::flow_generator::protocol_logs::CUSTOM_FIELD_POLICY_PRIORITY;
         use enterprise_utils::l7::custom_policy::{
             custom_field_policy::{
-                enums::{Op, Operation, PayloadType, Source},
+                enums::{Op, PayloadType, Source},
                 PolicySlice, Store,
             },
         };
         use public::l7_protocol::NativeTag;
+
+        use crate::flow_generator::protocol_logs::{auto_merge_custom_field, CUSTOM_FIELD_POLICY_PRIORITY};
     }
 }
 
@@ -1931,38 +1932,22 @@ impl HttpLog {
             return;
         };
 
-        for Operation { op, prio } in self.custom_field_store.drain_with(policies, &*info) {
-            match op {
-                Op::RewriteResponseStatus(status) => info.status_code = status as u32 as u16,
+        for op in self.custom_field_store.drain_with(policies, &*info) {
+            match &op.op {
                 Op::RewriteNativeTag(tag, value) => {
                     match tag {
-                        NativeTag::Version => {
-                            info.version = Version::try_from(value.as_str()).unwrap_or_default()
-                        }
                         // req
                         NativeTag::RequestType => {
                             if info.method.is_none() {
                                 info.method = Method::try_from(value.as_str()).unwrap_or_default();
                             }
                         }
-                        NativeTag::RequestDomain => info.host = value.to_string(),
-                        NativeTag::RequestResource => info.path = value.to_string(),
-                        NativeTag::Endpoint => info.endpoint = Some(value.to_string()),
-                        NativeTag::RequestId => info.stream_id = value.parse::<u32>().ok(),
                         // resp
                         NativeTag::ResponseCode => {
                             info.response_code_to_attribute();
                             info.status_code = value.parse::<u16>().unwrap_or_default();
                         }
-                        NativeTag::ResponseStatus => (),
-                        NativeTag::ResponseException => {
-                            info.custom_exception = Some(value.to_string())
-                        }
-                        NativeTag::ResponseResult => info.custom_result = Some(value.to_string()),
                         // trace
-                        NativeTag::TraceId => info
-                            .trace_ids
-                            .merge_field(CUSTOM_FIELD_POLICY_PRIORITY + prio, value.to_string()),
                         NativeTag::SpanId => {
                             if CUSTOM_FIELD_POLICY_PRIORITY <= info.span_id.prio() {
                                 let prev = mem::replace(
@@ -1977,44 +1962,7 @@ impl HttpLog {
                                 }
                             }
                         }
-                        NativeTag::HttpProxyClient => match info.client_ip.as_ref() {
-                            Some(client_ip) if client_ip.prio() < CUSTOM_FIELD_POLICY_PRIORITY => {
-                                ()
-                            }
-                            _ => {
-                                info.client_ip = Some(PrioField::new(
-                                    CUSTOM_FIELD_POLICY_PRIORITY,
-                                    value.to_string(),
-                                ))
-                            }
-                        },
-                        NativeTag::XRequestId => {
-                            if matches!(
-                                info.msg_type,
-                                LogMessageType::Request | LogMessageType::Response
-                            ) {
-                                let x_req_id = match info.msg_type {
-                                    LogMessageType::Request => &mut info.x_request_id_0,
-                                    LogMessageType::Response => &mut info.x_request_id_1,
-                                    _ => unreachable!(),
-                                };
-                                x_req_id
-                                    .set_with(CUSTOM_FIELD_POLICY_PRIORITY, || value.to_string());
-                            }
-                        }
-                        NativeTag::XRequestId0 => {
-                            info.x_request_id_0
-                                .set_with(CUSTOM_FIELD_POLICY_PRIORITY, || value.to_string());
-                        }
-                        NativeTag::XRequestId1 => {
-                            info.x_request_id_1
-                                .set_with(CUSTOM_FIELD_POLICY_PRIORITY, || value.to_string());
-                        }
-                        NativeTag::BizType => {
-                            info.biz_type = value.parse::<u8>().unwrap_or_default()
-                        }
-                        NativeTag::BizCode => info.biz_code = value.to_string(),
-                        NativeTag::BizScenario => info.biz_scenario = value.to_string(),
+                        _ => auto_merge_custom_field(op, info),
                     }
                 }
                 Op::AddAttribute(key, value) => {
@@ -2026,7 +1974,7 @@ impl HttpLog {
                 Op::AddMetric(key, value) => {
                     info.metrics.push(MetricKeyVal {
                         key: key.to_string(),
-                        val: value,
+                        val: *value,
                     });
                 }
                 Op::SavePayload(key) => {
@@ -2037,6 +1985,7 @@ impl HttpLog {
                         });
                     }
                 }
+                _ => auto_merge_custom_field(op, info),
             }
         }
     }
