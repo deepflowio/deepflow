@@ -24,17 +24,17 @@ cfg_if::cfg_if! {
     }
 }
 
+mod platform_synchronizer;
+pub use platform_synchronizer::process_info_enabled;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub use platform_synchronizer::{
     get_os_app_tag_by_exec, OsAppTag, ProcessData, ProcessDataOp, SocketSynchronizer,
 };
 
-mod platform_synchronizer;
-
-pub use platform_synchronizer::process_info_enabled;
-
 mod querier;
 pub mod synchronizer;
+
+pub const IGNORED_INTERFACES: [&str; 1] = ["kube-ipvs0"];
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct InterfaceEntry {
@@ -42,4 +42,16 @@ pub struct InterfaceEntry {
     pub mac: public::utils::net::MacAddr,
     pub domain_uuid: String,
     pub domain_name: String,
+}
+
+impl From<&InterfaceEntry> for public::proto::agent::InterfaceInfo {
+    fn from(entry: &InterfaceEntry) -> Self {
+        Self {
+            name: Some(entry.name.clone()),
+            mac: Some(entry.mac.into()),
+            device_id: Some(entry.domain_uuid.clone()),
+            device_name: Some(entry.domain_name.clone()),
+            ..Default::default()
+        }
+    }
 }

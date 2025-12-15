@@ -24,6 +24,7 @@ use regex::Regex;
 use crate::{
     config::handler::PlatformConfig,
     platform::{
+        self,
         kubernetes::{InterfaceInfoStore, Poller},
         platform_synchronizer::{
             linux_process::get_all_process_in, process_info_enabled, ProcessData,
@@ -195,40 +196,37 @@ impl Querier {
         let mut interfaces: Vec<_> = self
             .kubernetes_poller
             .as_ref()
-            .map(|poller| {
-                fn info_to_pb(info: &InterfaceInfo) -> pb::InterfaceInfo {
-                    pb::InterfaceInfo {
-                        mac: Some(info.mac.into()),
-                        name: Some(info.name.to_string()),
-                        device_id: Some(info.device_id.to_string()),
-                        tap_index: Some(info.tap_idx),
-                        ip: info.ips.iter().map(ToString::to_string).collect(),
-                        netns: Some(info.tap_ns.to_string()),
-                        netns_id: Some(info.ns_inode as u32),
-                        if_type: info.if_type.clone(),
-                        ..Default::default()
-                    }
-                }
-
-                if matches!(poller.as_ref(), &GenericPoller::ActivePoller(_)) {
-                    self.kubeif_store
-                        .iter()
-                        .map(|info| info_to_pb(info))
-                        .collect()
-                } else {
-                    self.kubernetes_interfaces
-                        .iter()
-                        .map(|info| info_to_pb(info))
-                        .collect()
-                }
+            .map(|poller| match poller.as_ref() {
+                &GenericPoller::ActivePoller(_) => self
+                    .kubeif_store
+                    .iter()
+                    .filter_map(|info| {
+                        if platform::IGNORED_INTERFACES.contains(&info.name.as_str()) {
+                            None
+                        } else {
+                            Some(info.into())
+                        }
+                    })
+                    .collect(),
+                _ => self
+                    .kubernetes_interfaces
+                    .iter()
+                    .filter_map(|info| {
+                        if platform::IGNORED_INTERFACES.contains(&info.name.as_str()) {
+                            None
+                        } else {
+                            Some(info.into())
+                        }
+                    })
+                    .collect(),
             })
             .unwrap_or_default();
-        interfaces.extend(self.xml_interfaces.iter().map(|info| pb::InterfaceInfo {
-            name: Some(info.name.clone()),
-            mac: Some(info.mac.into()),
-            device_id: Some(info.domain_uuid.clone()),
-            device_name: Some(info.domain_name.clone()),
-            ..Default::default()
+        interfaces.extend(self.xml_interfaces.iter().filter_map(|info| {
+            if platform::IGNORED_INTERFACES.contains(&info.name.as_str()) {
+                None
+            } else {
+                Some(info.into())
+            }
         }));
 
         let mut platform_data = pb::GenesisPlatformData {
