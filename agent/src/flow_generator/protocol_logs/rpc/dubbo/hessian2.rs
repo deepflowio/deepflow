@@ -31,12 +31,14 @@ if #[cfg(feature = "enterprise")] {
         use crate::{
             common::flow::L7Protocol,
             flow_generator::{
-                LogMessageType,
-                protocol_logs::{consts::APM_SPAN_ID_ATTR, pb_adapter::{KeyVal, MetricKeyVal}, CUSTOM_FIELD_POLICY_PRIORITY, PrioField},
+                protocol_logs::{
+                    auto_merge_custom_field,
+                    consts::APM_SPAN_ID_ATTR, pb_adapter::{KeyVal, MetricKeyVal}, CUSTOM_FIELD_POLICY_PRIORITY, PrioField,
+                },
             },
         };
         use enterprise_utils::l7::custom_policy::{
-            custom_field_policy::{enums::{Op, Operation, PayloadType, Source}, Store},
+            custom_field_policy::{enums::{Op, PayloadType, Source}, Store},
         };
         use public::l7_protocol::NativeTag;
     }
@@ -210,38 +212,17 @@ fn apply_custom_field_policies(
         param.direction.into(),
         Source::Payload(PayloadType::HESSIAN2, payload),
     );
-    for Operation { op, prio } in store.into_iter_with(policies, &*info) {
-        match op {
-            Op::RewriteResponseStatus(status) => {
-                info.status_code.replace(status as u32 as i32);
-            }
+    for op in store.into_iter_with(policies, &*info) {
+        match &op.op {
             Op::RewriteNativeTag(tag, value) => {
                 match tag {
-                    NativeTag::Version => info.dubbo_version = value.to_string(),
-                    // req
                     // request_resource priority greater than request_type
                     NativeTag::RequestType => {
                         if info.method_name.is_empty() {
                             info.method_name = value.to_string();
                         }
                     }
-                    NativeTag::RequestDomain => info.service_name = value.to_string(),
-                    NativeTag::RequestResource => info.method_name = value.to_string(),
-                    NativeTag::Endpoint => {
-                        info.endpoint.replace(value.to_string());
-                    }
-                    NativeTag::RequestId => {
-                        info.request_id = value.parse::<i64>().unwrap_or_default()
-                    }
-                    // res
-                    NativeTag::ResponseCode => info.status_code = value.parse::<i32>().ok(),
-                    NativeTag::ResponseStatus => (),
-                    NativeTag::ResponseException => info.custom_exception = Some(value.to_string()),
-                    NativeTag::ResponseResult => info.custom_result = Some(value.to_string()),
                     // trace info
-                    NativeTag::TraceId => info
-                        .trace_ids
-                        .merge_field(CUSTOM_FIELD_POLICY_PRIORITY + prio, value.to_string()),
                     NativeTag::SpanId => {
                         if CUSTOM_FIELD_POLICY_PRIORITY < info.span_id.prio() {
                             let old = std::mem::replace(
@@ -256,44 +237,7 @@ fn apply_custom_field_policies(
                             }
                         }
                     }
-                    NativeTag::HttpProxyClient => info.client_ip = Some(value.to_string()),
-                    NativeTag::XRequestId => {
-                        let x_req_id = match info.msg_type {
-                            LogMessageType::Request => &mut info.x_request_id_0,
-                            LogMessageType::Response => &mut info.x_request_id_1,
-                            _ => return,
-                        };
-                        match x_req_id {
-                            Some(old) if old.prio() < CUSTOM_FIELD_POLICY_PRIORITY => (),
-                            _ => {
-                                *x_req_id = Some(PrioField::new(
-                                    CUSTOM_FIELD_POLICY_PRIORITY,
-                                    value.to_string(),
-                                ));
-                            }
-                        }
-                    }
-                    NativeTag::XRequestId0 => match info.x_request_id_0.as_ref() {
-                        Some(old) if old.prio() < CUSTOM_FIELD_POLICY_PRIORITY => (),
-                        _ => {
-                            info.x_request_id_0 = Some(PrioField::new(
-                                CUSTOM_FIELD_POLICY_PRIORITY,
-                                value.to_string(),
-                            ));
-                        }
-                    },
-                    NativeTag::XRequestId1 => match info.x_request_id_1.as_ref() {
-                        Some(old) if old.prio() < CUSTOM_FIELD_POLICY_PRIORITY => (),
-                        _ => {
-                            info.x_request_id_1 = Some(PrioField::new(
-                                CUSTOM_FIELD_POLICY_PRIORITY,
-                                value.to_string(),
-                            ));
-                        }
-                    },
-                    NativeTag::BizType => info.biz_type = value.parse::<u8>().unwrap_or_default(),
-                    NativeTag::BizCode => info.biz_code = value.to_string(),
-                    NativeTag::BizScenario => info.biz_scenario = value.to_string(),
+                    _ => auto_merge_custom_field(op, info),
                 }
             }
             Op::AddAttribute(key, value) => {
@@ -305,11 +249,12 @@ fn apply_custom_field_policies(
             Op::AddMetric(key, value) => {
                 info.metrics.push(MetricKeyVal {
                     key: key.to_string(),
-                    val: value,
+                    val: *value,
                 });
             }
             // not supported
             Op::SavePayload(_) => (),
+            _ => auto_merge_custom_field(op, info),
         }
     }
 }
