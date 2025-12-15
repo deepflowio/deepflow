@@ -63,12 +63,11 @@ use public_derive::L7Log;
 cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
         use enterprise_utils::l7::custom_policy::{
-            custom_field_policy::{PolicySlice, Store, enums::{Op, Operation, Source}},
+            custom_field_policy::{PolicySlice, Store, enums::{Op, Source}},
             enums::TrafficDirection,
         };
-        use public::l7_protocol::NativeTag;
 
-        use crate::flow_generator::protocol_logs::CUSTOM_FIELD_POLICY_PRIORITY;
+        use crate::flow_generator::protocol_logs::auto_merge_custom_field;
     }
 }
 
@@ -1399,28 +1398,16 @@ impl MysqlLog {
         let Some(policies) = policies else {
             return;
         };
-        for Operation { op, prio } in self.custom_field_store.drain_with(policies, &*info) {
-            match op {
-                Op::RewriteResponseStatus(status) => {
-                    info.status = status;
-                }
-                Op::RewriteNativeTag(tag, value) => {
-                    match tag {
-                        NativeTag::TraceId => info.trace_ids.push(
-                            CUSTOM_FIELD_POLICY_PRIORITY + prio,
-                            std::borrow::Cow::Borrowed(value.as_ref()),
-                        ),
-                        NativeTag::SpanId => info.span_id = Some(value.to_string()),
-                        _ => {} // other tags are ignored
-                    }
-                }
+        for op in self.custom_field_store.drain_with(policies, &*info) {
+            match &op.op {
                 Op::AddAttribute(key, value) => {
                     info.attributes.push(KeyVal {
                         key: key.to_string(),
                         val: value.to_string(),
                     });
                 }
-                _ => (), // other types are ignored
+                Op::AddMetric(_, _) | Op::SavePayload(_) => (),
+                _ => auto_merge_custom_field(op, info),
             }
         }
     }
