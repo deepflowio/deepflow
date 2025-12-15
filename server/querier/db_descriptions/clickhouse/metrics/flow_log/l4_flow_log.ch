@@ -9,6 +9,10 @@ packet_tx                   , 发送包数                , 包   , 客户端发
 packet_rx                   , 接收包数                , 包   , 服务端发往客户端的包数总和
 total_packet_tx             , 累计发送包数            , 包  ,
 total_packet_rx             , 累计接收包数            , 包  ,
+ooo                         , TCP 乱序                , 包   ,
+ooo_tx                      , TCP 客户端乱序           , 包   ,
+ooo_rx                      , TCP 服务端乱序           , 包   ,
+fin_count                   , TCP FIN 包数            , 包   ,
 l3_byte                     , 网络层载荷              , 字节 , 
 l3_byte_tx                  , 发送网络层载荷          , 字节 , 客户端发往服务端的网络层载荷字节数总和（不含 IP 头）
 l3_byte_rx                  , 接收网络层载荷          , 字节 , 服务端发往客户端的网络层载荷字节数总和（不含 IP 头）

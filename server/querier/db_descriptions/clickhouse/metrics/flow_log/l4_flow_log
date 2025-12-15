@@ -9,6 +9,10 @@ packet_tx                   , packet_tx            , counter    , L3 Throughput 
 packet_rx                   , packet_rx            , counter    , L3 Throughput  , 111
 total_packet_tx             , total_packet_tx      , counter    , L3 Throughput  , 111
 total_packet_rx             , total_packet_rx      , counter    , L3 Throughput  , 111
+ooo                         ,                      , counter    , L3 Throughput  , 111
+ooo_tx                      , ooo_tx               , counter    , L3 Throughput  , 111
+ooo_rx                      , ooo_rx               , counter    , L3 Throughput  , 111
+fin_count                   , fin_count            , counter    , L3 Throughput  , 111
 l3_byte                     ,                      , counter    , L3 Throughput  , 111
 l3_byte_tx                  , l3_byte_tx           , counter    , L3 Throughput  , 111
 l3_byte_rx                  , l3_byte_rx           , counter    , L3 Throughput  , 111
