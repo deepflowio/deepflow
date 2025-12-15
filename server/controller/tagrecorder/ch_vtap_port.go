@@ -17,7 +17,6 @@
 package tagrecorder
 
 import (
-	"encoding/json"
 	"errors"
 	"slices"
 	"sort"
@@ -458,30 +457,41 @@ func (v *ChVTapPort) generateKey(dbItem metadbmodel.ChVTapPort) VtapPortKey {
 
 func (v *ChVTapPort) generateUpdateInfo(oldItem, newItem metadbmodel.ChVTapPort) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
-	oldItemMap := make(map[string]interface{})
-	newItemMap := make(map[string]interface{})
-	oldItemStr, err := json.Marshal(oldItem)
-	if err != nil {
-		return nil, false
+	if oldItem.Name != newItem.Name {
+		updateInfo["name"] = newItem.Name
 	}
-	newItemStr, err := json.Marshal(newItem)
-	if err != nil {
-		return nil, false
+	if oldItem.MacType != newItem.MacType {
+		updateInfo["mac_type"] = newItem.MacType
 	}
-	err = json.Unmarshal(oldItemStr, &oldItemMap)
-	if err != nil {
-		return nil, false
+	if oldItem.HostID != newItem.HostID {
+		updateInfo["host_id"] = newItem.HostID
 	}
-	err = json.Unmarshal(newItemStr, &newItemMap)
-	if err != nil {
-		return nil, false
+	if oldItem.HostName != newItem.HostName {
+		updateInfo["host_name"] = newItem.HostName
 	}
-	for oldKey, oldValue := range oldItemMap {
-		if strings.ToLower(oldKey) != "updated_at" {
-			if oldValue != newItemMap[oldKey] {
-				updateInfo[strings.ToLower(oldKey)] = newItemMap[oldKey]
-			}
-		}
+	if oldItem.CHostID != newItem.CHostID {
+		updateInfo["chost_id"] = newItem.CHostID
+	}
+	if oldItem.CHostName != newItem.CHostName {
+		updateInfo["chost_name"] = newItem.CHostName
+	}
+	if oldItem.PodNodeID != newItem.PodNodeID {
+		updateInfo["pod_node_id"] = newItem.PodNodeID
+	}
+	if oldItem.PodNodeName != newItem.PodNodeName {
+		updateInfo["pod_node_name"] = newItem.PodNodeName
+	}
+	if oldItem.DeviceID != newItem.DeviceID {
+		updateInfo["device_id"] = newItem.DeviceID
+	}
+	if oldItem.DeviceType != newItem.DeviceType {
+		updateInfo["device_type"] = newItem.DeviceType
+	}
+	if oldItem.DeviceName != newItem.DeviceName {
+		updateInfo["device_name"] = newItem.DeviceName
+	}
+	if oldItem.IconID != newItem.IconID {
+		updateInfo["icon_id"] = newItem.IconID
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true

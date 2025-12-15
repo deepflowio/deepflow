@@ -21,6 +21,7 @@ var VTAP_FLOW_PORT_METRICS = map[string]*Metrics{}
 var VTAP_FLOW_PORT_METRICS_REPLACE = map[string]*Metrics{
 	"l3_byte": NewReplaceMetrics("l3_byte_tx+l3_byte_rx", ""),
 	"l4_byte": NewReplaceMetrics("l4_byte_tx+l4_byte_rx", ""),
+	"ooo":     NewReplaceMetrics("ooo_tx+ooo_rx", ""),
 	"bpp":     NewReplaceMetrics("byte/packet", ""),
 	"bpp_tx":  NewReplaceMetrics("byte_tx/packet_tx", ""),
 	"bpp_rx":  NewReplaceMetrics("byte_rx/packet_rx", ""),

@@ -60,6 +60,9 @@ server_queue_lack           , 传输-服务端队列溢出     , 连接 , TCP �
 tcp_timeout                 , 传输-TCP 连接超时       , 连接 , TCP 传输失败的场景之一，见文档描述
 client_half_close_flow      , 断连-客户端半关         , 连接 , TCP 断连异常的场景之一，见文档描述
 server_half_close_flow      , 断连-服务端半关         , 连接 , TCP 断连异常的场景之一，见文档描述
+ooo                         , TCP 乱序               , 包   ,
+ooo_tx                      , TCP 客户端乱序          , 包   ,
+ooo_rx                      , TCP 服务端乱序          , 包   ,
 
 rtt                         , 平均 TCP 建连时延       , us , 采集周期内，所有 TCP 建连时延的平均值，单次时延的计算见文档描述
 rtt_client                  , 平均 TCP 建连客户端时延 , us , 采集周期内，所有 TCP 建连客户端时延的平均值，单次时延的计算见文档描述

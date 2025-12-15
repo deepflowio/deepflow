@@ -25,6 +25,7 @@ l4_byte_tx                  , l4_byte_tx           , counter    , L4 Throughput 
 l4_byte_rx                  , l4_byte_rx           , counter    , L4 Throughput  , 111
 direction_score             , direction_score      , bounded_gauge      , L4 Throughput  , 111
 log_count                   ,                      , counter    , L4 Throughput  , 111
+fin_count                   , fin_count            , counter    , L4 Throughput  , 111
 
 retrans_syn                 , retrans_syn          , counter    , TCP Slow       , 111
 retrans_synack              , retrans_synack       , counter    , TCP Slow       , 111
@@ -65,6 +66,9 @@ server_queue_lack           ,                      , counter    , TCP Error     
 tcp_timeout                 ,                      , counter    , TCP Error      , 111
 client_half_close_flow      ,                      , counter    , TCP Error      , 111
 server_half_close_flow      ,                      , counter    , TCP Error      , 111
+ooo                         ,                      , counter    , TCP Error      , 111
+ooo_tx                      , ooo_tx               , counter    , TCP Error      , 111
+ooo_rx                      , ooo_rx               , counter    , TCP Error      , 111
 
 rtt                         , rtt                  , delay      , Delay          , 111
 tls_rtt                     , tls_rtt              , delay      , Delay          , 111

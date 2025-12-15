@@ -25,6 +25,7 @@ l4_byte_tx                  , 发送传输层载荷          , 字节 , 客户�
 l4_byte_rx                  , 接收传输层载荷          , 字节 , 服务端发往客户端的包传输层载荷字节数总和（不含 TCP/UDP 头）
 direction_score             , 方向得分                ,      , 算法推理传输层连接方向（客户端、服务端角色）的准确性得分值，得分越高连接方向的准确性越高，得分最高 255
 log_count                   , 日志总量                , 个   , 
+fin_count                   , TCP FIN 包数            , 包   ,
 
 retrans_syn                 , SYN 重传                , 包   , SYN 包的重传次数
 retrans_synack              , SYN-ACK 重传            , 包   , SYN-ACK 包的重传次数
@@ -65,6 +66,9 @@ server_queue_lack           , 传输-服务端队列溢出     , 连接 ,
 tcp_timeout                 , 传输-TCP 连接超时       , 连接 ,
 client_half_close_flow      , 断连-客户端半关         , 连接 , TCP 断连异常的场景之一，见文档描述。
 server_half_close_flow      , 断连-服务端半关         , 连接 , TCP 断连异常的场景之一，见文档描述。
+ooo                         , TCP 乱序                , 包   ,
+ooo_tx                      , TCP 客户端乱序           , 包   ,
+ooo_rx                      , TCP 服务端乱序           , 包   ,
 
 rtt                         , 平均 TCP 建连时延       , us ,
 tls_rtt                     , 平均 TLS 建连时延       , us ,
