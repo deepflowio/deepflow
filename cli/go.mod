@@ -6,7 +6,7 @@ toolchain go1.24.4
 
 require (
 	github.com/bitly/go-simplejson v0.5.0
-	github.com/deepflowio/deepflow/message v0.0.0-20251030080503-9e5211641351
+	github.com/deepflowio/deepflow/message v0.0.0-20251106062554-cd61c2b9c965
 	github.com/deepflowio/deepflow/server v1.6.66-0.20251030080503-9e5211641351
 	github.com/golang/protobuf v1.5.4
 	github.com/mattn/go-runewidth v0.0.14
@@ -51,7 +51,7 @@ require (
 	github.com/go-playground/validator/v10 v10.19.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang/snappy v0.0.4 // indirect
+	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
