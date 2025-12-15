@@ -376,6 +376,37 @@ pub enum LinuxSllPacketType {
     FastRoute = 6, // FastRoute frame
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum PacketDirection {
+    ClientToServer = 0,
+    ServerToClient = 1,
+}
+
+impl PacketDirection {
+    pub fn reversed(&self) -> Self {
+        match self {
+            PacketDirection::ClientToServer => PacketDirection::ServerToClient,
+            PacketDirection::ServerToClient => PacketDirection::ClientToServer,
+        }
+    }
+}
+
+impl Default for PacketDirection {
+    fn default() -> PacketDirection {
+        PacketDirection::ClientToServer
+    }
+}
+
+impl fmt::Display for PacketDirection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ClientToServer => write!(f, "c2s"),
+            Self::ServerToClient => write!(f, "s2c"),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Copy, Clone, Eq, TryFromPrimitive)]
 #[repr(u8)]
 #[serde(rename_all = "snake_case")]

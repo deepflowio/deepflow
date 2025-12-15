@@ -545,28 +545,26 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, userInfo *
 			}
 		}
 		// 如果修改region，则清理掉云平台下所有软删除的数据
-		if region, ok := configUpdate["region_uuid"]; ok {
-			regionLcuuid, ok := region.(string)
-			if !ok {
-				return nil, response.ServiceError(httpcommon.INVALID_PARAMETERS, "region lcuuid must be string")
+		regionLcuuid, ok := configUpdate["region_uuid"]
+		if !ok || regionLcuuid == "" {
+			return nil, response.ServiceError(httpcommon.INVALID_PARAMETERS, "region_uuid must be specified in config")
+		}
+		if domain.Type == common.AGENT_SYNC {
+			var agentSyncDomains []metadbmodel.Domain
+			err := db.Where("type = ? AND lcuuid != ?", common.AGENT_SYNC, domain.Lcuuid).Find(&agentSyncDomains).Error
+			if err != nil {
+				return nil, response.ServiceError(httpcommon.SERVER_ERROR, err.Error())
 			}
-			if domain.Type == common.AGENT_SYNC {
-				var agentSyncDomains []metadbmodel.Domain
-				err := db.Where("type = ? AND lcuuid != ?", common.AGENT_SYNC, domain.Lcuuid).Find(&agentSyncDomains).Error
+			for _, asDomain := range agentSyncDomains {
+				configJson, err := simplejson.NewJson([]byte(asDomain.Config))
 				if err != nil {
 					return nil, response.ServiceError(httpcommon.SERVER_ERROR, err.Error())
 				}
-				for _, asDomain := range agentSyncDomains {
-					configJson, err := simplejson.NewJson([]byte(asDomain.Config))
-					if err != nil {
-						return nil, response.ServiceError(httpcommon.SERVER_ERROR, err.Error())
-					}
-					if regionLcuuid == configJson.Get("region_uuid").MustString() {
-						return nil, response.ServiceError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("region (%s) already exist agent sync doamin (%s)", regionLcuuid, asDomain.Name))
-					}
+				if regionLcuuid == configJson.Get("region_uuid").MustString() {
+					return nil, response.ServiceError(httpcommon.RESOURCE_ALREADY_EXIST, fmt.Sprintf("region (%s) already exist agent sync doamin (%s)", regionLcuuid, asDomain.Name))
 				}
 			}
-			if region != config["region_uuid"] {
+			if regionLcuuid != config["region_uuid"] {
 				log.Infof("delete domain (%s) soft deleted resource", domain.Name, db.LogPrefixORGID)
 				cleanSoftDeletedResource(db, lcuuid)
 			}
@@ -1126,7 +1124,11 @@ func (c *DomainChecker) checkAndAllocateController(db *metadb.DB) {
 	for _, domain := range domains {
 		config := make(map[string]interface{})
 		json.Unmarshal([]byte(domain.Config), &config)
-		regionLcuuid := config["region_uuid"].(string)
+		regionLcuuid, ok := config["region_uuid"].(string)
+		if !ok || regionLcuuid == "" {
+			log.Warningf("not found region_uuid in domian (%s) config (%s)", domain.Name, config, db.LogPrefixORGID)
+			continue
+		}
 		healthyControllerIPs := regionLcuuidToHealthyControllerIPs[regionLcuuid]
 		if !slices.Contains(healthyControllerIPs, domain.ControllerIP) {
 			length := len(healthyControllerIPs)

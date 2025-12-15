@@ -526,71 +526,7 @@ const BASE_FIELD_PRIORITY: u8 = 128;
 const CUSTOM_FIELD_POLICY_PRIORITY: u8 = 64;
 const PLUGIN_FIELD_PRIORITY: u8 = 32;
 
-pub struct PrioField<T> {
-    pub prio: u8,
-    pub field: T,
-}
-
-impl<T> PrioField<T> {
-    pub fn new(prio: u8, field: T) -> Self {
-        Self { prio, field }
-    }
-
-    pub fn into_inner(self) -> T {
-        self.field
-    }
-}
-
-impl<T: Clone> Clone for PrioField<T> {
-    fn clone(&self) -> Self {
-        Self {
-            prio: self.prio,
-            field: self.field.clone(),
-        }
-    }
-}
-
-impl<T: fmt::Debug> fmt::Debug for PrioField<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "PrioField {{ prio: {}, field: {:?} }}",
-            self.prio, self.field
-        )
-    }
-}
-
-impl<T: Default + PartialEq> PrioField<T> {
-    pub fn is_default(&self) -> bool {
-        self.field == T::default()
-    }
-}
-
-impl<T: Default> Default for PrioField<T> {
-    fn default() -> Self {
-        Self {
-            prio: u8::MAX,
-            field: T::default(),
-        }
-    }
-}
-
-impl<T: PartialEq> PartialEq for PrioField<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.prio == other.prio && self.field == other.field
-    }
-}
-
-impl<T: Eq> Eq for PrioField<T> {}
-
-impl<T: Serialize> Serialize for PrioField<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.field.serialize(serializer)
-    }
-}
+pub use public::types::PrioField;
 
 #[derive(Clone, Debug)]
 pub enum PrioStrings {
@@ -637,7 +573,7 @@ impl PrioStrings {
 
     pub fn push(&mut self, prio: u8, value: Cow<str>) {
         match self {
-            Self::Single(field) if prio < field.prio => {
+            Self::Single(field) if prio < field.prio() => {
                 *field = PrioField::new(prio, value.into_owned())
             }
             Self::Multiple(m) => {
@@ -651,9 +587,19 @@ impl PrioStrings {
         }
     }
 
+    pub fn first(&self) -> Option<&String> {
+        if self.is_default() {
+            return None;
+        }
+        match self {
+            Self::Single(field) => Some(field.get()),
+            Self::Multiple(m) => m.iter().min_by_key(|(_, p)| *p).map(|(k, _)| k),
+        }
+    }
+
     pub fn into_sorted_vec(self) -> Vec<String> {
         match self {
-            Self::Single(field) => vec![field.field],
+            Self::Single(field) => vec![field.into_inner()],
             Self::Multiple(m) => {
                 let mut strings = m.into_iter().collect::<Vec<_>>();
                 // smaller is higher priority, sort by ascending order
@@ -682,13 +628,13 @@ impl PrioFields {
     // insertion is kept in ascending order by prio; if prio is the same, insert it at the end (stable sort)
     #[inline]
     fn insert_sorted(&mut self, field: PrioField<String>) {
-        if field.field.is_empty() {
+        if field.get().is_empty() {
             return;
         }
         // find the first position greater than it (>), skip those that are equal
-        let pos = match self.0.binary_search_by(|x| x.prio.cmp(&field.prio)) {
+        let pos = match self.0.binary_search_by(|x| x.prio().cmp(&field.prio())) {
             Ok(mut i) => {
-                while i < self.0.len() && self.0[i].prio == field.prio {
+                while i < self.0.len() && self.0[i].prio() == field.prio() {
                     i += 1;
                 }
                 i
@@ -735,8 +681,8 @@ impl PrioFields {
         let mut seen = HashSet::new();
         let mut result = Vec::with_capacity(self.0.len());
         for pf in &self.0 {
-            if seen.insert(&pf.field) {
-                result.push(pf.field.clone());
+            if seen.insert(pf.get()) {
+                result.push(pf.get().clone());
             }
         }
         result
@@ -747,7 +693,7 @@ impl PrioFields {
         let mut result = Vec::with_capacity(3);
 
         for pf in self.0 {
-            let field = pf.field;
+            let field = pf.into_inner();
 
             if result.iter().any(|f| f == &field) {
                 continue;
@@ -764,11 +710,11 @@ impl PrioFields {
     // get first element's priority, or return max
     #[inline]
     pub fn highest_priority(&self) -> u8 {
-        self.0.first().map(|pf| pf.prio).unwrap_or(u8::MAX)
+        self.0.first().map(|pf| pf.prio()).unwrap_or(u8::MAX)
     }
 
     #[inline]
     pub fn highest(&self) -> &str {
-        self.0.first().map(|pf| pf.field.as_str()).unwrap_or("")
+        self.0.first().map(|pf| pf.get().as_str()).unwrap_or("")
     }
 }

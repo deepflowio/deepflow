@@ -34,6 +34,7 @@ pub mod rpc;
 pub mod segment_map;
 pub mod sender;
 pub mod throttle;
+pub mod types;
 pub mod utils;
 
 #[cfg(target_os = "linux")]
