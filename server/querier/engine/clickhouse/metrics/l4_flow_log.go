@@ -84,6 +84,7 @@ var L4_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 	"log_count": NewReplaceMetrics("1", ""),
 	"byte":      NewReplaceMetrics("byte_tx+byte_rx", ""),
 	"packet":    NewReplaceMetrics("packet_tx+packet_rx", ""),
+	"ooo":       NewReplaceMetrics("ooo_tx+ooo_rx", ""),
 	"l3_byte":   NewReplaceMetrics("l3_byte_tx+l3_byte_rx", ""),
 	"l4_byte":   NewReplaceMetrics("l4_byte_tx+l4_byte_rx", ""),
 	"bpp":       NewReplaceMetrics("(byte_tx+byte_rx)/(packet_tx+packet_rx)", "(packet_tx+packet_rx)>0"),

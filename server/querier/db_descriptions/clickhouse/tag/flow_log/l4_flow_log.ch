@@ -100,6 +100,7 @@ end_time              , 结束时间                     , 单位: 微秒。表�
 close_type            , 流结束类型                   ,
 status                , 状态                         , 根据协议（protocol）、流结束类型（close_type）分类。 `正常`包括：`正常结束`、`周期性上报`、`断连-XX半关`、`传输-超时`（非 TCP 协议）。 `客户端异常`包括：`建连-客户端XX`、`传输-客户端XX`。 `服务端异常`包括：`建连-服务端XX`、`传输-服务端XX`、`传输-超时`（TCP 协议）。 `未知`=`未知`。
 is_new_flow           , 新建流                       ,
+init_ipid             , 首包 IPID                    ,
 
 signal_source         , 信号源                       ,
 tap                   , 采集点                       , 已废弃，请使用 capture_network_type。

@@ -100,6 +100,7 @@ end_time              , End Time                          , Unit: microseconds. 
 close_type            , Flow Close Type                   ,
 status                , Status                            , Determined by the close_type and protocol: Normal/ForceReport/Non-TCP timeout/Disconnected* = Normal, Client* = Client Error, Server*/TCP Timeout = Server Error, others = Unknown.
 is_new_flow           , New Flow Flag                     ,
+init_ipid             , Initial IPID                      ,
 
 signal_source         , Signal Source                     ,
 tap                   , Traffic Access Point              , Deprecated，please use capture_network_type.
