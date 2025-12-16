@@ -252,6 +252,26 @@ pub enum TapSide {
 
 impl TapSide {
     pub const MAX: Self = Self::ServerApp;
+
+    pub fn reverse(&mut self) {
+        match *self {
+            Self::Client => *self = Self::Server,
+            Self::Server => *self = Self::Client,
+            Self::ClientNode => *self = Self::ServerNode,
+            Self::ServerNode => *self = Self::ClientNode,
+            Self::ClientHypervisor => *self = Self::ServerHypervisor,
+            Self::ServerHypervisor => *self = Self::ClientHypervisor,
+            Self::ClientGatewayHypervisor => *self = Self::ServerGatewayHypervisor,
+            Self::ServerGatewayHypervisor => *self = Self::ClientGatewayHypervisor,
+            Self::ClientGateway => *self = Self::ServerGateway,
+            Self::ServerGateway => *self = Self::ClientGateway,
+            Self::ClientProcess => *self = Self::ServerProcess,
+            Self::ServerProcess => *self = Self::ClientProcess,
+            Self::ClientApp => *self = Self::ServerApp,
+            Self::ServerApp => *self = Self::ClientApp,
+            _ => {}
+        }
+    }
 }
 
 impl Default for TapSide {

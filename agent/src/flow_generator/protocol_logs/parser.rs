@@ -194,6 +194,10 @@ impl MetaAppProto {
             base_info.syscall_cap_seq_1 = meta_packet.cap_start_seq as u32;
         }
 
+        if l7_info.is_reversed() {
+            base_info.reverse()
+        }
+
         Some(Self {
             base_info,
             direction: meta_packet.lookup_key.direction,

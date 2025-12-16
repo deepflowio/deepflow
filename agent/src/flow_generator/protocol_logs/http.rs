@@ -339,6 +339,8 @@ pub struct HttpInfo {
 
     #[serde(skip_serializing_if = "value_is_default")]
     is_async: bool,
+    #[serde(skip_serializing_if = "value_is_default")]
+    is_reversed: bool,
 }
 
 impl L7ProtocolInfoInterface for HttpInfo {
@@ -409,6 +411,10 @@ impl L7ProtocolInfoInterface for HttpInfo {
 
     fn get_biz_type(&self) -> u8 {
         self.biz_type
+    }
+
+    fn is_reversed(&self) -> bool {
+        self.is_reversed
     }
 }
 
@@ -520,6 +526,9 @@ impl HttpInfo {
         if let Some(is_async) = custom.is_async {
             self.is_async = is_async;
         }
+        if let Some(is_reversed) = custom.is_reversed {
+            self.is_reversed = is_reversed;
+        }
     }
 
     pub fn merge(&mut self, other: &mut Self) -> Result<()> {
@@ -593,6 +602,9 @@ impl HttpInfo {
 
         if other_is_grpc {
             self.proto = L7Protocol::Grpc;
+        }
+        if other.is_reversed {
+            self.is_reversed = other.is_reversed;
         }
         if other.biz_type > 0 {
             self.biz_type = other.biz_type;

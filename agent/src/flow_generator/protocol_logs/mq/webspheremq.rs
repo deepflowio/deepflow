@@ -47,6 +47,8 @@ pub struct WebSphereMqInfo {
     is_tls: bool,
     #[serde(skip)]
     is_async: bool,
+    #[serde(skip)]
+    is_reversed: bool,
 
     #[serde(skip_serializing_if = "value_is_default")]
     pub trace_ids: PrioFields,
@@ -132,6 +134,10 @@ impl L7ProtocolInfoInterface for WebSphereMqInfo {
     fn get_biz_type(&self) -> u8 {
         self.biz_type
     }
+
+    fn is_reversed(&self) -> bool {
+        self.is_reversed
+    }
 }
 
 impl WebSphereMqInfo {
@@ -151,6 +157,9 @@ impl WebSphereMqInfo {
         }
         if other.is_async {
             self.is_async = other.is_async;
+        }
+        if other.is_reversed {
+            self.is_reversed = other.is_reversed;
         }
     }
 
@@ -226,6 +235,9 @@ impl WebSphereMqInfo {
         }
         if let Some(is_async) = custom.is_async {
             self.is_async = is_async;
+        }
+        if let Some(is_reversed) = custom.is_reversed {
+            self.is_reversed = is_reversed;
         }
 
         if custom.biz_type > 0 {
