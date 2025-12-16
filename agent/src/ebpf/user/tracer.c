@@ -1964,6 +1964,29 @@ bool is_feature_matched(int feature, int pid, const char *path)
 	return !error;
 }
 
+bool is_feature_regex_set(int feature)
+{
+	if (feature < 0 || feature >= FEATURE_MAX) {
+		return false;
+	}
+	return cfg_feature_regex_array[feature].ok;
+}
+
+bool php_profiler_enabled(void)
+{
+	return is_feature_regex_set(FEATURE_PROFILE_PHP);
+}
+
+bool v8_profiler_enabled(void)
+{
+	return is_feature_regex_set(FEATURE_PROFILE_V8);
+}
+
+bool python_profiler_enabled(void)
+{
+	return is_feature_regex_set(FEATURE_PROFILE_PYTHON);
+}
+
 static void init_thread_ids(void)
 {
 	thread_ids.entries = NULL;

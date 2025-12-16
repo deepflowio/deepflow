@@ -17,19 +17,76 @@
 pub mod btf;
 pub mod error;
 pub mod maps;
+pub mod remote_memory;
 pub mod unwind;
 pub mod utils;
 
 // Standard library
+use std::collections::HashMap;
 use std::io::Write;
+use std::sync::{Mutex, OnceLock};
 
 // Third-party crates
-use log::info;
+use log::{info, trace};
 
 // Crate internal modules
 pub use unwind::lua::{LjOfs, LuaOfs, LuaRuntimeInfo, LuaUnwindInfo, LuaUnwindTable};
-use unwind::{python::PythonUnwindTable, UnwindTable};
+use unwind::{php::PhpUnwindTable, python::PythonUnwindTable, v8::V8UnwindTable, UnwindTable};
 pub use utils::protect_cpu_affinity;
+
+// ============================================================================
+// Global Interpreter Registry
+// ============================================================================
+
+/// Interpreter type enumeration
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InterpreterType {
+    Php,
+    V8,
+}
+
+/// Global registry mapping PID to interpreter type
+/// This is used for fast O(1) lookup in is_php_process() and is_v8_process()
+static REGISTERED_INTERPRETERS: OnceLock<Mutex<HashMap<u32, InterpreterType>>> = OnceLock::new();
+
+fn get_interpreter_registry() -> &'static Mutex<HashMap<u32, InterpreterType>> {
+    REGISTERED_INTERPRETERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Register a PID as an interpreter process
+pub fn register_interpreter(pid: u32, typ: InterpreterType) {
+    if let Ok(mut registry) = get_interpreter_registry().lock() {
+        registry.insert(pid, typ);
+        trace!("Registered PID {} as {:?} interpreter", pid, typ);
+    }
+}
+
+/// Unregister a PID from the interpreter registry
+pub fn unregister_interpreter(pid: u32) {
+    if let Ok(mut registry) = get_interpreter_registry().lock() {
+        registry.remove(&pid);
+        trace!("Unregistered PID {} from interpreter registry", pid);
+    }
+}
+
+/// Check if PID is registered as a specific interpreter type
+pub fn is_registered_as(pid: u32, typ: InterpreterType) -> bool {
+    if let Ok(registry) = get_interpreter_registry().lock() {
+        registry.get(&pid) == Some(&typ)
+    } else {
+        false
+    }
+}
+
+/// Check if PID is registered as any interpreter
+#[allow(dead_code)]
+pub fn is_registered_interpreter(pid: u32) -> bool {
+    if let Ok(registry) = get_interpreter_registry().lock() {
+        registry.contains_key(&pid)
+    } else {
+        false
+    }
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn unwind_table_create(
@@ -94,6 +151,55 @@ pub unsafe extern "C" fn python_unwind_table_load(table: *mut PythonUnwindTable,
 
 #[no_mangle]
 pub unsafe extern "C" fn python_unwind_table_unload(table: *mut PythonUnwindTable, pid: u32) {
+    (*table).unload(pid);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn php_unwind_table_create(
+    unwind_info_map_fd: i32,
+    offsets_map_fd: i32,
+) -> *mut PhpUnwindTable {
+    let table = Box::new(PhpUnwindTable::new(unwind_info_map_fd, offsets_map_fd));
+    Box::into_raw(table)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn php_unwind_table_destroy(table: *mut PhpUnwindTable) {
+    if !table.is_null() {
+        std::mem::drop(Box::from_raw(table));
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn php_unwind_table_load(table: *mut PhpUnwindTable, pid: u32) {
+    (*table).load(pid);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn php_unwind_table_unload(table: *mut PhpUnwindTable, pid: u32) {
+    (*table).unload(pid);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn v8_unwind_table_create(unwind_info_map_fd: i32) -> *mut V8UnwindTable {
+    let table = Box::new(V8UnwindTable::new(unwind_info_map_fd));
+    Box::into_raw(table)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn v8_unwind_table_destroy(table: *mut V8UnwindTable) {
+    if !table.is_null() {
+        std::mem::drop(Box::from_raw(table));
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn v8_unwind_table_load(table: *mut V8UnwindTable, pid: u32) {
+    (*table).load(pid);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn v8_unwind_table_unload(table: *mut V8UnwindTable, pid: u32) {
     (*table).unload(pid);
 }
 

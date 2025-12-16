@@ -96,6 +96,16 @@ typedef struct {
 } python_unwind_info_t;
 
 typedef struct {
+    uint64_t executor_globals_address;
+    uint64_t jit_return_address;
+    uint64_t execute_ex_start;   // absolute address of execute_ex start
+    uint64_t execute_ex_end;     // absolute address of execute_ex end (exclusive)
+    uint8_t  offsets_id;
+    uint8_t  has_jit;
+    uint8_t  _reserved[6];
+} php_unwind_info_t;
+
+typedef struct {
     int64_t current_frame;
 } py_cframe_t;
 
@@ -216,11 +226,103 @@ typedef struct {
     uint32_t off_global_state_dispatchmode;
 } lj_ofs;
 
+typedef struct {
+    uint16_t current_execute_data;
+} php_executor_globals_t;
+
+typedef struct {
+    uint8_t opline;
+    uint8_t function;
+    uint8_t this_type_info;
+    uint8_t prev_execute_data;
+} php_execute_data_t;
+
+typedef struct {
+    uint8_t common_type;
+    uint8_t common_funcname;
+    uint8_t common_scope;
+    uint32_t op_array_filename;
+    uint32_t op_array_linestart;
+    uint32_t sizeof_struct;
+} php_function_t;
+
+typedef struct {
+    uint64_t val;
+} php_string_t;
+
+typedef struct {
+    uint8_t lineno;
+} php_op_t;
+
+typedef struct {
+    uint64_t name;
+} php_class_entry_t;
+
+typedef struct {
+    php_executor_globals_t executor_globals;
+    php_execute_data_t execute_data;
+    php_function_t function;
+    php_string_t string;
+    php_op_t op;
+    php_class_entry_t class_entry;
+} php_offsets_t;
+
+typedef struct {
+    uint64_t isolate_address;
+    uint8_t offsets_id;
+    uint32_t version;
+} v8_unwind_info_t;
+
+typedef struct {
+    int16_t marker;
+    int16_t function;
+    int16_t bytecode_offset;
+} v8_frame_pointers_t;
+
+typedef struct {
+    uint16_t shared;
+    uint16_t code;
+} v8_js_function_t;
+
+typedef struct {
+    uint16_t name_or_scope_info;
+    uint16_t function_data;
+    uint16_t script_or_debug_info;
+} v8_shared_function_info_t;
+
+typedef struct {
+    uint16_t instruction_start;
+    uint16_t instruction_size;
+    uint16_t flags;
+} v8_code_t;
+
+typedef struct {
+    uint16_t name;
+    uint16_t source;
+} v8_script_t;
+
+typedef struct {
+    uint16_t source_position_table;
+} v8_bytecode_array_t;
+
+typedef struct {
+    v8_frame_pointers_t frame_pointers;
+    v8_js_function_t js_function;
+    v8_shared_function_info_t shared_function_info;
+    v8_code_t code;
+    v8_script_t script;
+    v8_bytecode_array_t bytecode_array;
+} v8_offsets_t;
+
 bool frame_pointer_heuristic_check(uint32_t pid);
 
 int32_t is_lua_process(uint32_t pid);
 
 bool is_python_process(uint32_t pid);
+
+bool is_php_process(uint32_t pid);
+
+bool is_v8_process(uint32_t pid);
 
 int32_t lua_detect(uint32_t pid, lua_runtime_info_t *out);
 
@@ -252,6 +354,14 @@ size_t merge_lua_stacks(void *trace_str, size_t len, const void *u_trace, const 
 
 size_t merge_python_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
 
+size_t merge_php_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
+
+size_t merge_v8_stacks(void *trace_str, size_t len, const void *i_trace, const void *u_trace);
+
+char *resolve_php_frame(uint32_t pid, uint64_t zend_function_ptr, uint64_t lineno, uint64_t is_jit);
+
+char *resolve_v8_frame(uint32_t pid, uint64_t pointer_and_type, uint64_t delta_or_marker, uint64_t sfi_fallback);
+
 int32_t protect_cpu_affinity_c(void);
 
 python_unwind_table_t *python_unwind_table_create(int32_t unwind_info_map_fd,
@@ -262,6 +372,27 @@ void python_unwind_table_destroy(python_unwind_table_t *table);
 void python_unwind_table_load(python_unwind_table_t *table, uint32_t pid);
 
 void python_unwind_table_unload(python_unwind_table_t *table, uint32_t pid);
+
+typedef struct php_unwind_table_t php_unwind_table_t;
+
+php_unwind_table_t *php_unwind_table_create(int32_t unwind_info_map_fd,
+                                            int32_t offsets_map_fd);
+
+void php_unwind_table_destroy(php_unwind_table_t *table);
+
+void php_unwind_table_load(php_unwind_table_t *table, uint32_t pid);
+
+void php_unwind_table_unload(php_unwind_table_t *table, uint32_t pid);
+
+typedef struct v8_unwind_table_t v8_unwind_table_t;
+
+v8_unwind_table_t *v8_unwind_table_create(int32_t unwind_info_map_fd);
+
+void v8_unwind_table_destroy(v8_unwind_table_t *table);
+
+void v8_unwind_table_load(v8_unwind_table_t *table, uint32_t pid);
+
+void v8_unwind_table_unload(v8_unwind_table_t *table, uint32_t pid);
 
 int32_t read_offset_of_stack_in_task_struct(void);
 
