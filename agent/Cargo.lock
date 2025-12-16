@@ -4697,6 +4697,7 @@ dependencies = [
  "regex",
  "rustc-demangle",
  "semver",
+ "tempfile",
  "thiserror 1.0.47",
 ]
 

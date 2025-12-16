@@ -1471,7 +1471,7 @@ inputs:
     #   ch: 匹配语言
     # unit:
     # range: []
-    # enum_options: [java, golang, python, lua, nodejs, dotnet]
+    # enum_options: [java, golang, python, lua, php, nodejs, dotnet]
     # modification: hot_update
     # ee_feature: false
     # description:
@@ -1648,6 +1648,16 @@ inputs:
         match_type: cmdline_with_args
         only_in_container: false
         rewrite_name: $5
+        enabled_features: [ebpf.profile.on_cpu, proc.gprocess_info]
+      - match_regex: \bphp(\d+)?(-fpm|-cli|-cgi)?( +-\S+)* +(\S*/)*([^ /]+\.php)
+        match_type: cmdline_with_args
+        only_in_container: false
+        rewrite_name: $5
+        enabled_features: [ebpf.profile.on_cpu, proc.gprocess_info]
+      - match_regex: \b(node|nodejs)( +--\S+)* +(\S*/)*([^ /]+\.js)
+        match_type: cmdline_with_args
+        only_in_container: false
+        rewrite_name: $4
         enabled_features: [ebpf.profile.on_cpu, proc.gprocess_info]
       - match_regex: ^deepflow-
         only_in_container: false
@@ -3684,6 +3694,69 @@ inputs:
         #     on-cpu 函数调用栈压缩，可以将带宽消耗降低 `x` 倍，但会使得 agent 额外消耗 `y%` 的 CPU。
         # upgrade_from: static_config.ebpf.preprocess.stack-compression
         stack_compression: true
+      # type: section
+      # name:
+      #   en: Language-specific Profiling
+      #   ch: 语言特定剖析
+      # description:
+      #   en: |-
+      #     Control which interpreter languages to profile. Disabling unused languages can save ~5-6 MB memory per language.
+      #     Total memory: ~17-20 MB (all enabled), ~6.1 MB (Python only), ~5.2 MB (PHP only), ~6.4 MB (Node.js only).
+      #   ch: |-
+      #     控制对哪些解释型语言进行剖析。禁用不使用的语言可以节省每个语言约 5-6 MB 内存。
+      #     总内存占用：~17-20 MB（全部启用），~6.1 MB（仅 Python），~5.2 MB（仅 PHP），~6.4 MB（仅 Node.js）。
+      languages:
+        # type: bool
+        # name:
+        #   en: Python profiling disabled
+        #   ch: 禁用 Python 剖析
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Disable Python interpreter profiling. When disabled, Python process stack traces will not be collected,
+        #     saving approximately 6.1 MB of kernel memory (python_tstate_addr_map, python_unwind_info_map, python_offsets_map).
+        #   ch: |-
+        #     禁用 Python 解释器剖析。禁用后将不采集 Python 进程的函数调用栈，
+        #     可节省约 6.1 MB 内核内存（python_tstate_addr_map、python_unwind_info_map、python_offsets_map）。
+        python_disabled: false
+        # type: bool
+        # name:
+        #   en: PHP profiling disabled
+        #   ch: 禁用 PHP 剖析
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Disable PHP interpreter profiling. When disabled, PHP process stack traces will not be collected,
+        #     saving approximately 5.2 MB of kernel memory (php_unwind_info_map, php_offsets_map).
+        #   ch: |-
+        #     禁用 PHP 解释器剖析。禁用后将不采集 PHP 进程的函数调用栈，
+        #     可节省约 5.2 MB 内核内存（php_unwind_info_map、php_offsets_map）。
+        php_disabled: false
+        # type: bool
+        # name:
+        #   en: Node.js profiling disabled
+        #   ch: 禁用 Node.js 剖析
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Disable Node.js (V8) interpreter profiling. When disabled, Node.js process stack traces will not be collected,
+        #     saving approximately 6.4 MB of kernel memory (v8_unwind_info_map).
+        #   ch: |-
+        #     禁用 Node.js（V8）解释器剖析。禁用后将不采集 Node.js 进程的函数调用栈，
+        #     可节省约 6.4 MB 内核内存（v8_unwind_info_map）。
+        nodejs_disabled: false
     # type: section
     # name:
     #   en: Tunning

@@ -5533,6 +5533,20 @@ impl ConfigHandler {
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if candidate_config.ebpf != new_config.ebpf {
             if candidate_config.capture_mode != PacketCaptureType::Analyzer {
+                // Check if language-specific profiling configuration changed (only on dynamic config update, not on first start)
+                if components.is_some()
+                    && candidate_config.ebpf.ebpf.profile.languages
+                        != new_config.ebpf.ebpf.profile.languages
+                {
+                    error!(
+                        "Language-specific profiling configuration changed from {:#?} to {:#?}. \
+                        This change requires deepflow-agent restart to take effect (eBPF maps cannot be \
+                        dynamically created/destroyed). deepflow-agent will restart now...",
+                        candidate_config.ebpf.ebpf.profile.languages,
+                        new_config.ebpf.ebpf.profile.languages
+                    );
+                    crate::utils::clean_and_exit(public::consts::NORMAL_EXIT_WITH_RESTART);
+                }
                 debug!(
                     "ebpf config change from {:#?} to {:#?}",
                     candidate_config.ebpf, new_config.ebpf
@@ -5585,6 +5599,7 @@ impl ConfigHandler {
         candidate_config.log = new_config.log.clone();
         candidate_config.port_config = new_config.port_config.clone();
         candidate_config.pcap = new_config.pcap.clone();
+        candidate_config.user_config = new_config.user_config.clone();
 
         if new_config != *candidate_config {
             error!(
