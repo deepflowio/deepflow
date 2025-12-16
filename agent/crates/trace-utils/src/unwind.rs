@@ -34,8 +34,9 @@ use ahash::AHasher;
 use libc::c_void;
 use log::{debug, trace, warn};
 use object::{
-    elf::{self, FileHeader64},
-    read::elf::FileHeader,
+    elf::{self, FileHeader64, PT_LOAD},
+    read::elf::{FileHeader, ProgramHeader},
+    Endianness,
 };
 
 use dwarf::UnwindEntry;
@@ -44,6 +45,52 @@ use crate::{
     maps::{get_memory_mappings, MemoryArea},
     utils::{bpf_delete_elem, bpf_update_elem, get_errno, IdGenerator, BPF_ANY},
 };
+
+/// Calculate the bias (ASLR offset) for a memory mapping.
+/// bias = process_vaddr - elf_vaddr
+/// where elf_vaddr is the virtual address in ELF file corresponding to the file offset.
+///
+/// This is the offset we need to subtract from a process VA to get the ELF VA,
+/// which can then be used to look up DWARF unwind entries.
+fn calculate_bias(data: &[u8], m: &MemoryArea) -> Option<u64> {
+    let header = FileHeader64::<Endianness>::parse(data).ok()?;
+    let endian = header.endian().ok()?;
+    let phdrs = header.program_headers(endian, data).ok()?;
+
+    // Find the PT_LOAD segment that contains the file offset
+    for phdr in phdrs {
+        if phdr.p_type(endian) != PT_LOAD {
+            continue;
+        }
+        let p_offset = phdr.p_offset(endian);
+        let p_filesz = phdr.p_filesz(endian);
+        let p_vaddr = phdr.p_vaddr(endian);
+
+        // Check if the mapping's file offset falls within this segment
+        if m.offset >= p_offset && m.offset < p_offset + p_filesz {
+            // Calculate the ELF virtual address for this mapping
+            let offset_in_segment = m.offset - p_offset;
+            let elf_vaddr = p_vaddr + offset_in_segment;
+            // bias = process_vaddr - elf_vaddr
+            // Use mx_start (executable section start) if available, otherwise m_start
+            // This handles merged memory areas where m_start may be from a different segment
+            let process_vaddr = if m.mx_start != 0 {
+                m.mx_start
+            } else {
+                m.m_start
+            };
+            let bias = process_vaddr.wrapping_sub(elf_vaddr);
+            return Some(bias);
+        }
+    }
+    // Fallback: if no matching PT_LOAD segment found, use old calculation
+    // This shouldn't happen for valid ELF files
+    warn!(
+        "calculate_bias: no matching PT_LOAD segment for file_offset={:#x} in {}",
+        m.offset, m.path
+    );
+    Some(m.m_start.wrapping_sub(m.offset))
+}
 
 #[derive(Default)]
 pub struct UnwindTable {
@@ -84,17 +131,54 @@ impl UnwindTable {
 
         let base_path: PathBuf = ["/proc", &pid.to_string(), "root"].iter().collect();
         for m in mm {
-            if m.path.chars().next() == Some('[') {
-                trace!("ignore file {}", m.path);
+            // Determine the path for logging/display purposes
+            let path: PathBuf = if m.path == "[vdso]" {
+                PathBuf::from("[vdso]")
+            } else if m.path.chars().next() == Some('[') {
+                trace!("ignore special mapping {}", m.path);
                 continue;
-            }
-            let mut path = base_path.clone();
-            path.push(&m.path[1..]);
-            let data = match fs::read(&path) {
-                Ok(d) => d,
-                Err(e) => {
-                    debug!("load file {} failed: {e}", path.display());
-                    continue;
+            } else {
+                let mut p = base_path.clone();
+                p.push(&m.path[1..]);
+                p
+            };
+
+            // Load the data from file or process memory
+            let data = if m.path == "[vdso]" {
+                // vdso is a special kernel-injected ELF object in process memory
+                // Read it directly from /proc/pid/mem
+                let mem_path: PathBuf = ["/proc", &pid.to_string(), "mem"].iter().collect();
+                let size = (m.m_end - m.m_start) as usize;
+                match fs::File::open(&mem_path) {
+                    Ok(mut file) => {
+                        use std::io::{Read, Seek, SeekFrom};
+                        let mut buf = vec![0u8; size];
+                        if file.seek(SeekFrom::Start(m.m_start)).is_ok()
+                            && file.read_exact(&mut buf).is_ok()
+                        {
+                            trace!(
+                                "loaded vdso from process memory at {:#x}, size={}",
+                                m.m_start,
+                                size
+                            );
+                            buf
+                        } else {
+                            debug!("failed to read vdso from process#{pid} memory");
+                            continue;
+                        }
+                    }
+                    Err(e) => {
+                        debug!("failed to open /proc/{}/mem: {}", pid, e);
+                        continue;
+                    }
+                }
+            } else {
+                match fs::read(&path) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        debug!("load file {} failed: {e}", path.display());
+                        continue;
+                    }
                 }
             };
 
@@ -116,9 +200,12 @@ impl UnwindTable {
                         break;
                     }
                     shard_list.entries[shard_list.len as usize] = *s;
-                    // offset is 0 iff object is not PIC/PIE, otherwise set offset according to proc maps
+                    // offset is 0 iff object is not PIC/PIE, otherwise recalculate bias
+                    // using ELF program headers for the current process mapping
                     if shard_list.entries[shard_list.len as usize].offset != 0 {
-                        shard_list.entries[shard_list.len as usize].offset = m.m_start;
+                        shard_list.entries[shard_list.len as usize].offset =
+                            calculate_bias(&data, &m)
+                                .unwrap_or_else(|| m.m_start.wrapping_sub(m.offset));
                     }
                     shard_list.len += 1;
                 }
@@ -171,8 +258,15 @@ impl UnwindTable {
                     path.display(),
                     entries.len()
                 );
-                let object_info =
-                    self.split_into_shards(pid, &m, &entries, max_pc, &mut shard_list, is_pic);
+                let object_info = self.split_into_shards(
+                    pid,
+                    &m,
+                    &data,
+                    &entries,
+                    max_pc,
+                    &mut shard_list,
+                    is_pic,
+                );
                 shard_count += object_info.shards.len();
                 self.object_cache.insert(digest, object_info);
                 continue;
@@ -220,7 +314,20 @@ impl UnwindTable {
             }
             let shard_info = &mut shard_list.entries[shard_list.len as usize];
             shard_info.id = shard.id;
-            shard_info.offset = if is_pic { m.m_start } else { 0 };
+            // Calculate the correct bias (offset) using ELF program headers
+            // For non-PIC executables (ET_EXEC), the bias is 0 because addresses are fixed
+            // For PIC/PIE executables, we need to calculate: bias = process_vaddr - elf_vaddr
+            shard_info.offset = if is_pic {
+                calculate_bias(&data, &m).unwrap_or_else(|| {
+                    warn!(
+                        "process#{pid} failed to calculate bias for {}, using fallback",
+                        path.display()
+                    );
+                    m.m_start.wrapping_sub(m.offset)
+                })
+            } else {
+                0
+            };
             shard_info.pc_min = entries[0].pc;
             shard_info.pc_max = max_pc;
             shard_info.entry_start = shard.len as u16 - entries.len() as u16;
@@ -348,6 +455,7 @@ impl UnwindTable {
         &mut self,
         pid: u32,
         m: &MemoryArea,
+        data: &[u8],
         entries: &[UnwindEntry],
         max_pc: u64,
         shard_list: &mut ProcessShardList,
@@ -359,6 +467,20 @@ impl UnwindTable {
         };
         let mut first_shard = true;
         let mut boxed_shard = BoxedShard::new(0);
+
+        // Pre-calculate bias for all shards in this object
+        let bias = if is_pic {
+            calculate_bias(data, m).unwrap_or_else(|| {
+                warn!(
+                    "process#{pid} failed to calculate bias for {}, using fallback",
+                    m.path
+                );
+                m.m_start.wrapping_sub(m.offset)
+            })
+        } else {
+            0
+        };
+
         for chunk in entries.chunks(UNWIND_ENTRIES_PER_SHARD) {
             let shard_id = self.id_gen.acquire();
             trace!(
@@ -380,17 +502,19 @@ impl UnwindTable {
                 );
                 break;
             }
-            let shard_info = &mut shard_list.entries[shard_list.len as usize];
-            shard_info.id = shard_id;
-            shard_info.offset = if is_pic { m.m_start } else { 0 };
-            shard_info.pc_min = chunk[0].pc;
-            shard_info.pc_max = max_pc;
-            shard_info.entry_start = 0;
-            shard_info.entry_end = chunk.len() as u16;
             if !first_shard {
                 // set max pc of last shard to min pc of this shard
-                shard_info.pc_max = chunk[0].pc;
+                shard_list.entries[shard_list.len as usize - 1].pc_max = chunk[0].pc;
             }
+
+            let shard_info = &mut shard_list.entries[shard_list.len as usize];
+            shard_info.id = shard_id;
+            shard_info.offset = bias;
+            shard_info.pc_min = chunk[0].pc;
+            // Use the last entry's PC for this shard, will be updated by next shard or max_pc at the end
+            shard_info.pc_max = chunk.last().map(|e| e.pc).unwrap_or(max_pc);
+            shard_info.entry_start = 0;
+            shard_info.entry_end = chunk.len() as u16;
 
             object_info.shards.push(shard_info.clone());
             *self.shard_rc.entry(shard.id).or_insert(0) += 1;
@@ -499,7 +623,7 @@ struct ObjectInfo {
     pids: Vec<u32>,
 }
 
-pub const UNWIND_SHARDS_PER_PROCESS: usize = 256;
+pub const UNWIND_SHARDS_PER_PROCESS: usize = 1024;
 
 // UnwindEntryShard is a value type of bpf map entry
 // Calling bpf_update_elem with a struct larger than 1MB seems to cause ENOMEM error on kernel 5.10
@@ -535,7 +659,7 @@ impl Default for ShardInfo {
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct ProcessShardList {
-    pub len: u8,
+    pub len: u16,
     pub entries: [ShardInfo; UNWIND_SHARDS_PER_PROCESS],
 }
 

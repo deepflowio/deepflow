@@ -933,7 +933,7 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 
 #ifdef LINUX_VER_5_2_PLUS
 
-#define SHARD_BSEARCH_LOOPS 9	// 2^9 = 512 > UNWIND_SHARDS_PER_PROCESS
+#define SHARD_BSEARCH_LOOPS 10	// 2^10 = 1024 >= UNWIND_SHARDS_PER_PROCESS
 #define ENTRY_BSEARCH_LOOPS 17	// 2^17 = 131072 > UNWIND_ENTRIES_PER_SHARD
 
 #define LOOP_EXHAUSTED 0xFFFFFFFF
@@ -1042,6 +1042,15 @@ int dwarf_unwind(void *ctx, unwind_state_t * state,
 			shard_info = shard_list->entries + shard_index;
 			shard =
 			    unwind_entry_shard_table__lookup(&shard_info->id);
+			// Validate that IP is actually within the shard's valid range
+			// If IP < offset+pc_min or IP >= offset+pc_max, this shard doesn't cover our IP
+			// This can happen when IP is in special regions like [uprobes] that have no DWARF info
+			if (regs->ip < shard_info->offset + shard_info->pc_min ||
+			    regs->ip >= shard_info->offset + shard_info->pc_max) {
+				bpf_debug("[DWARF] frame#%d: ip=%lx not in shard range, stopping",
+					state->stack.len, regs->ip);
+				goto finish;
+			}
 		}
 		// bpf_debug("frame#%d", state->stack.len);
 		// bpf_debug("ip=%lx bp=%lx sp=%lx", regs->ip, regs->bp, regs->sp);

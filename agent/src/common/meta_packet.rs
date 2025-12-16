@@ -267,6 +267,8 @@ pub struct MetaPacket<'a> {
     /********** for GPID **********/
     pub gpid_0: u32,
     pub gpid_1: u32,
+
+    pub ip_id: u16,
 }
 
 impl<'a> MetaPacket<'a> {
@@ -341,6 +343,14 @@ impl<'a> MetaPacket<'a> {
     pub fn is_psh_ack(&self) -> bool {
         if let ProtocolData::TcpHeader(tcp_data) = &self.protocol_data {
             return tcp_data.flags & TcpFlags::MASK == TcpFlags::PSH_ACK && self.payload_len > 1;
+        }
+        false
+    }
+
+    #[inline]
+    pub fn is_fin(&self) -> bool {
+        if let ProtocolData::TcpHeader(tcp_data) = &self.protocol_data {
+            return tcp_data.flags & TcpFlags::FIN == TcpFlags::FIN;
         }
         false
     }
@@ -781,6 +791,7 @@ impl<'a> MetaPacket<'a> {
                 ip_protocol = IpProtocol::from(packet[IPV4_PROTO_OFFSET + vlan_tag_size]);
                 self.lookup_key.proto = ip_protocol;
 
+                self.ip_id = read_u16_be(&packet[FIELD_OFFSET_ID + vlan_tag_size..]);
                 let frag = read_u16_be(&packet[FIELD_OFFSET_FRAG + vlan_tag_size..]);
                 if frag & 0xFFF != 0 {
                     // fragment
@@ -1170,7 +1181,7 @@ impl<'a> MetaPacket<'a> {
             if data.l7_protocol_hint == SOCK_DATA_HTTP2
                 || data.l7_protocol_hint == SOCK_DATA_TLS_HTTP2
             {
-                packet.lookup_key.direction = PacketDirection::from(data.msg_type);
+                packet.lookup_key.direction = Self::parse_direction(data.msg_type);
                 match data.msg_type {
                     MSG_REQUEST_END => packet.is_request_end = true,
                     MSG_RESPONSE_END => packet.is_response_end = true,
@@ -1179,6 +1190,20 @@ impl<'a> MetaPacket<'a> {
             }
         }
         return Ok(packet);
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[inline]
+    fn parse_direction(msg_type: u8) -> PacketDirection {
+        match msg_type {
+            crate::ebpf::MSG_REQUEST | crate::ebpf::MSG_REQUEST_END => {
+                PacketDirection::ClientToServer
+            }
+            crate::ebpf::MSG_RESPONSE | crate::ebpf::MSG_RESPONSE_END => {
+                PacketDirection::ServerToClient
+            }
+            _ => panic!("ebpf direction({}) unknown.", msg_type),
+        }
     }
 
     #[inline]

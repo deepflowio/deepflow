@@ -33,7 +33,7 @@ use crate::{
 const EH_FRAME_NAME: &'static str = ".eh_frame";
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum CfaType {
     RbpOffset,
     RspOffset,
@@ -277,6 +277,16 @@ pub fn read_unwind_entries(data: &[u8]) -> Result<Vec<UnwindEntry>> {
     let eh_frame = EhFrame::new(eh_section.data()?, NativeEndian);
     let ba = BaseAddresses::default().set_eh_frame(eh_section.address());
 
+    // Find the maximum address of executable sections (.text, .plt, etc.)
+    // to determine the actual code range, not just DWARF coverage
+    let mut max_executable_addr = 0u64;
+    for section in file.sections() {
+        if section.kind() == object::SectionKind::Text {
+            let section_end = section.address().saturating_add(section.size());
+            max_executable_addr = max_executable_addr.max(section_end);
+        }
+    }
+
     let mut unwind_entries = vec![];
     // represent pc ranges without dwarf entries
     let mut holes = vec![UnwindEntry {
@@ -318,8 +328,16 @@ pub fn read_unwind_entries(data: &[u8]) -> Result<Vec<UnwindEntry>> {
                 Err(index) => {
                     // we have holes[index - 1].pc < fde_start and holes[index].pc > fde_start here
                     let next_hole = &holes[index];
-                    if next_hole.pc >= fde_end {
+                    if next_hole.pc == fde_end {
                         // do nothing
+                    } else if next_hole.pc > fde_end {
+                        holes.insert(
+                            index,
+                            UnwindEntry {
+                                pc: fde_end,
+                                ..Default::default()
+                            },
+                        );
                     } else {
                         match (&holes[index..]).binary_search_by_key(&fde_end, |entry| entry.pc) {
                             Ok(offset) => {
@@ -357,6 +375,33 @@ pub fn read_unwind_entries(data: &[u8]) -> Result<Vec<UnwindEntry>> {
     }
     unwind_entries.extend(holes);
     unwind_entries.sort_unstable();
+
+    // Extend coverage to the full executable section range
+    // For code beyond DWARF coverage (e.g., PLT, hand-written asm),
+    // add a synthetic entry that reuses the last entry's unwinding rules
+    if max_executable_addr > 0 {
+        let last_dwarf_pc = unwind_entries
+            .iter()
+            .rev()
+            .find(|e| e.cfa_type != CfaType::NoEntry)
+            .map(|e| e.pc)
+            .unwrap_or(0);
+
+        if max_executable_addr > last_dwarf_pc {
+            // Add synthetic entry at max_executable_addr using last available rules
+            if let Some(last_entry) = unwind_entries
+                .iter()
+                .rev()
+                .find(|e| e.cfa_type != CfaType::NoEntry)
+            {
+                let mut extended_entry = *last_entry;
+                extended_entry.pc = max_executable_addr;
+                unwind_entries.push(extended_entry);
+                // Note: No need to re-sort since we're adding at the end
+            }
+        }
+    }
+
     Ok(unwind_entries)
 }
 

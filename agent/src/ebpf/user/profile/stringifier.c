@@ -575,24 +575,15 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 			ebpf_warning("bpf table %s not found", MAP_SYMBOL_TABLE_NAME);
 			return NULL;
 		}
-		symbol_t prev_key = {};
-		bool have_prev_key = false;
-		while (n_symbols < MAX_SYMBOL_NUM) {
-			symbol_t current_key = {};
-			int ret =
-			    bpf_get_next_key(map->fd,
-					    have_prev_key ? &prev_key : NULL,
-					    &current_key);
-			if (ret != 0) {
-				break;
-			}
-			if (bpf_lookup_elem(map->fd, &current_key,
-					 &symbol_ids[n_symbols]) == 0) {
-				symbols[n_symbols] = current_key;
+		symbol_t key = {};
+		symbol_t next_key = {};
+		while (bpf_get_next_key(map->fd, &key, &next_key) == 0 && n_symbols < MAX_SYMBOL_NUM) {
+			int ret = bpf_lookup_elem(map->fd, &next_key, &symbol_ids[n_symbols]);
+			if (ret == 0) {
+				symbols[n_symbols] = next_key;
 				n_symbols++;
 			}
-			prev_key = current_key;
-			have_prev_key = true;
+			key = next_key;
 		}
 	}
 

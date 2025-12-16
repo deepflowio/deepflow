@@ -8791,7 +8791,7 @@ processors:
   protocol_name: HTTP # 协议名称，如要解析 Grpc 请配置为 HTTP2，可选值： HTTP/HTTP2/Dubbo/SofaRPC/Custom/...
   custom_protocol_name: "my_protocol"  # 当 protocol_name 为 Custom 时生效，注意：此时必须存在一个 `processors.request_log.application_protocol_inference.custom_protocols` 配置，且自定义名称协议名称相等，否则无法解析
   filters:
-    traffic_direction: both # 在请求、响应或二者中搜索，默认值为 both
+    traffic_direction: both # 在请求、响应或二者中搜索，默认值为 both，可选值 request/response/both
     port_list: 1-65535 # 可以用于过滤端口
     feature_string: "" # 可以用于提取前匹配 Payload，对 header_field 类型无效
   # 是否保存原始数据。
@@ -8940,6 +8940,7 @@ processors:
       metric_name: "xyz" # 此时该字段将会出现在调用日志的 metrics.xyz 中，默认值为空
       rewrite_native_tag:
         # 可以填写以下几种字段之一，用于覆写对应字段的值
+        # 注意对应的协议需要支持，否则配置无效
         # - version
         # - request_type
         # - request_domain
@@ -8952,6 +8953,8 @@ processors:
         # - trace_id
         # - span_id
         # - x_request_id
+        # - x_request_id_0
+        # - x_request_id_1
         # - http_proxy_client
         # - biz_type
         # - biz_code
@@ -8981,6 +8984,7 @@ processors:
       priority: 0
   compound_fields:
   - format: "{field1_name}-{field2_name}" # 输出格式，其中 field1_name 和 field2_name 为已配置的字段名
+                                          # 也可以配置 native_tag 作为输入字段，但注意已配置字段的优先级更高
     output: # 参考 fields 中 output 的说明进行配置
       attribute_name: "xyz"
       metric_name: "xyz"

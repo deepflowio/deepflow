@@ -26,12 +26,17 @@ pub struct MemoryArea {
     pub m_start: u64,
     pub mx_start: u64, // start address of executable section
     pub m_end: u64,
+    pub offset: u64,
     pub path: String,
 }
 
 impl fmt::Display for MemoryArea {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:016x}-{:016x} {}", self.m_start, self.m_end, self.path)
+        write!(
+            f,
+            "{:016x}-{:016x} {:08x} {}",
+            self.m_start, self.m_end, self.offset, self.path
+        )
     }
 }
 
@@ -48,7 +53,12 @@ pub fn get_memory_mappings(pid: u32) -> io::Result<Vec<MemoryArea>> {
         let mut segs = line.split_whitespace();
         let addrs = segs.next();
         let perms = segs.next();
-        let Some(path) = segs.nth(3) else {
+        let offset = segs.next();
+        let _dev = segs.next();
+        let _inode = segs.next();
+        let path = segs.next();
+
+        let Some(path) = path else {
             continue;
         };
         let mut addrs = addrs
@@ -62,10 +72,12 @@ pub fn get_memory_mappings(pid: u32) -> io::Result<Vec<MemoryArea>> {
             continue;
         };
         let perms = perms.unwrap();
+        let offset = u64::from_str_radix(offset.unwrap_or("0"), 16).unwrap_or(0);
         match last_area.as_mut() {
             Some(area) if area.path == path => {
                 if perms.contains('x') {
                     area.mx_start = m_start;
+                    area.offset = offset;
                     last_executable = true;
                 }
                 area.m_start = area.m_start.min(m_start);
@@ -106,10 +118,18 @@ pub fn get_memory_mappings(pid: u32) -> io::Result<Vec<MemoryArea>> {
                     m_start,
                     mx_start: if perms.contains('x') { m_start } else { 0 },
                     m_end,
+                    offset,
                     path: path.to_owned(),
                 });
                 last_executable = perms.contains('x');
             }
+        }
+    }
+    // push the last area if it is executable
+    if last_executable {
+        if let Some(la) = last_area.take() {
+            trace!("found {:?}", la);
+            areas.push(la);
         }
     }
     Ok(areas)
