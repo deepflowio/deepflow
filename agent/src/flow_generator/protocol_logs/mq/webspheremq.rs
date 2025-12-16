@@ -86,6 +86,8 @@ pub struct WebSphereMqInfo {
     is_on_blacklist: bool,
 
     #[serde(skip_serializing_if = "value_is_default")]
+    biz_type: u8,
+    #[serde(skip_serializing_if = "value_is_default")]
     biz_code: String,
     #[serde(skip_serializing_if = "value_is_default")]
     biz_scenario: String,
@@ -125,6 +127,10 @@ impl L7ProtocolInfoInterface for WebSphereMqInfo {
 
     fn is_on_blacklist(&self) -> bool {
         self.is_on_blacklist
+    }
+
+    fn get_biz_type(&self) -> u8 {
+        self.biz_type
     }
 }
 
@@ -206,6 +212,9 @@ impl WebSphereMqInfo {
             self.is_async = is_async;
         }
 
+        if custom.biz_type > 0 {
+            self.biz_type = custom.biz_type;
+        }
         if let Some(biz_code) = custom.biz_code {
             self.biz_code = biz_code;
         }
@@ -249,6 +258,8 @@ impl From<WebSphereMqInfo> for L7ProtocolSendLog {
                 ..Default::default()
             }),
             flags: flags.bits(),
+            biz_code: f.biz_code,
+            biz_scenario: f.biz_scenario,
             ..Default::default()
         }
     }
