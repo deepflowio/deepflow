@@ -22,7 +22,7 @@ jobs:
       )
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
       issues: write
       id-token: write
@@ -30,24 +30,31 @@ jobs:
       - name: Get PR Info
         id: pr_info
         run: |
-          PR_DATA=$(gh pr view ${{ github.event.issue.number }} --repo ${{ github.repository }} --json headRefName,headRepository,author,isCrossRepository)
-          HEAD_REF_NAME=$(echo "$PR_DATA" | jq -r .headRefName)
-          IS_FORK=$(echo "$PR_DATA" | jq -r .isCrossRepository)
-          if [ "$IS_FORK" = "true" ]; then
-            echo "This is a FORKED PR. Manually constructing repository name."
-            REPO_NAME=$(echo "$PR_DATA" | jq -r .headRepository.name)
-            AUTHOR_LOGIN=$(echo "$PR_DATA" | jq -r .author.login)
-            HEAD_REPOSITORY="$AUTHOR_LOGIN/$REPO_NAME"
+          if PR_DATA=$(gh pr view $ISSUE_NUMBER --repo ${{ github.repository }} --json headRefName,headRepository,author,isCrossRepository 2>/dev/null); then
+            HEAD_REF_NAME=$(echo "$PR_DATA" | jq -r .headRefName)
+            IS_FORK=$(echo "$PR_DATA" | jq -r .isCrossRepository)
+            if [ "$IS_FORK" = "true" ]; then
+              echo "This is a FORKED PR. Manually constructing repository name."
+              REPO_NAME=$(echo "$PR_DATA" | jq -r .headRepository.name)
+              AUTHOR_LOGIN=$(echo "$PR_DATA" | jq -r .author.login)
+              HEAD_REPOSITORY="$AUTHOR_LOGIN/$REPO_NAME"
+            else
+              echo "This is an INTERNAL PR. Using the current repository name."
+              HEAD_REPOSITORY="${{ github.repository }}"
+            fi
+            echo "Final Repository Name: $HEAD_REPOSITORY"
+            echo "Final Branch Name: $HEAD_REF_NAME"
+            echo "repo_full_name=$HEAD_REPOSITORY" >> $GITHUB_OUTPUT
+            echo "branch_name=$HEAD_REF_NAME" >> $GITHUB_OUTPUT
           else
-            echo "This is an INTERNAL PR. Using the current repository name."
-            HEAD_REPOSITORY="${{ github.repository }}"
+            echo "Final Repository Name: ${{ github.repository }}"
+            echo "Final Branch Name: ${{ github.event.repository.default_branch }}"
+            echo "repo_full_name=${{ github.repository }}" >> $GITHUB_OUTPUT
+            echo "branch_name=${{ github.event.repository.default_branch }}" >> $GITHUB_OUTPUT
           fi
-          echo "Final Repository Name: $HEAD_REPOSITORY"
-          echo "Final Branch Name: $HEAD_REF_NAME"
-          echo "repo_full_name=$HEAD_REPOSITORY" >> $GITHUB_OUTPUT
-          echo "branch_name=$HEAD_REF_NAME" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -56,7 +63,7 @@ jobs:
           fetch-depth: 0
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@v1.0.16
         env:
           ANTHROPIC_BASE_URL: "${{ secrets.ANTHROPIC_BASE_URL }}"
         with:
