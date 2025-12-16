@@ -105,6 +105,8 @@ pub struct ZmtpInfo {
     res_msg_size: Option<u64>,
     is_tls: bool,
     is_async: bool,
+    #[serde(skip)]
+    is_reversed: bool,
     rtt: u64,
     status: L7ResponseStatus,
     err_msg: Option<String>,
@@ -139,6 +141,7 @@ impl Default for ZmtpInfo {
             res_msg_size: None,
             is_tls: false,
             is_async: false,
+            is_reversed: false,
             rtt: 0,
             status: L7ResponseStatus::Ok,
             err_msg: None,
@@ -180,6 +183,9 @@ impl ZmtpInfo {
         if res.is_on_blacklist {
             self.is_on_blacklist = res.is_on_blacklist;
         }
+        if res.is_reversed {
+            self.is_reversed = res.is_reversed;
+        }
     }
     fn wasm_hook(&mut self, param: &ParseParam, payload: &[u8]) {
         let mut vm_ref = param.wasm_vm.borrow_mut();
@@ -205,6 +211,9 @@ impl ZmtpInfo {
             }
             if let Some(is_async) = custom.is_async {
                 self.is_async = is_async;
+            }
+            if let Some(is_reversed) = custom.is_reversed {
+                self.is_reversed = is_reversed;
             }
         }
     }
@@ -304,6 +313,10 @@ impl L7ProtocolInfoInterface for ZmtpInfo {
     }
     fn is_on_blacklist(&self) -> bool {
         self.is_on_blacklist
+    }
+
+    fn is_reversed(&self) -> bool {
+        self.is_reversed
     }
 }
 
