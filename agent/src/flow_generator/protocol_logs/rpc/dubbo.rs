@@ -81,6 +81,8 @@ pub struct DubboInfo {
     is_tls: bool,
     #[serde(skip)]
     is_async: bool,
+    #[serde(skip)]
+    is_reversed: bool,
 
     // header
     #[serde(skip)]
@@ -175,6 +177,9 @@ impl DubboInfo {
         }
         if other.is_async {
             self.is_async = other.is_async;
+        }
+        if other.is_reversed {
+            self.is_reversed = other.is_reversed;
         }
         if other.event > 0 {
             self.event = other.event;
@@ -303,6 +308,9 @@ impl DubboInfo {
         if let Some(is_async) = custom.is_async {
             self.is_async = is_async;
         }
+        if let Some(is_reversed) = custom.is_reversed {
+            self.is_reversed = is_reversed;
+        }
     }
 
     fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
@@ -377,6 +385,10 @@ impl L7ProtocolInfoInterface for DubboInfo {
 
     fn is_on_blacklist(&self) -> bool {
         self.is_on_blacklist
+    }
+
+    fn is_reversed(&self) -> bool {
+        self.is_reversed
     }
 }
 

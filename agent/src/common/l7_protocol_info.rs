@@ -162,6 +162,10 @@ where
 
     fn is_tls(&self) -> bool;
 
+    fn is_reversed(&self) -> bool {
+        false
+    }
+
     fn get_endpoint(&self) -> Option<String> {
         None
     }
