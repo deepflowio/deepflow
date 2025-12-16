@@ -54,6 +54,8 @@ message AppInfo {
 
     // a null `is_end` means no need for protocol merge
     optional bool is_end = 21;
+    // L2 + L3 + L4 + TapSide
+    optional bool is_reversed = 23;
 
     repeated KeyVal attributes = 31;
 

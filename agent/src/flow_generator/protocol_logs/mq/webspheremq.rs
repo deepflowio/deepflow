@@ -43,6 +43,8 @@ pub struct WebSphereMqInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
+    #[serde(skip)]
+    is_reversed: bool,
 
     #[serde(skip_serializing_if = "value_is_default")]
     pub trace_id: String,
@@ -117,6 +119,10 @@ impl L7ProtocolInfoInterface for WebSphereMqInfo {
     fn is_on_blacklist(&self) -> bool {
         self.is_on_blacklist
     }
+
+    fn is_reversed(&self) -> bool {
+        self.is_reversed
+    }
 }
 
 impl WebSphereMqInfo {
@@ -132,6 +138,9 @@ impl WebSphereMqInfo {
         self.attributes.append(&mut other.attributes);
         if other.is_on_blacklist {
             self.is_on_blacklist = other.is_on_blacklist;
+        }
+        if other.is_reversed {
+            self.is_reversed = other.is_reversed;
         }
     }
 
@@ -175,6 +184,9 @@ impl WebSphereMqInfo {
 
         if let Some(span_id) = custom.trace.span_id {
             self.span_id = span_id;
+        }
+        if let Some(is_reversed) = custom.is_reversed {
+            self.is_reversed = is_reversed;
         }
 
         // extend attribute

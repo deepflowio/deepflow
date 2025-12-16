@@ -199,6 +199,8 @@ pub struct NatsInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
+    #[serde(skip)]
+    is_reversed: bool,
 
     rtt: u64,
 
@@ -809,6 +811,9 @@ impl L7ProtocolInfoInterface for NatsInfo {
             if rsp.is_on_blacklist {
                 req.is_on_blacklist = rsp.is_on_blacklist;
             }
+            if rsp.is_reversed {
+                req.is_reversed = rsp.is_reversed;
+            }
         }
         Ok(())
     }
@@ -827,6 +832,10 @@ impl L7ProtocolInfoInterface for NatsInfo {
 
     fn is_on_blacklist(&self) -> bool {
         self.is_on_blacklist
+    }
+
+    fn is_reversed(&self) -> bool {
+        self.is_reversed
     }
 }
 
@@ -877,6 +886,9 @@ impl NatsLog {
             }
             if custom.proto_str.len() > 0 {
                 info.l7_protocol_str = Some(custom.proto_str);
+            }
+            if let Some(is_reversed) = custom.is_reversed {
+                info.is_reversed = is_reversed;
             }
         }
     }
