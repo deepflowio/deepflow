@@ -67,6 +67,9 @@ pub struct AppInfo {
     pub is_end: ::core::option::Option<bool>,
     #[prost(bool, optional, tag = "22")]
     pub is_async: ::core::option::Option<bool>,
+    /// L2 + L3 + L4 + TapSide
+    #[prost(bool, optional, tag = "23")]
+    pub is_reversed: ::core::option::Option<bool>,
     #[prost(message, repeated, tag = "31")]
     pub attributes: ::prost::alloc::vec::Vec<KeyVal>,
     #[prost(uint32, optional, tag = "32")]
