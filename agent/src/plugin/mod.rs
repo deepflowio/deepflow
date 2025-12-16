@@ -111,6 +111,7 @@ pub struct CustomInfo {
 
     #[serde(skip)]
     pub is_on_blacklist: bool,
+    pub is_reversed: Option<bool>,
 }
 
 impl CustomInfo {
@@ -185,6 +186,7 @@ impl CustomInfo {
             ) x len(kv)
 
         biz type: 1 byte
+        // is reversed: 1 byte
     */
     fn from_legacy_protocol(buf: &[u8], dir: PacketDirection) -> Result<Self, Error> {
         let mut off = 0;
@@ -441,6 +443,7 @@ impl CustomInfo {
                 })
                 .collect(),
             biz_type: pb_info.biz_type.unwrap_or_default() as u8,
+            is_reversed: pb_info.is_reversed,
             ..Default::default()
         };
         match pb_info.info {
@@ -605,6 +608,10 @@ impl L7ProtocolInfoInterface for CustomInfo {
 
     fn get_biz_type(&self) -> u8 {
         self.biz_type
+    }
+
+    fn is_reversed(&self) -> bool {
+        self.is_reversed.unwrap_or_default()
     }
 }
 

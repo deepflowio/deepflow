@@ -307,6 +307,9 @@ pub struct HttpInfo {
 
     #[serde(skip)]
     service_name: Option<String>,
+
+    #[serde(skip_serializing_if = "value_is_default")]
+    is_reversed: bool,
 }
 
 impl HttpInfo {
@@ -407,6 +410,9 @@ impl HttpInfo {
 
         if custom.biz_type > 0 {
             self.biz_type = custom.biz_type;
+        }
+        if let Some(is_reversed) = custom.is_reversed {
+            self.is_reversed = is_reversed;
         }
     }
 
@@ -569,6 +575,10 @@ impl L7ProtocolInfoInterface for HttpInfo {
     fn get_biz_type(&self) -> u8 {
         self.biz_type
     }
+
+    fn is_reversed(&self) -> bool {
+        self.is_reversed
+    }
 }
 
 impl HttpInfo {
@@ -628,6 +638,9 @@ impl HttpInfo {
 
         if other_is_grpc {
             self.proto = L7Protocol::Grpc;
+        }
+        if other.is_reversed {
+            self.is_reversed = other.is_reversed;
         }
         if other.biz_type > 0 {
             self.biz_type = other.biz_type;

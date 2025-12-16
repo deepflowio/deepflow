@@ -81,6 +81,8 @@ pub struct DubboInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
+    #[serde(skip)]
+    is_reversed: bool,
 
     // header
     #[serde(skip)]
@@ -155,6 +157,9 @@ impl DubboInfo {
     pub fn merge(&mut self, other: &mut Self) {
         if other.is_tls {
             self.is_tls = other.is_tls;
+        }
+        if other.is_reversed {
+            self.is_reversed = other.is_reversed;
         }
         if other.event > 0 {
             self.event = other.event;
@@ -265,6 +270,10 @@ impl DubboInfo {
         // extend attribute
         if !custom.attributes.is_empty() {
             self.attributes.extend(custom.attributes);
+        }
+
+        if let Some(is_reversed) = custom.is_reversed {
+            self.is_reversed = is_reversed;
         }
     }
 
@@ -398,6 +407,10 @@ impl L7ProtocolInfoInterface for DubboInfo {
 
     fn is_on_blacklist(&self) -> bool {
         self.is_on_blacklist
+    }
+
+    fn is_reversed(&self) -> bool {
+        self.is_reversed
     }
 }
 

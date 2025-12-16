@@ -418,6 +418,33 @@ impl AppProtoLogsBaseInfo {
             0
         }
     }
+
+    fn reverse(&mut self) {
+        std::mem::swap(&mut self.mac_src, &mut self.mac_dst);
+        std::mem::swap(&mut self.ip_src, &mut self.ip_dst);
+        std::mem::swap(&mut self.l3_epc_id_src, &mut self.l3_epc_id_dst);
+        std::mem::swap(&mut self.port_src, &mut self.port_dst);
+        std::mem::swap(&mut self.req_tcp_seq, &mut self.resp_tcp_seq);
+        std::mem::swap(&mut self.gpid_0, &mut self.gpid_1);
+        std::mem::swap(&mut self.process_id_0, &mut self.process_id_1);
+        std::mem::swap(&mut self.process_kname_0, &mut self.process_kname_1);
+        std::mem::swap(
+            &mut self.syscall_trace_id_request,
+            &mut self.syscall_trace_id_response,
+        );
+        std::mem::swap(
+            &mut self.syscall_trace_id_thread_0,
+            &mut self.syscall_trace_id_thread_1,
+        );
+        std::mem::swap(&mut self.syscall_coroutine_0, &mut self.syscall_coroutine_1);
+        std::mem::swap(&mut self.syscall_cap_seq_0, &mut self.syscall_cap_seq_1);
+        std::mem::swap(
+            &mut self.is_vip_interface_src,
+            &mut self.is_vip_interface_dst,
+        );
+        std::mem::swap(&mut self.pod_id_0, &mut self.pod_id_1);
+        self.tap_side.reverse();
+    }
 }
 
 #[derive(Debug)]
