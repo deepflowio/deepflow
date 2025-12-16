@@ -66,8 +66,6 @@ pub struct RocketmqInfo {
     pub opaque: u32,
     #[serde(skip)]
     pub ext_queue_id: String,
-    #[serde(skip)]
-    pub req_body: String,
 
     // response
     #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
@@ -83,8 +81,6 @@ pub struct RocketmqInfo {
         skip_serializing_if = "value_is_default"
     )]
     pub remark: String,
-    #[serde(rename = "response_result", skip_serializing_if = "value_is_default")]
-    pub resp_body: String,
 
     captured_request_byte: u32,
     captured_response_byte: u32,
@@ -201,7 +197,6 @@ impl RocketmqInfo {
             self.resp_code = other.resp_code;
         }
         swap_if!(self, remark, is_empty, other);
-        swap_if!(self, resp_body, is_empty, other);
         self.captured_response_byte = other.captured_response_byte;
         swap_if!(self, endpoint, is_none, other);
         if other.is_on_blacklist {
@@ -247,7 +242,6 @@ impl From<RocketmqInfo> for L7ProtocolSendLog {
                 status: f.status,
                 code: Some(f.resp_code),
                 exception: f.remark,
-                result: f.resp_body,
                 ..Default::default()
             },
             trace_info: Some(TraceInfo {
@@ -400,7 +394,6 @@ impl RocketmqLog {
                     };
                 }
             }
-            info.req_body = body.body_data.body;
             //  handle oneway requests expecting no response in particular
             if header.is_oneway_request() {
                 info.msg_type = LogMessageType::Session;
@@ -419,7 +412,6 @@ impl RocketmqLog {
                 Some(remark) => remark.clone(),
                 _ => String::new(),
             };
-            info.resp_body = body.body_data.body;
         }
         info.endpoint = info.generate_endpoint();
 
@@ -1635,7 +1627,6 @@ pub struct RocketmqBody {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct RocketmqBodyData {
-    body: String,
     #[serde(skip)]
     pub properties: Option<String>,
 }
@@ -1662,27 +1653,15 @@ impl RocketmqBody {
         -1
     }
 
-    // directly use the whole json string as body content
+    // Skip body content copy for JSON type - we don't need the full body
+    // for protocol observability, only metadata from header is sufficient
     fn decode_for_json_type(&mut self, data: &[u8]) -> isize {
-        /*
-         * Request Direction:
-         *   clientID
-         *   consumerDataSet
-         *   producerDataSet
-         *
-         * Response Direction:
-         *   brokerDatas
-         *   queueDatas
-         *   filterServerTable
-         *   consumerIdList
-         *   groupList
-         *   topicList
-         */
-        self.body_data.body = String::from_utf8_lossy(data).into_owned();
+        // No longer copy the body data to avoid performance issues with large messages
+        // The metadata we need (topic, group, queue_id, etc.) is in the header
         data.len() as isize
     }
 
-    // only use the body string as body content
+    // Only extract properties for trace info, skip body content to improve performance
     fn decode_for_rocketmq_type(&mut self, data: &[u8]) -> isize {
         /*
          * Response Direction:
@@ -1695,25 +1674,39 @@ impl RocketmqBody {
          *   topicLength(1B), topic(topicLength),
          *   propertiesStrLength(2B), propertiesStr(propertiesLength)
          */
+        // Skip fixed header fields to get to bodyStrLength
         let mut offset: usize = 4 + 4 + 4 + 4 + 4 + 8 + 8 + 4 + 8 + 4 + 4 + 8 + 4 + 4 + 4 + 8;
-        let length = bytes::read_i32_be(&data[offset..(offset + 4)]);
-        offset += 4;
-        if length < 0 || length > (data.len() - offset) as i32 {
+        if offset + 4 > data.len() {
             return -1;
         }
-        self.body_data.body =
-            String::from_utf8_lossy(&data[offset..(offset + length as usize)]).into_owned();
-        offset += length as usize;
+        let body_length = bytes::read_i32_be(&data[offset..(offset + 4)]);
+        offset += 4;
+        if body_length < 0 || body_length > (data.len() - offset) as i32 {
+            return -1;
+        }
+        // Skip body content instead of copying it - this avoids large memory allocations
+        offset += body_length as usize;
 
+        if offset >= data.len() {
+            return -1;
+        }
         let topic_length = data[offset];
         offset += 1;
+        if offset + topic_length as usize > data.len() {
+            return -1;
+        }
         offset += topic_length as usize;
 
+        if offset + 2 > data.len() {
+            return -1;
+        }
         let properties_length = bytes::read_u16_be(&data[offset..(offset + 2)]);
         offset += 2;
         if properties_length > (data.len() - offset) as u16 {
             return -1;
         }
+        // Only copy properties which is needed for trace info extraction
+        // Properties are typically small (a few hundred bytes at most)
         let properties =
             String::from_utf8_lossy(&data[offset..(offset + properties_length as usize)])
                 .into_owned();
