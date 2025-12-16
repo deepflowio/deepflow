@@ -360,38 +360,30 @@ impl RocketmqLog {
         if body_offset < 0 {
             return Err(Error::RocketmqLogParseFailed);
         }
-        let header_data_ext_fields = match &header.header_data.ext_fields {
-            Some(ext_fields) => ext_fields.clone(),
-            _ => RocketmqHeaderExtFields::default(),
-        };
+        let mut header_data_ext_fields = header.header_data.ext_fields.take().unwrap_or_default();
         info.version = String::from(header.get_version_str());
         info.opaque = header.header_data.opaque as u32;
-        info.ext_topic = match &header_data_ext_fields.topic {
-            Some(topic) => topic.clone(),
-            _ => String::new(),
-        };
-        info.ext_queue_id = match &header_data_ext_fields.queue_id {
-            Some(queue_id) => queue_id.clone(),
-            _ => String::new(),
-        };
+        info.ext_topic = header_data_ext_fields.topic.take().unwrap_or_default();
+        info.ext_queue_id = header_data_ext_fields.queue_id.take().unwrap_or_default();
         if header.is_request() {
             info.msg_type = LogMessageType::Request;
             info.req_msg_size = Some(header.length as u32);
             info.req_code = header.header_data.code;
             info.req_code_name = String::from(header.get_request_code_str());
-            match &info.req_code_name[..] {
-                "SEND_BATCH_MESSAGE" | "SEND_MESSAGE" | "SEND_MESSAGE_V2" => {
-                    info.ext_group = match &header_data_ext_fields.producer_group {
-                        Some(producer_group) => producer_group.clone(),
-                        _ => String::new(),
-                    };
+            match header.header_data.code {
+                // SEND_BATCH_MESSAGE, SEND_MESSAGE, SEND_MESSAGE_V2
+                320 | 10 | 310 => {
+                    info.ext_group = header_data_ext_fields
+                        .producer_group
+                        .take()
+                        .unwrap_or_default();
                 }
                 // TODO: there are some different but necessary keys corresponding to request code
                 _ => {
-                    info.ext_group = match &header_data_ext_fields.consumer_group {
-                        Some(consumer_group) => consumer_group.clone(),
-                        _ => String::new(),
-                    };
+                    info.ext_group = header_data_ext_fields
+                        .consumer_group
+                        .take()
+                        .unwrap_or_default();
                 }
             }
             //  handle oneway requests expecting no response in particular
@@ -408,10 +400,7 @@ impl RocketmqLog {
             let (resp_code_name, status) = header.get_response_code_str_and_status();
             info.resp_code_name = String::from(resp_code_name);
             info.status = status;
-            info.remark = match &header.header_data.remark {
-                Some(remark) => remark.clone(),
-                _ => String::new(),
-            };
+            info.remark = header.header_data.remark.take().unwrap_or_default();
         }
         info.endpoint = info.generate_endpoint();
 
@@ -419,18 +408,15 @@ impl RocketmqLog {
         if info.msg_type == LogMessageType::Request {
             // for request messages sent by the producer,
             // try to retrieve properties field from ExtFields
-            if let Some(ext_fields) = &header.header_data.ext_fields {
+            if let Some(properties) = header_data_ext_fields.properties.as_ref() {
                 // extract trace info from the properties field within ExtFields
-                if let Some(properties) = &ext_fields.properties {
-                    let (msg_key, trace_ids, span_id) =
-                        parse_trace_info_from_properties(properties);
-                    if let Some(xid) = msg_key {
-                        info.msg_key = xid;
-                    }
-                    info.trace_ids.merge(trace_ids);
-                    if let Some(sid) = span_id {
-                        info.span_id = sid;
-                    }
+                let (msg_key, trace_ids, span_id) = parse_trace_info_from_properties(properties);
+                if let Some(xid) = msg_key {
+                    info.msg_key = xid;
+                }
+                info.trace_ids.merge(trace_ids);
+                if let Some(sid) = span_id {
+                    info.span_id = sid;
                 }
             }
         }
