@@ -22,6 +22,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 
 	"github.com/klauspost/compress/zlib"
 )
@@ -95,4 +97,77 @@ func (a AutoCompressedBytes) Value() (driver.Value, error) {
 	}
 
 	return b.Bytes(), nil
+}
+
+// AutoSplitedInts stores a slice of integers as a comma-separated string in database.
+// In-memory representation is always a slice of integers.
+// This type implements sql.Scanner and driver.Valuer interfaces for transparent
+// conversion between []int and comma-separated string format.
+type AutoSplitedInts []int
+
+// Scan parses comma-separated string from database into slice of integers.
+// Implements sql.Scanner interface for reading from database.
+func (a *AutoSplitedInts) Scan(value interface{}) error {
+	if value == nil {
+		*a = []int{}
+		return nil
+	}
+
+	var str string
+	switch v := value.(type) {
+	case string:
+		str = v
+	case []byte:
+		str = string(v)
+	default:
+		return errors.New(fmt.Sprint("failed to scan AutoSplitedInts value:", value))
+	}
+
+	// Handle empty string
+	str = strings.TrimSpace(str)
+	if str == "" {
+		*a = []int{}
+		return nil
+	}
+
+	// Split by comma and parse each integer
+	parts := strings.Split(str, ",")
+	result := make([]int, 0, len(parts))
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue // Skip empty parts
+		}
+
+		num, err := strconv.Atoi(part)
+		if err != nil {
+			return fmt.Errorf("failed to parse integer '%s': %w", part, err)
+		}
+		result = append(result, num)
+	}
+
+	*a = result
+	return nil
+}
+
+// Value converts slice of integers to comma-separated string for storage in database.
+// Implements driver.Valuer interface for writing to database.
+func (a AutoSplitedInts) Value() (driver.Value, error) {
+	if a == nil {
+		return "", nil
+	}
+
+	// Handle empty slice
+	if len(a) == 0 {
+		return "", nil
+	}
+
+	// Convert integers to strings and join with comma
+	strs := make([]string, len(a))
+	for i, num := range a {
+		strs[i] = strconv.Itoa(num)
+	}
+
+	return strings.Join(strs, ","), nil
 }
