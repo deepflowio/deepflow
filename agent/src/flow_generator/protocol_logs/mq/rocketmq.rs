@@ -1506,10 +1506,11 @@ impl RocketmqHeader {
             16 => ("NO_PERMISSION", L7ResponseStatus::ClientError),
             17 => ("TOPIC_NOT_EXIST", L7ResponseStatus::ClientError),
             18 => ("TOPIC_EXIST_ALREADY", L7ResponseStatus::ClientError),
-            19 => ("PULL_NOT_FOUND", L7ResponseStatus::ClientError),
-            20 => ("PULL_RETRY_IMMEDIATELY", L7ResponseStatus::ClientError),
+            // The following are normal business responses, not errors
+            19 => ("PULL_NOT_FOUND", L7ResponseStatus::Ok), // No new message, consumer caught up
+            20 => ("PULL_RETRY_IMMEDIATELY", L7ResponseStatus::Ok), // Hint to retry immediately
             21 => ("PULL_OFFSET_MOVED", L7ResponseStatus::ClientError),
-            22 => ("QUERY_NOT_FOUND", L7ResponseStatus::ClientError),
+            22 => ("QUERY_NOT_FOUND", L7ResponseStatus::Ok), // Query returned no results
             23 => ("SUBSCRIPTION_PARSE_FAILED", L7ResponseStatus::ClientError),
             24 => ("SUBSCRIPTION_NOT_EXIST", L7ResponseStatus::ClientError),
             25 => ("SUBSCRIPTION_NOT_LATEST", L7ResponseStatus::ClientError),
@@ -1519,8 +1520,8 @@ impl RocketmqHeader {
             ),
             27 => ("FILTER_DATA_NOT_EXIST", L7ResponseStatus::ClientError),
             28 => ("FILTER_DATA_NOT_LATEST", L7ResponseStatus::ClientError),
-            200 => ("TRANSACTION_SHOULD_COMMIT", L7ResponseStatus::ClientError),
-            201 => ("TRANSACTION_SHOULD_ROLLBACK", L7ResponseStatus::ClientError),
+            200 => ("TRANSACTION_SHOULD_COMMIT", L7ResponseStatus::Ok), // Transaction coordination
+            201 => ("TRANSACTION_SHOULD_ROLLBACK", L7ResponseStatus::Ok), // Transaction coordination
             202 => ("TRANSACTION_STATE_UNKNOW", L7ResponseStatus::ServerError),
             203 => (
                 "TRANSACTION_STATE_GROUP_WRONG",
@@ -1530,7 +1531,7 @@ impl RocketmqHeader {
             205 => ("NOT_IN_CURRENT_UNIT", L7ResponseStatus::ClientError),
             206 => ("CONSUMER_NOT_ONLINE", L7ResponseStatus::ServerError),
             207 => ("CONSUME_MSG_TIMEOUT", L7ResponseStatus::ServerError),
-            208 => ("NO_MESSAGE", L7ResponseStatus::ServerError),
+            208 => ("NO_MESSAGE", L7ResponseStatus::Ok), // No message available, normal state
             209 => (
                 "UPDATE_AND_CREATE_ACL_CONFIG_FAILED",
                 L7ResponseStatus::ServerError,
