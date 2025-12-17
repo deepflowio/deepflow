@@ -16,6 +16,11 @@
 
 package common
 
+var IGNORE_VINTERFACE_NAME = []string{
+	"lo",
+	"kube-ipvs0",
+}
+
 const (
 	SYNC_TYPE_FORMAT = "%d-%s-%s" // orgID-type-vtapKey
 )
