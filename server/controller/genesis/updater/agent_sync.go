@@ -19,6 +19,7 @@ package updater
 import (
 	"fmt"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -63,7 +64,7 @@ func (v *GenesisSyncRpcUpdater) ParseAgentVinterfaceInfo(orgID int, teamID, vtap
 		}
 
 		for _, item := range parsedGlobalIPs {
-			if item.Name == "lo" {
+			if slices.Contains(common.IGNORE_VINTERFACE_NAME, item.Name) {
 				continue
 			}
 			if v.ignoreNICRegex != nil && v.ignoreNICRegex.MatchString(item.Name) {
@@ -296,7 +297,7 @@ func (v *GenesisSyncRpcUpdater) ParseAgentHostAsVmPlatformInfo(orgID int, vtapID
 	ports := []model.GenesisPort{}
 	ipLastSeens := []model.GenesisIP{}
 	for _, iface := range interfaces {
-		if iface.MAC == "" || iface.Name == "lo" {
+		if iface.MAC == "" || slices.Contains(common.IGNORE_VINTERFACE_NAME, iface.Name) {
 			log.Debugf("not found mac or netcard is loopback (%#v)", iface, logger.NewORGPrefix(orgID))
 			continue
 		}
