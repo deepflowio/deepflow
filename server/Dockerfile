@@ -3,8 +3,7 @@ FROM alpine:latest as deepflow-server
 MAINTAINER songzhen@yunshan.net
 
 RUN apk update && \
-    apk upgrade && \
-    apk add tzdata
+    apk add --no-cache tzdata
 
 COPY ./server.yaml /etc/
 RUN mkdir -p /etc/metadb/schema
