@@ -26,8 +26,9 @@ use hpack::Decoder;
 use nom::{AsBytes, ParseTo};
 use serde::Serialize;
 
-use public::l7_protocol::{Field, FieldSetter, L7Log, L7ProtocolChecker};
-use public_derive::L7Log;
+use l7_log::{Field, FieldSetter, L7Log};
+use l7_log_derive::L7Log;
+use public::l7_protocol::L7ProtocolChecker;
 
 use super::{
     consts::*,
@@ -65,7 +66,7 @@ if #[cfg(feature = "enterprise")] {
                 PolicySlice, Store,
             },
         };
-        use public::l7_protocol::NativeTag;
+        use l7_log::NativeTag;
 
         use crate::flow_generator::protocol_logs::{auto_merge_custom_field, CUSTOM_FIELD_POLICY_PRIORITY};
     }

@@ -17,13 +17,18 @@ exclude = [
 bitflags = "1.3"
 k8s-openapi = { version = "0.24", features = ["v1_32", "schemars"] }
 kube = { version = "0.98", default-features = false }
+l7-log = { path = "crates/l7-log" }
+l7-log-derive = { path = "crates/l7-log-derive" }
 prost = "0.12"
 public = { path = "crates/public" }
-public-derive = { path = "crates/public-derive" }
 regex = "1"
 semver = { version = "1.0", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
 socket2 = { version = "0.4", features = ["all"] }
+strum = { version = "0.27", features = ["derive"] }
+strum_macros = "0.27"
 # why tonic 0.10:
 # - tonic >= 0.11 uses tokio-rustls 0.25 that no longer allow disabling certificate verifier
 # - tonic >= 0.12 uses hyper 1.0 which will break grpc tls code in EE version
@@ -72,6 +77,8 @@ ipnet = "2.4.0"
 ipnetwork = "0.18.0"
 lazy_static = "1.5.0"
 l7 = { path = "plugins/l7" }
+l7-log.workspace = true
+l7-log-derive.workspace = true
 libc = "0.2.103"
 log = "0.4"
 lru = "0.9.0"
@@ -91,14 +98,13 @@ pcap-sys = "0.1.3"
 pnet = "^0.29"
 prost.workspace = true
 public.workspace = true
-public-derive.workspace = true
 rand = "0.8.5"
 regex.workspace = true
 ring = "0.17"
 roxmltree = "0.14.1"
 serde.workspace = true
-serde_json = "1.0.72"
-serde_yaml = "0.9"
+serde_json.workspace = true
+serde_yaml.workspace = true
 signal-hook = "0.3"
 simple-dns = "0.10"
 socket2 = "0.4.4"
@@ -113,8 +119,8 @@ uuid = "1"
 wasmtime = "12.0.1"
 wasmtime-wasi = "12.0.1"
 zstd = "0.13.2"
-strum_macros = "0.27.2"
-strum = "0.27.2"
+strum.workspace = true
+strum_macros.workspace = true
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 cgroups-rs = "0.2.9"

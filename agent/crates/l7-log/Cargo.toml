@@ -1,10 +1,10 @@
 [package]
-name = "enterprise-utils"
+name = "l7-log"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bitflags.workspace = true
-l7-log.workspace = true
 public.workspace = true
 serde.workspace = true
+strum.workspace = true
+strum_macros.workspace = true

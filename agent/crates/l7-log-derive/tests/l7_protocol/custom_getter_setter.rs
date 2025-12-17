@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-use public::l7_protocol::{Field, FieldSetter, L7Log};
-use public_derive::L7Log;
+use l7_log::{Field, FieldSetter, L7Log};
+use l7_log_derive::L7Log;
 
 #[derive(L7Log)]
 #[l7_log(endpoint.getter = "get_endpoint", endpoint.setter = "set_endpoint")]

@@ -60,7 +60,7 @@ pub mod l7 {
                 #[derive(Clone, Debug, PartialEq)]
                 pub enum Op {
                     RewriteResponseStatus(public::enums::L7ResponseStatus),
-                    RewriteNativeTag(public::l7_protocol::NativeTag, Arc<String>),
+                    RewriteNativeTag(l7_log::NativeTag, Arc<String>),
                     AddAttribute(Arc<String>, Arc<String>),
                     AddMetric(Arc<String>, f32),
                     SavePayload(Arc<String>),
@@ -119,7 +119,7 @@ pub mod l7 {
                     unimplemented!()
                 }
 
-                pub fn into_iter_with<L: public::l7_protocol::L7Log>(
+                pub fn into_iter_with<L: l7_log::L7Log>(
                     self,
                     _: PolicySlice,
                     _: &L,
@@ -127,7 +127,7 @@ pub mod l7 {
                     std::iter::empty()
                 }
 
-                pub fn drain_with<L: public::l7_protocol::L7Log>(
+                pub fn drain_with<L: l7_log::L7Log>(
                     &mut self,
                     _: PolicySlice,
                     _: &L,

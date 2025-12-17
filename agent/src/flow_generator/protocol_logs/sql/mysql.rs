@@ -57,8 +57,9 @@ use crate::{
     },
     utils::bytes,
 };
-use public::l7_protocol::{Field, FieldSetter, L7Log, L7ProtocolChecker};
-use public_derive::L7Log;
+use l7_log::{Field, FieldSetter, L7Log};
+use l7_log_derive::L7Log;
+use public::l7_protocol::L7ProtocolChecker;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {

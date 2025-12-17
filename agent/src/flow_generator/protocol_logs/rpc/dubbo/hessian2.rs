@@ -40,7 +40,7 @@ if #[cfg(feature = "enterprise")] {
         use enterprise_utils::l7::custom_policy::{
             custom_field_policy::{enums::{Op, PayloadType, Source}, Store},
         };
-        use public::l7_protocol::NativeTag;
+        use l7_log::NativeTag;
     }
 }
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use public_derive::L7Log;
+use l7_log_derive::L7Log;
 
 #[derive(L7Log)]
 #[l7_log(version.skip = "true")]

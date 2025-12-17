@@ -17,11 +17,11 @@
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
-mod l7_protocol;
+mod l7_log;
 
 /// Usage of derive macro `L7Log`:
 ///
-/// ```rust
+/// ```ignore
 /// // omitting imports
 ///
 /// #[derive(L7Log)]
@@ -62,7 +62,7 @@ mod l7_protocol;
 ///
 /// For types that are not in the list, custom getters and setters can be specified as follows:
 ///
-/// ```rust
+/// ```ignore
 /// // omitting imports
 ///
 /// #[derive(L7Log)]
@@ -84,7 +84,7 @@ mod l7_protocol;
 ///
 /// Fields can also be renamed by using `l7_log` attribute.
 ///
-/// ```rust
+/// ```ignore
 /// // omitting imports
 ///
 /// #[derive(L7Log)]
@@ -96,7 +96,7 @@ mod l7_protocol;
 ///
 /// Fields can be skipped by using `l7_log` attribute.
 ///
-/// ```rust
+/// ```ignore
 /// // omitting imports
 ///
 /// #[derive(L7Log)]
@@ -109,7 +109,7 @@ mod l7_protocol;
 #[proc_macro_derive(L7Log, attributes(l7_log))]
 pub fn l7_log_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    l7_protocol::expand_derive(&input)
+    l7_log::expand_derive(&input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }

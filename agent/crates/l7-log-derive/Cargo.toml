@@ -1,5 +1,5 @@
 [package]
-name = "public-derive"
+name = "l7-log-derive"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,11 +7,11 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
+l7-log.workspace = true
 proc-macro2 = "1.0"
-public.workspace = true
 quote = "1.0"
-strum = "0.27"
 syn = "2.0"
 
 [dev-dependencies]
+public.workspace = true
 trybuild = "1.0"

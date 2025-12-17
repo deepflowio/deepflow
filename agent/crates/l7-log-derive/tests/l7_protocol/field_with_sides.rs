@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-use public::l7_protocol::Field;
-use public_derive::L7Log;
+use l7_log::{Field, L7Log};
+use l7_log_derive::L7Log;
 
 #[derive(L7Log)]
 #[l7_log(version.skip = "true")]
 #[l7_log(request_type.skip = "true")]
 #[l7_log(request_domain.skip = "true")]
 #[l7_log(request_resource.skip = "true")]
+#[l7_log(endpoint.skip = "true")]
 #[l7_log(request_id.skip = "true")]
 #[l7_log(response_code.skip = "true")]
 #[l7_log(response_status.skip = "true")]
@@ -29,21 +30,20 @@ use public_derive::L7Log;
 #[l7_log(response_result.skip = "true")]
 #[l7_log(trace_id.skip = "true")]
 #[l7_log(span_id.skip = "true")]
-#[l7_log(x_request_id.skip = "true")]
 #[l7_log(http_proxy_client.skip = "true")]
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
-struct MissingFields {
-    path: String,
+struct SoloField {
+    x_request_id: String,
 }
 
 #[derive(L7Log)]
-#[l7_log(endpoint.getter = "get_endpoint")]
 #[l7_log(version.skip = "true")]
 #[l7_log(request_type.skip = "true")]
 #[l7_log(request_domain.skip = "true")]
 #[l7_log(request_resource.skip = "true")]
+#[l7_log(endpoint.skip = "true")]
 #[l7_log(request_id.skip = "true")]
 #[l7_log(response_code.skip = "true")]
 #[l7_log(response_status.skip = "true")]
@@ -51,42 +51,45 @@ struct MissingFields {
 #[l7_log(response_result.skip = "true")]
 #[l7_log(trace_id.skip = "true")]
 #[l7_log(span_id.skip = "true")]
-#[l7_log(x_request_id.skip = "true")]
 #[l7_log(http_proxy_client.skip = "true")]
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
-struct MissingSetter {
+struct DuetField {
+    x_request_id_0: String,
+    x_request_id_1: String,
 }
 
-fn get_endpoint(_: &MissingSetter) -> Field<'_> {
-    unimplemented!();
+fn solo_field() {
+    let mut f = SoloField {
+        x_request_id: "test".to_string(),
+    };
+    assert_eq!(f.get_x_request_id(), "test");
+    f.set_x_request_id("test2".into());
+    assert_eq!(f.get_x_request_id(), "test2");
+    f.set_x_request_id_0(10.into());
+    assert_eq!(f.get_x_request_id_1(), "10");
+    f.set_x_request_id_1(Field::None.into());
+    assert_eq!(f.get_x_request_id_0(), "");
+    assert_eq!(f.x_request_id, "");
 }
 
-#[derive(L7Log)]
-#[l7_log(endpoint.setter = "set_endpoint")]
-#[l7_log(version.skip = "true")]
-#[l7_log(request_type.skip = "true")]
-#[l7_log(request_domain.skip = "true")]
-#[l7_log(request_resource.skip = "true")]
-#[l7_log(request_id.skip = "true")]
-#[l7_log(response_code.skip = "true")]
-#[l7_log(response_status.skip = "true")]
-#[l7_log(response_exception.skip = "true")]
-#[l7_log(response_result.skip = "true")]
-#[l7_log(trace_id.skip = "true")]
-#[l7_log(span_id.skip = "true")]
-#[l7_log(x_request_id.skip = "true")]
-#[l7_log(http_proxy_client.skip = "true")]
-#[l7_log(biz_type.skip = "true")]
-#[l7_log(biz_code.skip = "true")]
-#[l7_log(biz_scenario.skip = "true")]
-struct MissingGetter {
-}
-
-fn set_endpoint(_: &mut MissingGetter, _: Field<'_>) {
-    unimplemented!();
+fn duet_field() {
+    let mut f = DuetField {
+        x_request_id_0: "req_id_0".to_string(),
+        x_request_id_1: "req_id_1".to_string(),
+    };
+    assert_eq!(f.get_x_request_id_0(), "req_id_0");
+    assert_eq!(f.get_x_request_id_1(), "req_id_1");
+    f.set_x_request_id_0("test".into());
+    f.set_x_request_id_1("".into());
+    assert_eq!(f.get_x_request_id_0(), "test");
+    assert_eq!(f.get_x_request_id_1(), "");
+    assert_eq!(f.x_request_id_0, "test");
+    assert_eq!(f.x_request_id_1, "");
 }
 
 fn main() {
+    solo_field();
+    duet_field();
 }

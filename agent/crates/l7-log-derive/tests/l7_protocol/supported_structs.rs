@@ -16,8 +16,9 @@
 
 use std::borrow::Cow;
 
-use public::{enums::L7ResponseStatus, l7_protocol::{Field, FieldSetter, L7Log}, types::PrioField};
-use public_derive::L7Log;
+use l7_log::{Field, FieldSetter, L7Log};
+use l7_log_derive::L7Log;
+use public::{enums::L7ResponseStatus, types::PrioField};
 
 #[derive(L7Log)]
 #[l7_log(version.skip = "true")]

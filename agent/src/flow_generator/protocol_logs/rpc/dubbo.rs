@@ -21,8 +21,8 @@ use std::{borrow::Cow, mem::replace};
 
 use serde::Serialize;
 
-use public::l7_protocol::{Field, FieldSetter, L7Log};
-use public_derive::L7Log;
+use l7_log::{Field, FieldSetter, L7Log};
+use l7_log_derive::L7Log;
 
 use crate::{
     common::{

@@ -20,7 +20,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse::ParseStream, parse2, DeriveInput};
 
-use public::l7_protocol::NativeTag;
+use l7_log::NativeTag;
 
 const ATTRIBUTE_NAME: &str = "l7_log";
 
@@ -317,7 +317,7 @@ fn generate_getter(field: &syn::Ident, wrappers: &[Wrapper], ty: &str) -> TokenS
         match wrapper {
             Wrapper::Option => tokens.extend(quote! {
                 let Some(field) = field.as_ref() else {
-                    return ::public::l7_protocol::Field::None;
+                    return ::l7_log::Field::None;
                 };
             }),
             Wrapper::PrioField => tokens.extend(quote! {
@@ -327,11 +327,11 @@ fn generate_getter(field: &syn::Ident, wrappers: &[Wrapper], ty: &str) -> TokenS
     }
     if ty == "String" {
         tokens.extend(quote! {
-            ::public::l7_protocol::Field::Str(std::borrow::Cow::Borrowed(field))
+            ::l7_log::Field::Str(std::borrow::Cow::Borrowed(field))
         });
     } else {
         tokens.extend(quote! {
-            ::public::l7_protocol::Field::Int(*field as i64)
+            ::l7_log::Field::Int(*field as i64)
         });
     }
     tokens
@@ -345,24 +345,24 @@ fn generate_setter(field: &syn::Ident, wrappers: &[Wrapper], ty: &str) -> TokenS
     let get_owned_value = if ty == "String" {
         quote! {
             match value {
-                ::public::l7_protocol::Field::Str(s) => s.into_owned(),
-                ::public::l7_protocol::Field::Int(i) => i.to_string(),
-                ::public::l7_protocol::Field::None => Default::default(),
+                ::l7_log::Field::Str(s) => s.into_owned(),
+                ::l7_log::Field::Int(i) => i.to_string(),
+                ::l7_log::Field::None => Default::default(),
             }
         }
     } else {
         quote! {
             match value {
-                ::public::l7_protocol::Field::Str(s) => s.parse().unwrap_or_default(),
-                ::public::l7_protocol::Field::Int(i) => i as _,
-                ::public::l7_protocol::Field::None => Default::default(),
+                ::l7_log::Field::Str(s) => s.parse().unwrap_or_default(),
+                ::l7_log::Field::Int(i) => i as _,
+                ::l7_log::Field::None => Default::default(),
             }
         }
     };
     match (wrappers.get(0), wrappers.get(1)) {
         (Some(Wrapper::Option), Some(Wrapper::PrioField)) => quote! {
             let (prio, value) = (value.prio(), value.into_inner());
-            if matches!(value, ::public::l7_protocol::Field::None) {
+            if matches!(value, ::l7_log::Field::None) {
                 self.#field = None;
             } else {
                 match self.#field.as_mut() {
@@ -374,14 +374,14 @@ fn generate_setter(field: &syn::Ident, wrappers: &[Wrapper], ty: &str) -> TokenS
         (Some(Wrapper::PrioField), Some(Wrapper::Option)) => quote! {
             let (prio, value) = (value.prio(), value.into_inner());
             self.#field.set_with(prio, || match value {
-                ::public::l7_protocol::Field::None => None,
+                ::l7_log::Field::None => None,
                 _ => Some(#get_owned_value),
             })
         },
         (Some(Wrapper::Option), None) => quote! {
             let value = value.into_inner();
             self.#field = match value {
-                ::public::l7_protocol::Field::None => None,
+                ::l7_log::Field::None => None,
                 _ => Some(#get_owned_value),
             };
         },
@@ -408,8 +408,8 @@ fn generate_impls(key: &str, options: FieldOptions) -> syn::Result<TokenStream> 
         )
     } else {
         (
-            quote!(::public::l7_protocol::Field<'_>),
-            quote!(::public::l7_protocol::FieldSetter<'_>),
+            quote!(::l7_log::Field<'_>),
+            quote!(::l7_log::FieldSetter<'_>),
         )
     };
 

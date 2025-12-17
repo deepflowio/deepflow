@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-use public::l7_protocol::L7Log;
-use public_derive::L7Log;
+use l7_log::L7Log;
+use l7_log_derive::L7Log;
 
 #[derive(L7Log)]
 struct TestInfo {

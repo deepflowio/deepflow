@@ -724,7 +724,7 @@ cfg_if::cfg_if! {
         use log::warn;
 
         use enterprise_utils::l7::custom_policy::custom_field_policy::enums::{Op, Operation};
-        use public::l7_protocol::{FieldSetter, L7Log};
+        use l7_log::{FieldSetter, L7Log};
 
         pub fn auto_merge_custom_field<L: L7Log>(op: Operation, log: &mut L) {
             let Operation { op, prio } = op;
