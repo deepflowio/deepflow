@@ -1072,7 +1072,6 @@ impl EbpfCollector {
             ) != 0
             {
                 warn!("ebpf start_continuous_profiler error.");
-                return Err(Error::EbpfInitError);
             }
 
             if !on_cpu.disabled {
