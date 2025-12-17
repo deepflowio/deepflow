@@ -62,7 +62,7 @@ pub struct WebSphereMqInfo {
     #[serde(skip_serializing_if = "value_is_default")]
     pub request_resource: String,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub request_id: String,
+    pub endpoint: String,
 
     // response
     #[serde(rename = "response_status", skip_serializing_if = "value_is_default")]
@@ -171,28 +171,44 @@ impl WebSphereMqInfo {
     pub fn merge_custom_info(&mut self, custom: CustomInfo) {
         // req rewrite
         if !custom.req.domain.is_empty() {
+            self.msg_type = LogMessageType::Request;
             self.request_domain = custom.req.domain;
         }
 
         if !custom.req.req_type.is_empty() {
+            self.msg_type = LogMessageType::Request;
             self.request_type = custom.req.req_type;
+        }
+
+        if !custom.req.resource.is_empty() {
+            self.msg_type = LogMessageType::Request;
+            self.request_resource = custom.req.resource;
+        }
+
+        if !custom.req.endpoint.is_empty() {
+            self.msg_type = LogMessageType::Request;
+            self.endpoint = custom.req.endpoint;
         }
 
         //resp rewrite
         if let Some(code) = custom.resp.code {
+            self.msg_type = LogMessageType::Response;
             self.response_code_to_attribute();
             self.response_code = code;
         }
 
         if custom.resp.status != L7ResponseStatus::default() {
+            self.msg_type = LogMessageType::Response;
             self.status = custom.resp.status;
         }
 
         if !custom.resp.result.is_empty() {
+            self.msg_type = LogMessageType::Response;
             self.response_result = custom.resp.result;
         }
 
         if !custom.resp.exception.is_empty() {
+            self.msg_type = LogMessageType::Response;
             self.response_exception = custom.resp.exception;
         }
 
