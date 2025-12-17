@@ -264,6 +264,9 @@ func (u *UniversalTagsManager) getAuto(orgId uint16, autoType DeviceType, autoID
 }
 
 func (u *UniversalTagsManager) QueryCustomK8sLabels(orgId uint16, podID uint32) Labels {
+	if u.universalTagMaps[orgId] == nil {
+		return nil
+	}
 	return u.universalTagMaps[orgId].podK8SLabelMap[podID]
 }
 
