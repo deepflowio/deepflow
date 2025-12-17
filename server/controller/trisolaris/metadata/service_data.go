@@ -220,7 +220,7 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, dbDataCache *dbcache.
 	hasEmptyPortForIP := make(map[string]bool)                   // 记录每个 VPC 内的 IP 是否有空端口，key格式为 "vpcID:ip"
 
 	for _, cs := range customServices {
-		resources := strings.Split(cs.Resource, ",")
+		resources := strings.Split(cs.Resources, ",")
 		if slices.Contains([]int{CUSTOM_SERVICE_TYPE_CHOST, CUSTOM_SERVICE_TYPE_POD_SERVICE, CUSTOM_SERVICE_TYPE_POD_GROUP}, cs.Type) {
 			resourceIDs := make([]uint32, 0)
 			var resourceIDMap map[string]int
@@ -259,7 +259,11 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, dbDataCache *dbcache.
 		}
 
 		var ipPorts []customServiceIPPortKey
-
+		if len(cs.VPCIDs) != 1 {
+			log.Warningf("multi vpcs not supported for ip/port type custom_service (id: %v)", cs.ID)
+			continue
+		}
+		vpcID := cs.VPCIDs[0]
 		if cs.Type == CUSTOM_SERVICE_TYPE_IP {
 			ips := resources
 			for _, ip := range ips {
@@ -267,7 +271,7 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, dbDataCache *dbcache.
 				if ip == "" {
 					continue
 				}
-				ipPortKey := newCustomServiceIPPortKey(cs.VPCID, ip, 0)
+				ipPortKey := newCustomServiceIPPortKey(vpcID, ip, 0)
 				hasEmptyPortForIP[ipPortKey.ipKey()] = true
 				ipPorts = append(ipPorts, ipPortKey)
 			}
@@ -290,7 +294,7 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, dbDataCache *dbcache.
 					log.Warningf("[ORG-%v] invalid port format: %s", md.ORGID, portStr)
 					continue
 				}
-				ipPorts = append(ipPorts, newCustomServiceIPPortKey(cs.VPCID, ip, uint32(port)))
+				ipPorts = append(ipPorts, newCustomServiceIPPortKey(vpcID, ip, uint32(port)))
 			}
 		}
 
@@ -609,10 +613,11 @@ func (s *ServiceDataOP) mergeCustomServices(dbDataCache *dbcache.DBDataCache) []
 		if slices.Contains([]int{CUSTOM_SERVICE_TYPE_CHOST, CUSTOM_SERVICE_TYPE_POD_SERVICE, CUSTOM_SERVICE_TYPE_POD_GROUP}, customService.Type) {
 
 			service := &trident.ServiceInfo{
-				Type:         &serviceTypeCustomService,
-				Id:           proto.Uint32(uint32(customService.ID)),
-				EpcId:        proto.Uint32(uint32(customService.VPCID)),
-				PodClusterId: proto.Uint32(uint32(customService.PodClusterID)),
+				Type: &serviceTypeCustomService,
+				Id:   proto.Uint32(uint32(customService.ID)),
+				// 已确认，ingester 在打 自定义服务 CUSTOM_SERVICE 标记时，如果给了 ChostIds PodServiceIds PodGroupIds，不需要以下两字段数据
+				// EpcId:        proto.Uint32(uint32(customService.VPCID)),
+				// PodClusterId: proto.Uint32(uint32(customService.PodClusterID)),
 			}
 			switch customService.Type {
 			case CUSTOM_SERVICE_TYPE_CHOST:
@@ -638,7 +643,7 @@ func (s *ServiceDataOP) mergeCustomServices(dbDataCache *dbcache.DBDataCache) []
 			service := &trident.ServiceInfo{
 				Type:        &serviceTypeCustomService,
 				Id:          proto.Uint32(uint32(customService.ID)),
-				EpcId:       proto.Uint32(uint32(customService.VPCID)),
+				EpcId:       proto.Uint32(uint32(ipPort.vpcID)),
 				Ips:         []string{ipPort.ip},
 				ServerPorts: serverPorts,
 			}
