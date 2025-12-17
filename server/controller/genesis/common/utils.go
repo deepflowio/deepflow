@@ -207,6 +207,7 @@ func ParseIPOutput(s string) ([]Iface, error) {
 		} else if strings.HasPrefix(iface.Name, "tunl0") {
 			iface.MAC = "00:00:00:00:00:00"
 		}
+
 		ipMatched := IPRegex.FindStringSubmatch(line)
 		if ipMatched != nil {
 			maskLen, err := strconv.Atoi(ipMatched[2])
