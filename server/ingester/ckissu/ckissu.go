@@ -531,7 +531,7 @@ func (i *Issu) RunRecreateTables() error {
 func (i *Issu) DropTable(db, table string) {
 	for idx, connect := range i.Connections {
 		oldVersion, _ := i.getTableVersion(idx, "flow_metrics", "network_map.1m_local")
-		if strings.Compare(oldVersion, "v7.1.3.7") >= 0 || oldVersion == "" {
+		if strings.Compare(oldVersion, "v7.1.4.0") >= 0 || oldVersion == "" {
 			continue
 		}
 

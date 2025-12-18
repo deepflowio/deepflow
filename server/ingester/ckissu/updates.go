@@ -415,10 +415,12 @@ var ColumnAdd71 = []*ColumnAdds{
 	{
 		Dbs: []string{"flow_metrics"},
 		Tables: []string{
-			"network.1s_local", "network.1s", "network.1m_local", "network.1m",
-			"network_map.1s_local", "network_map.1s", "network_map.1m_local", "network_map.1m",
+			"network.1s_local", "network.1s",
+			"network.1m_local", "network.1m",
 			"network.1h", "network.1d",
-			"network_map.1d", "network_map.1d",
+			"network_map.1s_local", "network_map.1s",
+			"network_map.1m_local", "network_map.1m",
+			"network_map.1h", "network_map.1d",
 		},
 		ColumnNames: []string{"ooo_tx", "ooo_rx"},
 		ColumnType:  ckdb.UInt64,
@@ -447,6 +449,8 @@ var TableRecreates71 = &Tables{
 	Tables: []string{
 		"network.1h_local", "network.1h_mv",
 		"network.1d_local", "network.1d_mv",
+		"network_map.1h_local", "network_map.1h_mv",
+		"network_map.1d_local", "network_map.1d_mv",
 	},
 }
 
