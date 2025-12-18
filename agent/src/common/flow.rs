@@ -471,6 +471,7 @@ impl From<TcpPerfStats> for flow_log::TcpPerfStats {
             cit_max: p.cit_max,
             syn_count: p.syn_count,
             synack_count: p.synack_count,
+            fin_count: p.fin_count,
             ..Default::default()
         }
     }
