@@ -2248,6 +2248,17 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		),
 	}
 
+	// TopK-endpoints
+	tagResourceMap["topk_endpoints"] = map[string]*Tag{
+		"default": NewTag(
+			"tag_string_values[indexOf(tag_string_names,'topk_endpoints')]",
+			"",
+			"if(indexOf(tag_string_names,'topk_endpoints')=0,NULL,tag_string_values[indexOf(tag_string_names,'topk_endpoints')]) %s %s",
+			"%s(if(indexOf(tag_string_names,'topk_endpoints')=0,NULL,tag_string_values[indexOf(tag_string_names,'topk_endpoints')]), %s)",
+			"",
+		),
+	}
+
 	return tagResourceMap
 }
 
