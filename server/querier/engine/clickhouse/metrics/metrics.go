@@ -457,22 +457,22 @@ func GetMetricsDescriptions(db, table, where, queryCacheTTL, orgID string, useQu
 func GetPrometheusSingleTagTranslator(tag, table, orgID string) (string, string, error) {
 	labelType := ""
 	TagTranslatorStr := ""
-	nameNoPreffix := strings.TrimPrefix(tag, "tag.")
+	nameNoPrefix := strings.TrimPrefix(tag, "tag.")
 	metricID, ok := trans_prometheus.ORGPrometheus[orgID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return "", "", common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.ORGPrometheus[orgID].LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[orgID].LabelNameToID[nameNoPrefix]
 	if !ok {
-		errorMessage := fmt.Sprintf("%s not found", nameNoPreffix)
+		errorMessage := fmt.Sprintf("%s not found", nameNoPrefix)
 		return "", "", errors.New(errorMessage)
 	}
 	// Determine whether the tag is app_label or target_label
 	isAppLabel := false
 	if appLabels, ok := trans_prometheus.ORGPrometheus[orgID].MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
-			if appLabel.AppLabelName == nameNoPreffix {
+			if appLabel.AppLabelName == nameNoPrefix {
 				isAppLabel = true
 				labelType = "app"
 				TagTranslatorStr = fmt.Sprintf("dictGet('flow_tag.app_label_map', 'label_value', (toUInt64(%d), toUInt64(app_label_value_id_%d)))", labelNameID, appLabel.AppLabelColumnIndex)
@@ -520,13 +520,13 @@ func GetTagDBField(name, db, table, orgID string) (string, string, error) {
 	if !ok {
 		name := strings.Trim(name, "`")
 		// map item tag
-		nameNoPreffix, _, transKey := common.TransMapItem(name, table)
+		nameNoPrefix, _, transKey := common.TransMapItem(name, table)
 		if transKey != "" {
 			tagItem, _ = tag.GetTag(transKey, db, table, "default")
 			if strings.HasPrefix(name, "os.app.") || strings.HasPrefix(name, "k8s.env.") {
-				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
+				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPrefix)
 			} else {
-				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix, nameNoPreffix, nameNoPreffix)
+				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPrefix, nameNoPrefix, nameNoPrefix)
 			}
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			if strings.HasPrefix(name, "tag.") {
@@ -538,9 +538,9 @@ func GetTagDBField(name, db, table, orgID string) (string, string, error) {
 			} else {
 				tagItem, ok = tag.GetTag("attribute.", db, table, "default")
 			}
-			nameNoPreffix := strings.TrimPrefix(name, "tag.")
-			nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
-			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
+			nameNoPrefix := strings.TrimPrefix(name, "tag.")
+			nameNoPrefix = strings.TrimPrefix(nameNoPrefix, "attribute.")
+			tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPrefix)
 		}
 	} else {
 		if name == "metrics" {

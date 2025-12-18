@@ -2259,6 +2259,48 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		),
 	}
 
+	tagResourceMap["tag_string"] = map[string]*Tag{
+		"default": NewTag(
+			"toJSONString(CAST((tag_string_names, tag_string_values), 'Map(String, String)'))",
+			"",
+			"",
+			"",
+			"",
+		),
+	}
+
+	tagResourceMap["tag_string."] = map[string]*Tag{
+		"default": NewTag(
+			// null indicates the absence of this key
+			"if(indexOf(tag_string_names,'%s') != 0, tag_string_values[indexOf(tag_string_names,'%s')], NULL)",
+			"indexOf(tag_string_names,'%s') != 0",
+			"tag_string_values[indexOf(tag_string_names,'%s')] %s %v",
+			"%s(tag_string_values[indexOf(tag_string_names,'%s')],%v)",
+			"",
+		),
+	}
+
+	tagResourceMap["tag_int"] = map[string]*Tag{
+		"default": NewTag(
+			"toJSONString(CAST((tag_int_names, tag_int_values), 'Map(String, Int64)'))",
+			"",
+			"",
+			"",
+			"",
+		),
+	}
+
+	tagResourceMap["tag_int."] = map[string]*Tag{
+		"default": NewTag(
+			// null indicates the absence of this key
+			"if(indexOf(tag_int_names,'%s') != 0, tag_int_values[indexOf(tag_int_names,'%s')], NULL)",
+			"indexOf(tag_int_names,'%s') != 0",
+			"tag_int_values[indexOf(tag_int_names,'%s')] %s %v",
+			"%s(tag_int_values[indexOf(tag_int_names,'%s')],%v)",
+			"",
+		),
+	}
+
 	return tagResourceMap
 }
 
