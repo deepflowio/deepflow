@@ -351,7 +351,14 @@ static __always_inline void lua_state_stack_push(__u64 id, __u64 state)
 
 	struct lua_state_cache_t cache = {};
 	__builtin_memcpy(&cache, cache_ptr, sizeof(cache));
-
+	
+	/*
+	* Older Kernel(5.4) BPF verifier cannot prove constant stack offsets when using
+	* loop-based index access (even with #pragma unroll), so the program is
+	* rejected with “variable stack access”. Using hard-coded indices keeps
+	* all stack accesses constant and verifier-safe. 
+	* TODO: optimize/remove hard-coded indices later.
+	*/
 	__u8 depth = cache.depth;
 	if (depth >= LUA_STATE_STACK_DEPTH) {
 		cache.states[0] = cache.states[1];
