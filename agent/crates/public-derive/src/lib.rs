@@ -21,7 +21,7 @@ mod l7_protocol;
 
 /// Usage of derive macro `L7Log`:
 ///
-/// ```rust
+/// ```ignore
 /// // omitting imports
 ///
 /// #[derive(L7Log)]
@@ -62,7 +62,7 @@ mod l7_protocol;
 ///
 /// For types that are not in the list, custom getters and setters can be specified as follows:
 ///
-/// ```rust
+/// ```ignore
 /// // omitting imports
 ///
 /// #[derive(L7Log)]
@@ -84,7 +84,7 @@ mod l7_protocol;
 ///
 /// Fields can also be renamed by using `l7_log` attribute.
 ///
-/// ```rust
+/// ```ignore
 /// // omitting imports
 ///
 /// #[derive(L7Log)]
@@ -96,7 +96,7 @@ mod l7_protocol;
 ///
 /// Fields can be skipped by using `l7_log` attribute.
 ///
-/// ```rust
+/// ```ignore
 /// // omitting imports
 ///
 /// #[derive(L7Log)]
