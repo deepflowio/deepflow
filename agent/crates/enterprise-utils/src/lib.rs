@@ -83,7 +83,7 @@ pub mod l7 {
                 pub fn counters(
                     &self,
                 ) -> impl Iterator<Item = (&dyn public::counter::Module, public::counter::Countable)>
-                       + use<'_> {
+                       + '_ {
                     std::iter::empty()
                 }
             }
@@ -124,7 +124,7 @@ pub mod l7 {
                     &mut self,
                     _: PolicySlice,
                     _: &L,
-                ) -> impl Iterator<Item = enums::Operation> + use<L> {
+                ) -> impl Iterator<Item = enums::Operation> + '_ {
                     std::iter::empty()
                 }
             }
