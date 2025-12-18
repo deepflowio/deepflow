@@ -82,16 +82,9 @@ pub mod l7 {
                 }
                 pub fn counters(
                     &self,
-                ) -> impl Iterator<Item = (Module, public::counter::Countable)> + use<'_>
-                {
+                ) -> impl Iterator<Item = (&dyn public::counter::Module, public::counter::Countable)>
+                       + use<'_> {
                     std::iter::empty()
-                }
-            }
-
-            pub struct Module;
-            impl public::counter::Module for Module {
-                fn name(&self) -> &'static str {
-                    unimplemented!()
                 }
             }
 
