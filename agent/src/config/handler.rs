@@ -5433,18 +5433,26 @@ impl ConfigHandler {
                 "log_parser config change from {:#?} to {:#?}",
                 candidate_config.log_parser, new_config.log_parser
             );
+            #[cfg(feature = "enterprise")]
+            stats_collector.deregister_countables(
+                candidate_config
+                    .log_parser
+                    .l7_log_dynamic
+                    .extra_field_policies
+                    .counters()
+                    .map(|(m, _)| m),
+            );
+
             candidate_config.log_parser = new_config.log_parser.clone();
 
-            // old counters will be deregistered automatically because they are weak referenced
             #[cfg(feature = "enterprise")]
-            for (m, c) in candidate_config
-                .log_parser
-                .l7_log_dynamic
-                .extra_field_policies
-                .counters()
-            {
-                stats_collector.register_countable(&m, c);
-            }
+            stats_collector.register_countables(
+                candidate_config
+                    .log_parser
+                    .l7_log_dynamic
+                    .extra_field_policies
+                    .counters(),
+            );
         }
 
         if candidate_config.synchronizer != new_config.synchronizer {
