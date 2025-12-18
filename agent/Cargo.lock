@@ -3476,10 +3476,10 @@ dependencies = [
 name = "public-derive"
 version = "0.1.0"
 dependencies = [
+ "cfg-if",
  "proc-macro2",
  "public",
  "quote",
- "strum",
  "syn 2.0.100",
  "trybuild",
 ]
