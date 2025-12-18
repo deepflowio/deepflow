@@ -4321,9 +4321,9 @@ inputs:
    - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
 2. 配置`HTTP2`或`gRPC`会全部开启这两个协议
 
-### TCP Option Trace {#inputs.ebpf.tcp_option_trace}
+### TCP Option Trace {#inputs.ebpf.socket.sock_ops.tcp_option_trace}
 
-#### 启用 {#inputs.ebpf.tcp_option_trace.enabled}
+#### 启用 {#inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled}
 
 **标签**:
 
@@ -4331,14 +4331,16 @@ inputs:
 
 **FQCN**:
 
-`inputs.ebpf.tcp_option_trace.enabled`
+`inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled`
 
 **默认值**:
 ```yaml
 inputs:
   ebpf:
-    tcp_option_trace:
-      enabled: false
+    socket:
+      sock_ops:
+        tcp_option_trace:
+          enabled: false
 ```
 
 **模式**:
@@ -4354,7 +4356,7 @@ inputs:
 
 限制：PID 跟踪依赖 `agent/src/ebpf/user/extended/bpf/tcp_option_tracing.bpf.c` 中的 per-CPU syscall map。当 CPU 拥堵或软中断在不同 CPU 上处理 TCP 时，注入的元数据可能缺失或过期。
 
-#### PID 注入窗口 {#inputs.ebpf.tcp_option_trace.sampling_window_bytes}
+#### PID 注入窗口 {#inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes}
 
 **标签**:
 
@@ -4362,14 +4364,16 @@ inputs:
 
 **FQCN**:
 
-`inputs.ebpf.tcp_option_trace.sampling_window_bytes`
+`inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes`
 
 **默认值**:
 ```yaml
 inputs:
   ebpf:
-    tcp_option_trace:
-      sampling_window_bytes: 16384
+    socket:
+      sock_ops:
+        tcp_option_trace:
+          sampling_window_bytes: 16384
 ```
 
 **模式**:

@@ -1033,20 +1033,21 @@ impl EbpfCollector {
         #[cfg(feature = "extended_observability")]
         ebpf::set_dpdk_trace_enabled(config.dpdk_enabled);
 
-        if ebpf::set_tcp_option_tracing_sample_window(
-            config.ebpf.tcp_option_trace.sampling_window_bytes as u32,
-        ) != 0
+        let tcp_option_trace = &config.ebpf.socket.sock_ops.tcp_option_trace;
+
+        if ebpf::set_tcp_option_tracing_sample_window(tcp_option_trace.sampling_window_bytes as u32)
+            != 0
         {
             warn!(
                 "failed to set tcp option tracing sampling window to {}",
-                config.ebpf.tcp_option_trace.sampling_window_bytes
+                tcp_option_trace.sampling_window_bytes
             );
         }
 
-        if ebpf::set_tcp_option_tracing_enabled(config.ebpf.tcp_option_trace.enabled) != 0 {
+        if ebpf::set_tcp_option_tracing_enabled(tcp_option_trace.enabled) != 0 {
             warn!(
                 "failed to set tcp option tracing enabled to {}",
-                config.ebpf.tcp_option_trace.enabled
+                tcp_option_trace.enabled
             );
         }
 
@@ -1502,20 +1503,22 @@ impl EbpfCollector {
 
             Self::ebpf_on_config_change(config.l7_log_packet_size);
 
+            let tcp_option_trace = &config.ebpf.socket.sock_ops.tcp_option_trace;
+
             if ebpf::set_tcp_option_tracing_sample_window(
-                config.ebpf.tcp_option_trace.sampling_window_bytes as u32,
+                tcp_option_trace.sampling_window_bytes as u32,
             ) != 0
             {
                 warn!(
                     "failed to set tcp option tracing sampling window to {}",
-                    config.ebpf.tcp_option_trace.sampling_window_bytes
+                    tcp_option_trace.sampling_window_bytes
                 );
             }
 
-            if ebpf::set_tcp_option_tracing_enabled(config.ebpf.tcp_option_trace.enabled) != 0 {
+            if ebpf::set_tcp_option_tracing_enabled(tcp_option_trace.enabled) != 0 {
                 warn!(
                     "failed to set tcp option tracing enabled to {}",
-                    config.ebpf.tcp_option_trace.enabled
+                    tcp_option_trace.enabled
                 );
             }
         }

@@ -1023,8 +1023,23 @@ pub struct EbpfSocketTunning {
 pub struct EbpfSocket {
     pub uprobe: EbpfSocketUprobe,
     pub kprobe: EbpfSocketKprobe,
+    pub sock_ops: EbpfSocketSockOps,
     pub tunning: EbpfSocketTunning,
     pub preprocess: EbpfSocketPreprocess,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfSocketSockOps {
+    pub tcp_option_trace: EbpfTcpOptionTrace,
+}
+
+impl Default for EbpfSocketSockOps {
+    fn default() -> Self {
+        Self {
+            tcp_option_trace: EbpfTcpOptionTrace::default(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -1267,7 +1282,6 @@ impl EbpfSocketPreprocess {
 pub struct Ebpf {
     pub disabled: bool,
     pub socket: EbpfSocket,
-    pub tcp_option_trace: EbpfTcpOptionTrace,
     pub file: EbpfFile,
     pub profile: EbpfProfile,
     pub tunning: EbpfTunning,
@@ -1280,7 +1294,6 @@ impl Default for Ebpf {
         Self {
             disabled: false,
             socket: EbpfSocket::default(),
-            tcp_option_trace: EbpfTcpOptionTrace::default(),
             file: EbpfFile::default(),
             profile: EbpfProfile::default(),
             tunning: EbpfTunning::default(),

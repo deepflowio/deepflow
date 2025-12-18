@@ -3549,23 +3549,25 @@ impl ConfigHandler {
             restart_agent = !first_run;
         }
 
-        if ebpf.tcp_option_trace.enabled != new_ebpf.tcp_option_trace.enabled {
+        let sock_ops = &mut ebpf.socket.sock_ops;
+        let new_sock_ops = &mut new_ebpf.socket.sock_ops;
+        if sock_ops.tcp_option_trace.enabled != new_sock_ops.tcp_option_trace.enabled {
             info!(
-                "Update inputs.ebpf.tcp_option_trace.enabled from {:?} to {:?}.",
-                ebpf.tcp_option_trace.enabled, new_ebpf.tcp_option_trace.enabled
+                "Update inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled from {:?} to {:?}.",
+                sock_ops.tcp_option_trace.enabled, new_sock_ops.tcp_option_trace.enabled
             );
-            ebpf.tcp_option_trace.enabled = new_ebpf.tcp_option_trace.enabled;
+            sock_ops.tcp_option_trace.enabled = new_sock_ops.tcp_option_trace.enabled;
         }
-        if ebpf.tcp_option_trace.sampling_window_bytes
-            != new_ebpf.tcp_option_trace.sampling_window_bytes
+        if sock_ops.tcp_option_trace.sampling_window_bytes
+            != new_sock_ops.tcp_option_trace.sampling_window_bytes
         {
             info!(
-                "Update inputs.ebpf.tcp_option_trace.sampling_window_bytes from {:?} to {:?}.",
-                ebpf.tcp_option_trace.sampling_window_bytes,
-                new_ebpf.tcp_option_trace.sampling_window_bytes
+                "Update inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes from {:?} to {:?}.",
+                sock_ops.tcp_option_trace.sampling_window_bytes,
+                new_sock_ops.tcp_option_trace.sampling_window_bytes
             );
-            ebpf.tcp_option_trace.sampling_window_bytes =
-                new_ebpf.tcp_option_trace.sampling_window_bytes;
+            sock_ops.tcp_option_trace.sampling_window_bytes =
+                new_sock_ops.tcp_option_trace.sampling_window_bytes;
         }
 
         let uprobe = &mut ebpf.socket.uprobe;
