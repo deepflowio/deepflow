@@ -90,7 +90,7 @@ func readFile(fileName string) ([][]interface{}, error) {
 	return data, nil
 }
 
-func TransMapItem(name, table string) (nameNoPreffix string, nameNoSuffix string, transKey string) {
+func TransMapItem(name, table string) (nameNoPrefix string, nameNoSuffix string, transKey string) {
 	for preffix, tag := range TRANS_MAP_ITEM_TAG {
 		if strings.HasPrefix(name, preffix) {
 			nameNoSuffix = name
@@ -103,7 +103,7 @@ func TransMapItem(name, table string) (nameNoPreffix string, nameNoSuffix string
 					}
 				}
 			}
-			nameNoPreffix = strings.TrimPrefix(nameNoSuffix, preffix)
+			nameNoPrefix = strings.TrimPrefix(nameNoSuffix, preffix)
 			return
 		}
 	}
