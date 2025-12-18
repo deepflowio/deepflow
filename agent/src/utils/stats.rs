@@ -228,11 +228,10 @@ impl Collector {
         self.receiver.clone()
     }
 
-    pub fn register_countable(&self, module: &dyn Module, countable: Countable) {
-        let min_interval_loaded = self.min_interval.load(Ordering::Relaxed);
+    fn prepare_source(module: &dyn Module, countable: Countable, min_interval: u64) -> Source {
         let mut source = Source {
             module: module.name(),
-            interval: Duration::from_secs(min_interval_loaded),
+            interval: Duration::from_secs(min_interval),
             countable,
             tags: vec![],
             skip: 0,
@@ -250,9 +249,7 @@ impl Collector {
         }
         for option in module.options() {
             match option {
-                StatsOption::Interval(interval)
-                    if interval.as_secs() >= self.min_interval.load(Ordering::Relaxed) =>
-                {
+                StatsOption::Interval(interval) if interval.as_secs() >= min_interval => {
                     source.interval = Duration::from_secs(
                         interval.as_secs() / TICK_CYCLE.as_secs() * TICK_CYCLE.as_secs(),
                     )
@@ -263,22 +260,34 @@ impl Collector {
                 ),
             }
         }
-        if source.interval.as_secs() > min_interval_loaded {
-            source.skip = (source.interval.as_secs() / min_interval_loaded) as i64;
+        if source.interval.as_secs() > min_interval {
+            source.skip = (source.interval.as_secs() / min_interval) as i64;
         }
+        source
+    }
+
+    pub fn register_countable(&self, module: &dyn Module, countable: Countable) {
+        self.register_countables(std::iter::once((module, countable)));
+    }
+
+    pub fn register_countables<'a, I>(&self, countables: I)
+    where
+        I: Iterator<Item = (&'a dyn Module, Countable)>,
+    {
+        let min_interval = self.min_interval.load(Ordering::Relaxed);
         let mut sources = self.sources.lock().unwrap();
+        let new_items = countables
+            .map(|(m, c)| Self::prepare_source(m, c, min_interval))
+            .collect::<Vec<_>>();
         sources.retain(|s| {
             let closed = s.countable.closed();
-            let equals = s == &source;
+            let equals = new_items.iter().any(|item| item == s);
             if !closed && equals {
-                warn!(
-                    "Found duplicated counter source {}, please check if the old one is correctly closed.",
-                    source
-                );
+                warn!("Found duplicated counter source {s}, please check if the old one is correctly closed.");
             }
             !closed && !equals
         });
-        sources.push(source);
+        sources.extend(new_items);
     }
 
     pub fn deregister_countables<'a, I>(&self, countables: I)
