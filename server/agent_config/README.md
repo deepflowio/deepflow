@@ -4426,9 +4426,9 @@ this feature to be effective.
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
 Attention: configuring `HTTP2` or `gRPC` will enable both protocols.
 
-### TCP Option Trace {#inputs.ebpf.tcp_option_trace}
+### TCP Option Trace {#inputs.ebpf.socket.sock_ops.tcp_option_trace}
 
-#### Enabled {#inputs.ebpf.tcp_option_trace.enabled}
+#### Enabled {#inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled}
 
 **Tags**:
 
@@ -4436,14 +4436,16 @@ Attention: configuring `HTTP2` or `gRPC` will enable both protocols.
 
 **FQCN**:
 
-`inputs.ebpf.tcp_option_trace.enabled`
+`inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled`
 
 **Default value**:
 ```yaml
 inputs:
   ebpf:
-    tcp_option_trace:
-      enabled: false
+    socket:
+      sock_ops:
+        tcp_option_trace:
+          enabled: false
 ```
 
 **Schema**:
@@ -4459,7 +4461,7 @@ Note: This feature requires cgroup v2 (unified hierarchy). On hosts using cgroup
 
 Limitation: PID tracking relies on the per-CPU syscall map defined in `agent/src/ebpf/user/extended/bpf/tcp_option_tracing.bpf.c`. Under CPU congestion, TCP softirqs may run on a different CPU than the userspace thread and the injected metadata can be missing or stale.
 
-#### PID Injection Window {#inputs.ebpf.tcp_option_trace.sampling_window_bytes}
+#### PID Injection Window {#inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes}
 
 **Tags**:
 
@@ -4467,14 +4469,16 @@ Limitation: PID tracking relies on the per-CPU syscall map defined in `agent/src
 
 **FQCN**:
 
-`inputs.ebpf.tcp_option_trace.sampling_window_bytes`
+`inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes`
 
 **Default value**:
 ```yaml
 inputs:
   ebpf:
-    tcp_option_trace:
-      sampling_window_bytes: 16384
+    socket:
+      sock_ops:
+        tcp_option_trace:
+          sampling_window_bytes: 16384
 ```
 
 **Schema**:

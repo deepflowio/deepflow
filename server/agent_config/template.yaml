@@ -2960,53 +2960,59 @@ inputs:
           #     配置样例: `tx_hooks: [i40e_xmit_pkts, virtio_xmit_pkts_packed, virtio_xmit_pkts]`
           # upgrade_from:
           tx_hooks: []
-    # type: section
-    # name:
-    #   en: TCP Option Trace
-    #   ch: TCP Option Trace
-    # description:
-    tcp_option_trace:
-      # type: bool
+      # type: section
       # name:
-      #   en: TCP Option Tracing
-      #   ch: TCP Option 注入
-      # unit:
-      # range: []
-      # enum_options: []
-      # modification: hot_update
-      # ee_feature: false
+      #   en: SockOps
+      #   ch: SockOps
       # description:
-      #   en: |-
-      #     Whether to enable the tcp-option tracing SockOps program, which injects DeepFlow metadata
-      #     (for example, process PID) into a custom TCP option for eligible connections.
-      #     Note: This feature requires cgroup v2 (unified hierarchy). On hosts using cgroup v1
-      #     the SockOps program will fail to attach and the agent will log a warning.
-      #     Limitation: PID tracking relies on the per-CPU syscall map in. Under CPU congestion,
-      #     softirqs handling TCP may run on a different CPU than the userspace thread, so the
-      #     injected metadata can be missing or stale.
-      #   ch: |-
-      #     是否开启 TCP Option Tracing SockOps 程序，用于在满足条件的 TCP 连接上注入 DeepFlow 元数据（如进程 PID）。
-      #     注意：该功能依赖 cgroup v2（统一层级）。在 cgroup v1 主机上 SockOps 绑定会失败.
-      #     限制：PID 跟踪依赖per-CPU syscall map。CPU 拥堵、软中断可能在不同 CPU 运行时，注入的元数据可能缺失或过期。
-      enabled: false
-      # type: int
-      # name:
-      #   en: PID Injection Window
-      #   ch: PID 注入窗口
-      # unit: Bytes
-      # range: [0, 1048576]
-      # enum_options: []
-      # modification: hot_update
-      # ee_feature: false
-      # description:
-      #   en: |-
-      #     Minimum number of TCP payload bytes between PID injections. Default 16KB matches the
-      #     legacy behavior; smaller windows increase frequency, larger windows decrease it. Set to
-      #     0 to disable sampling and inject on every eligible packet.
-      #   ch: |-
-      #     控制 PID 注入之间的最小 TCP 负载间隔字节数。缺省为 16KB，与历史行为一致；值越小注入越频繁，值越大越稀疏。
-      #     设置为0关闭采样窗口功能，对所有数据包注入。
-      sampling_window_bytes: 16384
+      sock_ops:
+        # type: section
+        # name:
+        #   en: TCP Option Trace
+        #   ch: TCP Option Trace
+        # description:
+        tcp_option_trace:
+          # type: bool
+          # name:
+          #   en: TCP Option Tracing
+          #   ch: TCP Option 注入
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: hot_update
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     Whether to enable the tcp-option tracing SockOps program, which injects DeepFlow metadata
+          #     (for example, process PID) into a custom TCP option for eligible connections.
+          #     Note: This feature requires cgroup v2 (unified hierarchy). On hosts using cgroup v1
+          #     the SockOps program will fail to attach and the agent will log a warning.
+          #     Limitation: PID tracking relies on the per-CPU syscall map in. Under CPU congestion,
+          #     softirqs handling TCP may run on a different CPU than the userspace thread, so the
+          #     injected metadata can be missing or stale.
+          #   ch: |-
+          #     是否开启 TCP Option Tracing SockOps 程序，用于在满足条件的 TCP 连接上注入 DeepFlow 元数据（如进程 PID）。
+          #     注意：该功能依赖 cgroup v2（统一层级）。在 cgroup v1 主机上 SockOps 绑定会失败.
+          #     限制：PID 跟踪依赖per-CPU syscall map。CPU 拥堵、软中断可能在不同 CPU 运行时，注入的元数据可能缺失或过期。
+          enabled: false
+          # type: int
+          # name:
+          #   en: PID Injection Window
+          #   ch: PID 注入窗口
+          # unit: Bytes
+          # range: [0, 1048576]
+          # enum_options: []
+          # modification: hot_update
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     Minimum number of TCP payload bytes between PID injections. Default 16KB matches the
+          #     legacy behavior; smaller windows increase frequency, larger windows decrease it. Set to
+          #     0 to disable sampling and inject on every eligible packet.
+          #   ch: |-
+          #     控制 PID 注入之间的最小 TCP 负载间隔字节数。缺省为 16KB，与历史行为一致；值越小注入越频繁，值越大越稀疏。
+          #     设置为0关闭采样窗口功能，对所有数据包注入。
+          sampling_window_bytes: 16384
       # type: section
       # name: Kprobe
       # description:
