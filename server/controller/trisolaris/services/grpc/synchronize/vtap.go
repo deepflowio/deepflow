@@ -109,7 +109,8 @@ func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string, expectedRevision st
 	}
 	content := vtapRrepo.Image
 	totalLen := uint64(len(content))
-	step := uint64(1024 * 1024)
+	// max upgrade data packet size is 1024KB, so use half mega byte step
+	step := uint64(common.HALF_MEGA_BYTE)
 	pktCount := uint32(math.Ceil(float64(totalLen) / float64(step)))
 	cipherStr := md5.Sum(content)
 	md5Sum := fmt.Sprintf("%x", cipherStr)
