@@ -639,6 +639,7 @@ type ChNpbTunnel struct {
 type ChAlarmPolicy struct {
 	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name      string    `gorm:"column:name;type:char(128)" json:"NAME"`
+	Info      string    `gorm:"column:info;type:text" json:"INFO"`
 	UserID    int       `gorm:"column:user_id;type:int" json:"USER_ID"`
 	TeamID    int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime:now,type:timestamp" json:"UPDATED_AT"`

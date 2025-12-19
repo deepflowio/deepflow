@@ -545,6 +545,7 @@ const (
 		"(\n" +
 		"    `id` Int64,\n" +
 		"    `name` String,\n" +
+		"    `info` String,\n" +
 		"    `user_id` Int64,\n" +
 		"    `team_id` UInt64\n" +
 		")\n" +
