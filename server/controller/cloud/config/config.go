@@ -31,8 +31,6 @@ type FusionComputeConfig struct {
 
 type CloudConfig struct {
 	KubernetesGatherInterval uint32              `default:"30" yaml:"kubernetes_gather_interval"`
-	AliyunRegionName         string              `default:"cn-beijing" yaml:"aliyun_region_name"`
-	AWSRegionName            string              `default:"cn-north-1" yaml:"aws_region_name"`
 	HostnameToIPFile         string              `default:"/etc/hostname_to_ip.csv" yaml:"hostname_to_ip_file"`
 	DNSEnable                bool                `default:"false" yaml:"dns_enable"`
 	HTTPTimeout              int                 `default:"30" yaml:"http_timeout"`
@@ -49,8 +47,6 @@ func SetCloudGlobalConfig(c CloudConfig) {
 		DNSEnable:           c.DNSEnable,
 		HTTPTimeout:         c.HTTPTimeout,
 		DebugEnabled:        c.DebugEnabled,
-		AliyunRegionName:    c.AliyunRegionName,
-		AWSRegionName:       c.AWSRegionName,
 		CustomTagLenMax:     c.CustomTagLenMax,
 		ProcessNameLenMax:   c.ProcessNameLenMax,
 		QingCloudConfig:     c.QingCloudConfig,

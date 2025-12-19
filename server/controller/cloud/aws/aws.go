@@ -94,6 +94,11 @@ func NewAws(orgID int, domain metadbmodel.Domain, cfg cloudconfig.CloudConfig) (
 		return nil, err
 	}
 
+	regionName := config.Get("region_name").MustString()
+	if regionName == "" {
+		regionName = REGION_NAME
+	}
+
 	regionLcuuid := config.Get("region_uuid").MustString()
 	if regionLcuuid == "" {
 		regionLcuuid = common.DEFAULT_REGION
@@ -109,7 +114,7 @@ func NewAws(orgID int, domain metadbmodel.Domain, cfg cloudconfig.CloudConfig) (
 		lcuuid:           domain.Lcuuid,
 		uuidGenerate:     domain.DisplayName,
 		httpClient:       httpClient,
-		apiDefaultRegion: cfg.AWSRegionName,
+		apiDefaultRegion: regionName,
 		regionLcuuid:     regionLcuuid,
 		includeRegions:   cloudcommon.UniqRegions(config.Get("include_regions").MustString()),
 		credential:       awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(secretID, decryptSecretKey, "")),
