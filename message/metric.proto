@@ -128,8 +128,6 @@ message Performance {
     uint64 zero_win_rx = 4;
     uint32 retrans_syn = 5;
     uint32 retrans_synack = 6;
-    uint64 ooo_tx = 7;
-    uint64 ooo_rx = 8;
 }
 
 message Anomaly {
@@ -150,6 +148,9 @@ message Anomaly {
     uint32 l7_client_error = 13;
     uint32 l7_server_error = 14;
     uint32 l7_timeout = 15;
+
+    uint64 client_ooo = 20;
+    uint64 server_ooo = 21;
 }
 
 message FlowLoad {
