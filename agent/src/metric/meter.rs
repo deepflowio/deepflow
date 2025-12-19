@@ -313,8 +313,6 @@ pub struct Performance {
     pub zero_win_rx: u64,
     pub retrans_syn: u32,
     pub retrans_synack: u32,
-    pub ooo_tx: u64,
-    pub ooo_rx: u64,
 }
 
 impl Performance {
@@ -325,8 +323,6 @@ impl Performance {
         self.zero_win_rx += other.zero_win_rx;
         self.retrans_syn += other.retrans_syn;
         self.retrans_synack += other.retrans_synack;
-        self.ooo_tx += other.ooo_tx;
-        self.ooo_rx += other.ooo_rx;
     }
 }
 
@@ -339,8 +335,6 @@ impl From<Performance> for metric::Performance {
             zero_win_rx: m.zero_win_rx,
             retrans_syn: m.retrans_syn,
             retrans_synack: m.retrans_synack,
-            ooo_tx: m.ooo_tx,
-            ooo_rx: m.ooo_rx,
         }
     }
 }
@@ -364,6 +358,9 @@ pub struct Anomaly {
     pub l7_client_error: u32,
     pub l7_server_error: u32,
     pub l7_timeout: u32,
+
+    pub client_ooo: u64,
+    pub server_ooo: u64,
 }
 
 impl Anomaly {
@@ -385,6 +382,8 @@ impl Anomaly {
         self.l7_client_error += other.l7_client_error;
         self.l7_server_error += other.l7_server_error;
         self.l7_timeout += other.l7_timeout;
+        self.client_ooo += other.client_ooo;
+        self.server_ooo += other.server_ooo;
     }
 }
 
@@ -408,6 +407,9 @@ impl From<Anomaly> for metric::Anomaly {
             l7_client_error: m.l7_client_error,
             l7_server_error: m.l7_server_error,
             l7_timeout: m.l7_timeout,
+
+            client_ooo: m.client_ooo,
+            server_ooo: m.server_ooo,
         }
     }
 }
