@@ -355,7 +355,7 @@ func (c *Cloud) getCloudData() {
 			c.sendStatsd(cloudCost)
 		} else {
 			c.resource.ErrorState = cResource.ErrorState
-			c.resource.ErrorMessage = cResource.ErrorMessage
+			c.resource.ErrorMessage = fmt.Sprintf("%s %s", time.Now().Format(common.GO_BIRTHDAY), cResource.ErrorMessage)
 			log.Warningf("get cloud (%s) data, verify is (false), error state (%d), error message (%s)", c.basicInfo.Name, cResource.ErrorState, cResource.ErrorMessage, logger.NewORGPrefix(c.orgID))
 		}
 	}
