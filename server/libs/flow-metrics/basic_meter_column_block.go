@@ -220,6 +220,8 @@ type PerformanceBlock struct {
 	ColZeroWin       proto.ColUInt64
 	ColRetransSyn    proto.ColUInt64
 	ColRetransSynack proto.ColUInt64
+	ColOooTx         proto.ColUInt64
+	ColOooRx         proto.ColUInt64
 }
 
 func (b *PerformanceBlock) Reset() {
@@ -231,6 +233,8 @@ func (b *PerformanceBlock) Reset() {
 	b.ColZeroWin.Reset()
 	b.ColRetransSyn.Reset()
 	b.ColRetransSynack.Reset()
+	b.ColOooTx.Reset()
+	b.ColOooRx.Reset()
 }
 
 func (b *PerformanceBlock) ToInput(input proto.Input) proto.Input {
@@ -243,6 +247,8 @@ func (b *PerformanceBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_ZERO_WIN, Data: &b.ColZeroWin},
 		proto.InputColumn{Name: ckdb.COLUMN_RETRANS_SYN, Data: &b.ColRetransSyn},
 		proto.InputColumn{Name: ckdb.COLUMN_RETRANS_SYNACK, Data: &b.ColRetransSynack},
+		proto.InputColumn{Name: ckdb.COLUMN_OOO_TX, Data: &b.ColOooTx},
+		proto.InputColumn{Name: ckdb.COLUMN_OOO_RX, Data: &b.ColOooRx},
 	)
 }
 
@@ -260,6 +266,8 @@ func (n *Performance) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColZeroWin.Append(n.ZeroWinTx + n.ZeroWinRx)
 	block.ColRetransSyn.Append(uint64(n.RetransSyn))
 	block.ColRetransSynack.Append(uint64(n.RetransSynack))
+	block.ColOooTx.Append(n.OooTx)
+	block.ColOooRx.Append(n.OooRx)
 }
 
 type AnomalyBlock struct {

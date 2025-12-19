@@ -390,6 +390,8 @@ type Performance struct {
 	ZeroWinRx     uint64 `json:"zero_win_rx" category:"$metrics"`
 	RetransSyn    uint32 `json:"retrans_syn" category:"$metrics"`
 	RetransSynack uint32 `json:"retrans_synack" category:"$metrics"`
+	OooTx         uint64 `json:"ooo_tx" category:"$metrics"`
+	OooRx         uint64 `json:"ooo_rx" category:"$metrics"`
 }
 
 func (a *Performance) Reverse() {
@@ -403,6 +405,8 @@ func (a *Performance) WriteToPB(p *pb.Performance) {
 	p.ZeroWinRx = a.ZeroWinRx
 	p.RetransSyn = a.RetransSyn
 	p.RetransSynack = a.RetransSynack
+	p.OooTx = a.OooTx
+	p.OooRx = a.OooRx
 }
 
 func (a *Performance) ReadFromPB(p *pb.Performance) {
@@ -412,6 +416,8 @@ func (a *Performance) ReadFromPB(p *pb.Performance) {
 	a.ZeroWinRx = p.ZeroWinRx
 	a.RetransSyn = p.RetransSyn
 	a.RetransSynack = p.RetransSynack
+	a.OooTx = p.OooTx
+	a.OooRx = p.OooRx
 }
 
 func (a *Performance) ConcurrentMerge(other *Performance) {
@@ -421,6 +427,8 @@ func (a *Performance) ConcurrentMerge(other *Performance) {
 	a.ZeroWinRx += other.ZeroWinRx
 	a.RetransSyn += other.RetransSyn
 	a.RetransSynack += other.RetransSynack
+	a.OooTx += other.OooTx
+	a.OooRx += other.OooRx
 }
 
 func (a *Performance) SequentialMerge(other *Performance) {
@@ -430,9 +438,11 @@ func (a *Performance) SequentialMerge(other *Performance) {
 func (a *Performance) MarshalTo(b []byte) int {
 	fields := []string{
 		"retrans_tx=", "retrans_rx=", "retrans=", "zero_win_tx=", "zero_win_rx=", "zero_win=", "retrans_syn=", "retrans_synack",
+		"ooo_tx=", "ooo_rx=", "ooo=",
 	}
 	values := []uint64{
 		a.RetransTx, a.RetransRx, a.RetransTx + a.RetransRx, a.ZeroWinTx, a.ZeroWinRx, a.ZeroWinTx + a.ZeroWinRx, uint64(a.RetransSyn), uint64(a.RetransSynack),
+		a.OooTx, a.OooRx, a.OooTx + a.OooRx,
 	}
 	return marshalKeyValues(b, fields, values)
 }
@@ -448,6 +458,9 @@ const (
 
 	PERF_RETRANS_SYN
 	PERF_RETRANS_SYNACK
+
+	PERF_OOO_TX
+	PERF_OOO_RX
 )
 
 func PerformanceColumns() []*ckdb.Column {
@@ -463,6 +476,9 @@ func PerformanceColumns() []*ckdb.Column {
 
 			PERF_RETRANS_SYN:    {"retrans_syn", "Total client retransmit SYN times"},
 			PERF_RETRANS_SYNACK: {"retrans_synack", "Total server retransmit SYNACK times"},
+
+			PERF_OOO_TX: {"ooo_tx", "Total client out of order times"},
+			PERF_OOO_RX: {"ooo_rx", "Total server out of order times"},
 		},
 		ckdb.UInt64)
 }
