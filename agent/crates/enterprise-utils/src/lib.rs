@@ -82,8 +82,8 @@ pub mod l7 {
                 }
                 pub fn counters(
                     &self,
-                ) -> impl Iterator<Item = (&dyn public::counter::Module, public::counter::Countable)>
-                       + '_ {
+                ) -> impl Iterator<Item = (&dyn public::counter::Module, public::counter::Countable)> + '_
+                {
                     std::iter::empty()
                 }
             }
