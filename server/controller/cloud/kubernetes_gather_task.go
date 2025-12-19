@@ -122,7 +122,7 @@ func (k *KubernetesGatherTask) run(rSignal *queue.OverwriteQueue) {
 	kResource, err := k.kubernetesGather.GetKubernetesGatherData()
 	// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
 	if err != nil {
-		kResource.ErrorMessage = err.Error()
+		kResource.ErrorMessage = fmt.Sprintf("%s %s", time.Now().Format(common.GO_BIRTHDAY), err.Error())
 		if kResource.ErrorState == 0 {
 			kResource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
 		}
