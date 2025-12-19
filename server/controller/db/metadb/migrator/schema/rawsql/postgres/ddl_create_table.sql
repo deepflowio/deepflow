@@ -2231,6 +2231,7 @@ CREATE INDEX ch_npb_tunnel_updated_at_index ON ch_npb_tunnel(updated_at);
 CREATE TABLE IF NOT EXISTS ch_alarm_policy (
     id              SERIAL PRIMARY KEY,
     name            VARCHAR(256),
+    info            TEXT,
     user_id         INTEGER,
     team_id         INTEGER DEFAULT 1,
     updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

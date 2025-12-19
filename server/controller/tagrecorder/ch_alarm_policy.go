@@ -17,6 +17,8 @@
 package tagrecorder
 
 import (
+	"encoding/json"
+
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
@@ -46,9 +48,22 @@ func (p *ChAlarmPolicy) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.Ch
 
 	keyToItem := make(map[IDKey]metadbmodel.ChAlarmPolicy)
 	for _, alarmPolicy := range alarmPolicys {
+		info := map[string]interface{}{}
+		if alarmPolicy.QueryConditions != "" {
+			info["QUERY_CONDITIONS"] = alarmPolicy.QueryConditions
+		}
+		if alarmPolicy.MonitoringInterval != "" {
+			info["MONITORING_INTERVAL"] = alarmPolicy.MonitoringInterval
+		}
+		infoBytes, err := json.Marshal(info)
+		if err != nil {
+			log.Errorf("marshal alarm policy info failed: %v, %s", err, db.LogPrefixORGID)
+			return nil, false
+		}
 		keyToItem[IDKey{ID: alarmPolicy.ID}] = metadbmodel.ChAlarmPolicy{
 			ID:     alarmPolicy.ID,
 			Name:   alarmPolicy.Name,
+			Info:   string(infoBytes),
 			UserID: alarmPolicy.UserID,
 			TeamID: alarmPolicy.TeamID,
 		}
@@ -67,6 +82,9 @@ func (p *ChAlarmPolicy) generateUpdateInfo(oldItem, newItem metadbmodel.ChAlarmP
 	}
 	if oldItem.UserID != newItem.UserID {
 		updateInfo["user_id"] = newItem.UserID
+	}
+	if oldItem.Info != newItem.Info {
+		updateInfo["info"] = newItem.Info
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true

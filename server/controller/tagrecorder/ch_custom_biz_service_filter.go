@@ -142,93 +142,93 @@ func (s *ChCustomBizServiceFilter) generateNewData(db *metadb.DB) (map[IDKey]met
 				}
 			}
 		}
-
-		clientBody := map[string]interface{}{
-			"conditions": map[string]interface{}{
-				"RESOURCE_SETS": clientResourceSets,
-			},
-			"selects": map[string]interface{}{
-				"TAGS": []interface{}{""},
-			},
-			"tableName": table,
-			"paths":     clientPaths,
-			"db":        database,
-		}
-
-		serverBody := map[string]interface{}{
-			"conditions": map[string]interface{}{
-				"RESOURCE_SETS": serverResourceSets,
-			},
-			"selects": map[string]interface{}{
-				"TAGS": []interface{}{""},
-			},
-			"tableName": table,
-			"paths":     serverPaths,
-			"db":        database,
-		}
-
 		// client
-		clientRes, clientErr := common.CURLPerform(
-			"POST",
-			fmt.Sprintf("http://%s:%d/create-business-sql", s.cfg.QuerierJSService.Host, s.cfg.QuerierJSService.Port),
-			clientBody,
-		)
-		if clientErr != nil {
-			log.Error(clientErr, db.LogPrefixORGID)
-			return nil, false
-		}
-		for k, _ := range clientRes.Get("DATA").Get("path").MustArray() {
-			query := clientRes.Get("DATA").Get("path").GetIndex(k)
-			queryID := query.GetPath("sql", "QUERY_ID").MustString()
-			queryIDSlice := strings.Split(queryID, "-")
-			serviceIDStr := strings.TrimPrefix(queryIDSlice[0], "R")
-			serviceIDInt, err := strconv.Atoi(serviceIDStr)
-			if err != nil {
-				log.Error(err, db.LogPrefixORGID)
+		if len(clientResourceSets) > 0 {
+			clientBody := map[string]interface{}{
+				"conditions": map[string]interface{}{
+					"RESOURCE_SETS": clientResourceSets,
+				},
+				"selects": map[string]interface{}{
+					"TAGS": []interface{}{""},
+				},
+				"tableName": table,
+				"paths":     clientPaths,
+				"db":        database,
+			}
+			clientRes, clientErr := common.CURLPerform(
+				"POST",
+				fmt.Sprintf("http://%s:%d/create-business-sql", s.cfg.QuerierJSService.Host, s.cfg.QuerierJSService.Port),
+				clientBody,
+			)
+			if clientErr != nil {
+				log.Error(clientErr, db.LogPrefixORGID)
 				return nil, false
 			}
-			clientFilter := query.GetPath("sql", "WHERE").MustString()
-			serviceFilter, ok := keyToItem[IDKey{ID: serviceIDInt}]
-			if ok {
-				serviceFilter.ClientFilter = clientFilter
-				keyToItem[IDKey{ID: serviceIDInt}] = serviceFilter
-			} else {
-				keyToItem[IDKey{ID: serviceIDInt}] = metadbmodel.ChCustomBizServiceFilter{
-					ID:           serviceIDInt,
-					ClientFilter: clientFilter,
+			for k, _ := range clientRes.Get("DATA").Get("path").MustArray() {
+				query := clientRes.Get("DATA").Get("path").GetIndex(k)
+				queryID := query.GetPath("sql", "QUERY_ID").MustString()
+				queryIDSlice := strings.Split(queryID, "-")
+				serviceIDStr := strings.TrimPrefix(queryIDSlice[0], "R")
+				serviceIDInt, err := strconv.Atoi(serviceIDStr)
+				if err != nil {
+					log.Error(err, db.LogPrefixORGID)
+					return nil, false
+				}
+				clientFilter := query.GetPath("sql", "WHERE").MustString()
+				serviceFilter, ok := keyToItem[IDKey{ID: serviceIDInt}]
+				if ok {
+					serviceFilter.ClientFilter = clientFilter
+					keyToItem[IDKey{ID: serviceIDInt}] = serviceFilter
+				} else {
+					keyToItem[IDKey{ID: serviceIDInt}] = metadbmodel.ChCustomBizServiceFilter{
+						ID:           serviceIDInt,
+						ClientFilter: clientFilter,
+					}
 				}
 			}
 		}
-
 		// server
-		serverRes, serverErr := common.CURLPerform(
-			"POST",
-			fmt.Sprintf("http://%s:%d/create-business-sql", s.cfg.QuerierJSService.Host, s.cfg.QuerierJSService.Port),
-			serverBody,
-		)
-		if serverErr != nil {
-			log.Error(serverErr, db.LogPrefixORGID)
-			return nil, false
-		}
-		for l, _ := range serverRes.Get("DATA").Get("path").MustArray() {
-			query := serverRes.Get("DATA").Get("path").GetIndex(l)
-			queryID := query.GetPath("sql", "QUERY_ID").MustString()
-			queryIDSlice := strings.Split(queryID, "-")
-			serviceIDStr := strings.TrimPrefix(queryIDSlice[0], "R")
-			serviceIDInt, err := strconv.Atoi(serviceIDStr)
-			if err != nil {
-				log.Error(err, db.LogPrefixORGID)
+		if len(serverResourceSets) > 0 {
+			serverBody := map[string]interface{}{
+				"conditions": map[string]interface{}{
+					"RESOURCE_SETS": serverResourceSets,
+				},
+				"selects": map[string]interface{}{
+					"TAGS": []interface{}{""},
+				},
+				"tableName": table,
+				"paths":     serverPaths,
+				"db":        database,
+			}
+			serverRes, serverErr := common.CURLPerform(
+				"POST",
+				fmt.Sprintf("http://%s:%d/create-business-sql", s.cfg.QuerierJSService.Host, s.cfg.QuerierJSService.Port),
+				serverBody,
+			)
+			if serverErr != nil {
+				log.Error(serverErr, db.LogPrefixORGID)
 				return nil, false
 			}
-			serverFilter := query.GetPath("sql", "WHERE").MustString()
-			serviceFilter, ok := keyToItem[IDKey{ID: serviceIDInt}]
-			if ok {
-				serviceFilter.ServerFilter = serverFilter
-				keyToItem[IDKey{ID: serviceIDInt}] = serviceFilter
-			} else {
-				keyToItem[IDKey{ID: serviceIDInt}] = metadbmodel.ChCustomBizServiceFilter{
-					ID:           serviceIDInt,
-					ServerFilter: serverFilter,
+			for l, _ := range serverRes.Get("DATA").Get("path").MustArray() {
+				query := serverRes.Get("DATA").Get("path").GetIndex(l)
+				queryID := query.GetPath("sql", "QUERY_ID").MustString()
+				queryIDSlice := strings.Split(queryID, "-")
+				serviceIDStr := strings.TrimPrefix(queryIDSlice[0], "R")
+				serviceIDInt, err := strconv.Atoi(serviceIDStr)
+				if err != nil {
+					log.Error(err, db.LogPrefixORGID)
+					return nil, false
+				}
+				serverFilter := query.GetPath("sql", "WHERE").MustString()
+				serviceFilter, ok := keyToItem[IDKey{ID: serviceIDInt}]
+				if ok {
+					serviceFilter.ServerFilter = serverFilter
+					keyToItem[IDKey{ID: serviceIDInt}] = serviceFilter
+				} else {
+					keyToItem[IDKey{ID: serviceIDInt}] = metadbmodel.ChCustomBizServiceFilter{
+						ID:           serviceIDInt,
+						ServerFilter: serverFilter,
+					}
 				}
 			}
 		}
