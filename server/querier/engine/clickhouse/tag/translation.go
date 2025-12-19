@@ -2301,6 +2301,16 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		),
 	}
 
+	tagResourceMap["policy_info"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGetOrDefault('flow_tag.alarm_policy_map', 'info', (toUInt64(policy_id)), '{}')",
+			"",
+			"toUInt64(policy_id) GLOBAL IN (SELECT id FROM flow_tag.alarm_policy_map WHERE info %s %s)",
+			"toUInt64(policy_id) GLOBAL IN (SELECT id FROM flow_tag.alarm_policy_map WHERE %s(info,%s))",
+			"policy_id",
+		),
+	}
+
 	return tagResourceMap
 }
 
