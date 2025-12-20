@@ -577,7 +577,7 @@ impl PerfData {
         stats.counts_peers[0].zero_win_count = self.zero_win_count_0;
         stats.counts_peers[1].zero_win_count = self.zero_win_count_1;
         stats.counts_peers[0].ooo_count = self.ooo_0;
-        stats.counts_peers[1].ooo_count = self.ooo_0;
+        stats.counts_peers[1].ooo_count = self.ooo_1;
 
         stats.syn_count = self.syn;
         stats.synack_count = self.synack;
