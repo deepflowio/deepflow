@@ -512,12 +512,11 @@ static unsigned int calc_kernel_page_cnt(unsigned int page_cnt)
  * @param t Tracer address
  * @param The map_name Perf buffer map name
  * @param The raw_cb Perf reader raw data callback
- * @param Lost_cb perf reader data lost callback
- * @param Pages_cnt How many memory pages are used for ring-buffer
- *            (system page size * pages_cnt)
- * @param Thread_nr The number of threads required for the reader's work
- * @param Epoll_timeout perf epoll timeout
- * @return Perf_reader address on success, NULL on error
+ * @param lost_cb perf reader data lost callback
+ * @param pages_cnt How many memory pages are used for ring-buffer
+ * @param thread_nr The number of threads required for the reader's work
+ * @param epoll_timeout perf epoll timeout
+ * @return perf_reader address on success, NULL on error
  */
 struct bpf_perf_reader *create_perf_buffer_reader(struct bpf_tracer *t,
 						  const char *map_name,
@@ -549,7 +548,7 @@ struct bpf_perf_reader *create_perf_buffer_reader(struct bpf_tracer *t,
 		pages_cnt = 1 << min_log2((unsigned int)pages_cnt);
 
 	reader->tracer = t;
-	// Adjust to system page size.
+	// Adjust to system page count.
 	reader->perf_pages_cnt = calc_kernel_page_cnt(pages_cnt);
 	reader->epoll_timeout = epoll_timeout;
 
