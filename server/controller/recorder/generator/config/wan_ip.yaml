@@ -1,0 +1,31 @@
+name: wan_ip
+public_name: WANIP
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+
+cache_tool:
+  enabled: true
+  fields:
+  - name: lcuuid
+    public_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: id
+    public_name: ID
+    type: int
+  - name: ip
+    public_name: IP
+    type: string
+  - name: vInterfaceID
+    public_name: VInterfaceID
+    type: int
+  has_extension: true
+  collection_extension: true

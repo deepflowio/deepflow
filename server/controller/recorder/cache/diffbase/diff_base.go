@@ -121,20 +121,3 @@ func NewDataSet(md *rcommon.Metadata) *DataSet {
 		VIP:                          make(map[string]*VIP),
 	}
 }
-
-type DiffBase struct {
-	Sequence int    `json:"sequence"`
-	Lcuuid   string `json:"lcuuid"`
-}
-
-func (d *DiffBase) GetSequence() int {
-	return d.Sequence
-}
-
-func (d *DiffBase) SetSequence(sequence int) {
-	d.Sequence = sequence
-}
-
-func (d *DiffBase) GetLcuuid() string {
-	return d.Lcuuid
-}

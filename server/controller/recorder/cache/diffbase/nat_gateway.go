@@ -17,39 +17,35 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddNATGateway(dbItem *metadbmodel.NATGateway, seq int) {
-	b.NATGateways[dbItem.Lcuuid] = &NATGateway{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:         dbItem.Name,
-		FloatingIPs:  dbItem.FloatingIPs,
-		RegionLcuuid: dbItem.Region,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, b.NATGateways[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteNATGateway(lcuuid string) {
-	delete(b.NATGateways, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type NATGateway struct {
-	DiffBase
-	Name         string `json:"name"`
-	FloatingIPs  string `json:"floating_ips"`
-	RegionLcuuid string `json:"region_lcuuid"`
+	ResourceBase
+	Name         string
+	FloatingIPs  string
+	RegionLcuuid string
 }
 
-func (n *NATGateway) Update(cloudItem *cloudmodel.NATGateway) {
-	n.Name = cloudItem.Name
-	n.FloatingIPs = cloudItem.FloatingIPs
-	n.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, n))
+func (a *NATGateway) reset(dbItem *metadbmodel.NATGateway, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.FloatingIPs = dbItem.FloatingIPs
+	a.RegionLcuuid = dbItem.Region
+}
+
+func NewNATGatewayCollection(t *tool.Tool) *NATGatewayCollection {
+	c := new(NATGatewayCollection)
+	c.collection = newCollectionBuilder[*NATGateway]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.NATGateway { return new(metadbmodel.NATGateway) }).
+		withCacheItemFactory(func() *NATGateway { return new(NATGateway) }).
+		build()
+	return c
+}
+
+type NATGatewayCollection struct {
+	collection[*NATGateway, *metadbmodel.NATGateway]
 }

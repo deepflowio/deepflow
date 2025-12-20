@@ -1,0 +1,27 @@
+name: az
+public_name: AZ
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type : string
+    - name: Label
+      type : string
+    - name: RegionLcuuid
+      type : string
+      db_field_name: Region
+
+cache_tool:
+  enabled: true
+  fields:
+    - name: lcuuid
+      public_name: Lcuuid
+      type: string
+      is_validation_field: true
+    - name: id
+      public_name: ID
+      type: int
+    - name: name
+      public_name: Name
+      type: string

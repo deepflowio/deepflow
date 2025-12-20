@@ -17,35 +17,33 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPodServicePort(dbItem *metadbmodel.PodServicePort, seq int) {
-	b.PodServicePorts[dbItem.Lcuuid] = &PodServicePort{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:            dbItem.Name,
-		SubDomainLcuuid: dbItem.SubDomain,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, b.PodServicePorts[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeletePodServicePort(lcuuid string) {
-	delete(b.PodServicePorts, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type PodServicePort struct {
-	DiffBase
-	Name            string `json:"name"`
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	ResourceBase
+	Name            string
+	SubDomainLcuuid string
 }
 
-func (p *PodServicePort) Update(cloudItem *cloudmodel.PodServicePort) {
-	p.Name = cloudItem.Name
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, p))
+func (a *PodServicePort) reset(dbItem *metadbmodel.PodServicePort, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.SubDomainLcuuid = dbItem.SubDomain
+}
+
+func NewPodServicePortCollection(t *tool.Tool) *PodServicePortCollection {
+	c := new(PodServicePortCollection)
+	c.collection = newCollectionBuilder[*PodServicePort]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.PodServicePort { return new(metadbmodel.PodServicePort) }).
+		withCacheItemFactory(func() *PodServicePort { return new(PodServicePort) }).
+		build()
+	return c
+}
+
+type PodServicePortCollection struct {
+	collection[*PodServicePort, *metadbmodel.PodServicePort]
 }

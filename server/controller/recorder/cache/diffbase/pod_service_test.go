@@ -17,7 +17,7 @@ func TestPodServiceExternalIPSync(t *testing.T) {
 	}
 
 	// 创建 mock 工具数据集
-	toolDataSet := &tool.DataSet{}
+	tool := &tool.Tool{}
 
 	// 测试场景1：AddPodService 应该正确设置 ExternalIP
 	dbItem := &metadbmodel.PodService{
@@ -29,7 +29,7 @@ func TestPodServiceExternalIPSync(t *testing.T) {
 		ServiceClusterIP: "10.0.0.1",
 	}
 
-	dataset.AddPodService(dbItem, 1, toolDataSet)
+	dataset.AddPodService(dbItem, 1, tool)
 
 	// 验证 ExternalIP 被正确设置
 	podService := dataset.PodServices["test-lcuuid-1"]
@@ -47,7 +47,7 @@ func TestPodServiceExternalIPSync(t *testing.T) {
 		Spec:             "{}",
 	}
 
-	podService.Update(cloudItem, toolDataSet)
+	podService.Update(cloudItem, tool)
 
 	// 验证 ExternalIP 被正确更新
 	if podService.ExternalIP != "192.168.1.200" {
@@ -56,7 +56,7 @@ func TestPodServiceExternalIPSync(t *testing.T) {
 
 	// 测试场景3：空字符串 ExternalIP
 	cloudItem.ExternalIP = ""
-	podService.Update(cloudItem, toolDataSet)
+	podService.Update(cloudItem, tool)
 
 	if podService.ExternalIP != "" {
 		t.Errorf("Expected ExternalIP to be empty string, got '%s'", podService.ExternalIP)

@@ -17,39 +17,31 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddLANIP(dbItem *metadbmodel.LANIP, seq int, toolDataSet *tool.DataSet) {
-	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
-	// which may cause recorder performance issues.
-	// subnetLcuuid, _ := toolDataSet.GetSubnetLcuuidByID(dbItem.SubnetID)
-	b.LANIPs[dbItem.Lcuuid] = &LANIP{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		SubDomainLcuuid: dbItem.SubDomain,
-		// SubnetLcuuid:    subnetLcuuid,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteLANIP(lcuuid string) {
-	delete(b.LANIPs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type LANIP struct {
-	DiffBase
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
-	SubnetLcuuid    string `json:"subnet_lcuuid"`
+	ResourceBase
+	SubDomainLcuuid string
 }
 
-func (l *LANIP) Update(cloudItem *cloudmodel.IP) {
-	l.SubnetLcuuid = cloudItem.SubnetLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, l))
+func (a *LANIP) reset(dbItem *metadbmodel.LANIP, tool *tool.Tool) {
+	a.SubDomainLcuuid = dbItem.SubDomain
+}
+
+func NewLANIPCollection(t *tool.Tool) *LANIPCollection {
+	c := new(LANIPCollection)
+	c.collection = newCollectionBuilder[*LANIP]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.LANIP { return new(metadbmodel.LANIP) }).
+		withCacheItemFactory(func() *LANIP { return new(LANIP) }).
+		build()
+	return c
+}
+
+type LANIPCollection struct {
+	collection[*LANIP, *metadbmodel.LANIP]
 }

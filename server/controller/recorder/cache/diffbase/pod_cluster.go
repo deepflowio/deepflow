@@ -17,44 +17,39 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPodCluster(dbItem *metadbmodel.PodCluster, seq int) {
-	b.PodClusters[dbItem.Lcuuid] = &PodCluster{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:            dbItem.Name,
-		ClusterName:     dbItem.ClusterName,
-		RegionLcuuid:    dbItem.Region,
-		AZLcuuid:        dbItem.AZ,
-		SubDomainLcuuid: dbItem.SubDomain,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, b.PodClusters[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeletePodCluster(lcuuid string) {
-	delete(b.PodClusters, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type PodCluster struct {
-	DiffBase
-	Name            string `json:"name"`
-	ClusterName     string `json:"cluster_name"`
-	RegionLcuuid    string `json:"region_lcuuid"`
-	AZLcuuid        string `json:"az_lcuuid"`
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	ResourceBase
+	Name            string
+	ClusterName     string
+	RegionLcuuid    string
+	AZLcuuid        string
+	SubDomainLcuuid string
 }
 
-func (p *PodCluster) Update(cloudItem *cloudmodel.PodCluster) {
-	p.Name = cloudItem.Name
-	p.ClusterName = cloudItem.ClusterName
-	p.RegionLcuuid = cloudItem.RegionLcuuid
-	p.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, p))
+func (a *PodCluster) reset(dbItem *metadbmodel.PodCluster, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.ClusterName = dbItem.ClusterName
+	a.RegionLcuuid = dbItem.Region
+	a.AZLcuuid = dbItem.AZ
+	a.SubDomainLcuuid = dbItem.SubDomain
+}
+
+func NewPodClusterCollection(t *tool.Tool) *PodClusterCollection {
+	c := new(PodClusterCollection)
+	c.collection = newCollectionBuilder[*PodCluster]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.PodCluster { return new(metadbmodel.PodCluster) }).
+		withCacheItemFactory(func() *PodCluster { return new(PodCluster) }).
+		build()
+	return c
+}
+
+type PodClusterCollection struct {
+	collection[*PodCluster, *metadbmodel.PodCluster]
 }

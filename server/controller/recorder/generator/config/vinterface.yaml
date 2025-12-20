@@ -1,0 +1,79 @@
+name: vinterface
+public_name: VInterface
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: Type
+      type: int
+    - name: TapMac
+      type: string
+    - name: NetnsID
+      type: uint32
+    - name: VtapID
+      type: uint32
+    - name: VPCID
+      type: int
+    - name: DeviceType
+      type: int
+    - name: DeviceLcuuid
+      type: string
+      ref: Device
+    - name: NetworkLcuuid
+      type: string
+      ref: Network
+      db_field_name: NetworkID
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+
+cache_tool:
+  enabled: true
+  fields:
+  - name: lcuuid
+    public_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: id
+    public_name: ID
+    type: int
+  - name: name
+    public_name: Name
+    type: string
+  - name: ifType
+    public_name: Type
+    type: int
+  - name: index
+    public_name: Index
+    type: int
+  - name: mac
+    public_name: Mac
+    type: string
+  - name: regionID
+    public_name: RegionID
+    type: int
+    ref: Region
+    db_field_name: Region
+  - name: networkID
+    public_name: NetworkID
+    type: int
+  - name: vpcID
+    public_name: VPCID
+    type: int
+  - name: deviceType
+    public_name: DeviceType
+    type: int
+  - name: deviceID
+    public_name: DeviceID
+    type: int
+  - name: deviceName
+    public_name: DeviceName
+    type: string
+    is_custom: true
+  has_extension: true
+  collection_extension: true

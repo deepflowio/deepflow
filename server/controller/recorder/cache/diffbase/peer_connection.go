@@ -17,34 +17,31 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPeerConnection(dbItem *metadbmodel.PeerConnection, seq int, toolDataSet *tool.DataSet) {
-	b.PeerConnections[dbItem.Lcuuid] = &PeerConnection{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name: dbItem.Name,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, b.PeerConnections[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeletePeerConnection(lcuuid string) {
-	delete(b.PeerConnections, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type PeerConnection struct {
-	DiffBase
-	Name string `json:"name"`
+	ResourceBase
+	Name string
 }
 
-func (p *PeerConnection) Update(cloudItem *cloudmodel.PeerConnection) {
-	p.Name = cloudItem.Name
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, p))
+func (a *PeerConnection) reset(dbItem *metadbmodel.PeerConnection, tool *tool.Tool) {
+	a.Name = dbItem.Name
+}
+
+func NewPeerConnectionCollection(t *tool.Tool) *PeerConnectionCollection {
+	c := new(PeerConnectionCollection)
+	c.collection = newCollectionBuilder[*PeerConnection]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.PeerConnection { return new(metadbmodel.PeerConnection) }).
+		withCacheItemFactory(func() *PeerConnection { return new(PeerConnection) }).
+		build()
+	return c
+}
+
+type PeerConnectionCollection struct {
+	collection[*PeerConnection, *metadbmodel.PeerConnection]
 }

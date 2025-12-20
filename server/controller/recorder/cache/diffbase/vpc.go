@@ -17,48 +17,41 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddVPC(dbItem *metadbmodel.VPC, seq int) {
-	b.VPCs[dbItem.Lcuuid] = &VPC{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:         dbItem.Name,
-		Label:        dbItem.Label,
-		Owner:        dbItem.Owner,
-		TunnelID:     dbItem.TunnelID,
-		CIDR:         dbItem.CIDR,
-		RegionLcuuid: dbItem.Region,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VPC_EN, b.VPCs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteVPC(lcuuid string) {
-	delete(b.VPCs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VPC_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type VPC struct {
-	DiffBase
-	Name         string `json:"name"`
-	Label        string `json:"label"`
-	Owner        string `json:"owner"`
-	TunnelID     int    `json:"tunnel_id"`
-	CIDR         string `json:"cidr"`
-	RegionLcuuid string `json:"region_lcuuid"`
+	ResourceBase
+	Name         string
+	Label        string
+	TunnelID     int
+	CIDR         string
+	RegionLcuuid string
+	Owner        string
 }
 
-func (v *VPC) Update(cloudItem *cloudmodel.VPC) {
-	v.Name = cloudItem.Name
-	v.Label = cloudItem.Label
-	v.Owner = cloudItem.Owner
-	v.TunnelID = cloudItem.TunnelID
-	v.CIDR = cloudItem.CIDR
-	v.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VPC_EN, v))
+func (a *VPC) reset(dbItem *metadbmodel.VPC, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.Label = dbItem.Label
+	a.TunnelID = dbItem.TunnelID
+	a.CIDR = dbItem.CIDR
+	a.RegionLcuuid = dbItem.Region
+	a.Owner = dbItem.Owner
+}
+
+func NewVPCCollection(t *tool.Tool) *VPCCollection {
+	c := new(VPCCollection)
+	c.collection = newCollectionBuilder[*VPC]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_VPC_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.VPC { return new(metadbmodel.VPC) }).
+		withCacheItemFactory(func() *VPC { return new(VPC) }).
+		build()
+	return c
+}
+
+type VPCCollection struct {
+	collection[*VPC, *metadbmodel.VPC]
 }

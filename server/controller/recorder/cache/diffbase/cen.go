@@ -24,16 +24,16 @@ import (
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
-func (b *DataSet) AddCEN(dbItem *metadbmodel.CEN, seq int, toolDataSet *tool.DataSet) {
+func (b *DataSet) AddCEN(dbItem *metadbmodel.CEN, seq int, tool *tool.Tool) {
 	vpcLcuuids := []string{}
 	for _, vpcID := range rcommon.StringToIntSlice(dbItem.VPCIDs) {
-		vpcLcuuid, exists := toolDataSet.GetVPCLcuuidByID(vpcID)
-		if exists {
+		vpcLcuuid := tool.VPC().GetByID(vpcID).Lcuuid()
+		if vpcLcuuid != "" {
 			vpcLcuuids = append(vpcLcuuids, vpcLcuuid)
 		}
 	}
 	b.CENs[dbItem.Lcuuid] = &CEN{
-		DiffBase: DiffBase{
+		ResourceBase: ResourceBase{
 			Sequence: seq,
 			Lcuuid:   dbItem.Lcuuid,
 		},
@@ -48,14 +48,38 @@ func (b *DataSet) DeleteCEN(lcuuid string) {
 	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_CEN_EN, lcuuid), b.metadata.LogPrefixes)
 }
 
-type CEN struct {
-	DiffBase
-	Name       string   `json:"name"`
-	VPCLcuuids []string `json:"vpc_lcuuids"`
-}
-
 func (c *CEN) Update(cloudItem *cloudmodel.CEN) {
 	c.Name = cloudItem.Name
 	c.VPCLcuuids = cloudItem.VPCLcuuids
 	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_CEN_EN, c))
+}
+
+type CEN struct {
+	ResourceBase
+	Name       string   `json:"name"`
+	VPCLcuuids []string `json:"vpc_lcuuids"`
+}
+
+func (c *CEN) reset(dbItem *metadbmodel.CEN, tool *tool.Tool) {
+	vpcLcuuids := []string{}
+	for _, vpcID := range rcommon.StringToIntSlice(dbItem.VPCIDs) {
+		vpcLcuuid := tool.VPC().GetByID(vpcID).Lcuuid()
+		if vpcLcuuid != "" {
+			vpcLcuuids = append(vpcLcuuids, vpcLcuuid)
+		}
+	}
+	c.Name = dbItem.Name
+	c.VPCLcuuids = vpcLcuuids
+}
+
+type CENCollection struct {
+	collectionComponent[*CEN, CEN, *metadbmodel.CEN, metadbmodel.CEN]
+}
+
+func NewCENCollection(t *tool.Tool) *CENCollection {
+	c := new(CENCollection)
+	c.withResourceType(ctrlrcommon.RESOURCE_TYPE_CEN_EN).
+		withTool(t).
+		init()
+	return c
 }

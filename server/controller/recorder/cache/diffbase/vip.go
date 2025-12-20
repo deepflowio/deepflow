@@ -17,36 +17,33 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddVIP(dbItem *metadbmodel.VIP, seq int) {
-	b.VIP[dbItem.Lcuuid] = &VIP{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		IP:     dbItem.IP,
-		VTapID: dbItem.VTapID,
-	}
-	log.Info(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VIP_EN, b.VIP[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteVIP(lcuuid string) {
-	delete(b.VIP, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VIP_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type VIP struct {
-	DiffBase
-	IP     string `json:"ip" binding:"required"`
-	VTapID uint32 `json:"vtap_id" binding:"required"`
+	ResourceBase
+	IP     string
+	VTapID uint32
 }
 
-func (p *VIP) Update(cloudItem *cloudmodel.VIP) {
-	p.IP = cloudItem.IP
-	p.VTapID = cloudItem.VTapID
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VIP_EN, p))
+func (a *VIP) reset(dbItem *metadbmodel.VIP, tool *tool.Tool) {
+	a.IP = dbItem.IP
+	a.VTapID = dbItem.VTapID
+}
+
+func NewVIPCollection(t *tool.Tool) *VIPCollection {
+	c := new(VIPCollection)
+	c.collection = newCollectionBuilder[*VIP]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_VIP_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.VIP { return new(metadbmodel.VIP) }).
+		withCacheItemFactory(func() *VIP { return new(VIP) }).
+		build()
+	return c
+}
+
+type VIPCollection struct {
+	collection[*VIP, *metadbmodel.VIP]
 }

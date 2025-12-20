@@ -17,45 +17,39 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddRedisInstance(dbItem *metadbmodel.RedisInstance, seq int) {
-	b.RedisInstances[dbItem.Lcuuid] = &RedisInstance{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:         dbItem.Name,
-		State:        dbItem.State,
-		PublicHost:   dbItem.PublicHost,
-		RegionLcuuid: dbItem.Region,
-		AZLcuuid:     dbItem.AZ,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, b.RedisInstances[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteRedisInstance(lcuuid string) {
-	delete(b.RedisInstances, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type RedisInstance struct {
-	DiffBase
-	Name         string `json:"name"`
-	State        int    `json:"state"`
-	PublicHost   string `json:"public_host"`
-	RegionLcuuid string `json:"region_lcuuid"`
-	AZLcuuid     string `json:"az_lcuuid"`
+	ResourceBase
+	Name         string
+	State        int
+	PublicHost   string
+	RegionLcuuid string
+	AZLcuuid     string
 }
 
-func (r *RedisInstance) Update(cloudItem *cloudmodel.RedisInstance) {
-	r.Name = cloudItem.Name
-	r.State = cloudItem.State
-	r.PublicHost = cloudItem.PublicHost
-	r.RegionLcuuid = cloudItem.RegionLcuuid
-	r.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, r))
+func (a *RedisInstance) reset(dbItem *metadbmodel.RedisInstance, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.State = dbItem.State
+	a.PublicHost = dbItem.PublicHost
+	a.RegionLcuuid = dbItem.Region
+	a.AZLcuuid = dbItem.AZ
+}
+
+func NewRedisInstanceCollection(t *tool.Tool) *RedisInstanceCollection {
+	c := new(RedisInstanceCollection)
+	c.collection = newCollectionBuilder[*RedisInstance]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.RedisInstance { return new(metadbmodel.RedisInstance) }).
+		withCacheItemFactory(func() *RedisInstance { return new(RedisInstance) }).
+		build()
+	return c
+}
+
+type RedisInstanceCollection struct {
+	collection[*RedisInstance, *metadbmodel.RedisInstance]
 }

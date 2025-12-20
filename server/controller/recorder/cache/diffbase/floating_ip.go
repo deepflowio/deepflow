@@ -17,38 +17,33 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddFloatingIP(dbItem *metadbmodel.FloatingIP, seq int, toolDataSet *tool.DataSet) {
-	vpcLcuuid, _ := toolDataSet.GetVPCLcuuidByID(dbItem.VPCID)
-	b.FloatingIPs[dbItem.Lcuuid] = &FloatingIP{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		RegionLcuuid: dbItem.Region,
-		VPCLcuuid:    vpcLcuuid,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, b.FloatingIPs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteFloatingIP(lcuuid string) {
-	delete(b.FloatingIPs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type FloatingIP struct {
-	DiffBase
-	RegionLcuuid string `json:"region_lcuuid"`
-	VPCLcuuid    string `json:"vpc_lcuuid"`
+	ResourceBase
+	RegionLcuuid string
+	VPCLcuuid    string
 }
 
-func (f *FloatingIP) Update(cloudItem *cloudmodel.FloatingIP) {
-	f.RegionLcuuid = cloudItem.RegionLcuuid
-	f.VPCLcuuid = cloudItem.VPCLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, f))
+func (a *FloatingIP) reset(dbItem *metadbmodel.FloatingIP, tool *tool.Tool) {
+	a.RegionLcuuid = dbItem.Region
+	a.VPCLcuuid = tool.VPC().GetByID(dbItem.VPCID).Lcuuid()
+}
+
+func NewFloatingIPCollection(t *tool.Tool) *FloatingIPCollection {
+	c := new(FloatingIPCollection)
+	c.collection = newCollectionBuilder[*FloatingIP]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.FloatingIP { return new(metadbmodel.FloatingIP) }).
+		withCacheItemFactory(func() *FloatingIP { return new(FloatingIP) }).
+		build()
+	return c
+}
+
+type FloatingIPCollection struct {
+	collection[*FloatingIP, *metadbmodel.FloatingIP]
 }

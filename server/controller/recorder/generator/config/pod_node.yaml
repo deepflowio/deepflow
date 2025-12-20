@@ -1,0 +1,65 @@
+name: pod_node
+public_name: PodNode
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Type
+      type: int
+    - name: State
+      type: int
+    - name: Hostname
+      type: string
+    - name: IP
+      type: string
+    - name: VCPUNum
+      type: int
+    - name: MemTotal
+      type: int
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+
+cache_tool:
+  enabled: true
+  fields:
+  - name: lcuuid
+    public_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: id
+    public_name: ID
+    type: int
+  - name: domainLcuuid
+    public_name: DomainLcuuid
+    type: string
+    db_field_name: Domain
+  - name: name
+    public_name: Name
+    type: string
+  - name: regionID
+    public_name: RegionID
+    type: int
+    ref: Region
+    db_field_name: Region
+  - name: azID
+    public_name: AZID
+    type: int
+    ref: AZ
+    db_field_name: AZ
+  - name: vpcID
+    public_name: VPCID
+    type: int
+  - name: podClusterID
+    public_name: PodClusterID
+    type: int
+  - name: vmID
+    public_name: VMID
+    type: int
+    has_setter: true

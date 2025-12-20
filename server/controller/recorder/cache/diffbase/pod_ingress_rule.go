@@ -19,25 +19,29 @@ package diffbase
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPodIngressRule(dbItem *metadbmodel.PodIngressRule, seq int) {
-	b.PodIngressRules[dbItem.Lcuuid] = &PodIngressRule{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		SubDomainLcuuid: dbItem.SubDomain,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, b.PodIngressRules[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeletePodIngressRule(lcuuid string) {
-	delete(b.PodIngressRules, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type PodIngressRule struct {
-	DiffBase
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	ResourceBase
+	SubDomainLcuuid string
+}
+
+func (a *PodIngressRule) reset(dbItem *metadbmodel.PodIngressRule, tool *tool.Tool) {
+	a.SubDomainLcuuid = dbItem.SubDomain
+}
+
+func NewPodIngressRuleCollection(t *tool.Tool) *PodIngressRuleCollection {
+	c := new(PodIngressRuleCollection)
+	c.collection = newCollectionBuilder[*PodIngressRule]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.PodIngressRule { return new(metadbmodel.PodIngressRule) }).
+		withCacheItemFactory(func() *PodIngressRule { return new(PodIngressRule) }).
+		build()
+	return c
+}
+
+type PodIngressRuleCollection struct {
+	collection[*PodIngressRule, *metadbmodel.PodIngressRule]
 }

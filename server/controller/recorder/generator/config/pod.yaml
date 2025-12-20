@@ -1,0 +1,93 @@
+name: pod
+public_name: Pod
+cache_tool:
+  enabled: true
+  fields:
+  - name: lcuuid
+    public_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: id
+    public_name: ID
+    type: int
+  - name: domainLcuuid
+    public_name: DomainLcuuid
+    type: string
+    db_field_name: Domain
+  - name: name
+    public_name: Name
+    type: string
+  - name: regionID
+    public_name: RegionID
+    type: int
+    ref: Region
+    db_field_name: Region
+  - name: azID
+    public_name: AZID
+    type: int
+    ref: AZ
+    db_field_name: AZ
+  - name: vpcID
+    public_name: VPCID
+    type: int
+  - name: podClusterID
+    public_name: PodClusterID
+    type: int
+  - name: podNamespaceID
+    public_name: PodNamespaceID
+    type: int
+  - name: podGroupID
+    public_name: PodGroupID
+    type: int
+  - name: podNodeID
+    public_name: PodNodeID
+    type: int
+  has_extension: true
+  collection_extension: true
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: Label
+      type: string
+    - name: Annotation
+      type: string
+    - name: ENV
+      type: string
+    - name: ContainerIDs
+      type: string
+    - name: State
+      type: int
+    - name: CreatedAt
+      type: time.Time
+    - name: PodNodeLcuuid
+      type: string
+      ref: PodNode
+      db_field_name: PodNodeID
+    - name: PodReplicaSetLcuuid
+      type: string
+      ref: PodReplicaSet
+      db_field_name: PodReplicaSetID
+    - name: PodGroupLcuuid
+      type: string
+      ref: PodGroup
+      db_field_name: PodGroupID
+    - name: PodServiceLcuuid
+      type: string
+      ref: PodService
+      db_field_name: PodServiceID
+    - name: VPCLcuuid
+      type: string
+      ref: VPC
+      db_field_name: VPCID
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain

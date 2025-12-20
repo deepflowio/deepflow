@@ -17,45 +17,39 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddLBListener(dbItem *metadbmodel.LBListener, seq int) {
-	b.LBListeners[dbItem.Lcuuid] = &LBListener{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:     dbItem.Name,
-		IPs:      dbItem.IPs,
-		SNATIPs:  dbItem.SNATIPs,
-		Port:     dbItem.Port,
-		Protocol: dbItem.Protocol,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, b.LBListeners[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteLBListener(lcuuid string) {
-	delete(b.LBListeners, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type LBListener struct {
-	DiffBase
-	Name     string `json:"name"`
-	IPs      string `json:"ips"`
-	SNATIPs  string `json:"snat_ips"`
-	Port     int    `json:"port"`
-	Protocol string `json:"protocal"`
+	ResourceBase
+	Name     string
+	IPs      string
+	SNATIPs  string
+	Port     int
+	Protocol string
 }
 
-func (l *LBListener) Update(cloudItem *cloudmodel.LBListener) {
-	l.Name = cloudItem.Name
-	l.IPs = cloudItem.IPs
-	l.SNATIPs = cloudItem.SNATIPs
-	l.Port = cloudItem.Port
-	l.Protocol = cloudItem.Protocol
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, l))
+func (a *LBListener) reset(dbItem *metadbmodel.LBListener, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.IPs = dbItem.IPs
+	a.SNATIPs = dbItem.SNATIPs
+	a.Port = dbItem.Port
+	a.Protocol = dbItem.Protocol
+}
+
+func NewLBListenerCollection(t *tool.Tool) *LBListenerCollection {
+	c := new(LBListenerCollection)
+	c.collection = newCollectionBuilder[*LBListener]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.LBListener { return new(metadbmodel.LBListener) }).
+		withCacheItemFactory(func() *LBListener { return new(LBListener) }).
+		build()
+	return c
+}
+
+type LBListenerCollection struct {
+	collection[*LBListener, *metadbmodel.LBListener]
 }

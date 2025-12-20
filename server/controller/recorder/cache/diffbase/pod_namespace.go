@@ -17,41 +17,37 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPodNamespace(dbItem *metadbmodel.PodNamespace, seq int) {
-	b.PodNamespaces[dbItem.Lcuuid] = &PodNamespace{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		RegionLcuuid:     dbItem.Region,
-		AZLcuuid:         dbItem.AZ,
-		SubDomainLcuuid:  dbItem.SubDomain,
-		LearnedCloudTags: dbItem.LearnedCloudTags,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, b.PodNamespaces[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeletePodNamespace(lcuuid string) {
-	delete(b.PodNamespaces, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type PodNamespace struct {
-	DiffBase
-	RegionLcuuid     string            `json:"region_lcuuid"`
-	AZLcuuid         string            `json:"az_lcuuid"`
-	SubDomainLcuuid  string            `json:"sub_domain_lcuuid"`
-	LearnedCloudTags map[string]string `json:"learned_cloud_tags"`
+	ResourceBase
+	RegionLcuuid     string
+	AZLcuuid         string
+	SubDomainLcuuid  string
+	LearnedCloudTags map[string]string
 }
 
-func (p *PodNamespace) Update(cloudItem *cloudmodel.PodNamespace) {
-	p.RegionLcuuid = cloudItem.RegionLcuuid
-	p.AZLcuuid = cloudItem.AZLcuuid
-	p.LearnedCloudTags = cloudItem.CloudTags
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, p))
+func (a *PodNamespace) reset(dbItem *metadbmodel.PodNamespace, tool *tool.Tool) {
+	a.RegionLcuuid = dbItem.Region
+	a.AZLcuuid = dbItem.AZ
+	a.SubDomainLcuuid = dbItem.SubDomain
+	a.LearnedCloudTags = dbItem.LearnedCloudTags
+}
+
+func NewPodNamespaceCollection(t *tool.Tool) *PodNamespaceCollection {
+	c := new(PodNamespaceCollection)
+	c.collection = newCollectionBuilder[*PodNamespace]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.PodNamespace { return new(metadbmodel.PodNamespace) }).
+		withCacheItemFactory(func() *PodNamespace { return new(PodNamespace) }).
+		build()
+	return c
+}
+
+type PodNamespaceCollection struct {
+	collection[*PodNamespace, *metadbmodel.PodNamespace]
 }

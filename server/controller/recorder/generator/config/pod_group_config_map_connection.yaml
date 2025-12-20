@@ -1,0 +1,23 @@
+name: pod_group_config_map_connection
+public_name: PodGroupConfigMapConnection
+
+cache_diffbase:
+  enabled: true
+  fields: []
+
+cache_tool:
+  enabled: true
+  fields:
+  - name: lcuuid
+    public_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: id
+    public_name: ID
+    type: int
+  - name: configMapID
+    public_name: ConfigMapID
+    type: int
+  - name: podGroupID
+    public_name: PodGroupID
+    type: int

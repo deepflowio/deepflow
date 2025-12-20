@@ -1,0 +1,25 @@
+name: vtap
+public_name: VTap
+
+cache_diffbase:
+  enabled: false
+
+cache_tool:
+  enabled: true
+  fields:
+    - name: id
+      public_name: ID
+      type: int
+    - name: lcuuid
+      public_name: Lcuuid
+      type: string
+      is_validation_field: true
+    - name: name
+      public_name: Name
+      type: string
+    - name: aType
+      public_name: Type
+      type: int
+    - name: launchServerID
+      public_name: LaunchServerID
+      type: int

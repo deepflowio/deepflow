@@ -1,0 +1,33 @@
+name: lb_listener
+public_name: LBListener
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: IPs
+      type: string
+    - name: SNATIPs
+      type: string
+    - name: Port
+      type: int
+    - name: Protocol
+      type: string
+
+cache_tool:
+  enabled: true
+  fields:
+  - name: lcuuid
+    public_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: id
+    public_name: ID
+    type: int
+  - name: name
+    public_name: Name
+    type: string
+  - name: lbID
+    public_name: LBID
+    type: int

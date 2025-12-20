@@ -17,44 +17,37 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddVRouter(dbItem *metadbmodel.VRouter, seq int, toolDataSet *tool.DataSet) {
-	vpcLcuuid, _ := toolDataSet.GetVPCLcuuidByID(dbItem.VPCID)
-	b.VRouters[dbItem.Lcuuid] = &VRouter{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:         dbItem.Name,
-		Label:        dbItem.Label,
-		VPCLcuuid:    vpcLcuuid,
-		RegionLcuuid: dbItem.Region,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, b.VRouters[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteVRouter(lcuuid string) {
-	delete(b.VRouters, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type VRouter struct {
-	DiffBase
-	Name         string `json:"name"`
-	Label        string `json:"label"`
-	VPCLcuuid    string `json:"vpc_lcuuid"`
-	RegionLcuuid string `json:"region_lcuuid"`
+	ResourceBase
+	Name         string
+	Label        string
+	VPCLcuuid    string
+	RegionLcuuid string
 }
 
-func (v *VRouter) Update(cloudItem *cloudmodel.VRouter) {
-	v.Name = cloudItem.Name
-	v.Label = cloudItem.Label
-	v.VPCLcuuid = cloudItem.VPCLcuuid
-	v.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, v))
+func (a *VRouter) reset(dbItem *metadbmodel.VRouter, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.Label = dbItem.Label
+	a.VPCLcuuid = tool.VPC().GetByID(dbItem.VPCID).Lcuuid()
+	a.RegionLcuuid = dbItem.Region
+}
+
+func NewVRouterCollection(t *tool.Tool) *VRouterCollection {
+	c := new(VRouterCollection)
+	c.collection = newCollectionBuilder[*VRouter]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.VRouter { return new(metadbmodel.VRouter) }).
+		withCacheItemFactory(func() *VRouter { return new(VRouter) }).
+		build()
+	return c
+}
+
+type VRouterCollection struct {
+	collection[*VRouter, *metadbmodel.VRouter]
 }

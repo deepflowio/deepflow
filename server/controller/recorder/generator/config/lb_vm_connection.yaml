@@ -1,0 +1,9 @@
+name: lb_vm_connection
+public_name: LBVMConnection
+
+cache_diffbase:
+  enabled: true
+  fields: []
+
+cache_tool:
+  enabled: false

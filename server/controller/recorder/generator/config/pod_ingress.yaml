@@ -1,0 +1,47 @@
+name: pod_ingress
+public_name: PodIngress
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+
+cache_tool:
+  enabled: true
+  fields:
+  - name: lcuuid
+    public_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: id
+    public_name: ID
+    type: int
+  - name: name
+    public_name: Name
+    type: string
+  - name: regionID
+    public_name: RegionID
+    type: int
+    ref: Region
+    db_field_name: Region
+  - name: azID
+    public_name: AZID
+    type: int
+    ref: AZ
+    db_field_name: AZ
+  - name: podNamespaceID
+    public_name: PodNamespaceID
+    type: int
+  - name: podClusterID
+    public_name: PodClusterID
+    type: int

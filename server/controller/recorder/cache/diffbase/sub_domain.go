@@ -17,33 +17,31 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddSubDomain(dbItem *metadbmodel.SubDomain, seq int) {
-	b.SubDomains[dbItem.Lcuuid] = &SubDomain{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name: dbItem.Name,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, b.SubDomains[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteSubDomain(lcuuid string) {
-	delete(b.SubDomains, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type SubDomain struct {
-	DiffBase
-	Name string `json:"name"`
+	ResourceBase
+	Name string
 }
 
-func (s *SubDomain) Update(cloudItem *cloudmodel.SubDomain) {
-	s.Name = cloudItem.Name
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, s))
+func (a *SubDomain) reset(dbItem *metadbmodel.SubDomain, tool *tool.Tool) {
+	a.Name = dbItem.Name
+}
+
+func NewSubDomainCollection(t *tool.Tool) *SubDomainCollection {
+	c := new(SubDomainCollection)
+	c.collection = newCollectionBuilder[*SubDomain]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.SubDomain { return new(metadbmodel.SubDomain) }).
+		withCacheItemFactory(func() *SubDomain { return new(SubDomain) }).
+		build()
+	return c
+}
+
+type SubDomainCollection struct {
+	collection[*SubDomain, *metadbmodel.SubDomain]
 }

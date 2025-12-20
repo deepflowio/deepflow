@@ -1,0 +1,12 @@
+name: pod_ingress_rule_backend
+public_name: PodIngressRuleBackend
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+
+cache_tool:
+  enabled: false

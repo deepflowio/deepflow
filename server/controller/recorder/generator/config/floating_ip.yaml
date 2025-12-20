@@ -1,0 +1,16 @@
+name: floating_ip
+public_name: FloatingIP
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: VPCLcuuid
+      type: string
+      ref: VPC
+      db_field_name: VPCID
+
+cache_tool:
+  enabled: false

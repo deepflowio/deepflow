@@ -17,54 +17,42 @@
 package diffbase
 
 import (
-	"sigs.k8s.io/yaml"
-
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddConfigMap(dbItem *metadbmodel.ConfigMap, seq int) {
-	b.ConfigMaps[dbItem.Lcuuid] = &ConfigMap{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:     dbItem.Name,
-		Data:     string(dbItem.Data),
-		DataHash: dbItem.DataHash,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, b.ConfigMaps[dbItem.Lcuuid].ToLoggable()), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteConfigMap(lcuuid string) {
-	delete(b.ConfigMaps, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type ConfigMap struct {
-	DiffBase
-	Name     string `json:"name"`
-	Data     string `json:"data"`
-	DataHash string `json:"data_hash"`
+	ResourceBase
+	Name     string
+	Data     string
+	DataHash string
 }
 
-// ToLoggable converts the ConfigMap to a loggable format, excluding the Data field.
-func (v ConfigMap) ToLoggable() interface{} {
-	copied := v
+func (a *ConfigMap) reset(dbItem *metadbmodel.ConfigMap, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.Data = string(dbItem.Data)
+	a.DataHash = dbItem.DataHash
+}
+
+// ToLoggable converts ConfigMap to a loggable format, excluding sensitive fields
+func (a ConfigMap) ToLoggable() interface{} {
+	copied := a
 	copied.Data = "**HIDDEN**"
 	return copied
 }
 
-func (v *ConfigMap) Update(cloudItem *cloudmodel.ConfigMap, toolDataSet *tool.DataSet) {
-	v.Name = cloudItem.Name
-	yamlData, err := yaml.JSONToYAML([]byte(cloudItem.Data))
-	if err != nil {
-		log.Errorf("failed to convert JSON data: %v to YAML: %s", cloudItem.Data, toolDataSet.GetMetadata().LogPrefixes)
-		return
-	}
-	v.Data = string(yamlData)
-	v.DataHash = cloudItem.DataHash
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, v.ToLoggable()))
+func NewConfigMapCollection(t *tool.Tool) *ConfigMapCollection {
+	c := new(ConfigMapCollection)
+	c.collection = newCollectionBuilder[*ConfigMap]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.ConfigMap { return new(metadbmodel.ConfigMap) }).
+		withCacheItemFactory(func() *ConfigMap { return new(ConfigMap) }).
+		build()
+	return c
+}
+
+type ConfigMapCollection struct {
+	collection[*ConfigMap, *metadbmodel.ConfigMap]
 }

@@ -1,0 +1,30 @@
+name: vpc
+public_name: VPC
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: Label
+      type: string
+    - name: TunnelID
+      type: int
+    - name: CIDR
+      type: string
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: Owner
+      type: string
+
+cache_tool:
+  enabled: true
+  fields:
+  - name: lcuuid
+    public_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: id
+    public_name: ID
+    type: int

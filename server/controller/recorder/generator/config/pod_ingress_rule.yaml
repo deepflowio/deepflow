@@ -1,0 +1,23 @@
+name: pod_ingress_rule
+public_name: PodIngressRule
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+
+cache_tool:
+  enabled: true
+  fields:
+  - name: lcuuid
+    public_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: id
+    public_name: ID
+    type: int
+  - name: name
+    public_name: Name
+    type: string

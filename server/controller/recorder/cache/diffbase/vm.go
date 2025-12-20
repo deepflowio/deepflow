@@ -17,78 +17,55 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddVM(dbItem *metadbmodel.VM, seq int, toolDataSet *tool.DataSet) {
-	vpcLcuuid, _ := toolDataSet.GetVPCLcuuidByID(dbItem.VPCID)
-	networkLcuuid, _ := toolDataSet.GetNetworkLcuuidByID(dbItem.NetworkID)
-	newItem := &VM{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:             dbItem.Name,
-		Label:            dbItem.Label,
-		IP:               dbItem.IP,
-		Hostname:         dbItem.Hostname,
-		VPCLcuuid:        vpcLcuuid,
-		State:            dbItem.State,
-		HType:            dbItem.HType,
-		LaunchServer:     dbItem.LaunchServer,
-		HostID:           dbItem.HostID,
-		RegionLcuuid:     dbItem.Region,
-		AZLcuuid:         dbItem.AZ,
-		LearnedCloudTags: dbItem.LearnedCloudTags,
-		NetworkLcuuid:    networkLcuuid,
-	}
-	b.VMs[dbItem.Lcuuid] = newItem
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, b.VMs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteVM(lcuuid string) {
-	delete(b.VMs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type VM struct {
-	DiffBase
-	Name             string            `json:"name"`
-	Label            string            `json:"label"`
-	IP               string            `json:"ip"`
-	Hostname         string            `json:"hostname"`
-	State            int               `json:"state"`
-	HType            int               `json:"htype"`
-	LaunchServer     string            `json:"launch_server"`
-	HostID           int               `json:"host_id"`
-	VPCLcuuid        string            `json:"vpc_lcuuid"`
-	RegionLcuuid     string            `json:"region_lcuuid"`
-	AZLcuuid         string            `json:"az_lcuuid"`
-	LearnedCloudTags map[string]string `json:"learned_cloud_tags"`
-	NetworkLcuuid    string            `json:"network_lcuuid"`
+	ResourceBase
+	Name             string
+	Label            string
+	IP               string
+	Hostname         string
+	State            int
+	HType            int
+	LaunchServer     string
+	VPCLcuuid        string
+	RegionLcuuid     string
+	AZLcuuid         string
+	LearnedCloudTags map[string]string
+	NetworkLcuuid    string
+	HostID           int
 }
 
-func (v *VM) Update(cloudItem *cloudmodel.VM, toolDataSet *tool.DataSet) {
-	v.Name = cloudItem.Name
-	v.Label = cloudItem.Label
-	v.IP = cloudItem.IP
-	v.Hostname = cloudItem.Hostname
-	v.State = cloudItem.State
-	v.HType = cloudItem.HType
-	v.LaunchServer = cloudItem.LaunchServer
-	v.VPCLcuuid = cloudItem.VPCLcuuid
-	v.RegionLcuuid = cloudItem.RegionLcuuid
-	v.AZLcuuid = cloudItem.AZLcuuid
-	v.LearnedCloudTags = cloudItem.CloudTags
-	v.NetworkLcuuid = cloudItem.NetworkLcuuid
-	if cloudItem.LaunchServer != "" {
-		hostID, exists := toolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
-		if exists {
-			v.HostID = hostID
-		}
-	}
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_EN, v))
+func (a *VM) reset(dbItem *metadbmodel.VM, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.Label = dbItem.Label
+	a.IP = dbItem.IP
+	a.Hostname = dbItem.Hostname
+	a.State = dbItem.State
+	a.HType = dbItem.HType
+	a.LaunchServer = dbItem.LaunchServer
+	a.VPCLcuuid = tool.VPC().GetByID(dbItem.VPCID).Lcuuid()
+	a.RegionLcuuid = dbItem.Region
+	a.AZLcuuid = dbItem.AZ
+	a.LearnedCloudTags = dbItem.LearnedCloudTags
+	a.NetworkLcuuid = tool.Network().GetByID(dbItem.NetworkID).Lcuuid()
+	a.HostID = tool.Host().GetByIP(dbItem.LaunchServer).ID()
+}
+
+func NewVMCollection(t *tool.Tool) *VMCollection {
+	c := new(VMCollection)
+	c.collection = newCollectionBuilder[*VM]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_VM_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.VM { return new(metadbmodel.VM) }).
+		withCacheItemFactory(func() *VM { return new(VM) }).
+		build()
+	return c
+}
+
+type VMCollection struct {
+	collection[*VM, *metadbmodel.VM]
 }

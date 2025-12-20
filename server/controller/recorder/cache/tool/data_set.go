@@ -133,13 +133,6 @@ type DataSet struct {
 	processGIDToSoftDeletedCount map[uint32]uint
 }
 
-type ProcessIdentifier struct {
-	Name        string
-	PodGroupID  int
-	VTapID      uint32
-	CommandLine string
-}
-
 func NewDataSet(md *rcommon.Metadata) *DataSet {
 	return &DataSet{
 		metadata: md,
