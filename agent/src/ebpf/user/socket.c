@@ -2736,7 +2736,7 @@ static void reconfig_load_resources(struct bpf_tracer *tracer, char *load_name,
  *     in data processing, at the same time, it is also the number of threads reading the
  *     perf buffer.
  * @perf_pages_cnt
- *     Number of page frames with kernel shared memory footprint, the value is a power of 2.
+ *     Number of page frames with kernel shared memory footprint, the value is a power of 2, with page frame size of 4 KB.
  * @queue_size
  *     Ring cache queue size. The value is a power of 2.
  * @max_socket_entries
