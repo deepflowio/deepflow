@@ -1,5 +1,9 @@
 name: vtap
 public_name: VTap
+
+cache_diffbase:
+  enabled: false
+
 cache_tool:
   enabled: true
   fields:

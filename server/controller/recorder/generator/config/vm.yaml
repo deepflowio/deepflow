@@ -1,5 +1,45 @@
 name: vm
 public_name: VM
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: Label
+      type: string
+    - name: IP
+      type: string
+    - name: Hostname
+      type: string
+    - name: State
+      type: int
+    - name: HType
+      type: int
+    - name: LaunchServer
+      type: string
+    - name: VPCLcuuid
+      type: string
+      ref: VPC
+      db_field_name: VPCID
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+    - name: LearnedCloudTags
+      type: map[string]string
+    - name: NetworkLcuuid
+      type: string
+      ref: Network
+      db_field_name: NetworkID
+    - name: HostID
+      type: int
+      ref: Host
+      ref_field: IP
+      db_field_name: LaunchServer
+
 cache_tool:
   enabled: true
   fields:

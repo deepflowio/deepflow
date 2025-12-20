@@ -17,58 +17,47 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddNetwork(dbItem *metadbmodel.Network, seq int, toolDataSet *tool.DataSet) {
-	vpcLcuuid, _ := toolDataSet.GetVPCLcuuidByID(dbItem.VPCID)
-	b.Networks[dbItem.Lcuuid] = &Network{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:            dbItem.Name,
-		Label:           dbItem.Label,
-		TunnelID:        dbItem.TunnelID,
-		NetType:         dbItem.NetType,
-		SegmentationID:  dbItem.SegmentationID,
-		VPCLcuuid:       vpcLcuuid,
-		RegionLcuuid:    dbItem.Region,
-		AZLcuuid:        dbItem.AZ,
-		SubDomainLcuuid: dbItem.SubDomain,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, b.Networks[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteNetwork(lcuuid string) {
-	delete(b.Networks, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type Network struct {
-	DiffBase
-	Name            string `json:"name"`
-	Label           string `json:"label"`
-	TunnelID        int    `json:"tunnel_id"`
-	NetType         int    `json:"net_type"`
-	SegmentationID  int    `json:"segmentation_id"`
-	VPCLcuuid       string `json:"vpc_lcuuid"`
-	RegionLcuuid    string `json:"region_lcuuid"`
-	AZLcuuid        string `json:"az_lcuuid"`
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	ResourceBase
+	Name            string
+	Label           string
+	TunnelID        int
+	NetType         int
+	SegmentationID  int
+	VPCLcuuid       string
+	RegionLcuuid    string
+	AZLcuuid        string
+	SubDomainLcuuid string
 }
 
-func (n *Network) Update(cloudItem *cloudmodel.Network) {
-	n.Name = cloudItem.Name
-	n.Label = cloudItem.Label
-	n.TunnelID = cloudItem.TunnelID
-	n.NetType = cloudItem.NetType
-	n.SegmentationID = cloudItem.SegmentationID
-	n.VPCLcuuid = cloudItem.VPCLcuuid
-	n.RegionLcuuid = cloudItem.RegionLcuuid
-	n.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, n))
+func (a *Network) reset(dbItem *metadbmodel.Network, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.Label = dbItem.Label
+	a.TunnelID = dbItem.TunnelID
+	a.NetType = dbItem.NetType
+	a.SegmentationID = dbItem.SegmentationID
+	a.VPCLcuuid = tool.VPC().GetByID(dbItem.VPCID).Lcuuid()
+	a.RegionLcuuid = dbItem.Region
+	a.AZLcuuid = dbItem.AZ
+	a.SubDomainLcuuid = dbItem.SubDomain
+}
+
+func NewNetworkCollection(t *tool.Tool) *NetworkCollection {
+	c := new(NetworkCollection)
+	c.collection = newCollectionBuilder[*Network]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.Network { return new(metadbmodel.Network) }).
+		withCacheItemFactory(func() *Network { return new(Network) }).
+		build()
+	return c
+}
+
+type NetworkCollection struct {
+	collection[*Network, *metadbmodel.Network]
 }

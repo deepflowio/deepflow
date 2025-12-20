@@ -1,5 +1,17 @@
 name: az
 public_name: AZ
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type : string
+    - name: Label
+      type : string
+    - name: RegionLcuuid
+      type : string
+      db_field_name: Region
+
 cache_tool:
   enabled: true
   fields:

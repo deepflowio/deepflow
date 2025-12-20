@@ -1,5 +1,23 @@
 name: pod_cluster
 public_name: PodCluster
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: ClusterName
+      type: string
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+
 cache_tool:
   enabled: true
   fields:

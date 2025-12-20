@@ -1,5 +1,16 @@
 name: wan_ip
 public_name: WANIP
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+
 cache_tool:
   enabled: true
   fields:

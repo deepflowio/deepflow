@@ -1,0 +1,11 @@
+name: sub_domain
+public_name: SubDomain
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+
+cache_tool:
+  enabled: false

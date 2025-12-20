@@ -1,5 +1,10 @@
 name: pod_group_config_map_connection
 public_name: PodGroupConfigMapConnection
+
+cache_diffbase:
+  enabled: true
+  fields: []
+
 cache_tool:
   enabled: true
   fields:

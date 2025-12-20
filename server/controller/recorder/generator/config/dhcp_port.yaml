@@ -1,5 +1,22 @@
 name: dhcp_port
 public_name: DHCPPort
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+    - name: VPCLcuuid
+      type: string
+      ref: VPC
+      db_field_name: VPCID
+
 cache_tool:
   enabled: true
   fields:

@@ -1,5 +1,47 @@
 name: pod_service
 public_name: PodService
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: Label
+      type: string
+    - name: Annotation
+      type: string
+    - name: Selector
+      type: string
+    - name: ExternalIP
+      type: string
+    - name: ServiceClusterIP
+      type: string
+    - name: Metadata
+      type: string
+      db_type: bytes
+      need_hide: true
+    - name: MetadataHash
+      type: string
+    - name: Spec
+      type: string
+      db_type: bytes
+      need_hide: true
+    - name: SpecHash
+      type: string
+    - name: PodIngressLcuuid
+      type: string
+      ref: PodIngress
+      db_field_name: PodIngressID
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+
 cache_tool:
   enabled: true
   fields:

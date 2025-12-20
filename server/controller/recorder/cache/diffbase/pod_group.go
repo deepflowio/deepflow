@@ -17,89 +17,61 @@
 package diffbase
 
 import (
-	"sigs.k8s.io/yaml"
-
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPodGroup(dbItem *metadbmodel.PodGroup, seq int) {
-	b.PodGroups[dbItem.Lcuuid] = &PodGroup{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:            dbItem.Name,
-		Label:           dbItem.Label,
-		NetworkMode:     dbItem.NetworkMode,
-		PodNum:          dbItem.PodNum,
-		Type:            dbItem.Type,
-		Metadata:        string(dbItem.Metadata),
-		MetadataHash:    dbItem.MetadataHash,
-		Spec:            string(dbItem.Spec),
-		SpecHash:        dbItem.SpecHash,
-		RegionLcuuid:    dbItem.Region,
-		AZLcuuid:        dbItem.AZ,
-		SubDomainLcuuid: dbItem.SubDomain,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, b.PodGroups[dbItem.Lcuuid].ToLoggable()), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeletePodGroup(lcuuid string) {
-	delete(b.PodGroups, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type PodGroup struct {
-	DiffBase
-	Name            string `json:"name"`
-	Label           string `json:"label"`
-	PodNum          int    `json:"pod_num"`
-	Type            int    `json:"type"`
-	NetworkMode     int    `json:"network_mode"`
-	Metadata        string `json:"metadata"`
-	MetadataHash    string `json:"metadata_hash"`
-	Spec            string `json:"spec"`
-	SpecHash        string `json:"spec_hash"`
-	RegionLcuuid    string `json:"region_lcuuid"`
-	AZLcuuid        string `json:"az_lcuuid"`
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	ResourceBase
+	Name            string
+	Label           string
+	PodNum          int
+	Type            int
+	Metadata        string
+	MetadataHash    string
+	Spec            string
+	SpecHash        string
+	RegionLcuuid    string
+	AZLcuuid        string
+	SubDomainLcuuid string
+	NetworkMode     int
 }
 
-// ToLoggable converts PodGroup to a loggable format, excluding fields Spec and Metadata
-func (p PodGroup) ToLoggable() interface{} {
-	copied := p
+func (a *PodGroup) reset(dbItem *metadbmodel.PodGroup, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.Label = dbItem.Label
+	a.PodNum = dbItem.PodNum
+	a.Type = dbItem.Type
+	a.Metadata = string(dbItem.Metadata)
+	a.MetadataHash = dbItem.MetadataHash
+	a.Spec = string(dbItem.Spec)
+	a.SpecHash = dbItem.SpecHash
+	a.RegionLcuuid = dbItem.Region
+	a.AZLcuuid = dbItem.AZ
+	a.SubDomainLcuuid = dbItem.SubDomain
+	a.NetworkMode = dbItem.NetworkMode
+}
+
+// ToLoggable converts PodGroup to a loggable format, excluding sensitive fields
+func (a PodGroup) ToLoggable() interface{} {
+	copied := a
 	copied.Metadata = "**HIDDEN**"
 	copied.Spec = "**HIDDEN**"
 	return copied
 }
 
-func (p *PodGroup) Update(cloudItem *cloudmodel.PodGroup, toolDataSet *tool.DataSet) {
-	p.Name = cloudItem.Name
-	p.Label = cloudItem.Label
-	p.NetworkMode = cloudItem.NetworkMode
-	p.PodNum = cloudItem.PodNum
-	p.Type = cloudItem.Type
+func NewPodGroupCollection(t *tool.Tool) *PodGroupCollection {
+	c := new(PodGroupCollection)
+	c.collection = newCollectionBuilder[*PodGroup]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.PodGroup { return new(metadbmodel.PodGroup) }).
+		withCacheItemFactory(func() *PodGroup { return new(PodGroup) }).
+		build()
+	return c
+}
 
-	yamlMetadata, err := yaml.JSONToYAML([]byte(cloudItem.Metadata))
-	if err != nil {
-		log.Errorf("failed to convert JSON metadata: %v to YAML: %s", cloudItem.Metadata, toolDataSet.GetMetadata().LogPrefixes)
-		return
-	}
-	p.Metadata = string(yamlMetadata)
-	p.MetadataHash = cloudItem.MetadataHash
-
-	yamlSpec, err := yaml.JSONToYAML([]byte(cloudItem.Spec))
-	if err != nil {
-		log.Errorf("failed to convert JSON spec: %v to YAML: %s", cloudItem.Spec, toolDataSet.GetMetadata().LogPrefixes)
-		return
-	}
-	p.Spec = string(yamlSpec)
-	p.SpecHash = cloudItem.SpecHash
-
-	p.RegionLcuuid = cloudItem.RegionLcuuid
-	p.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, p.ToLoggable()))
+type PodGroupCollection struct {
+	collection[*PodGroup, *metadbmodel.PodGroup]
 }

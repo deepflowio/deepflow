@@ -19,23 +19,27 @@ package diffbase
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddNATVMConnection(dbItem *metadbmodel.NATVMConnection, seq int) {
-	b.NATVMConnections[dbItem.Lcuuid] = &NATVMConnection{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, b.NATVMConnections[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteNATVMConnection(lcuuid string) {
-	delete(b.NATVMConnections, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type NATVMConnection struct {
-	DiffBase
+	ResourceBase
+}
+
+func (a *NATVMConnection) reset(dbItem *metadbmodel.NATVMConnection, tool *tool.Tool) {
+}
+
+func NewNATVMConnectionCollection(t *tool.Tool) *NATVMConnectionCollection {
+	c := new(NATVMConnectionCollection)
+	c.collection = newCollectionBuilder[*NATVMConnection]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.NATVMConnection { return new(metadbmodel.NATVMConnection) }).
+		withCacheItemFactory(func() *NATVMConnection { return new(NATVMConnection) }).
+		build()
+	return c
+}
+
+type NATVMConnectionCollection struct {
+	collection[*NATVMConnection, *metadbmodel.NATVMConnection]
 }

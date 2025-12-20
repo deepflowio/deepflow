@@ -1,0 +1,15 @@
+name: routing_table
+public_name: RoutingTable
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Destination
+      type: string
+    - name: Nexthop
+      type: string
+    - name: NexthopType
+      type: string
+
+cache_tool:
+  enabled: false

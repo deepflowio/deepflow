@@ -17,39 +17,35 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddRoutingTable(dbItem *metadbmodel.RoutingTable, seq int) {
-	b.RoutingTables[dbItem.Lcuuid] = &RoutingTable{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Destination: dbItem.Destination,
-		Nexthop:     dbItem.Nexthop,
-		NexthopType: dbItem.NexthopType,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, b.RoutingTables[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteRoutingTable(lcuuid string) {
-	delete(b.RoutingTables, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type RoutingTable struct {
-	DiffBase
-	Destination string `json:"destination"`
-	Nexthop     string `json:"nexthop"`
-	NexthopType string `json:"nexthop_type"`
+	ResourceBase
+	Destination string
+	Nexthop     string
+	NexthopType string
 }
 
-func (r *RoutingTable) Update(cloudItem *cloudmodel.RoutingTable) {
-	r.Destination = cloudItem.Destination
-	r.Nexthop = cloudItem.Nexthop
-	r.NexthopType = cloudItem.NexthopType
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, r))
+func (a *RoutingTable) reset(dbItem *metadbmodel.RoutingTable, tool *tool.Tool) {
+	a.Destination = dbItem.Destination
+	a.Nexthop = dbItem.Nexthop
+	a.NexthopType = dbItem.NexthopType
+}
+
+func NewRoutingTableCollection(t *tool.Tool) *RoutingTableCollection {
+	c := new(RoutingTableCollection)
+	c.collection = newCollectionBuilder[*RoutingTable]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.RoutingTable { return new(metadbmodel.RoutingTable) }).
+		withCacheItemFactory(func() *RoutingTable { return new(RoutingTable) }).
+		build()
+	return c
+}
+
+type RoutingTableCollection struct {
+	collection[*RoutingTable, *metadbmodel.RoutingTable]
 }

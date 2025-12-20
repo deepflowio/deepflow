@@ -1,5 +1,21 @@
 name: pod_namespace
 public_name: PodNamespace
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+    - name: LearnedCloudTags
+      type: map[string]string
+
 cache_tool:
   enabled: true
   fields:

@@ -1,0 +1,9 @@
+name: nat_vm_connection
+public_name: NATVMConnection
+
+cache_diffbase:
+  enabled: true
+  fields: []
+
+cache_tool:
+  enabled: false

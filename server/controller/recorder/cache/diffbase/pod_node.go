@@ -17,56 +17,47 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPodNode(dbItem *metadbmodel.PodNode, seq int) {
-	b.PodNodes[dbItem.Lcuuid] = &PodNode{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Type:            dbItem.Type,
-		State:           dbItem.State,
-		Hostname:        dbItem.Hostname,
-		IP:              dbItem.IP,
-		VCPUNum:         dbItem.VCPUNum,
-		MemTotal:        dbItem.MemTotal,
-		RegionLcuuid:    dbItem.Region,
-		AZLcuuid:        dbItem.AZ,
-		SubDomainLcuuid: dbItem.SubDomain,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, b.PodNodes[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeletePodNode(lcuuid string) {
-	delete(b.PodNodes, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type PodNode struct {
-	DiffBase
-	Type            int    `json:"type"`
-	State           int    `json:"state"`
-	Hostname        string `json:"hostname"`
-	IP              string `json:"ip"`
-	VCPUNum         int    `json:"vcpu_num"`
-	MemTotal        int    `json:"mem_total"`
-	RegionLcuuid    string `json:"region_lcuuid"`
-	AZLcuuid        string `json:"az_lcuuid"`
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	ResourceBase
+	Type            int
+	State           int
+	Hostname        string
+	IP              string
+	VCPUNum         int
+	MemTotal        int
+	RegionLcuuid    string
+	AZLcuuid        string
+	SubDomainLcuuid string
 }
 
-func (p *PodNode) Update(cloudItem *cloudmodel.PodNode) {
-	p.Type = cloudItem.Type
-	p.State = cloudItem.State
-	p.Hostname = cloudItem.Hostname
-	p.IP = cloudItem.IP
-	p.VCPUNum = cloudItem.VCPUNum
-	p.MemTotal = cloudItem.MemTotal
-	p.RegionLcuuid = cloudItem.RegionLcuuid
-	p.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, p))
+func (a *PodNode) reset(dbItem *metadbmodel.PodNode, tool *tool.Tool) {
+	a.Type = dbItem.Type
+	a.State = dbItem.State
+	a.Hostname = dbItem.Hostname
+	a.IP = dbItem.IP
+	a.VCPUNum = dbItem.VCPUNum
+	a.MemTotal = dbItem.MemTotal
+	a.RegionLcuuid = dbItem.Region
+	a.AZLcuuid = dbItem.AZ
+	a.SubDomainLcuuid = dbItem.SubDomain
+}
+
+func NewPodNodeCollection(t *tool.Tool) *PodNodeCollection {
+	c := new(PodNodeCollection)
+	c.collection = newCollectionBuilder[*PodNode]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.PodNode { return new(metadbmodel.PodNode) }).
+		withCacheItemFactory(func() *PodNode { return new(PodNode) }).
+		build()
+	return c
+}
+
+type PodNodeCollection struct {
+	collection[*PodNode, *metadbmodel.PodNode]
 }

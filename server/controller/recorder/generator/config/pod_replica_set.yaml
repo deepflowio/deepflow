@@ -1,5 +1,25 @@
 name: pod_replica_set
 public_name: PodReplicaSet
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: Label
+      type: string
+    - name: PodNum
+      type: int
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+
 cache_tool:
   enabled: true
   fields:

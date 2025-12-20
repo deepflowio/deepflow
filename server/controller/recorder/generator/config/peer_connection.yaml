@@ -1,0 +1,11 @@
+name: peer_connection
+public_name: PeerConnection
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+
+cache_tool:
+  enabled: false

@@ -17,45 +17,33 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddWANIP(dbItem *metadbmodel.WANIP, seq int, toolDataSet *tool.DataSet) {
-	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
-	// which may cause recorder performance issues.
-	// var subnetLcuuid string
-	// if dbItem.SubnetID != 0 {
-	// 	subnetLcuuid, _ = toolDataSet.GetSubnetLcuuidByID(dbItem.SubnetID)
-	// }
-	b.WANIPs[dbItem.Lcuuid] = &WANIP{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		RegionLcuuid:    dbItem.Region,
-		SubDomainLcuuid: dbItem.SubDomain,
-		// SubnetLcuuid:    subnetLcuuid,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, b.WANIPs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteWANIP(lcuuid string) {
-	delete(b.WANIPs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type WANIP struct {
-	DiffBase
-	RegionLcuuid    string `json:"region_lcuuid"`
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
-	SubnetLcuuid    string `json:"subnet_lcuuid"`
+	ResourceBase
+	RegionLcuuid    string
+	SubDomainLcuuid string
 }
 
-func (w *WANIP) Update(cloudItem *cloudmodel.IP) {
-	w.RegionLcuuid = cloudItem.RegionLcuuid
-	// w.SubnetLcuuid = cloudItem.SubnetLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, w))
+func (a *WANIP) reset(dbItem *metadbmodel.WANIP, tool *tool.Tool) {
+	a.RegionLcuuid = dbItem.Region
+	a.SubDomainLcuuid = dbItem.SubDomain
+}
+
+func NewWANIPCollection(t *tool.Tool) *WANIPCollection {
+	c := new(WANIPCollection)
+	c.collection = newCollectionBuilder[*WANIP]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.WANIP { return new(metadbmodel.WANIP) }).
+		withCacheItemFactory(func() *WANIP { return new(WANIP) }).
+		build()
+	return c
+}
+
+type WANIPCollection struct {
+	collection[*WANIP, *metadbmodel.WANIP]
 }

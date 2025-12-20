@@ -19,23 +19,27 @@ package diffbase
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddNATRule(dbItem *metadbmodel.NATRule, seq int) {
-	b.NATRules[dbItem.Lcuuid] = &NATRule{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, b.NATRules[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteNATRule(lcuuid string) {
-	delete(b.NATRules, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type NATRule struct {
-	DiffBase
+	ResourceBase
+}
+
+func (a *NATRule) reset(dbItem *metadbmodel.NATRule, tool *tool.Tool) {
+}
+
+func NewNATRuleCollection(t *tool.Tool) *NATRuleCollection {
+	c := new(NATRuleCollection)
+	c.collection = newCollectionBuilder[*NATRule]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.NATRule { return new(metadbmodel.NATRule) }).
+		withCacheItemFactory(func() *NATRule { return new(NATRule) }).
+		build()
+	return c
+}
+
+type NATRuleCollection struct {
+	collection[*NATRule, *metadbmodel.NATRule]
 }

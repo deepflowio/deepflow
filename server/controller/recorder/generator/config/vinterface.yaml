@@ -1,5 +1,37 @@
 name: vinterface
 public_name: VInterface
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: Type
+      type: int
+    - name: TapMac
+      type: string
+    - name: NetnsID
+      type: uint32
+    - name: VtapID
+      type: uint32
+    - name: VPCID
+      type: int
+    - name: DeviceType
+      type: int
+    - name: DeviceLcuuid
+      type: string
+      ref: Device
+    - name: NetworkLcuuid
+      type: string
+      ref: Network
+      db_field_name: NetworkID
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+
 cache_tool:
   enabled: true
   fields:

@@ -1,0 +1,13 @@
+name: vip
+public_name: VIP
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: IP
+      type: string
+    - name: VTapID
+      type: uint32
+
+cache_tool:
+  enabled: false

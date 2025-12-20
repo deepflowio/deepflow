@@ -34,14 +34,18 @@ type Field struct {
 	Name              string `yaml:"name"`
 	PublicName        string `yaml:"public_name"`
 	Type              string `yaml:"type"`
+	DbType            string `yaml:"db_type"`
 	IsValidationField bool   `yaml:"is_validation_field"`
 	Ref               string `yaml:"ref"`
 	DbFieldName       string `yaml:"db_field_name"`
+	JsonTag           string `yaml:"json_tag"`
+	NeedHide          bool   `yaml:"need_hide"`
 	HasSetter         bool   `yaml:"has_setter"`
 	HasCustom         bool   `yaml:"has_custom"`
 	IsCustom          bool   `yaml:"is_custom"`
 	IsPlural          bool   `yaml:"is_plural"`
 	Comment           string `yaml:"comment"`
+	RefField          string `yaml:"ref_field"` // Added missing RefField field
 	CamelName         string
 	PublicCamelName   string
 }
@@ -68,10 +72,16 @@ type CacheToolConfig struct {
 	ExtensionFields  string
 }
 
+type CacheDiffbaseConfig struct {
+	Enabled bool    `yaml:"enabled"`
+	Fields  []Field `yaml:"fields"`
+}
+
 type Config struct {
-	Name       string          `yaml:"name"`
-	PublicName string          `yaml:"public_name"`
-	CacheTool  CacheToolConfig `yaml:"cache_tool"`
+	Name          string               `yaml:"name"`
+	PublicName    string               `yaml:"public_name"`
+	CacheTool     CacheToolConfig      `yaml:"cache_tool"`
+	CacheDiffbase CacheDiffbaseConfig  `yaml:"cache_diffbase"`
 }
 
 // CacheToolGenerator 聚合 cache_tool 代码生成器的所有方法
@@ -79,6 +89,13 @@ type CacheToolGenerator struct {
 	config      Config
 	cacheConfig CacheToolConfig
 	template    *template.Template
+}
+
+// CacheDiffbaseGenerator 聚合 cache_diffbase 代码生成器的所有方法
+type CacheDiffbaseGenerator struct {
+	config         Config
+	diffbaseConfig CacheDiffbaseConfig
+	template       *template.Template
 }
 
 // NewCacheToolGenerator 创建新的 CacheToolGenerator 实例
@@ -120,6 +137,39 @@ func NewCacheToolGenerator(configFile string) (*CacheToolGenerator, error) {
 	return generator, nil
 }
 
+// NewCacheDiffbaseGenerator 创建新的 CacheDiffbaseGenerator 实例
+func NewCacheDiffbaseGenerator(configFile string) (*CacheDiffbaseGenerator, error) {
+	configData, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %v", err)
+	}
+
+	var config Config
+	err = yaml.Unmarshal(configData, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config data: %v", err)
+	}
+
+	generator := &CacheDiffbaseGenerator{config: config}
+
+	// 解析和适配配置
+	err = generator.adaptConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// 处理字段
+	generator.processFields()
+
+	// 加载模板
+	err = generator.loadTemplate()
+	if err != nil {
+		return nil, err
+	}
+
+	return generator, nil
+}
+
 // adaptConfig 适配配置结构
 func (g *CacheToolGenerator) adaptConfig() error {
 	if !g.config.CacheTool.Enabled {
@@ -139,6 +189,11 @@ func (g *CacheToolGenerator) processFields() {
 		} else {
 			g.cacheConfig.Fields[i].PublicCamelName = toCamel(g.cacheConfig.Fields[i].Name, true)
 		}
+
+		// Add logic to handle ref_field
+		if g.cacheConfig.Fields[i].Ref != "" && g.cacheConfig.Fields[i].RefField != "" {
+			g.cacheConfig.Fields[i].RefField = toCamel(g.cacheConfig.Fields[i].RefField, true)
+		}
 	}
 
 	for i := range g.cacheConfig.KeyFields {
@@ -154,6 +209,7 @@ func (g *CacheToolGenerator) loadTemplate() error {
 	tmpl, err := template.New(templateFile).Funcs(template.FuncMap{
 		"ToUpper":      toUpper,
 		"toLowerCamel": toLowerCamel,
+		"hasSuffix":    strings.HasSuffix,
 	}).ParseFiles(templateFile)
 	if err != nil {
 		return fmt.Errorf("failed to parse template: %v", err)
@@ -317,6 +373,88 @@ func (g *CacheToolGenerator) Generate() error {
 	return nil
 }
 
+// CacheDiffbaseGenerator 的方法实现
+
+// adaptConfig 适配配置结构
+func (g *CacheDiffbaseGenerator) adaptConfig() error {
+	if !g.config.CacheDiffbase.Enabled {
+		return fmt.Errorf("cache_diffbase is not enabled in configuration")
+	}
+
+	g.diffbaseConfig = g.config.CacheDiffbase
+	return nil
+}
+
+// processFields 处理字段配置，生成 CamelName 和 PublicCamelName
+func (g *CacheDiffbaseGenerator) processFields() {
+	for i := range g.diffbaseConfig.Fields {
+		g.diffbaseConfig.Fields[i].CamelName = toCamel(g.diffbaseConfig.Fields[i].Name, false)
+		if g.diffbaseConfig.Fields[i].PublicName != "" {
+			g.diffbaseConfig.Fields[i].PublicCamelName = g.diffbaseConfig.Fields[i].PublicName
+		} else {
+			g.diffbaseConfig.Fields[i].PublicCamelName = toCamel(g.diffbaseConfig.Fields[i].Name, true)
+		}
+	}
+}
+
+// loadTemplate 加载模板文件
+func (g *CacheDiffbaseGenerator) loadTemplate() error {
+	templateFile := "cache_diffbase.go.tpl"
+
+	tmpl, err := template.New(templateFile).Funcs(template.FuncMap{
+		"ToUpper":      toUpper,
+		"toLowerCamel": toLowerCamel,
+		"hasSuffix":    strings.HasSuffix,
+	}).ParseFiles(templateFile)
+	if err != nil {
+		return fmt.Errorf("failed to parse template: %v", err)
+	}
+
+	g.template = tmpl
+	return nil
+}
+
+// Generate 生成代码文件
+func (g *CacheDiffbaseGenerator) Generate() error {
+	// 构造模板数据
+	templateData := struct {
+		Name       string
+		PublicName string
+		Fields     []Field
+	}{
+		Name:       g.config.Name,
+		PublicName: g.config.PublicName,
+		Fields:     g.diffbaseConfig.Fields,
+	}
+
+	var generatedCode bytes.Buffer
+	err := g.template.Execute(&generatedCode, templateData)
+	if err != nil {
+		return fmt.Errorf("failed to execute template: %v", err)
+	}
+
+	outputDir := "../cache/diffbase"
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			return fmt.Errorf("failed to create output directory: %v", err)
+		}
+	}
+
+	outputFile := filepath.Join(outputDir, g.config.Name+".go")
+	err = os.WriteFile(outputFile, generatedCode.Bytes(), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write generated code to file: %v", err)
+	}
+
+	// 执行 go fmt 格式化生成的代码
+	if err := formatGoFile(outputFile); err != nil {
+		log.Printf("Warning: failed to format %s: %v", outputFile, err)
+	}
+
+	fmt.Printf("Generated diffbase code for %s in %s\n", g.config.Name, outputFile)
+	return nil
+}
+
 // HasCustomField 检查 CacheToolConfig 中是否有自定义字段
 func (c *CacheToolConfig) HasCustomField() {
 	for _, f := range c.Fields {
@@ -386,17 +524,44 @@ func generateFromFiles(configFiles []string) error {
 
 	for _, configFile := range configFiles {
 		fmt.Printf("Processing %s...\n", configFile)
-		generator, err := NewCacheToolGenerator(configFile)
+		
+		// 读取配置文件判断启用了哪些生成器
+		configData, err := os.ReadFile(configFile)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("%s: %v", configFile, err))
+			errors = append(errors, fmt.Sprintf("%s: failed to read config: %v", configFile, err))
 			continue
 		}
 
-		if err := generator.Generate(); err != nil {
-			errors = append(errors, fmt.Sprintf("%s: %v", configFile, err))
+		var config Config
+		err = yaml.Unmarshal(configData, &config)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: failed to unmarshal config: %v", configFile, err))
 			continue
 		}
-		successCount++
+
+		// 生成 cache_tool
+		if config.CacheTool.Enabled {
+			generator, err := NewCacheToolGenerator(configFile)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("%s (cache_tool): %v", configFile, err))
+			} else if err := generator.Generate(); err != nil {
+				errors = append(errors, fmt.Sprintf("%s (cache_tool): %v", configFile, err))
+			} else {
+				successCount++
+			}
+		}
+
+		// 生成 cache_diffbase  
+		if config.CacheDiffbase.Enabled {
+			generator, err := NewCacheDiffbaseGenerator(configFile)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("%s (cache_diffbase): %v", configFile, err))
+			} else if err := generator.Generate(); err != nil {
+				errors = append(errors, fmt.Sprintf("%s (cache_diffbase): %v", configFile, err))
+			} else {
+				successCount++
+			}
+		}
 	}
 
 	fmt.Printf("\nGeneration complete: %d success, %d failed\n", successCount, len(errors))
@@ -475,14 +640,9 @@ func main() {
 		return
 	}
 
-	// 单个文件处理（保持原有兼容性）
+	// 单个文件处理（保持原有兼容性，但使用统一的生成逻辑）
 	configFile := arg
-	generator, err := NewCacheToolGenerator(configFile)
-	if err != nil {
-		log.Fatalf("failed to create generator: %v", err)
-	}
-
-	if err := generator.Generate(); err != nil {
-		log.Fatalf("failed to generate code: %v", err)
+	if err := generateFromFiles([]string{configFile}); err != nil {
+		log.Fatalf("generation failed: %v", err)
 	}
 }

@@ -1,5 +1,17 @@
 name: nat_gateway
 public_name: NATGateway
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: FloatingIPs
+      type: string
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+
 cache_tool:
   enabled: true
   fields:

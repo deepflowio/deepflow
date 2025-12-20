@@ -17,39 +17,35 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddLBTargetServer(dbItem *metadbmodel.LBTargetServer, seq int) {
-	b.LBTargetServers[dbItem.Lcuuid] = &LBTargetServer{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		IP:       dbItem.IP,
-		Port:     dbItem.Port,
-		Protocol: dbItem.Protocol,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, b.LBTargetServers[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteLBTargetServer(lcuuid string) {
-	delete(b.LBTargetServers, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type LBTargetServer struct {
-	DiffBase
-	IP       string `json:"ip"`
-	Port     int    `json:"port"`
-	Protocol string `json:"protocal"`
+	ResourceBase
+	IP       string
+	Port     int
+	Protocol string
 }
 
-func (l *LBTargetServer) Update(cloudItem *cloudmodel.LBTargetServer) {
-	l.IP = cloudItem.IP
-	l.Port = cloudItem.Port
-	l.Protocol = cloudItem.Protocol
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, l))
+func (a *LBTargetServer) reset(dbItem *metadbmodel.LBTargetServer, tool *tool.Tool) {
+	a.IP = dbItem.IP
+	a.Port = dbItem.Port
+	a.Protocol = dbItem.Protocol
+}
+
+func NewLBTargetServerCollection(t *tool.Tool) *LBTargetServerCollection {
+	c := new(LBTargetServerCollection)
+	c.collection = newCollectionBuilder[*LBTargetServer]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.LBTargetServer { return new(metadbmodel.LBTargetServer) }).
+		withCacheItemFactory(func() *LBTargetServer { return new(LBTargetServer) }).
+		build()
+	return c
+}
+
+type LBTargetServerCollection struct {
+	collection[*LBTargetServer, *metadbmodel.LBTargetServer]
 }

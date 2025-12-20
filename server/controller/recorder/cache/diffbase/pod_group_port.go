@@ -17,35 +17,33 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPodGroupPort(dbItem *metadbmodel.PodGroupPort, seq int) {
-	b.PodGroupPorts[dbItem.Lcuuid] = &PodGroupPort{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:            dbItem.Name,
-		SubDomainLcuuid: dbItem.SubDomain,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, b.PodGroupPorts[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeletePodGroupPort(lcuuid string) {
-	delete(b.PodGroupPorts, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type PodGroupPort struct {
-	DiffBase
-	Name            string `json:"name"`
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	ResourceBase
+	Name            string
+	SubDomainLcuuid string
 }
 
-func (p *PodGroupPort) Update(cloudItem *cloudmodel.PodGroupPort) {
-	p.Name = cloudItem.Name
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, p))
+func (a *PodGroupPort) reset(dbItem *metadbmodel.PodGroupPort, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.SubDomainLcuuid = dbItem.SubDomain
+}
+
+func NewPodGroupPortCollection(t *tool.Tool) *PodGroupPortCollection {
+	c := new(PodGroupPortCollection)
+	c.collection = newCollectionBuilder[*PodGroupPort]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.PodGroupPort { return new(metadbmodel.PodGroupPort) }).
+		withCacheItemFactory(func() *PodGroupPort { return new(PodGroupPort) }).
+		build()
+	return c
+}
+
+type PodGroupPortCollection struct {
+	collection[*PodGroupPort, *metadbmodel.PodGroupPort]
 }

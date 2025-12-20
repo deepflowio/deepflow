@@ -44,3 +44,50 @@ cache_tool:
     type: int
   has_extension: true
   collection_extension: true
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: Label
+      type: string
+    - name: Annotation
+      type: string
+    - name: ENV
+      type: string
+    - name: ContainerIDs
+      type: string
+    - name: State
+      type: int
+    - name: CreatedAt
+      type: time.Time
+    - name: PodNodeLcuuid
+      type: string
+      ref: PodNode
+      db_field_name: PodNodeID
+    - name: PodReplicaSetLcuuid
+      type: string
+      ref: PodReplicaSet
+      db_field_name: PodReplicaSetID
+    - name: PodGroupLcuuid
+      type: string
+      ref: PodGroup
+      db_field_name: PodGroupID
+    - name: PodServiceLcuuid
+      type: string
+      ref: PodService
+      db_field_name: PodServiceID
+    - name: VPCLcuuid
+      type: string
+      ref: VPC
+      db_field_name: VPCID
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain

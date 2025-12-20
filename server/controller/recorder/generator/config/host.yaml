@@ -1,5 +1,30 @@
 name: host
 public_name: Host
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: IP
+      type: string
+    - name: Hostname
+      type: string
+    - name: HType
+      type: int
+    - name: VCPUNum
+      type: int
+    - name: MemTotal
+      type: int
+    - name: ExtraInfo
+      type: string
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+
 cache_tool:
   enabled: true
   fields:

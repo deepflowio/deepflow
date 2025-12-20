@@ -19,23 +19,27 @@ package diffbase
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddLBVMConnection(dbItem *metadbmodel.LBVMConnection, seq int) {
-	b.LBVMConnections[dbItem.Lcuuid] = &LBVMConnection{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, b.LBVMConnections[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteLBVMConnection(lcuuid string) {
-	delete(b.LBVMConnections, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type LBVMConnection struct {
-	DiffBase
+	ResourceBase
+}
+
+func (a *LBVMConnection) reset(dbItem *metadbmodel.LBVMConnection, tool *tool.Tool) {
+}
+
+func NewLBVMConnectionCollection(t *tool.Tool) *LBVMConnectionCollection {
+	c := new(LBVMConnectionCollection)
+	c.collection = newCollectionBuilder[*LBVMConnection]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.LBVMConnection { return new(metadbmodel.LBVMConnection) }).
+		withCacheItemFactory(func() *LBVMConnection { return new(LBVMConnection) }).
+		build()
+	return c
+}
+
+type LBVMConnectionCollection struct {
+	collection[*LBVMConnection, *metadbmodel.LBVMConnection]
 }

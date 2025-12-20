@@ -1,5 +1,41 @@
 name: pod_group
 public_name: PodGroup
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: Label
+      type: string
+    - name: PodNum
+      type: int
+    - name: Type
+      type: int
+    - name: Metadata
+      type: string
+      db_type: bytes
+      need_hide: true
+    - name: MetadataHash
+      type: string
+    - name: Spec
+      type: string
+      db_type: bytes
+      need_hide: true
+    - name: SpecHash
+      type: string
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+    - name: NetworkMode
+      type: int
+
 cache_tool:
   enabled: true
   fields:

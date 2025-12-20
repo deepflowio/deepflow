@@ -17,94 +17,59 @@
 package diffbase
 
 import (
-	"time"
-
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPod(dbItem *metadbmodel.Pod, seq int, toolDataSet *tool.DataSet) {
-	var podNodeLcuuid string
-	if dbItem.PodNodeID != 0 {
-		podNodeLcuuid, _ = toolDataSet.GetPodNodeLcuuidByID(dbItem.PodNodeID)
-	}
-	var podReplicaSetLcuuid string
-	if dbItem.PodReplicaSetID != 0 {
-		podReplicaSetLcuuid, _ = toolDataSet.GetPodReplicaSetLcuuidByID(dbItem.PodReplicaSetID)
-	}
-	var podGroupLcuuid string
-	if dbItem.PodGroupID != 0 {
-		podGroupLcuuid, _ = toolDataSet.GetPodGroupLcuuidByID(dbItem.PodGroupID)
-	}
-	var podServiceLcuuid string
-	if dbItem.PodServiceID != 0 {
-		podServiceLcuuid, _ = toolDataSet.GetPodServiceLcuuidByID(dbItem.PodServiceID)
-	}
-	vpcLcuuid, _ := toolDataSet.GetVPCLcuuidByID(dbItem.VPCID)
-	b.Pods[dbItem.Lcuuid] = &Pod{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:                dbItem.Name,
-		Label:               dbItem.Label,
-		Annotation:          dbItem.Annotation,
-		ENV:                 dbItem.ENV,
-		ContainerIDs:        dbItem.ContainerIDs,
-		State:               dbItem.State,
-		CreatedAt:           dbItem.CreatedAt,
-		PodNodeLcuuid:       podNodeLcuuid,
-		PodReplicaSetLcuuid: podReplicaSetLcuuid,
-		PodGroupLcuuid:      podGroupLcuuid,
-		PodServiceLcuuid:    podServiceLcuuid,
-		VPCLcuuid:           vpcLcuuid,
-		RegionLcuuid:        dbItem.Region,
-		AZLcuuid:            dbItem.AZ,
-		SubDomainLcuuid:     dbItem.SubDomain,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_EN, b.Pods[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeletePod(lcuuid string) {
-	delete(b.Pods, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type Pod struct {
-	DiffBase
-	Name                string    `json:"name"`
-	Label               string    `json:"label"`
-	Annotation          string    `json:"annotation"`
-	ENV                 string    `json:"env"`
-	ContainerIDs        string    `json:"container_ids"`
-	State               int       `json:"state"`
-	CreatedAt           time.Time `json:"created_at"`
-	PodNodeLcuuid       string    `json:"pod_node_lcuuid"`
-	PodReplicaSetLcuuid string    `json:"pod_replica_set_lcuuid"`
-	PodGroupLcuuid      string    `json:"pod_group_lcuuid"`
-	PodServiceLcuuid    string    `json:"pod_service_lcuuid"`
-	VPCLcuuid           string    `json:"vpc_lcuuid"`
-	RegionLcuuid        string    `json:"region_lcuuid"`
-	AZLcuuid            string    `json:"az_lcuuid"`
-	SubDomainLcuuid     string    `json:"sub_domain_lcuuid"`
+	ResourceBase
+	Name                string
+	Label               string
+	Annotation          string
+	ENV                 string
+	ContainerIDs        string
+	State               int
+	CreatedAt           time.Time
+	PodNodeLcuuid       string
+	PodReplicaSetLcuuid string
+	PodGroupLcuuid      string
+	PodServiceLcuuid    string
+	VPCLcuuid           string
+	RegionLcuuid        string
+	AZLcuuid            string
+	SubDomainLcuuid     string
 }
 
-func (p *Pod) Update(cloudItem *cloudmodel.Pod) {
-	p.Name = cloudItem.Name
-	p.Label = cloudItem.Label
-	p.ENV = cloudItem.ENV
-	p.Annotation = cloudItem.Annotation
-	p.ContainerIDs = cloudItem.ContainerIDs
-	p.State = cloudItem.State
-	p.CreatedAt = cloudItem.CreatedAt
-	p.PodNodeLcuuid = cloudItem.PodNodeLcuuid
-	p.PodReplicaSetLcuuid = cloudItem.PodReplicaSetLcuuid
-	p.PodGroupLcuuid = cloudItem.PodGroupLcuuid
-	p.PodServiceLcuuid = cloudItem.PodServiceLcuuid
-	p.VPCLcuuid = cloudItem.VPCLcuuid
-	p.RegionLcuuid = cloudItem.RegionLcuuid
-	p.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_EN, p))
+func (a *Pod) reset(dbItem *metadbmodel.Pod, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.Label = dbItem.Label
+	a.Annotation = dbItem.Annotation
+	a.ENV = dbItem.ENV
+	a.ContainerIDs = dbItem.ContainerIDs
+	a.State = dbItem.State
+	a.CreatedAt = dbItem.CreatedAt
+	a.PodNodeLcuuid = tool.PodNode().GetByID(dbItem.PodNodeID).Lcuuid()
+	a.PodReplicaSetLcuuid = tool.PodReplicaSet().GetByID(dbItem.PodReplicaSetID).Lcuuid()
+	a.PodGroupLcuuid = tool.PodGroup().GetByID(dbItem.PodGroupID).Lcuuid()
+	a.PodServiceLcuuid = tool.PodService().GetByID(dbItem.PodServiceID).Lcuuid()
+	a.VPCLcuuid = tool.VPC().GetByID(dbItem.VPCID).Lcuuid()
+	a.RegionLcuuid = dbItem.Region
+	a.AZLcuuid = dbItem.AZ
+	a.SubDomainLcuuid = dbItem.SubDomain
+}
+
+func NewPodCollection(t *tool.Tool) *PodCollection {
+	c := new(PodCollection)
+	c.collection = newCollectionBuilder[*Pod]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_POD_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.Pod { return new(metadbmodel.Pod) }).
+		withCacheItemFactory(func() *Pod { return new(Pod) }).
+		build()
+	return c
+}
+
+type PodCollection struct {
+	collection[*Pod, *metadbmodel.Pod]
 }

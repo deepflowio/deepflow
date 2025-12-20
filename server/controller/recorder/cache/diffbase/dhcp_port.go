@@ -17,44 +17,37 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddDHCPPort(dbItem *metadbmodel.DHCPPort, seq int, toolDataSet *tool.DataSet) {
-	vpcLcuuid, _ := toolDataSet.GetVPCLcuuidByID(dbItem.VPCID)
-	b.DHCPPorts[dbItem.Lcuuid] = &DHCPPort{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:         dbItem.Name,
-		RegionLcuuid: dbItem.Region,
-		AZLcuuid:     dbItem.AZ,
-		VPCLcuuid:    vpcLcuuid,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, b.DHCPPorts[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteDHCPPort(lcuuid string) {
-	delete(b.DHCPPorts, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type DHCPPort struct {
-	DiffBase
-	Name         string `json:"name"`
-	RegionLcuuid string `json:"region_lcuuid"`
-	AZLcuuid     string `json:"az_lcuuid"`
-	VPCLcuuid    string `json:"vpc_lcuuid"`
+	ResourceBase
+	Name         string
+	RegionLcuuid string
+	AZLcuuid     string
+	VPCLcuuid    string
 }
 
-func (d *DHCPPort) Update(cloudItem *cloudmodel.DHCPPort) {
-	d.Name = cloudItem.Name
-	d.RegionLcuuid = cloudItem.RegionLcuuid
-	d.AZLcuuid = cloudItem.AZLcuuid
-	d.VPCLcuuid = cloudItem.VPCLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, d))
+func (a *DHCPPort) reset(dbItem *metadbmodel.DHCPPort, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.RegionLcuuid = dbItem.Region
+	a.AZLcuuid = dbItem.AZ
+	a.VPCLcuuid = tool.VPC().GetByID(dbItem.VPCID).Lcuuid()
+}
+
+func NewDHCPPortCollection(t *tool.Tool) *DHCPPortCollection {
+	c := new(DHCPPortCollection)
+	c.collection = newCollectionBuilder[*DHCPPort]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.DHCPPort { return new(metadbmodel.DHCPPort) }).
+		withCacheItemFactory(func() *DHCPPort { return new(DHCPPort) }).
+		build()
+	return c
+}
+
+type DHCPPortCollection struct {
+	collection[*DHCPPort, *metadbmodel.DHCPPort]
 }

@@ -17,44 +17,39 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddLB(dbItem *metadbmodel.LB, seq int) {
-	b.LBs[dbItem.Lcuuid] = &LB{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:         dbItem.Name,
-		Model:        dbItem.Model,
-		VIP:          dbItem.VIP,
-		RegionLcuuid: dbItem.Region,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_EN, b.LBs[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteLB(lcuuid string) {
-	delete(b.LBs, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type LB struct {
-	DiffBase
-	Name         string `json:"name"`
-	Model        int    `json:"model"`
-	VIP          string `json:"vip"`
-	VPCLcuuid    string `json:"vpc_lcuuid"`
-	RegionLcuuid string `json:"region_lcuuid"`
+	ResourceBase
+	Name         string
+	Model        int
+	VIP          string
+	VPCLcuuid    string
+	RegionLcuuid string
 }
 
-func (l *LB) Update(cloudItem *cloudmodel.LB) {
-	l.Name = cloudItem.Name
-	l.Model = cloudItem.Model
-	l.VIP = cloudItem.VIP
-	l.VPCLcuuid = cloudItem.VPCLcuuid
-	l.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_LB_EN, l))
+func (a *LB) reset(dbItem *metadbmodel.LB, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.Model = dbItem.Model
+	a.VIP = dbItem.VIP
+	a.VPCLcuuid = tool.VPC().GetByID(dbItem.VPCID).Lcuuid()
+	a.RegionLcuuid = dbItem.Region
+}
+
+func NewLBCollection(t *tool.Tool) *LBCollection {
+	c := new(LBCollection)
+	c.collection = newCollectionBuilder[*LB]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_LB_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.LB { return new(metadbmodel.LB) }).
+		withCacheItemFactory(func() *LB { return new(LB) }).
+		build()
+	return c
+}
+
+type LBCollection struct {
+	collection[*LB, *metadbmodel.LB]
 }

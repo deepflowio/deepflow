@@ -19,25 +19,29 @@ package diffbase
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddVMPodNodeConnection(dbItem *metadbmodel.VMPodNodeConnection, seq int) {
-	b.VMPodNodeConnections[dbItem.Lcuuid] = &VMPodNodeConnection{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		SubDomainLcuuid: dbItem.SubDomain,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, b.VMPodNodeConnections[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteVMPodNodeConnection(lcuuid string) {
-	delete(b.VMPodNodeConnections, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type VMPodNodeConnection struct {
-	DiffBase
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	ResourceBase
+	SubDomainLcuuid string
+}
+
+func (a *VMPodNodeConnection) reset(dbItem *metadbmodel.VMPodNodeConnection, tool *tool.Tool) {
+	a.SubDomainLcuuid = dbItem.SubDomain
+}
+
+func NewVMPodNodeConnectionCollection(t *tool.Tool) *VMPodNodeConnectionCollection {
+	c := new(VMPodNodeConnectionCollection)
+	c.collection = newCollectionBuilder[*VMPodNodeConnection]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.VMPodNodeConnection { return new(metadbmodel.VMPodNodeConnection) }).
+		withCacheItemFactory(func() *VMPodNodeConnection { return new(VMPodNodeConnection) }).
+		build()
+	return c
+}
+
+type VMPodNodeConnectionCollection struct {
+	collection[*VMPodNodeConnection, *metadbmodel.VMPodNodeConnection]
 }

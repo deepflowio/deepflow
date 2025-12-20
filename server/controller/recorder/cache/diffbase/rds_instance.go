@@ -17,50 +17,43 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddRDSInstance(dbItem *metadbmodel.RDSInstance, seq int) {
-	b.RDSInstances[dbItem.Lcuuid] = &RDSInstance{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:         dbItem.Name,
-		State:        dbItem.State,
-		Series:       dbItem.Series,
-		Model:        dbItem.Model,
-		RegionLcuuid: dbItem.Region,
-		AZLcuuid:     dbItem.AZ,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, b.RDSInstances[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeleteRDSInstance(lcuuid string) {
-	delete(b.RDSInstances, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type RDSInstance struct {
-	DiffBase
-	Name         string `json:"name"`
-	State        int    `json:"state"`
-	Series       int    `json:"series"`
-	Model        int    `json:"model"`
-	VPCLcuuid    string `json:"vpc_lcuuid"`
-	RegionLcuuid string `json:"region_lcuuid"`
-	AZLcuuid     string `json:"az_lcuuid"`
+	ResourceBase
+	Name         string
+	State        int
+	Series       int
+	Model        int
+	VPCLcuuid    string
+	RegionLcuuid string
+	AZLcuuid     string
 }
 
-func (r *RDSInstance) Update(cloudItem *cloudmodel.RDSInstance) {
-	r.Name = cloudItem.Name
-	r.State = cloudItem.State
-	r.Series = cloudItem.Series
-	r.Model = cloudItem.Model
-	r.VPCLcuuid = cloudItem.VPCLcuuid
-	r.RegionLcuuid = cloudItem.RegionLcuuid
-	r.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, r))
+func (a *RDSInstance) reset(dbItem *metadbmodel.RDSInstance, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.State = dbItem.State
+	a.Series = dbItem.Series
+	a.Model = dbItem.Model
+	a.VPCLcuuid = tool.VPC().GetByID(dbItem.VPCID).Lcuuid()
+	a.RegionLcuuid = dbItem.Region
+	a.AZLcuuid = dbItem.AZ
+}
+
+func NewRDSInstanceCollection(t *tool.Tool) *RDSInstanceCollection {
+	c := new(RDSInstanceCollection)
+	c.collection = newCollectionBuilder[*RDSInstance]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.RDSInstance { return new(metadbmodel.RDSInstance) }).
+		withCacheItemFactory(func() *RDSInstance { return new(RDSInstance) }).
+		build()
+	return c
+}
+
+type RDSInstanceCollection struct {
+	collection[*RDSInstance, *metadbmodel.RDSInstance]
 }

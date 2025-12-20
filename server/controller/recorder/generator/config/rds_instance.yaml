@@ -1,5 +1,28 @@
 name: rds_instance
 public_name: RDSInstance
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: State
+      type: int
+    - name: Series
+      type: int
+    - name: Model
+      type: int
+    - name: VPCLcuuid
+      type: string
+      ref: VPC
+      db_field_name: VPCID
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+
 cache_tool:
   enabled: true
   fields:

@@ -1,5 +1,23 @@
 name: lb
 public_name: LB
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: Model
+      type: int
+    - name: VIP
+      type: string
+    - name: VPCLcuuid
+      type: string
+      ref: VPC
+      db_field_name: VPCID
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+
 cache_tool:
   enabled: true
   fields:

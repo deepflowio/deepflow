@@ -1,5 +1,18 @@
 name: config_map
 public_name: ConfigMap
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: Data
+      type: string
+      db_type: bytes
+      need_hide: true
+    - name: DataHash
+      type: string
+
 cache_tool:
   enabled: true
   fields:

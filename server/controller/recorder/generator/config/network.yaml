@@ -1,5 +1,33 @@
 name: network
 public_name: Network
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: Name
+      type: string
+    - name: Label
+      type: string
+    - name: TunnelID
+      type: int
+    - name: NetType
+      type: int
+    - name: SegmentationID
+      type: int
+    - name: VPCLcuuid
+      type: string
+      ref: VPC
+      db_field_name: VPCID
+    - name: RegionLcuuid
+      type: string
+      db_field_name: Region
+    - name: AZLcuuid
+      type: string
+      db_field_name: AZ
+    - name: SubDomainLcuuid
+      type: string
+      db_field_name: SubDomain
+
 cache_tool:
   enabled: true
   fields:

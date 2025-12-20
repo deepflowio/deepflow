@@ -19,23 +19,27 @@ package diffbase
 import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPodGroupConfigMapConnection(dbItem *metadbmodel.PodGroupConfigMapConnection, seq int) {
-	b.PodGroupConfigMapConnections[dbItem.Lcuuid] = &PodGroupConfigMapConnection{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, b.PodGroupConfigMapConnections[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeletePodGroupConfigMapConnection(lcuuid string) {
-	delete(b.PodGroupConfigMapConnections, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type PodGroupConfigMapConnection struct {
-	DiffBase
+	ResourceBase
+}
+
+func (a *PodGroupConfigMapConnection) reset(dbItem *metadbmodel.PodGroupConfigMapConnection, tool *tool.Tool) {
+}
+
+func NewPodGroupConfigMapConnectionCollection(t *tool.Tool) *PodGroupConfigMapConnectionCollection {
+	c := new(PodGroupConfigMapConnectionCollection)
+	c.collection = newCollectionBuilder[*PodGroupConfigMapConnection]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.PodGroupConfigMapConnection { return new(metadbmodel.PodGroupConfigMapConnection) }).
+		withCacheItemFactory(func() *PodGroupConfigMapConnection { return new(PodGroupConfigMapConnection) }).
+		build()
+	return c
+}
+
+type PodGroupConfigMapConnectionCollection struct {
+	collection[*PodGroupConfigMapConnection, *metadbmodel.PodGroupConfigMapConnection]
 }

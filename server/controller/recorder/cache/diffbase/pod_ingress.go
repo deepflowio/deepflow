@@ -17,41 +17,37 @@
 package diffbase
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 )
 
-func (b *DataSet) AddPodIngress(dbItem *metadbmodel.PodIngress, seq int) {
-	b.PodIngresses[dbItem.Lcuuid] = &PodIngress{
-		DiffBase: DiffBase{
-			Sequence: seq,
-			Lcuuid:   dbItem.Lcuuid,
-		},
-		Name:            dbItem.Name,
-		RegionLcuuid:    dbItem.Region,
-		AZLcuuid:        dbItem.AZ,
-		SubDomainLcuuid: dbItem.SubDomain,
-	}
-	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, b.PodIngresses[dbItem.Lcuuid]), b.metadata.LogPrefixes)
-}
-
-func (b *DataSet) DeletePodIngress(lcuuid string) {
-	delete(b.PodIngresses, lcuuid)
-	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, lcuuid), b.metadata.LogPrefixes)
-}
-
 type PodIngress struct {
-	DiffBase
-	Name            string `json:"name"`
-	RegionLcuuid    string `json:"region_lcuuid"`
-	AZLcuuid        string `json:"az_lcuuid"`
-	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
+	ResourceBase
+	Name            string
+	RegionLcuuid    string
+	AZLcuuid        string
+	SubDomainLcuuid string
 }
 
-func (p *PodIngress) Update(cloudItem *cloudmodel.PodIngress) {
-	p.Name = cloudItem.Name
-	p.RegionLcuuid = cloudItem.RegionLcuuid
-	p.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, p))
+func (a *PodIngress) reset(dbItem *metadbmodel.PodIngress, tool *tool.Tool) {
+	a.Name = dbItem.Name
+	a.RegionLcuuid = dbItem.Region
+	a.AZLcuuid = dbItem.AZ
+	a.SubDomainLcuuid = dbItem.SubDomain
+}
+
+func NewPodIngressCollection(t *tool.Tool) *PodIngressCollection {
+	c := new(PodIngressCollection)
+	c.collection = newCollectionBuilder[*PodIngress]().
+		withResourceType(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN).
+		withTool(t).
+		withDBItemFactory(func() *metadbmodel.PodIngress { return new(metadbmodel.PodIngress) }).
+		withCacheItemFactory(func() *PodIngress { return new(PodIngress) }).
+		build()
+	return c
+}
+
+type PodIngressCollection struct {
+	collection[*PodIngress, *metadbmodel.PodIngress]
 }
