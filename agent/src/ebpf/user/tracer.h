@@ -46,6 +46,8 @@
 #include <regex.h>
 #include "config.h"
 
+#define PERF_PAGE_DEF_SZ 4096
+
 #define STRINGIFY(x) #x
 #define UPROBE_FUNC_NAME(N) STRINGIFY(df_U_##N)
 #define URETPROBE_FUNC_NAME(N) STRINGIFY(df_UR_##N)
