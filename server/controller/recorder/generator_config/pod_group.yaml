@@ -1,5 +1,50 @@
 name: pod_group
 orm_name: PodGroup
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: label
+      orm_name: Label
+      type: string
+    - name: pod_num
+      orm_name: PodNum
+      type: int
+    - name: type
+      orm_name: Type
+      type: int
+    - name: metadata
+      orm_name: Metadata
+      type: string
+      from: bytes
+      is_large: true
+    - name: metadata_hash
+      orm_name: MetadataHash
+      type: string
+    - name: spec
+      orm_name: Spec
+      type: string
+      from: bytes
+      is_large: true
+    - name: spec_hash
+      orm_name: SpecHash
+      type: string
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+    - name: network_mode
+      orm_name: NetworkMode
+      type: int
+
 cache_tool:
   enabled: true
   fields:

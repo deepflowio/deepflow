@@ -1,5 +1,60 @@
 name: pod_service
 orm_name: PodService
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: label
+      orm_name: Label
+      type: string
+    - name: annotation
+      orm_name: Annotation
+      type: string
+    - name: selector
+      orm_name: Selector
+      type: string
+    - name: external_ip
+      orm_name: ExternalIP
+      type: string
+    - name: service_cluster_ip
+      orm_name: ServiceClusterIP
+      type: string
+    - name: metadata
+      orm_name: Metadata
+      type: string
+      from: bytes
+      is_large: true
+    - name: metadata_hash
+      orm_name: MetadataHash
+      type: string
+    - name: spec
+      orm_name: Spec
+      type: string
+      from: bytes
+      is_large: true
+    - name: spec_hash
+      orm_name: SpecHash
+      type: string
+    - name: pod_ingress_lcuuid
+      orm_name: PodIngressID
+      type: string
+      ref:
+        resource: pod_ingress
+        lookup_by: id
+        target: lcuuid
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+
 cache_tool:
   enabled: true
   fields:

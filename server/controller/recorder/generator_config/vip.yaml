@@ -1,0 +1,15 @@
+name: vip
+orm_name: VIP
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: ip
+      orm_name: IP
+      type: string
+    - name: vtap_id
+      orm_name: VTapID
+      type: uint32
+
+cache_tool:
+  enabled: false

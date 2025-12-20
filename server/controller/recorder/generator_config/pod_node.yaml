@@ -1,5 +1,37 @@
 name: pod_node
 orm_name: PodNode
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: type
+      orm_name: Type
+      type: int
+    - name: state
+      orm_name: State
+      type: int
+    - name: hostname
+      orm_name: Hostname
+      type: string
+    - name: ip
+      orm_name: IP
+      type: string
+    - name: vcpu_num
+      orm_name: VCPUNum
+      type: int
+    - name: mem_total
+      orm_name: MemTotal
+      type: int
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+
 cache_tool:
   enabled: true
   fields:

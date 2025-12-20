@@ -1,0 +1,20 @@
+name: cen
+orm_name: CEN
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: vpc_lcuuids
+      orm_name: VPCIDs
+      type: list
+      of: string
+      ref:
+        resource: vpc
+        lookup_by: id
+        target: lcuuid
+
+cache_tool:
+  enabled: false

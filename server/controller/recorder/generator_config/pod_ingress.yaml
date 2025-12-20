@@ -1,5 +1,22 @@
 name: pod_ingress
 orm_name: PodIngress
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+
 cache_tool:
   enabled: true
   fields:

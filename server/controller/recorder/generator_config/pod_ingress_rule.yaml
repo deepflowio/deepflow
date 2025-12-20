@@ -1,5 +1,13 @@
 name: pod_ingress_rule
 orm_name: PodIngressRule
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+
 cache_tool:
   enabled: true
   fields:

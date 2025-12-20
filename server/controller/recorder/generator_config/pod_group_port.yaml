@@ -1,0 +1,15 @@
+name: pod_group_port
+orm_name: PodGroupPort
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+
+cache_tool:
+  enabled: false

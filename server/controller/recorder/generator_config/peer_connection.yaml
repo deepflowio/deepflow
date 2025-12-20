@@ -1,0 +1,12 @@
+name: peer_connection
+orm_name: PeerConnection
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+
+cache_tool:
+  enabled: false

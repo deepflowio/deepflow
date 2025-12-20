@@ -1,0 +1,9 @@
+name: nat_rule
+orm_name: NATRule
+
+cache_diffbase:
+  enabled: true
+  fields: []
+
+cache_tool:
+  enabled: false

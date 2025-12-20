@@ -1,5 +1,28 @@
 name: vpc
 orm_name: VPC
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: label
+      orm_name: Label
+      type: string
+    - name: tunnel_id
+      orm_name: TunnelID
+      type: int
+    - name: cidr
+      orm_name: CIDR
+      type: string
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: owner
+      orm_name: Owner
+      type: string
+
 cache_tool:
   enabled: true
   fields:

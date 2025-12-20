@@ -1,5 +1,29 @@
 name: lb
 orm_name: LB
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: model
+      orm_name: Model
+      type: int
+    - name: vip
+      orm_name: VIP
+      type: string
+    - name: vpc_lcuuid
+      orm_name: VPCID
+      type: string
+      ref:
+        resource: vpc
+        lookup_by: id
+        target: lcuuid
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+
 cache_tool:
   enabled: true
   fields:

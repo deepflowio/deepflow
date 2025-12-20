@@ -59,6 +59,35 @@ type KeyField struct {
 	PublicCamelName string
 }
 
+// DiffbaseRefConfig cache_diffbase 中的外键引用配置（使用 small_snake_case 值）
+type DiffbaseRefConfig struct {
+	Resource string `yaml:"resource"`
+	LookupBy string `yaml:"lookup_by"`
+	Target   string `yaml:"target"`
+}
+
+// DiffbaseField cache_diffbase 中的字段定义
+type DiffbaseField struct {
+	Name        string             `yaml:"name"`
+	OrmName     string             `yaml:"orm_name"`
+	Type        string             `yaml:"type"`
+	Of          string             `yaml:"of"`            // 集合元素类型，配合 type: list 使用
+	From        string             `yaml:"from"`           // 数据源类型转换，如 bytes
+	IsLarge     bool               `yaml:"is_large"`       // 是否为大字段（日志输出时隐藏）
+	IsExtension bool               `yaml:"is_extension"`   // 是否为扩展字段（reset 中跳过，由 resetExt 处理）
+	Ref         *DiffbaseRefConfig `yaml:"ref"`
+	Comment     string             `yaml:"comment"`
+
+	// 运行时填充
+	CamelName       string
+	PublicCamelName string
+	IsList          bool   // 运行时从 type == "list" 推导
+	GoType          string // 运行时生成的实际 Go 类型
+	RefResource     string // 运行时 toCamel(ref.resource)
+	RefLookupBy     string // 运行时 toCamel(ref.lookup_by)
+	RefTarget       string // 运行时 toCamel(ref.target)
+}
+
 type CacheToolConfig struct {
 	Enabled    bool     `yaml:"enabled"`
 	Fields     []Field  `yaml:"fields"`
@@ -76,10 +105,22 @@ type CacheToolConfig struct {
 	ExtensionFields  string
 }
 
+type CacheDiffbaseConfig struct {
+	Enabled    bool            `yaml:"enabled"`
+	Fields     []DiffbaseField `yaml:"fields"`
+	Extensions []string        `yaml:"extensions"`
+
+	// 运行时推导
+	HasStructExtension bool
+	HasExtensionField  bool
+	HasLargeField      bool
+}
+
 type Config struct {
 	Name      string          `yaml:"name"`
 	OrmName   string          `yaml:"orm_name"`
 	CacheTool CacheToolConfig `yaml:"cache_tool"`
+	CacheDiffbase CacheDiffbaseConfig `yaml:"cache_diffbase"`
 
 	PublicName string // 运行时生成
 }
@@ -89,6 +130,13 @@ type CacheToolGenerator struct {
 	config      Config
 	cacheConfig CacheToolConfig
 	template    *template.Template
+}
+
+// CacheDiffbaseGenerator 聚合 cache_diffbase 代码生成器的所有方法
+type CacheDiffbaseGenerator struct {
+	config         Config
+	diffbaseConfig CacheDiffbaseConfig
+	template       *template.Template
 }
 
 // NewCacheToolGenerator 创建新的 CacheToolGenerator 实例
@@ -120,6 +168,42 @@ func NewCacheToolGenerator(configFile string) (*CacheToolGenerator, error) {
 
 	// 处理扩展文件
 	generator.loadExtensions()
+
+	// 加载模板
+	err = generator.loadTemplate()
+	if err != nil {
+		return nil, err
+	}
+
+	return generator, nil
+}
+
+// NewCacheDiffbaseGenerator 创建新的 CacheDiffbaseGenerator 实例
+func NewCacheDiffbaseGenerator(configFile string) (*CacheDiffbaseGenerator, error) {
+	configData, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %v", err)
+	}
+
+	var config Config
+	err = yaml.Unmarshal(configData, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config data: %v", err)
+	}
+
+	generator := &CacheDiffbaseGenerator{config: config}
+
+	// 解析和适配配置
+	err = generator.adaptConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// 处理字段
+	generator.processFields()
+
+	// 从字段和 extensions 配置推导运行时标志
+	generator.deriveFlags()
 
 	// 加载模板
 	err = generator.loadTemplate()
@@ -194,6 +278,8 @@ func (g *CacheToolGenerator) loadTemplate() error {
 	tmpl, err := template.New(templateName).Funcs(template.FuncMap{
 		"ToUpper":      toUpper,
 		"toLowerCamel": toLowerCamel,
+		"hasSuffix":    strings.HasSuffix,
+		"trimPrefix":   strings.TrimPrefix, // 注册 trimPrefix 函数
 	}).ParseFiles(templateFile)
 	if err != nil {
 		return fmt.Errorf("failed to parse template: %v", err)
@@ -350,12 +436,136 @@ func (g *CacheToolGenerator) Generate() error {
 		log.Printf("Warning: failed to format %s: %v", outputFile, err)
 	}
 
-	// 执行 goimports 格式化 import
-	if err := formatImports(outputFile); err != nil {
-		log.Printf("Warning: failed to format imports in %s: %v", outputFile, err)
+	fmt.Printf("Generated code for %s in %s\n", g.config.Name, outputFile)
+	return nil
+}
+
+// CacheDiffbaseGenerator 的方法实现
+
+// adaptConfig 适配配置结构
+func (g *CacheDiffbaseGenerator) adaptConfig() error {
+	if !g.config.CacheDiffbase.Enabled {
+		return fmt.Errorf("cache_diffbase is not enabled in configuration")
 	}
 
-	fmt.Printf("Generated code for %s in %s\n", g.config.Name, outputFile)
+	// 自动从 snake_case Name 生成 UpperCamelCase PublicName
+	g.config.PublicName = toCamel(g.config.Name, true)
+
+	if g.config.OrmName == "" {
+		return fmt.Errorf("orm_name is required in configuration")
+	}
+
+	g.diffbaseConfig = g.config.CacheDiffbase
+	return nil
+}
+
+// processFields 处理字段配置，生成 CamelName、PublicCamelName 和 GoType
+func (g *CacheDiffbaseGenerator) processFields() {
+	for i := range g.diffbaseConfig.Fields {
+		f := &g.diffbaseConfig.Fields[i]
+		f.CamelName = toCamel(f.Name, false)
+		f.PublicCamelName = toCamel(f.Name, true)
+
+		// 处理 list 类型
+		if f.Type == "list" {
+			f.IsList = true
+			f.GoType = "[]" + f.Of
+		} else {
+			f.GoType = f.Type
+		}
+
+		// 处理 ref 配置，转换为 PascalCase
+		if f.Ref != nil {
+			f.RefResource = toCamel(f.Ref.Resource, true)
+			f.RefLookupBy = toCamel(f.Ref.LookupBy, true)
+			f.RefTarget = toCamel(f.Ref.Target, true)
+		}
+
+		// 推导 HasExtensionField 和 HasLargeField
+		if f.IsExtension {
+			g.diffbaseConfig.HasExtensionField = true
+		}
+		if f.IsLarge {
+			g.diffbaseConfig.HasLargeField = true
+		}
+	}
+}
+
+// deriveFlags 从 extensions 配置推导运行时标志
+func (g *CacheDiffbaseGenerator) deriveFlags() {
+	for _, ext := range g.diffbaseConfig.Extensions {
+		switch ext {
+		case "struct":
+			g.diffbaseConfig.HasStructExtension = true
+		}
+	}
+}
+
+// loadTemplate 加载模板文件
+func (g *CacheDiffbaseGenerator) loadTemplate() error {
+	templateFile := "../cache/diffbase/gen.go.tpl"
+	templateName := filepath.Base(templateFile)
+
+	tmpl, err := template.New(templateName).Funcs(template.FuncMap{
+		"ToUpper":      toUpper,
+		"toLowerCamel": toLowerCamel,
+		"hasSuffix":    strings.HasSuffix,
+		"trimPrefix":   strings.TrimPrefix, // 注册 trimPrefix 函数
+	}).ParseFiles(templateFile)
+	if err != nil {
+		return fmt.Errorf("failed to parse template: %v", err)
+	}
+
+	g.template = tmpl
+	return nil
+}
+
+// Generate 生成代码文件
+func (g *CacheDiffbaseGenerator) Generate() error {
+	// 构造模板数据
+	templateData := struct {
+		Name               string
+		PublicName         string
+		OrmName            string
+		Fields             []DiffbaseField
+		HasStructExtension bool
+		HasExtensionField  bool
+		HasLargeField      bool
+	}{
+		Name:               g.config.Name,
+		PublicName:         g.config.PublicName,
+		OrmName:            g.config.OrmName,
+		Fields:             g.diffbaseConfig.Fields,
+		HasStructExtension: g.diffbaseConfig.HasStructExtension,
+		HasExtensionField:  g.diffbaseConfig.HasExtensionField,
+		HasLargeField:      g.diffbaseConfig.HasLargeField,
+	}
+
+	var generatedCode bytes.Buffer
+	err := g.template.Execute(&generatedCode, templateData)
+	if err != nil {
+		return fmt.Errorf("failed to execute template: %v", err)
+	}
+
+	outputDir := "../cache/diffbase"
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			return fmt.Errorf("failed to create output directory: %v", err)
+		}
+	}
+
+	outputFile := filepath.Join(outputDir, g.config.Name+".go")
+	err = os.WriteFile(outputFile, generatedCode.Bytes(), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write generated code to file: %v", err)
+	}
+
+	// 执行 go fmt 格式化生成的代码
+	if err := formatGoFile(outputFile); err != nil {
+		log.Printf("Warning: failed to format %s: %v", outputFile, err)
+	}
+
+	fmt.Printf("Generated diffbase code for %s in %s\n", g.config.Name, outputFile)
 	return nil
 }
 
@@ -391,23 +601,22 @@ func toUpper(s string) string {
 	return strings.ToUpper(s)
 }
 
-// formatGoFile 使用 go fmt 格式化 Go 代码文件（通用工具函数）
+// formatGoFile 使用 go fmt  格式化 Go 代码文件（通用工具函数）,使用 goimports 格式化 import
 func formatGoFile(filePath string) error {
+	// 设置 go fmt  命令
 	cmd := exec.Command("go", "fmt", filePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("go fmt failed: %v, output: %s", err, string(output))
 	}
-	return nil
-}
 
-// formatImports 使用 goimports 格式化 import
-func formatImports(filePath string) error {
-	cmd := exec.Command("goimports", "-w", filePath)
-	output, err := cmd.CombinedOutput()
+	// 设置 goimports 命令
+	cmd = exec.Command("goimports", "-w", filePath)
+	output, err = cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("goimports failed: %v, output: %s", err, string(output))
 	}
+
 	return nil
 }
 
@@ -418,17 +627,44 @@ func generateFromFiles(configFiles []string) error {
 
 	for _, configFile := range configFiles {
 		fmt.Printf("Processing %s...\n", configFile)
-		generator, err := NewCacheToolGenerator(configFile)
+
+		// 读取配置文件判断启用了哪些生成器
+		configData, err := os.ReadFile(configFile)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("%s: %v", configFile, err))
+			errors = append(errors, fmt.Sprintf("%s: failed to read config: %v", configFile, err))
 			continue
 		}
 
-		if err := generator.Generate(); err != nil {
-			errors = append(errors, fmt.Sprintf("%s: %v", configFile, err))
+		var config Config
+		err = yaml.Unmarshal(configData, &config)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: failed to unmarshal config: %v", configFile, err))
 			continue
 		}
-		successCount++
+
+		// 生成 cache_tool
+		if config.CacheTool.Enabled {
+			generator, err := NewCacheToolGenerator(configFile)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("%s (cache_tool): %v", configFile, err))
+			} else if err := generator.Generate(); err != nil {
+				errors = append(errors, fmt.Sprintf("%s (cache_tool): %v", configFile, err))
+			} else {
+				successCount++
+			}
+		}
+
+		// 生成 cache_diffbase
+		if config.CacheDiffbase.Enabled {
+			generator, err := NewCacheDiffbaseGenerator(configFile)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("%s (cache_diffbase): %v", configFile, err))
+			} else if err := generator.Generate(); err != nil {
+				errors = append(errors, fmt.Sprintf("%s (cache_diffbase): %v", configFile, err))
+			} else {
+				successCount++
+			}
+		}
 	}
 
 	fmt.Printf("\nGeneration complete: %d success, %d failed\n", successCount, len(errors))
@@ -507,14 +743,9 @@ func main() {
 		return
 	}
 
-	// 单个文件处理（保持原有兼容性）
+	// 单个文件处理（保持原有兼容性，但使用统一的生成逻辑）
 	configFile := arg
-	generator, err := NewCacheToolGenerator(configFile)
-	if err != nil {
-		log.Fatalf("failed to create generator: %v", err)
-	}
-
-	if err := generator.Generate(); err != nil {
-		log.Fatalf("failed to generate code: %v", err)
+	if err := generateFromFiles([]string{configFile}); err != nil {
+		log.Fatalf("generation failed: %v", err)
 	}
 }

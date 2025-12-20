@@ -1,5 +1,25 @@
 name: process
 orm_name: Process
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: os_app_tags
+      orm_name: OSAPPTags
+      type: string
+    - name: container_id
+      orm_name: ContainerID
+      type: string
+    - name: device_type
+      orm_name: DeviceType
+      type: int
+    - name: device_id
+      orm_name: DeviceID
+      type: int
+
 cache_tool:
   enabled: true
   fields:

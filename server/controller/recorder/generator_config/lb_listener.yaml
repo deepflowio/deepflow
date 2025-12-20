@@ -1,5 +1,25 @@
 name: lb_listener
 orm_name: LBListener
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: ips
+      orm_name: IPs
+      type: string
+    - name: snat_ips
+      orm_name: SNATIPs
+      type: string
+    - name: port
+      orm_name: Port
+      type: int
+    - name: protocol
+      orm_name: Protocol
+      type: string
+
 cache_tool:
   enabled: true
   fields:

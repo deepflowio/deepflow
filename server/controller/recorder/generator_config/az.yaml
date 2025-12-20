@@ -1,5 +1,19 @@
 name: az
 orm_name: AZ
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: label
+      orm_name: Label
+      type: string
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+
 cache_tool:
   enabled: true
   fields:

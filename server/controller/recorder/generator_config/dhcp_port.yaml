@@ -1,5 +1,26 @@
 name: dhcp_port
 orm_name: DHCPPort
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+    - name: vpc_lcuuid
+      orm_name: VPCID
+      type: string
+      ref:
+        resource: vpc
+        lookup_by: id
+        target: lcuuid
+
 cache_tool:
   enabled: true
   fields:

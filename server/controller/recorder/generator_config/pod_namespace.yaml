@@ -1,5 +1,22 @@
 name: pod_namespace
 orm_name: PodNamespace
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+    - name: learned_cloud_tags
+      orm_name: LearnedCloudTags
+      type: map[string]string
+
 cache_tool:
   enabled: true
   fields:

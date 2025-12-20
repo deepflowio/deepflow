@@ -1,5 +1,41 @@
 name: network
 orm_name: Network
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: label
+      orm_name: Label
+      type: string
+    - name: tunnel_id
+      orm_name: TunnelID
+      type: int
+    - name: net_type
+      orm_name: NetType
+      type: int
+    - name: segmentation_id
+      orm_name: SegmentationID
+      type: int
+    - name: vpc_lcuuid
+      orm_name: VPCID
+      type: string
+      ref:
+        resource: vpc
+        lookup_by: id
+        target: lcuuid
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+
 cache_tool:
   enabled: true
   fields:

@@ -1,5 +1,37 @@
 name: host
 orm_name: Host
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: ip
+      orm_name: IP
+      type: string
+    - name: hostname
+      orm_name: Hostname
+      type: string
+    - name: htype
+      orm_name: HType
+      type: int
+    - name: vcpu_num
+      orm_name: VCPUNum
+      type: int
+    - name: mem_total
+      orm_name: MemTotal
+      type: int
+    - name: extra_info
+      orm_name: ExtraInfo
+      type: string
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+
 cache_tool:
   enabled: true
   fields:

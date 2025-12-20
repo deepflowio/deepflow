@@ -1,5 +1,75 @@
 name: pod
 orm_name: Pod
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: label
+      orm_name: Label
+      type: string
+    - name: annotation
+      orm_name: Annotation
+      type: string
+    - name: env
+      orm_name: ENV
+      type: string
+    - name: container_ids
+      orm_name: ContainerIDs
+      type: string
+    - name: state
+      orm_name: State
+      type: int
+    - name: created_at
+      orm_name: CreatedAt
+      type: time.Time
+    - name: pod_node_lcuuid
+      orm_name: PodNodeID
+      type: string
+      ref:
+        resource: pod_node
+        lookup_by: id
+        target: lcuuid
+    - name: pod_replica_set_lcuuid
+      orm_name: PodReplicaSetID
+      type: string
+      ref:
+        resource: pod_replica_set
+        lookup_by: id
+        target: lcuuid
+    - name: pod_group_lcuuid
+      orm_name: PodGroupID
+      type: string
+      ref:
+        resource: pod_group
+        lookup_by: id
+        target: lcuuid
+    - name: pod_service_lcuuid
+      orm_name: PodServiceID
+      type: string
+      ref:
+        resource: pod_service
+        lookup_by: id
+        target: lcuuid
+    - name: vpc_lcuuid
+      orm_name: VPCID
+      type: string
+      ref:
+        resource: vpc
+        lookup_by: id
+        target: lcuuid
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+
 cache_tool:
   enabled: true
   fields:

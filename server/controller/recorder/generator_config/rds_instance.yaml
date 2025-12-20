@@ -1,5 +1,35 @@
 name: rds_instance
 orm_name: RDSInstance
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: state
+      orm_name: State
+      type: int
+    - name: series
+      orm_name: Series
+      type: int
+    - name: model
+      orm_name: Model
+      type: int
+    - name: vpc_lcuuid
+      orm_name: VPCID
+      type: string
+      ref:
+        resource: vpc
+        lookup_by: id
+        target: lcuuid
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+
 cache_tool:
   enabled: true
   fields:

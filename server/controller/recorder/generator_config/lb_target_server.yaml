@@ -1,0 +1,18 @@
+name: lb_target_server
+orm_name: LBTargetServer
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: ip
+      orm_name: IP
+      type: string
+    - name: port
+      orm_name: Port
+      type: int
+    - name: protocol
+      orm_name: Protocol
+      type: string
+
+cache_tool:
+  enabled: false

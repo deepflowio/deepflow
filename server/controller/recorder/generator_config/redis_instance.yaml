@@ -1,5 +1,25 @@
 name: redis_instance
 orm_name: RedisInstance
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: state
+      orm_name: State
+      type: int
+    - name: public_host
+      orm_name: PublicHost
+      type: string
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+
 cache_tool:
   enabled: true
   fields:

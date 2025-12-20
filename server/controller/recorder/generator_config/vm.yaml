@@ -1,5 +1,61 @@
 name: vm
 orm_name: VM
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: label
+      orm_name: Label
+      type: string
+    - name: ip
+      orm_name: IP
+      type: string
+    - name: hostname
+      orm_name: Hostname
+      type: string
+    - name: state
+      orm_name: State
+      type: int
+    - name: htype
+      orm_name: HType
+      type: int
+    - name: launch_server
+      orm_name: LaunchServer
+      type: string
+    - name: vpc_lcuuid
+      orm_name: VPCID
+      type: string
+      ref:
+        resource: vpc
+        lookup_by: id
+        target: lcuuid
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+    - name: learned_cloud_tags
+      orm_name: LearnedCloudTags
+      type: map[string]string
+    - name: network_lcuuid
+      orm_name: NetworkID
+      type: string
+      ref:
+        resource: network
+        lookup_by: id
+        target: lcuuid
+    - name: host_id
+      orm_name: LaunchServer
+      type: int
+      ref:
+        resource: host
+        lookup_by: ip
+        target: id
+
 cache_tool:
   enabled: true
   fields:

@@ -1,5 +1,19 @@
 name: nat_gateway
 orm_name: NATGateway
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: floating_ips
+      orm_name: FloatingIPs
+      type: string
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+
 cache_tool:
   enabled: true
   fields:

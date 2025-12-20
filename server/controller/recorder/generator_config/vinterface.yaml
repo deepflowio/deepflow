@@ -1,5 +1,50 @@
 name: vinterface
 orm_name: VInterface
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: type
+      orm_name: Type
+      type: int
+    - name: tap_mac
+      orm_name: TapMac
+      type: string
+    - name: netns_id
+      orm_name: NetnsID
+      type: uint32
+    - name: vtap_id
+      orm_name: VtapID
+      type: uint32
+    - name: vpc_id
+      orm_name: VPCID
+      type: int
+    - name: device_type
+      orm_name: DeviceType
+      type: int
+    - name: device_lcuuid
+      orm_name: DeviceLcuuid
+      type: string
+      is_extension: true
+    - name: network_lcuuid
+      orm_name: NetworkID
+      type: string
+      ref:
+        resource: network
+        lookup_by: id
+        target: lcuuid
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+  extensions:
+    - struct
+
 cache_tool:
   enabled: true
   fields:

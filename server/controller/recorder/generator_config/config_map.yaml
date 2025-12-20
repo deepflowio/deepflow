@@ -1,5 +1,21 @@
 name: config_map
 orm_name: ConfigMap
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: data
+      orm_name: Data
+      type: string
+      from: bytes
+      is_large: true
+    - name: data_hash
+      orm_name: DataHash
+      type: string
+
 cache_tool:
   enabled: true
   fields:
