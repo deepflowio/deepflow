@@ -784,13 +784,12 @@ func (a *Anomaly) WriteBlock(block *ckdb.Block) {
 		a.TCPEstablishFail,
 		a.TCPTransferFail,
 		a.TCPRstFail,
+		a.OooTx, a.OooRx,
 
 		a.L7ClientError,
 		a.L7ServerError,
 		a.L7Timeout,
 		a.L7ClientError+a.L7ServerError,
-
-		a.OooTx, a.OooRx,
 	)
 }
 
