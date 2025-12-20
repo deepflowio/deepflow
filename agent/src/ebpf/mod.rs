@@ -602,15 +602,15 @@ extern "C" {
     //            false Define a map without preallocated memory
     pub fn set_bpf_map_prealloc(enabled: bool) -> c_void;
 
-    // 参数说明：
-    // callback: 回调接口 rust -> C，返回值参考 TRACER_CALLBACK_FLAG_* 的定义
-    // thread_nr: 工作线程数，是指用户态有多少线程参与数据处理。
-    // perf_pages_cnt: 和内核共享内存占用的页框数量, 值为2的次幂。
-    // ring_size: 环形缓存队列大小，值为2的次幂。
-    // max_socket_entries: 设置用于socket追踪的hash表项最大值，取决于实际场景中并发请求数量。
-    // max_trace_entries: 设置用于线程/协程追踪会话的hash表项最大值。
-    // socket_map_max_reclaim: socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作。
-    // 返回值：成功返回0，否则返回非0
+    // Parameter descriptions:
+    // callback: Callback interface from Rust to C; return values refer to definitions of TRACER_CALLBACK_FLAG_*.
+    // thread_nr: Number of worker threads, indicating how many user-space threads participate in data processing.
+    // perf_pages_cnt: Number of page frames occupied by shared memory with the kernel; value is a power of 2, with page frame size of 4 KB.
+    // ring_size: Size of the ring buffer queue; value is a power of 2.
+    // max_socket_entries: Maximum number of hash table entries for socket tracking, depending on the concurrency in the actual scenario.
+    // max_trace_entries: Maximum number of hash table entries for thread/coroutine tracking sessions.
+    // socket_map_max_reclaim: Maximum threshold for cleaning entries in the socket map; when the current number of entries exceeds this value, the map cleanup is triggered.
+    // Return value: Returns 0 on success, non-zero otherwise.
     pub fn running_socket_tracer(
         callback: extern "C" fn(_: *mut c_void, queue_id: c_int, sd: *mut SK_BPF_DATA) -> c_int,
         thread_nr: c_int,

@@ -3818,9 +3818,11 @@ inputs:
       #     value is `2^n (5 <= n <= 13)`. Used for perf data transfer. If the
       #     value is between `2^n` and `2^(n+1)`, it will be automatically adjusted
       #     by the ebpf configurator to the minimum value `2^n`.
+      #     The page size is 4 KB.
       #   ch: |-
       #     内核共享内存占用的页数。值为 `2^n (5 <= n <= 13)`。用于 perf 数据传输。
       #     如果值在 `2^n` 和 `2^(n+1)` 之间，将自动调整到最小值 `2^n`。
+      #     页的大小为4KB。
       # upgrade_from: static_config.ebpf.perf-pages-count
       perf_pages_count: 128
       # type: int
