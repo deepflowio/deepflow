@@ -5278,6 +5278,7 @@ The number of page occupied by the shared memory of the kernel. The
 value is `2^n (5 <= n <= 13)`. Used for perf data transfer. If the
 value is between `2^n` and `2^(n+1)`, it will be automatically adjusted
 by the ebpf configurator to the minimum value `2^n`.
+The page size is 4 KB.
 
 #### Kernel Ring Size {#inputs.ebpf.tunning.kernel_ring_size}
 

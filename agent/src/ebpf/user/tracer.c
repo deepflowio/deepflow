@@ -476,6 +476,37 @@ void free_all_readers(struct bpf_tracer *t)
 	}
 }
 
+ /*
+  * Perf uses a fixed page size defined by PERF_PAGE_DEF_SZ (usually 4KB)
+  * to manage shared memory buffers. However, the system's actual page size
+  * may differ (Some high-end ARM 64-bit platforms support larger page sizes,
+  * such as 16KB or 64KB). To correctly allocate kernel shared memory,
+  * the number of perf pages must be converted to the corresponding number
+  * of system pages.
+  */
+static unsigned int calc_kernel_page_cnt(unsigned int page_cnt)
+{
+	unsigned int perf_bytes = PERF_PAGE_DEF_SZ * page_cnt;
+	unsigned int system_page_sz = (unsigned int)sysconf(_SC_PAGESIZE);
+
+	// Calculate the required system pages using ceiling division
+	unsigned int kernel_page_cnt;
+	kernel_page_cnt = (perf_bytes + system_page_sz - 1) / system_page_sz;
+
+	// Ensure the system page count is greater than 1
+	// because the first page usually holds metadata
+	// and additional pages are required for data.
+	if (kernel_page_cnt <= 1) {
+		kernel_page_cnt = 2;
+	}
+
+	ebpf_info("Input pages: %u, system page size: %u bytes, required"
+		  " system pages: %u\n",
+		  page_cnt, system_page_sz, kernel_page_cnt);
+
+	return kernel_page_cnt;
+}
+
 /**
  * @brief create a perf buffer reader.
  * @param t Tracer address
@@ -518,7 +549,8 @@ struct bpf_perf_reader *create_perf_buffer_reader(struct bpf_tracer *t,
 		pages_cnt = 1 << min_log2((unsigned int)pages_cnt);
 
 	reader->tracer = t;
-	reader->perf_pages_cnt = pages_cnt;
+	// Adjust to system page size.
+	reader->perf_pages_cnt = calc_kernel_page_cnt(pages_cnt);
 	reader->epoll_timeout = epoll_timeout;
 
 	if (perf_reader_setup(reader, thread_nr))
