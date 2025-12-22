@@ -169,9 +169,13 @@ func EncodeToJson(item EncodeItem, dataSourceId int, exporterCfg *config.Exporte
 				keyStr = (keyStr[:pos]) + keyStr[pos+3:] // 3 is  length of '_id'
 			}
 			if strings.HasSuffix(structTags.Name, "_1") {
-				valueStr = uTags1.GetTagValue(structTags.UniversalTagMapID)
+				if uTags1 != nil {
+					valueStr = uTags1.GetTagValue(structTags.UniversalTagMapID)
+				}
 			} else {
-				valueStr = uTags0.GetTagValue(structTags.UniversalTagMapID)
+				if uTags0 != nil {
+					valueStr = uTags0.GetTagValue(structTags.UniversalTagMapID)
+				}
 			}
 			isString = true
 		} else if structTags.EnumFile != "" && !exporterCfg.EnumTranslateToNameDisabled {
