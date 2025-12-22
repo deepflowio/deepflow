@@ -67,30 +67,8 @@ func createTestMetadata(domainLcuuid string) *message.Metadata {
 }
 
 // Helper function to create a ResourcePubSubComponent for testing AddedRegions
-func createTestResourcePubSubComponentForRegions() *ResourcePubSubComponent[
-	*message.AddedRegions,
-	message.AddedRegions,
-	message.AddNoneAddition,
-	*message.UpdatedRegion,
-	message.UpdatedRegion,
-	*message.UpdatedRegionFields,
-	message.UpdatedRegionFields,
-	*message.DeletedRegions,
-	message.DeletedRegions,
-	message.DeleteNoneAddition,
-] {
-	return &ResourcePubSubComponent[
-		*message.AddedRegions,
-		message.AddedRegions,
-		message.AddNoneAddition,
-		*message.UpdatedRegion,
-		message.UpdatedRegion,
-		*message.UpdatedRegionFields,
-		message.UpdatedRegionFields,
-		*message.DeletedRegions,
-		message.DeletedRegions,
-		message.DeleteNoneAddition,
-	]{
+func createTestResourcePubSubComponentForRegions() *ResourcePubSubComponent {
+	return &ResourcePubSubComponent{
 		resourceType:    "region",
 		PubSubComponent: newPubSubComponent("test-pubsub"),
 	}
@@ -270,7 +248,7 @@ func TestAnyChangePubSubComponent_PublishChange_EdgeCases(t *testing.T) {
 func TestResourcePubSubComponent_PublishBatchAdded(t *testing.T) {
 	tests := []struct {
 		name                        string
-		setupSubscribers            func(*ResourcePubSubComponent[*message.AddedRegions, message.AddedRegions, message.AddNoneAddition, *message.UpdatedRegion, message.UpdatedRegion, *message.UpdatedRegionFields, message.UpdatedRegionFields, *message.DeletedRegions, message.DeletedRegions, message.DeleteNoneAddition]) []*mockResourceBatchAddedSubscriber
+		setupSubscribers            func(*ResourcePubSubComponent) []*mockResourceBatchAddedSubscriber
 		domainLcuuid                string
 		addedMessage                *message.AddedRegions
 		expectedSubscriberCallCount []int    // how many times each subscriber should be called
@@ -279,7 +257,7 @@ func TestResourcePubSubComponent_PublishBatchAdded(t *testing.T) {
 	}{
 		{
 			name: "publish to Full topic with matching domain subscriber",
-			setupSubscribers: func(pub *ResourcePubSubComponent[*message.AddedRegions, message.AddedRegions, message.AddNoneAddition, *message.UpdatedRegion, message.UpdatedRegion, *message.UpdatedRegionFields, message.UpdatedRegionFields, *message.DeletedRegions, message.DeletedRegions, message.DeleteNoneAddition]) []*mockResourceBatchAddedSubscriber {
+			setupSubscribers: func(pub *ResourcePubSubComponent) []*mockResourceBatchAddedSubscriber {
 				subscriber := &mockResourceBatchAddedSubscriber{}
 				spec := NewSubscriptionSpec("test-pubsub", TopicResourceBatchAddedFull,
 					SubscriptionSpecOptionDomain("domain-123"))
@@ -302,7 +280,7 @@ func TestResourcePubSubComponent_PublishBatchAdded(t *testing.T) {
 		},
 		{
 			name: "publish to MetadbItems topic with matching domain subscriber",
-			setupSubscribers: func(pub *ResourcePubSubComponent[*message.AddedRegions, message.AddedRegions, message.AddNoneAddition, *message.UpdatedRegion, message.UpdatedRegion, *message.UpdatedRegionFields, message.UpdatedRegionFields, *message.DeletedRegions, message.DeletedRegions, message.DeleteNoneAddition]) []*mockResourceBatchAddedSubscriber {
+			setupSubscribers: func(pub *ResourcePubSubComponent) []*mockResourceBatchAddedSubscriber {
 				subscriber := &mockResourceBatchAddedSubscriber{}
 				spec := NewSubscriptionSpec("test-pubsub", TopicResourceBatchAddedMetadbItems,
 					SubscriptionSpecOptionDomain("domain-123"))
@@ -324,7 +302,7 @@ func TestResourcePubSubComponent_PublishBatchAdded(t *testing.T) {
 		},
 		{
 			name: "subscriber with non-matching domain should not be called",
-			setupSubscribers: func(pub *ResourcePubSubComponent[*message.AddedRegions, message.AddedRegions, message.AddNoneAddition, *message.UpdatedRegion, message.UpdatedRegion, *message.UpdatedRegionFields, message.UpdatedRegionFields, *message.DeletedRegions, message.DeletedRegions, message.DeleteNoneAddition]) []*mockResourceBatchAddedSubscriber {
+			setupSubscribers: func(pub *ResourcePubSubComponent) []*mockResourceBatchAddedSubscriber {
 				subscriber := &mockResourceBatchAddedSubscriber{}
 				spec := NewSubscriptionSpec("test-pubsub", TopicResourceBatchAddedFull,
 					SubscriptionSpecOptionDomain("domain-456"))
@@ -346,7 +324,7 @@ func TestResourcePubSubComponent_PublishBatchAdded(t *testing.T) {
 		},
 		{
 			name: "multiple subscribers with different topics and domains",
-			setupSubscribers: func(pub *ResourcePubSubComponent[*message.AddedRegions, message.AddedRegions, message.AddNoneAddition, *message.UpdatedRegion, message.UpdatedRegion, *message.UpdatedRegionFields, message.UpdatedRegionFields, *message.DeletedRegions, message.DeletedRegions, message.DeleteNoneAddition]) []*mockResourceBatchAddedSubscriber {
+			setupSubscribers: func(pub *ResourcePubSubComponent) []*mockResourceBatchAddedSubscriber {
 				subscriber1 := &mockResourceBatchAddedSubscriber{}
 				subscriber2 := &mockResourceBatchAddedSubscriber{}
 				subscriber3 := &mockResourceBatchAddedSubscriber{}
@@ -384,7 +362,7 @@ func TestResourcePubSubComponent_PublishBatchAdded(t *testing.T) {
 		},
 		{
 			name: "subscriber with empty domain should receive notification",
-			setupSubscribers: func(pub *ResourcePubSubComponent[*message.AddedRegions, message.AddedRegions, message.AddNoneAddition, *message.UpdatedRegion, message.UpdatedRegion, *message.UpdatedRegionFields, message.UpdatedRegionFields, *message.DeletedRegions, message.DeletedRegions, message.DeleteNoneAddition]) []*mockResourceBatchAddedSubscriber {
+			setupSubscribers: func(pub *ResourcePubSubComponent) []*mockResourceBatchAddedSubscriber {
 				subscriber := &mockResourceBatchAddedSubscriber{}
 				spec := NewSubscriptionSpec("test-pubsub", TopicResourceBatchAddedFull)
 				pub.Subscribe(subscriber, spec)
@@ -405,7 +383,7 @@ func TestResourcePubSubComponent_PublishBatchAdded(t *testing.T) {
 		},
 		{
 			name: "empty added message should still trigger notifications",
-			setupSubscribers: func(pub *ResourcePubSubComponent[*message.AddedRegions, message.AddedRegions, message.AddNoneAddition, *message.UpdatedRegion, message.UpdatedRegion, *message.UpdatedRegionFields, message.UpdatedRegionFields, *message.DeletedRegions, message.DeletedRegions, message.DeleteNoneAddition]) []*mockResourceBatchAddedSubscriber {
+			setupSubscribers: func(pub *ResourcePubSubComponent) []*mockResourceBatchAddedSubscriber {
 				subscriber := &mockResourceBatchAddedSubscriber{}
 				spec := NewSubscriptionSpec("test-pubsub", TopicResourceBatchAddedFull,
 					SubscriptionSpecOptionDomain("domain-123"))
@@ -424,7 +402,7 @@ func TestResourcePubSubComponent_PublishBatchAdded(t *testing.T) {
 		},
 		{
 			name: "no subscribers should handle gracefully",
-			setupSubscribers: func(pub *ResourcePubSubComponent[*message.AddedRegions, message.AddedRegions, message.AddNoneAddition, *message.UpdatedRegion, message.UpdatedRegion, *message.UpdatedRegionFields, message.UpdatedRegionFields, *message.DeletedRegions, message.DeletedRegions, message.DeleteNoneAddition]) []*mockResourceBatchAddedSubscriber {
+			setupSubscribers: func(pub *ResourcePubSubComponent) []*mockResourceBatchAddedSubscriber {
 				return []*mockResourceBatchAddedSubscriber{}
 			},
 			domainLcuuid: "domain-123",
