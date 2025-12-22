@@ -3,8 +3,6 @@ syntax = "proto2";
 package trident;
 option go_package = "trident";
 
-import "common.proto";
-
 service Synchronizer {
     rpc Sync(SyncRequest) returns (SyncResponse) {}
     rpc Push(SyncRequest) returns (stream SyncResponse) {}
@@ -15,6 +13,22 @@ service Synchronizer {
     rpc GetUniversalTagNameMaps(UniversalTagNameMapsRequest) returns (UniversalTagNameMapsResponse) {}
     // because gRPC cannot be initiated by server, the req/resp of this rpc is reversed
     rpc GetOrgIDs(OrgIDsRequest) returns (OrgIDsResponse) {}
+}
+
+enum TridentType {
+    TT_UNKNOWN = 0;
+    TT_PROCESS = 1;                        // Agent in KVM
+    TT_VM = 2;                             // Agent in a dedicated VM on ESXi
+    TT_PUBLIC_CLOUD = 3;                   // Agent in Cloud host (VM)
+    // _ = 4;                              // --deprecated--
+    TT_PHYSICAL_MACHINE = 5;               // Agent in Cloud host (BM), or legacy host
+    TT_DEDICATED_PHYSICAL_MACHINE = 6;     // Agent in a dedicated host to receive mirror traffic
+    TT_HOST_POD = 7;                       // Agent in K8s Node (Cloud BM, or legacy host)
+    TT_VM_POD = 8;                         // Agent in K8s Node (Cloud VM)
+    TT_TUNNEL_DECAPSULATION = 9;           // Agent in a dedicated host to decap tunnel traffic
+    TT_HYPER_V_COMPUTE = 10;               // Agent in Hyper-V Compute Node
+    TT_HYPER_V_NETWORK = 11;               // Agent in Hyper-V Network Node
+    TT_K8S_SIDECAR = 12;                   // Agent in K8s POD
 }
 
 enum State {
@@ -241,7 +255,7 @@ message Config {
     optional uint32 proxy_controller_port = 39 [default = 30035];
 
     optional uint32 vtap_id = 40;  // 限制在64000
-    optional common.TridentType trident_type = 41 [default = TT_UNKNOWN];
+    optional TridentType trident_type = 41 [default = TT_UNKNOWN];
     optional uint32 platform_sync_interval = 42 [default = 10];
     optional uint32 team_id = 43 [default = 0];
     optional uint32 organize_id = 44 [default = 0];

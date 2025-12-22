@@ -1633,6 +1633,12 @@ CREATE TABLE IF NOT EXISTS genesis_storage (
 );
 TRUNCATE TABLE genesis_storage;
 
+CREATE TABLE IF NOT EXISTS genesis_cluster (
+    id          VARCHAR(64) NOT NULL PRIMARY KEY,
+    node_ip     VARCHAR(48)
+);
+TRUNCATE TABLE genesis_cluster;
+
 -- ClickHouse dictionary
 
 CREATE TABLE IF NOT EXISTS ch_region (
