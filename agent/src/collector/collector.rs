@@ -520,6 +520,7 @@ impl Stash {
                 0,
                 0,
                 L7Protocol::Unknown,
+                false,
                 self.context.agent_mode,
             );
             self.fill_edge_l4_stats(tagger, acc_flow.flow_meter);
@@ -554,6 +555,7 @@ impl Stash {
                     0,
                     0,
                     L7Protocol::Unknown,
+                    false,
                     self.context.agent_mode,
                 );
                 self.fill_single_l4_stats(tagger, flow_meter);
@@ -569,6 +571,7 @@ impl Stash {
                 0,
                 0,
                 L7Protocol::Unknown,
+                false,
                 self.context.agent_mode,
             );
             // edge_stats: If the direction of a certain end is known, the statistical data
@@ -712,6 +715,7 @@ impl Stash {
                 meter.biz_type,
                 meter.time_span,
                 meter.l7_protocol,
+                meter.is_reversed,
                 self.context.agent_mode,
             );
             tagger.code |= Code::L7_PROTOCOL;
@@ -742,6 +746,7 @@ impl Stash {
                     meter.biz_type,
                     meter.time_span,
                     meter.l7_protocol,
+                    meter.is_reversed,
                     self.context.agent_mode,
                 );
                 tagger.code |= Code::L7_PROTOCOL;
@@ -758,6 +763,7 @@ impl Stash {
                 meter.biz_type,
                 meter.time_span,
                 meter.l7_protocol,
+                meter.is_reversed,
                 self.context.agent_mode,
             );
             tagger.code |= Code::L7_PROTOCOL;
@@ -879,13 +885,14 @@ fn get_single_tagger(
     global_thread_id: u8,
     flow: &MiniFlow,
     ep: usize,
-    direction: Direction,
+    mut direction: Direction,
     is_active_host: bool,
     config: &CollectorConfig,
     endpoint: Option<String>,
     biz_type: u8,
     time_span: u32,
     l7_protocol: L7Protocol,
+    is_reversed: bool,
     agent_mode: RunningMode,
 ) -> Tagger {
     let flow_key = &flow.flow_key;
@@ -937,17 +944,35 @@ fn get_single_tagger(
         l3_epc_id: get_l3_epc_id(side.l3_epc_id, flow.signal_source),
         gpid: side.gpid,
         protocol: flow_key.proto,
-        direction,
-        tap_side: TapSide::from(direction),
+        direction: if is_reversed {
+            direction.reverse()
+        } else {
+            direction
+        },
+        tap_side: if is_reversed {
+            TapSide::from(direction).reverse()
+        } else {
+            TapSide::from(direction)
+        },
         tap_port: flow_key.tap_port,
         tap_type: flow_key.tap_type,
         // If the resource is located on the client, the service port is ignored
-        server_port: if ep == FLOW_METRICS_PEER_SRC
-            || ignore_server_port(flow, config.inactive_server_port_aggregation)
-        {
+        server_port: if ignore_server_port(flow, config.inactive_server_port_aggregation) {
             0
         } else {
-            flow.peers[1].nat_real_port
+            if ep == FLOW_METRICS_PEER_SRC {
+                if is_reversed {
+                    flow.peers[0].nat_real_port
+                } else {
+                    0
+                }
+            } else {
+                if is_reversed {
+                    0
+                } else {
+                    flow.peers[1].nat_real_port
+                }
+            }
         },
         is_ipv6,
         code: {
@@ -988,6 +1013,7 @@ fn get_edge_tagger(
     biz_type: u8,
     time_span: u32,
     l7_protocol: L7Protocol,
+    is_reversed: bool,
     agent_mode: RunningMode,
 ) -> Tagger {
     let flow_key = &flow.flow_key;
@@ -1040,7 +1066,7 @@ fn get_edge_tagger(
         (src_mac, dst_mac)
     };
 
-    Tagger {
+    let mut tagger = Tagger {
         global_thread_id,
         agent_id: config.agent_id,
         mac: src_mac,
@@ -1087,7 +1113,18 @@ fn get_edge_tagger(
         biz_type,
         time_span,
         ..Default::default()
+    };
+
+    if is_reversed {
+        let server_port = if ignore_server_port(flow, config.inactive_server_port_aggregation) {
+            0
+        } else {
+            src_ep.nat_real_port
+        };
+        tagger.reverse(server_port);
     }
+
+    tagger
 }
 
 fn get_l3_epc_id(l3_epc_id: i32, signal_source: SignalSource) -> i16 {

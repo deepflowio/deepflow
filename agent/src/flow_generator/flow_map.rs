@@ -1674,7 +1674,7 @@ impl FlowMap {
             .perf_cache
             .borrow_mut()
             .timeout_cache
-            .pop_timeout_count(flow_id, false);
+            .pop_timeout_count(flow_id, false, l7_info.is_reversed());
         let (l7_perf_stats, l7_protocol) =
             meta_flow_log.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
         let app_proto_head = l7_info.app_proto_head().unwrap();
@@ -1689,6 +1689,7 @@ impl FlowMap {
         };
 
         let mut l7_stats = L7Stats::default();
+        l7_stats.is_reversed = l7_info.is_reversed();
         l7_stats.stats = l7_perf_stats.clone();
         l7_stats.endpoint = l7_info.get_endpoint();
         l7_stats.flow_id = flow_id;
@@ -2018,28 +2019,52 @@ impl FlowMap {
             let flow = &tagged_flow.flow;
             if let Some(flow_perf) = flow.flow_perf_stats.as_ref() {
                 let mut perf_cache = self.perf_cache.borrow_mut();
+                let (forward, backward) = if flow_end {
+                    perf_cache
+                        .rrt_cache
+                        .collect_flow_perf_stats(flow.flow_id)
+                        .unwrap_or_default()
+                } else {
+                    (L7PerfStats::default(), L7PerfStats::default())
+                };
                 let l7_stats = L7Stats {
                     stats: L7PerfStats {
-                        err_timeout: perf_cache
-                            .timeout_cache
-                            .pop_timeout_count(flow.flow_id, flow_end)
-                            as u32,
-                        ..if flow_end {
-                            perf_cache
-                                .rrt_cache
-                                .collect_flow_perf_stats(flow.flow_id)
-                                .unwrap_or_default()
-                        } else {
-                            Default::default()
-                        }
+                        err_timeout: perf_cache.timeout_cache.pop_timeout_count(
+                            flow.flow_id,
+                            flow_end,
+                            false,
+                        ) as u32,
+                        ..forward
                     },
                     flow_id: flow.flow_id,
                     signal_source: flow.signal_source,
                     time_in_second: flow.flow_stat_time.into(),
                     l7_protocol: flow_perf.l7_protocol,
                     flow: Some(tagged_flow.clone()),
+                    is_reversed: false,
                     ..Default::default()
                 };
+                self.l7_stats_output
+                    .send(self.l7_stats_allocator.allocate_one_with(l7_stats));
+
+                let l7_stats = L7Stats {
+                    stats: L7PerfStats {
+                        err_timeout: perf_cache.timeout_cache.pop_timeout_count(
+                            flow.flow_id,
+                            flow_end,
+                            true,
+                        ) as u32,
+                        ..backward
+                    },
+                    flow_id: flow.flow_id,
+                    signal_source: flow.signal_source,
+                    time_in_second: flow.flow_stat_time.into(),
+                    l7_protocol: flow_perf.l7_protocol,
+                    flow: Some(tagged_flow.clone()),
+                    is_reversed: true,
+                    ..Default::default()
+                };
+
                 self.l7_stats_output
                     .send(self.l7_stats_allocator.allocate_one_with(l7_stats));
             }
