@@ -99,17 +99,20 @@ enum func_type {
 
 /* ----- helper functions ----- */
 
-static __always_inline void *uadd(const void *p, __u32 off)
+static inline __attribute__ ((always_inline))
+void *uadd(const void *p, __u32 off)
 {
 	return (void *)((unsigned long)p + off);
 }
 
-static __always_inline int uread(void *dst, const void *src, __u32 sz)
+static inline __attribute__ ((always_inline))
+int uread(void *dst, const void *src, __u32 sz)
 {
 	return bpf_probe_read_user(dst, sz, src);
 }
 
-static __always_inline int uread_mref(void **p64, const void *src_mref)
+static inline __attribute__ ((always_inline))
+int uread_mref(void **p64, const void *src_mref)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	__u64 v = 0;
@@ -124,7 +127,8 @@ static __always_inline int uread_mref(void **p64, const void *src_mref)
 #endif
 }
 
-static __always_inline void *decode_gcref_raw(__u64 raw, lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+void *decode_gcref_raw(__u64 raw, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	__u64 ptr = raw & ((1ULL << 47) - 1);
@@ -134,8 +138,8 @@ static __always_inline void *decode_gcref_raw(__u64 raw, lj_ofs *lj)
 #endif
 }
 
-static __always_inline int uread_gcref(void **dst, const void *pt,
-				       lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int uread_gcref(void **dst, const void *pt, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	__u64 raw;
@@ -150,8 +154,8 @@ static __always_inline int uread_gcref(void **dst, const void *pt,
 #endif
 }
 
-static __always_inline int gcfunc_get_proto(void *fn, void **ppt,
-											const lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int gcfunc_get_proto(void *fn, void **ppt, const lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	// 1) read MRef l.pc (treat as 64 bits; works for both GC64 and non-GC64)
@@ -191,7 +195,8 @@ static __always_inline int gcfunc_get_proto(void *fn, void **ppt,
 #endif
 }
 
-static __always_inline int L_get_base(void *L, void **base, lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int L_get_base(void *L, void **base, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	return uread((void **)base, uadd(L, lj->off_l_base), sizeof(void *));
@@ -200,7 +205,8 @@ static __always_inline int L_get_base(void *L, void **base, lj_ofs *lj)
 #endif
 }
 
-static __always_inline int L_get_stack(void *L, void **stack, lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int L_get_stack(void *L, void **stack, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	return uread_mref((void **)stack, uadd(L, lj->off_l_stack));
@@ -209,8 +215,8 @@ static __always_inline int L_get_stack(void *L, void **stack, lj_ofs *lj)
 #endif
 }
 
-static __always_inline int proto_get_firstline(void *pt, int *pline,
-					       lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int proto_get_firstline(void *pt, int *pline, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	return uread(pline, uadd(pt, lj->off_gcproto_firstline),
@@ -220,8 +226,8 @@ static __always_inline int proto_get_firstline(void *pt, int *pline,
 #endif
 }
 
-static __always_inline int gcfunc_get_cfunc(void *fn, void **cfuncp,
-					    lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int gcfunc_get_cfunc(void *fn, void **cfuncp, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	return uread(cfuncp, uadd(fn, lj->off_gcfunc_cfunc), sizeof(*cfuncp));
@@ -230,8 +236,8 @@ static __always_inline int gcfunc_get_cfunc(void *fn, void **cfuncp,
 #endif
 }
 
-static __always_inline int gcfunc_get_ffid(void *fn, __u8 * pffid,
-					   lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int gcfunc_get_ffid(void *fn, __u8 *pffid, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	return uread(pffid, uadd(fn, lj->off_gcfunc_ffid), sizeof(*pffid));
@@ -240,7 +246,8 @@ static __always_inline int gcfunc_get_ffid(void *fn, __u8 * pffid,
 #endif
 }
 
-static __always_inline int is_luafunc(void *fn, lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int is_luafunc(void *fn, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	__u8 ffid;
@@ -253,7 +260,8 @@ static __always_inline int is_luafunc(void *fn, lj_ofs *lj)
 #endif
 }
 
-static __always_inline int is_cfunc(void *fn, lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int is_cfunc(void *fn, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	__u8 ffid;
@@ -266,7 +274,8 @@ static __always_inline int is_cfunc(void *fn, lj_ofs *lj)
 #endif
 }
 
-static __always_inline int is_ffunc(void *fn, lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int is_ffunc(void *fn, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	__u8 ffid;
@@ -279,8 +288,8 @@ static __always_inline int is_ffunc(void *fn, lj_ofs *lj)
 #endif
 }
 
-static __always_inline int get_frame_ftsz(void *frame, __u64 * ftsz,
-					  lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int get_frame_ftsz(void *frame, __u64 *ftsz, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	return uread(ftsz, frame, sizeof(__u64));
@@ -289,8 +298,8 @@ static __always_inline int get_frame_ftsz(void *frame, __u64 * ftsz,
 #endif
 }
 
-static __always_inline int get_frame_gc_ptr(void *frame, void **gc_ptr,
-					    lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int get_frame_gc_ptr(void *frame, void **gc_ptr, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	void *gcref_slot = (void *)((char *)frame - lj->tv_sz);
@@ -310,7 +319,8 @@ static __always_inline int get_frame_gc_ptr(void *frame, void **gc_ptr,
 #endif
 }
 
-static __always_inline int frame_islua_wr(void *frame, lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int frame_islua_wr(void *frame, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	__u64 ftsz;
@@ -324,7 +334,8 @@ static __always_inline int frame_islua_wr(void *frame, lj_ofs *lj)
 #endif
 }
 
-static __always_inline int frame_isvarg_wr(void *frame, lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int frame_isvarg_wr(void *frame, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	__u64 ftsz;
@@ -338,7 +349,8 @@ static __always_inline int frame_isvarg_wr(void *frame, lj_ofs *lj)
 #endif
 }
 
-static __always_inline void *frame_func_wr(void *frame, lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+void *frame_func_wr(void *frame, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	void *frame_gc_ptr;
@@ -352,8 +364,8 @@ static __always_inline void *frame_func_wr(void *frame, lj_ofs *lj)
 #endif
 }
 
-static __always_inline int frame_gc_equals_L(void *frame, void *L,
-					     lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+int frame_gc_equals_L(void *frame, void *L, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	void *frame_gc_ptr;
@@ -366,7 +378,9 @@ static __always_inline int frame_gc_equals_L(void *frame, void *L,
 	return -1;
 #endif
 }
-static __always_inline int frame_pc_prev_wr(const void *pc, __u32 *prev_bc)
+
+static inline __attribute__ ((always_inline))
+int frame_pc_prev_wr(const void *pc, __u32 *prev_bc)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	return uread(prev_bc, (const char *)pc - sizeof(*prev_bc),
@@ -376,7 +390,8 @@ static __always_inline int frame_pc_prev_wr(const void *pc, __u32 *prev_bc)
 #endif
 }
 
-static __always_inline void *frame_prevl_wr(void *frame, lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+void *frame_prevl_wr(void *frame, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	__u64 savedpc_raw = 0;
@@ -404,7 +419,8 @@ static __always_inline void *frame_prevl_wr(void *frame, lj_ofs *lj)
 #endif
 }
 
-static __always_inline void *frame_prevd_wr(void *frame, lj_ofs *lj)
+static inline __attribute__ ((always_inline))
+void *frame_prevd_wr(void *frame, lj_ofs *lj)
 {
 #if LUAJIT_AARCH64_LAYOUT
 	__u64 ftsz = 0;
