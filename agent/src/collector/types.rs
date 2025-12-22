@@ -162,6 +162,7 @@ pub struct AppMeterWithFlow {
     pub time_in_second: Timestamp,
     // request-reponse time span
     pub time_span: u32,
+    pub is_reversed: bool,
 }
 
 #[derive(Clone)]

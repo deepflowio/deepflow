@@ -551,6 +551,7 @@ pub struct L7Stats {
     // request-reponse time span
     pub time_span: u32,
     pub biz_type: u8,
+    pub is_reversed: bool,
 }
 
 #[derive(Serialize, Debug, Default, Clone, PartialEq, Eq)]
