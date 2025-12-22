@@ -70,6 +70,7 @@ struct AppMeterWithL7Protocol {
     l7_protocol: L7Protocol,
     biz_type: u8,
     time_in_second: Duration,
+    is_reversed: bool,
 }
 
 struct QuadrupleStash {
@@ -278,6 +279,7 @@ impl SubQuadGen {
                 m.endpoint == l7_stats.endpoint
                     && m.biz_type == l7_stats.biz_type
                     && m.time_span == time_span
+                    && m.is_reversed == l7_stats.is_reversed
             }) {
                 // flow L7Protocol of different client ports on the same server port may be inconsistent.
                 // unknown l7_protocol needs to be judged by the close_type and duration of the flow,
@@ -298,6 +300,7 @@ impl SubQuadGen {
                     biz_type: l7_stats.biz_type,
                     time_span,
                     time_in_second,
+                    is_reversed: l7_stats.is_reversed,
                 };
                 meters.push(meter);
             }
@@ -323,6 +326,7 @@ impl SubQuadGen {
                         is_active_host1,
                         time_in_second: meter.time_in_second.into(),
                         biz_type: meter.biz_type,
+                        is_reversed: meter.is_reversed,
                         time_span,
                     });
 
@@ -359,6 +363,7 @@ impl SubQuadGen {
                     time_in_second: l7_stats.time_in_second.into(),
                     biz_type: l7_stats.biz_type,
                     time_span,
+                    is_reversed: l7_stats.is_reversed,
                 });
                 if close_type != CloseType::Unknown && close_type != CloseType::ForcedReport {
                     Self::push_closed_app_meter(
@@ -378,6 +383,7 @@ impl SubQuadGen {
                     biz_type: l7_stats.biz_type,
                     time_span,
                     time_in_second,
+                    is_reversed: l7_stats.is_reversed,
                 };
                 let _ = stash.l7_stats.insert(l7_stats.flow_id, vec![meter]);
             }
