@@ -20,6 +20,7 @@ use std::{
 
 use libc::c_void;
 use log::{debug, trace, warn};
+use object::{Object, ObjectSection, ObjectSymbol};
 use regex::Regex;
 use semver::{Version, VersionReq};
 
@@ -28,6 +29,12 @@ use crate::{
     maps::{get_memory_mappings, MemoryArea},
     utils::{bpf_delete_elem, bpf_update_elem, get_errno, IdGenerator, BPF_ANY},
 };
+
+/// Maximum distance from _PyRuntime for a valid autoTLSkey address
+/// autoTLSkey should be within a few KB of _PyRuntime
+/// This is a validation threshold, not a version-specific offset
+#[cfg(target_arch = "x86_64")]
+const PYRUNTIME_MAX_DISTANCE: u64 = 0x10000;
 
 use super::elf_utils::MappedFile;
 
@@ -175,11 +182,210 @@ impl Interpreter {
         }
         Err(error_not_supported_version(self.pid, self.version.clone()))
     }
+
+    /// Find the autoTLSkey address from PyGILState_GetThisThreadState function.
+    ///
+    /// Python stores each thread's PyThreadState in thread-local storage using
+    /// pthread_setspecific/getspecific. The key is stored in autoTLSkey variable
+    /// within _PyRuntime structure.
+    ///
+    /// This function analyzes the PyGILState_GetThisThreadState function to find
+    /// the address of the autoTLSkey variable.
+    const GIL_STATE_SYMBOL: &'static str = "PyGILState_GetThisThreadState";
+
+    fn find_auto_tls_key_address(&mut self) -> Result<u64> {
+        if !VersionReq::parse(">=3.7.0").unwrap().matches(&self.version) {
+            return Err(error_not_supported_version(self.pid, self.version.clone()));
+        }
+
+        // Get _PyRuntime address as reference point
+        let runtime_addr = match self.find_symbol_address(Self::RUNTIME_SYMBOL)? {
+            Some(addr) => addr,
+            None => return Err(Error::Msg("_PyRuntime symbol not found".to_string())),
+        };
+
+        // Read PyGILState_GetThisThreadState function code
+        let (sym_addr, code) = self.read_symbol_code(Self::GIL_STATE_SYMBOL, 128)?;
+
+        // Analyze the function to find the autoTLSkey address
+        #[cfg(target_arch = "x86_64")]
+        {
+            self.decode_auto_tls_key_x86(&code, sym_addr, runtime_addr)
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            self.decode_auto_tls_key_arm64(&code, sym_addr, runtime_addr)
+        }
+
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        {
+            Err(Error::Msg(
+                "autoTLSkey extraction not supported on this architecture".to_string(),
+            ))
+        }
+    }
+
+    fn read_symbol_code(&mut self, name: &str, size: usize) -> Result<(u64, Vec<u8>)> {
+        for file in [Some(&mut self.exe), self.lib.as_mut()] {
+            let Some(file) = file else {
+                continue;
+            };
+            file.load()?;
+            let obj = object::File::parse(&*file.contents)?;
+
+            if let Some(sym) = obj
+                .symbols()
+                .chain(obj.dynamic_symbols())
+                .find(|s| s.name().map(|n| n == name).unwrap_or(false))
+            {
+                let addr = sym.address();
+
+                // Find the section containing this symbol
+                for section in obj.sections() {
+                    let sec_addr = section.address();
+                    let sec_size = section.size();
+                    if addr >= sec_addr && addr < sec_addr + sec_size {
+                        let section_data = section.data()?;
+                        let offset = (addr - sec_addr) as usize;
+                        let read_size = size.min(section_data.len() - offset);
+                        let code = section_data[offset..offset + read_size].to_vec();
+
+                        // Calculate the actual address in memory
+                        let ba = file.base_address()?;
+                        let mem_addr = addr + ba;
+
+                        return Ok((mem_addr, code));
+                    }
+                }
+            }
+        }
+        Err(Error::Msg(format!("Symbol {} not found", name)))
+    }
+
+    /// Decode autoTLSkey address from x86_64 assembly
+    #[cfg(target_arch = "x86_64")]
+    fn decode_auto_tls_key_x86(
+        &self,
+        code: &[u8],
+        code_addr: u64,
+        runtime_addr: u64,
+    ) -> Result<u64> {
+        // PyGILState_GetThisThreadState typically:
+        // 1. Loads autoTLSkey address into rdi
+        // 2. Calls PyThread_tss_get
+        //
+        // Common patterns:
+        // - lea rdi, [rip + offset]  ; load autoTLSkey address
+        // - call/jmp PyThread_tss_get
+        //
+        // We look for LEA with RIP-relative addressing
+
+        for i in 0..code.len().saturating_sub(7) {
+            // REX.W LEA rdi, [rip + disp32]
+            // 48 8d 3d XX XX XX XX
+            if code[i] == 0x48 && code[i + 1] == 0x8d && code[i + 2] == 0x3d {
+                let disp = i32::from_le_bytes([code[i + 3], code[i + 4], code[i + 5], code[i + 6]]);
+                // RIP-relative addressing: address = instruction_end + displacement
+                let instruction_end = code_addr + (i as u64) + 7;
+                let target_addr = (instruction_end as i64 + disp as i64) as u64;
+
+                trace!(
+                    "Found LEA rdi, [rip+{:#x}] at {:#x}, target={:#x}",
+                    disp,
+                    code_addr + i as u64,
+                    target_addr
+                );
+
+                // Verify the address is within _PyRuntime or nearby
+                // autoTLSkey is typically within a few KB of _PyRuntime
+                let distance = if target_addr > runtime_addr {
+                    target_addr - runtime_addr
+                } else {
+                    runtime_addr - target_addr
+                };
+
+                if distance < PYRUNTIME_MAX_DISTANCE {
+                    // Python 3.7+ uses Py_tss_t structure which has two ints
+                    // We need the second int (the actual key), so add 4
+                    let auto_tls_key_addr =
+                        if self.version >= Version::new(3, 7, 0) && target_addr % 8 == 0 {
+                            target_addr + 4
+                        } else {
+                            target_addr
+                        };
+
+                    debug!(
+                        "Found autoTLSkey address {:#x} (adjusted from {:#x})",
+                        auto_tls_key_addr, target_addr
+                    );
+                    return Ok(auto_tls_key_addr);
+                }
+            }
+
+            // Also check for MOV rdi, [rip + disp32]
+            // 48 8b 3d XX XX XX XX
+            if code[i] == 0x48 && code[i + 1] == 0x8b && code[i + 2] == 0x3d {
+                let disp = i32::from_le_bytes([code[i + 3], code[i + 4], code[i + 5], code[i + 6]]);
+                let instruction_end = code_addr + (i as u64) + 7;
+                let target_addr = (instruction_end as i64 + disp as i64) as u64;
+
+                let distance = if target_addr > runtime_addr {
+                    target_addr - runtime_addr
+                } else {
+                    runtime_addr - target_addr
+                };
+
+                if distance < PYRUNTIME_MAX_DISTANCE {
+                    let auto_tls_key_addr =
+                        if self.version >= Version::new(3, 7, 0) && target_addr % 8 == 0 {
+                            target_addr + 4
+                        } else {
+                            target_addr
+                        };
+
+                    debug!(
+                        "Found autoTLSkey address {:#x} (from MOV)",
+                        auto_tls_key_addr
+                    );
+                    return Ok(auto_tls_key_addr);
+                }
+            }
+        }
+
+        // Fallback: calculate from known _PyRuntime offsets for Python 3.10
+        // autoTLSkey is at _PyRuntime.gilstate.autoTSSkey._key
+        let fallback_addr = runtime_addr + PY310_INITIAL_STATE.auto_tls_key_offset;
+        debug!(
+            "Could not find autoTLSkey from disassembly, using fallback offset {:#x}",
+            fallback_addr
+        );
+        Ok(fallback_addr)
+    }
+
+    /// Decode autoTLSkey address from ARM64 assembly
+    #[cfg(target_arch = "aarch64")]
+    fn decode_auto_tls_key_arm64(
+        &self,
+        _code: &[u8],
+        _code_addr: u64,
+        runtime_addr: u64,
+    ) -> Result<u64> {
+        // TODO: Implement ARM64 pattern analysis
+        // For now, use fallback from Python 3.10 known offset
+        let fallback_addr = runtime_addr + PY310_INITIAL_STATE.auto_tls_key_offset;
+        warn!(
+            "ARM64 autoTLSkey extraction not implemented, using fallback {:#x}",
+            fallback_addr
+        );
+        Ok(fallback_addr)
+    }
 }
 
 pub struct InterpreterInfo {
     pub version: Version,
     pub thread_address: u64,
+    pub auto_tls_key_addr: u64,
 }
 
 impl InterpreterInfo {
@@ -202,9 +408,24 @@ impl InterpreterInfo {
         );
 
         let mut intp = Interpreter::new(pid, exe_area, lib_area)?;
+
+        // Get auto_tls_key_addr for multi-threading support
+        let auto_tls_key_addr = match intp.find_auto_tls_key_address() {
+            Ok(addr) => addr,
+            Err(e) => {
+                warn!("Failed to find autoTLSkey address for process#{pid}: {e}, using fallback");
+                // Fallback: calculate from known Python 3.10 _PyRuntime offset
+                let runtime_addr = intp
+                    .find_symbol_address(Interpreter::RUNTIME_SYMBOL)?
+                    .ok_or_else(|| Error::Msg("_PyRuntime not found".to_string()))?;
+                runtime_addr + PY310_INITIAL_STATE.auto_tls_key_offset
+            }
+        };
+
         Ok(Self {
             version: intp.version.clone(),
             thread_address: intp.thread_state_address()?,
+            auto_tls_key_addr,
         })
     }
 
@@ -220,18 +441,63 @@ impl InterpreterInfo {
     }
 }
 
+/// Python runtime state offsets
+/// These are offsets within the _PyRuntime global structure for a specific Python version
 pub struct InitialState {
+    /// Offset of _PyRuntime.gilstate.tstate_current (points to current thread's PyThreadState)
+    /// For single-threaded or main thread access
     tstate_current: u64,
+
+    /// Offset of _PyRuntime.gilstate.autoTSSkey._key (pthread_key_t value) on x86_64
+    /// Used for multi-threaded PyThreadState lookup via TSD
+    /// Note: This is the offset to the pthread_key_t value, not the Py_tss_t struct itself
+    #[cfg(target_arch = "x86_64")]
+    auto_tls_key_offset: u64,
+
+    /// Offset of _PyRuntime.gilstate.autoTSSkey._key (pthread_key_t value) on ARM64
+    /// Used for multi-threaded PyThreadState lookup via TSD
+    /// Note: This offset needs verification on actual ARM64 Python builds
+    #[cfg(target_arch = "aarch64")]
+    auto_tls_key_offset: u64,
 }
 
+#[cfg(target_arch = "x86_64")]
 const PY310_INITIAL_STATE: &InitialState = &InitialState {
     tstate_current: 568,
+    auto_tls_key_offset: 0x24c, // _PyRuntime.gilstate.autoTSSkey._key
 };
+
+#[cfg(target_arch = "aarch64")]
+const PY310_INITIAL_STATE: &InitialState = &InitialState {
+    tstate_current: 568,
+    auto_tls_key_offset: 0x57c, // _PyRuntime.gilstate.autoTSSkey._key (0x578 + 4)
+};
+
+/// Thread Specific Data information for accessing per-thread PyThreadState
+/// This is used to correctly unwind Python stacks in multi-threaded applications
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TSDInfo {
+    /// Offset from thread pointer base (TPBASE) to TSD storage
+    pub offset: i16,
+    /// TSD key multiplier (glibc=16, musl=8)
+    pub multiplier: u8,
+    /// Whether indirect addressing is needed (musl=1, glibc=0)
+    pub indirect: u8,
+}
 
 #[repr(C)]
 pub struct PythonUnwindInfo {
-    pub thread_state_address: u64,
+    /// Address of autoTLSkey variable in Python runtime
+    pub auto_tls_key_addr: u64,
+    /// Python version encoded as 0xMMmm (e.g., 0x030A for 3.10)
+    pub version: u16,
+    /// Thread Specific Data info for multi-threading support
+    pub tsd_info: TSDInfo,
+    /// ID for looking up python_offsets in the offsets map
     pub offsets_id: u8,
+    /// Padding for alignment
+    pub _padding: [u8; 5],
 }
 
 #[repr(C)]
@@ -394,11 +660,39 @@ impl PythonUnwindTable {
                 id as u8
             }
         };
-        let info = PythonUnwindInfo {
-            thread_state_address: info.thread_address,
-            offsets_id,
+
+        // Extract TSD info for multi-threading support
+        let tsd_info = match super::tsd::extract_tsd_info(pid) {
+            Ok(tsd) => {
+                debug!(
+                    "Extracted TSD info for process#{pid}: offset={}, multiplier={}, indirect={}",
+                    tsd.offset, tsd.multiplier, tsd.indirect
+                );
+                tsd
+            }
+            Err(e) => {
+                debug!("Failed to extract TSD info for process#{pid}: {e}, using defaults");
+                super::tsd::get_default_tsd_info(pid)
+            }
         };
-        self.update_unwind_info_map(pid, &info);
+
+        // Encode version as 0xMMmm (e.g., 3.10 -> 0x030A)
+        let version = ((info.version.major as u16) << 8) | (info.version.minor as u16);
+
+        let unwind_info = PythonUnwindInfo {
+            auto_tls_key_addr: info.auto_tls_key_addr,
+            version,
+            tsd_info,
+            offsets_id,
+            _padding: [0; 5],
+        };
+
+        debug!(
+            "Loading Python unwind info for process#{pid}: autoTLSkey={:#x}, version={:#x}",
+            unwind_info.auto_tls_key_addr, unwind_info.version
+        );
+
+        self.update_unwind_info_map(pid, &unwind_info);
     }
 
     pub unsafe fn unload(&mut self, pid: u32) {

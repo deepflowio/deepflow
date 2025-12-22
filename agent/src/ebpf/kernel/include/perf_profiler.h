@@ -102,6 +102,7 @@ struct stack_trace_key_t {
 
 typedef struct {
 	__u32 task_struct_stack_offset;
+	__u64 tpbase_offset;  /* Offset of fsbase/tpidr in task_struct for TLS access */
 } unwind_sysinfo_t;
 
 #define CLASS_NAME_LEN 32

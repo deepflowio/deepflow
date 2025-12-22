@@ -241,11 +241,33 @@ static bool requires_dwarf_unwind_table(int pid) {
 }
 
 int unwind_tracer_init(struct bpf_tracer *tracer) {
-    int32_t offset = read_offset_of_stack_in_task_struct();
-    if (offset < 0) {
+    /* Initialize unwind_sysinfo with task_struct offsets */
+    int32_t stack_offset = read_offset_of_stack_in_task_struct();
+    if (stack_offset < 0) {
         ebpf_warning("unwind tracer init: failed to get field stack offset in task struct from btf");
         ebpf_warning("unwinder may not handle in kernel perf events correctly");
-    } else if (!bpf_table_set_value(tracer, MAP_UNWIND_SYSINFO_NAME, 0, &offset)) {
+    }
+
+    /* Get tpbase_offset for TLS access (needed for Python multi-threading support) */
+    int64_t tpbase_offset = read_tpbase_offset();
+    if (tpbase_offset < 0) {
+        ebpf_warning("unwind tracer init: failed to get tpbase offset from kernel");
+        ebpf_warning("Python multi-threaded profiling may not work correctly");
+        tpbase_offset = 0;
+    } else {
+        ebpf_info("unwind tracer init: tpbase_offset=%ld", tpbase_offset);
+    }
+
+    /* Update unwind_sysinfo map with both offsets */
+    struct {
+        uint32_t task_struct_stack_offset;
+        uint64_t tpbase_offset;
+    } sysinfo = {
+        .task_struct_stack_offset = stack_offset > 0 ? (uint32_t)stack_offset : 0,
+        .tpbase_offset = (uint64_t)tpbase_offset,
+    };
+
+    if (!bpf_table_set_value(tracer, MAP_UNWIND_SYSINFO_NAME, 0, &sysinfo)) {
         ebpf_warning("unwind tracer init: update %s error", MAP_UNWIND_SYSINFO_NAME);
         ebpf_warning("unwinder may not handle in kernel perf events correctly");
     }
@@ -337,48 +359,7 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
     return 0;
 }
 
-static struct symbol python_symbols[] = { { .type = PYTHON_UPROBE,
-                                            .symbol = "PyEval_SaveThread",
-                                            .probe_func = URETPROBE_FUNC_NAME(python_save_tstate_addr),
-                                            .is_probe_ret = true, }, };
 
-static void python_parse_and_register(int pid, struct tracer_probes_conf *conf) {
-    char *path = NULL;
-    int n = 0;
-
-    if (pid <= 1)
-        goto out;
-
-    if (!is_user_process(pid))
-        goto out;
-
-    // Python symbols may reside in the main executable or libpython.so
-    // Check both
-    path = get_elf_path_by_pid(pid);
-    if (path) {
-        n = add_probe_sym_to_tracer_probes(pid, path, conf, python_symbols, NELEMS(python_symbols));
-        if (n > 0) {
-            ebpf_info("python uprobe, pid:%d, path:%s\n", pid, path);
-            free(path);
-            return;
-        }
-    }
-
-    path = get_so_path_by_pid_and_name(pid, "python3");
-    if (!path) {
-        path = get_so_path_by_pid_and_name(pid, "python2");
-        if (!path) {
-            goto out;
-        }
-    }
-
-    ebpf_info("python uprobe, pid:%d, path:%s\n", pid, path);
-    add_probe_sym_to_tracer_probes(pid, path, conf, python_symbols, NELEMS(python_symbols));
-
-out:
-    free(path);
-    return;
-}
 
 static void lua_parse_and_register(int pid, struct tracer_probes_conf *conf) {
     lua_runtime_info_t info = {0};
@@ -567,11 +548,7 @@ void unwind_events_handle(void) {
         tracer = event->tracer;
         if (tracer && python_profiler_enabled() && is_python_process(event->pid)) {
             python_unwind_table_load(g_python_unwind_table, event->pid);
-            pthread_mutex_lock(&tracer->mutex_probes_lock);
-            python_parse_and_register(event->pid, tracer->tps);
-            tracer_uprobes_update(tracer);
-            tracer_hooks_process(tracer, HOOK_ATTACH, &count);
-            pthread_mutex_unlock(&tracer->mutex_probes_lock);
+            // Note: Python profiling uses TSD mechanism, no uprobes needed
         }
 
         if (tracer && php_profiler_enabled() && is_php_process(event->pid)) {
