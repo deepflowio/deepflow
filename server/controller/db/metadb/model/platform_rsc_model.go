@@ -648,11 +648,11 @@ func (p PeerConnection) GetSubDomainLcuuid() string {
 type CEN struct {
 	Base           `gorm:"embedded" mapstructure:",squash"`
 	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
-	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
-	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL" mapstructure:"LABEL"`
-	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
-	VPCIDs         string `gorm:"column:epc_ids;type:text;default:''" json:"EPC_IDS" mapstructure:"EPC_IDS"` // separated by ,
-	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
+	Name           string          `gorm:"column:name;type:varchar(256);default:''" json:"NAME" mapstructure:"NAME"`
+	Label          string          `gorm:"column:label;type:char(64);default:''" json:"LABEL" mapstructure:"LABEL"`
+	Alias          string          `gorm:"column:alias;type:char(64);default:''" json:"ALIAS" mapstructure:"ALIAS"`
+	VPCIDs         AutoSplitedInts `gorm:"column:epc_ids;type:text;default:''" json:"EPC_IDS" mapstructure:"EPC_IDS"` // separated by ,
+	Domain         string          `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 }
 
 func (CEN) TableName() string {
