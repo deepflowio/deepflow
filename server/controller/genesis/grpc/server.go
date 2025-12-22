@@ -109,7 +109,7 @@ func (g *SynchronizerServer) GenerateCache() {
 	for _, orgID := range orgIDs {
 		db, err := metadb.GetDB(orgID)
 		if err != nil {
-			log.Errorf("get org (%d) metadb session failed", orgID)
+			log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 			continue
 		}
 		var agentGroups []metadbmodel.VTapGroup
@@ -458,7 +458,7 @@ func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *con
 		return &controller.GenesisSharingK8SResponse{
 			Epoch:    &epochStr,
 			ErrorMsg: &k8sData.ErrorMSG,
-			Entries:  k8sData.Entries,
+			Entries:  k8sData.EntriesJson,
 		}, nil
 	}
 
