@@ -46,54 +46,12 @@ func GetManager() *Manager {
 	pubSubManagerOnce.Do(func() {
 		pubSubManager = &Manager{
 			TypeToPubSub: map[string]PubSub{
-				// AnyChangePubSub
-				PubSubTypeWholeDomain:    NewWholeDomain(),
-				PubSubTypeWholeSubDomain: NewWholeSubDomain(),
-
-				// ResourcePubSub
-				PubSubTypeAZ:                          NewAZ(),
-				PubSubTypeSubDomain:                   NewSubDomain(),
-				PubSubTypeHost:                        NewHost(),
-				PubSubTypeVM:                          NewVM(),
-				PubSubTypeVPC:                         NewVPC(),
-				PubSubTypeNetwork:                     NewNetwork(),
-				PubSubTypeSubnet:                      NewSubnet(),
-				PubSubTypeVRouter:                     NewVRouter(),
-				PubSubTypeRoutingTable:                NewRoutingTable(),
-				PubSubTypeDHCPPort:                    NewDHCPPort(),
-				PubSubTypeVInterface:                  NewVInterface(),
-				PubSubTypeFloatingIP:                  NewFloatingIP(),
-				PubSubTypeWANIP:                       NewWANIP(),
-				PubSubTypeLANIP:                       NewLANIP(),
-				PubSubTypeVIP:                         NewVIP(),
-				PubSubTypeNATGateway:                  NewNATGateway(),
-				PubSubTypeNATRule:                     NewNATRule(),
-				PubSubTypeNATVMConnection:             NewNATVMConnection(),
-				PubSubTypeLB:                          NewLB(),
-				PubSubTypeLBListener:                  NewLBListener(),
-				PubSubTypeLBTargetServer:              NewLBTargetServer(),
-				PubSubTypeLBVMConnection:              NewLBVMConnection(),
-				PubSubTypePeerConnection:              NewPeerConnection(),
-				PubSubTypeCEN:                         NewCEN(),
-				PubSubTypeRDSInstance:                 NewRDSInstance(),
-				PubSubTypeRedisInstance:               NewRedisInstance(),
-				PubSubTypePodCluster:                  NewPodCluster(),
-				PubSubTypePodNode:                     NewPodNode(),
-				PubSubTypeVMPodNodeConnection:         NewVMPodNodeConnection(),
-				PubSubTypePodNamespace:                NewPodNamespace(),
-				PubSubTypePodIngress:                  NewPodIngress(),
-				PubSubTypePodIngressRule:              NewPodIngressRule(),
-				PubSubTypePodIngressRuleBackend:       NewPodIngressRuleBackend(),
-				PubSubTypePodService:                  NewPodService(),
-				PubSubTypePodServicePort:              NewPodServicePort(),
-				PubSubTypePodGroup:                    NewPodGroup(),
-				PubSubTypePodGroupPort:                NewPodGroupPort(),
-				PubSubTypePodReplicaSet:               NewPodReplicaSet(),
-				PubSubTypePod:                         NewPod(),
-				PubSubTypeConfigMap:                   NewConfigMap(),
-				PubSubTypePodGroupConfigMapConnection: NewPodGroupConfigMapConnection(),
-				PubSubTypeProcess:                     NewProcess(),
+				PubSubTypeWholeDomain:    newAnyChangePubSub(PubSubTypeWholeDomain),
+				PubSubTypeWholeSubDomain: newAnyChangePubSub(PubSubTypeWholeSubDomain),
 			},
+		}
+		for pubSubType := range rscPubSubTypeToResourceType {
+			pubSubManager.TypeToPubSub[pubSubType] = newResourcePubSub(pubSubType)
 		}
 	})
 	return pubSubManager
