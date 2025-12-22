@@ -96,7 +96,7 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+		log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 		return common.GenesisSyncDataResponse{}, err
 	}
 

@@ -701,6 +701,15 @@ func (GenesisStorage) TableName() string {
 	return "genesis_storage"
 }
 
+type GenesisCluster struct {
+	ID     string `gorm:"primaryKey;column:id;type:char(64)" json:"ID"`
+	NodeIP string `gorm:"column:node_ip;type:char(48)" json:"NODE_IP"`
+}
+
+func (GenesisCluster) TableName() string {
+	return "genesis_cluster"
+}
+
 type Process struct {
 	ResourceType int    `json:"RESOURCE_TYPE"` // 1: vm 14: pod node
 	ResourceName string `json:"RESOURCE_NAME"`
