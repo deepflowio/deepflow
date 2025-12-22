@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -30,31 +31,35 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
+	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
+	"gorm.io/gorm/clause"
 )
 
 type KubernetesStorage struct {
+	nodeIP         string
 	listenPort     int
 	listenNodePort int
 	cfg            config.GenesisConfig
 	kCtx           context.Context
 	kCancel        context.CancelFunc
 	channel        chan common.KubernetesInfo
-	kubernetesData map[int]map[string]common.KubernetesInfo
-	mutex          sync.Mutex
+	kubernetesData map[string]common.KubernetesInfo
+	mutex          sync.RWMutex
 }
 
 func NewKubernetesStorage(ctx context.Context, port, nPort int, cfg config.GenesisConfig, kChan chan common.KubernetesInfo) *KubernetesStorage {
 	kCtx, kCancel := context.WithCancel(ctx)
 	return &KubernetesStorage{
+		nodeIP:         os.Getenv(ccommon.NODE_IP_KEY),
 		listenPort:     port,
 		listenNodePort: nPort,
 		cfg:            cfg,
 		kCtx:           kCtx,
 		kCancel:        kCancel,
 		channel:        kChan,
-		kubernetesData: map[int]map[string]common.KubernetesInfo{},
-		mutex:          sync.Mutex{},
+		kubernetesData: map[string]common.KubernetesInfo{},
+		mutex:          sync.RWMutex{},
 	}
 }
 
@@ -62,33 +67,62 @@ func (k *KubernetesStorage) Clear() {
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 
-	k.kubernetesData = map[int]map[string]common.KubernetesInfo{}
+	k.kubernetesData = map[string]common.KubernetesInfo{}
 }
 
-func (k *KubernetesStorage) Add(orgID int, newInfo common.KubernetesInfo) {
-	k.mutex.Lock()
-	unTriggerFlag := false
-	kubernetesData, ok := k.kubernetesData[orgID]
-	if ok {
-		// 上报消息中version未变化时，只更新epoch和error_msg
-		if oldInfo, ok := kubernetesData[newInfo.ClusterID]; ok && oldInfo.Version == newInfo.Version {
-			unTriggerFlag = true
-			oldInfo.Epoch = newInfo.Epoch
-			oldInfo.ErrorMSG = newInfo.ErrorMSG
-			kubernetesData[newInfo.ClusterID] = oldInfo
-		} else {
-			kubernetesData[newInfo.ClusterID] = newInfo
-		}
-	} else {
-		k.kubernetesData[orgID] = map[string]common.KubernetesInfo{
-			newInfo.ClusterID: newInfo,
-		}
+func (k *KubernetesStorage) formatKey(orgID int, clusterID string) string {
+	return fmt.Sprintf("%d-%s", orgID, clusterID)
+}
+
+func (k *KubernetesStorage) CheckVersion(orgID int, clusterID string, version uint64) bool {
+	k.mutex.RLock()
+	defer k.mutex.RUnlock()
+
+	key := k.formatKey(orgID, clusterID)
+	data, ok := k.kubernetesData[key]
+	if !ok {
+		return false
 	}
-	k.fetch()
+	return data.Version == version
+}
+
+func (k *KubernetesStorage) Add(orgID int, newData common.KubernetesInfo) {
+	k.mutex.Lock()
+	key := k.formatKey(orgID, newData.ClusterID)
+	unTriggerFlag := false
+	data, ok := k.kubernetesData[key]
+	// when version unchanged in the reported message, only update epoch and error_msg
+	if ok && data.Version == newData.Version {
+		unTriggerFlag = true
+		data.Epoch = newData.Epoch
+		data.ErrorMSG = newData.ErrorMSG
+		k.kubernetesData[key] = data
+	} else {
+		k.kubernetesData[key] = newData
+	}
 	k.mutex.Unlock()
 
+	k.fetch()
+
+	db, err := metadb.GetDB(orgID)
+	if err != nil {
+		log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
+		return
+	}
+	err = db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"node_ip"}),
+	}).Create(&model.GenesisCluster{
+		ID:     newData.ClusterID,
+		NodeIP: k.nodeIP,
+	}).Error
+	if err != nil {
+		log.Errorf("update cluster (id:%s/node_ip:%s) failed: %s", newData.ClusterID, k.nodeIP, err.Error(), logger.NewORGPrefix(orgID))
+		return
+	}
+
 	if !unTriggerFlag {
-		err := k.triggerCloudRrefresh(orgID, newInfo.ClusterID, newInfo.Version)
+		err = k.triggerCloudRefresh(orgID, newData.ClusterID, newData.Version)
 		if err != nil {
 			log.Warning(fmt.Sprintf("trigger cloud kubernetes refresh failed: (%s)", err.Error()), logger.NewORGPrefix(orgID))
 		}
@@ -96,19 +130,19 @@ func (k *KubernetesStorage) Add(orgID int, newInfo common.KubernetesInfo) {
 }
 
 func (k *KubernetesStorage) fetch() {
-	for _, k8sDatas := range k.kubernetesData {
-		for _, kData := range k8sDatas {
-			k.channel <- kData
-		}
+	k.mutex.RLock()
+	defer k.mutex.RUnlock()
+	for _, data := range k.kubernetesData {
+		k.channel <- data
 	}
 }
 
-func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, version uint64) error {
+func (k *KubernetesStorage) triggerCloudRefresh(orgID int, clusterID string, version uint64) error {
 	var controllerIP, domainLcuuid, subDomainLcuuid string
 
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+		log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 		return err
 	}
 
@@ -166,18 +200,25 @@ func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, ve
 func (k *KubernetesStorage) run() {
 	for {
 		time.Sleep(time.Duration(k.cfg.DataPersistenceInterval) * time.Second)
+
 		now := time.Now()
-		k.mutex.Lock()
-		for _, kubernetesData := range k.kubernetesData {
-			for key, s := range kubernetesData {
-				if now.Sub(s.Epoch) <= time.Duration(k.cfg.AgingTime)*time.Second {
-					continue
-				}
-				delete(kubernetesData, key)
+		k.mutex.RLock()
+		toDeleteKeys := []string{}
+		for key, data := range k.kubernetesData {
+			if now.Sub(data.Epoch) <= time.Duration(k.cfg.AgingTime)*time.Second {
+				continue
 			}
+			toDeleteKeys = append(toDeleteKeys, key)
 		}
-		k.fetch()
+		k.mutex.RUnlock()
+
+		k.mutex.Lock()
+		for _, key := range toDeleteKeys {
+			delete(k.kubernetesData, key)
+		}
 		k.mutex.Unlock()
+
+		k.fetch()
 	}
 }
 

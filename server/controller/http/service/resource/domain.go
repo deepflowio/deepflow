@@ -752,6 +752,23 @@ func deleteDomain(domain *metadbmodel.Domain, db *metadb.DB, userInfo *httpcommo
 	db.Unscoped().Where(map[string]interface{}{"domain": lcuuid}).Delete(&metadbmodel.SubDomain{})
 	db.Unscoped().Where(map[string]interface{}{"domain": lcuuid}).Delete(&metadbmodel.AZ{})
 
+	clusterIDs := []string{}
+	if domain.Type == common.KUBERNETES && domain.ClusterID != "" {
+		clusterIDs = append(clusterIDs, domain.ClusterID)
+	} else {
+		var subDomains []metadbmodel.SubDomain
+		db.Unscoped().Where(map[string]interface{}{"domain": lcuuid}).Find(&subDomains)
+		for _, subDomain := range subDomains {
+			if subDomain.ClusterID == "" {
+				continue
+			}
+			clusterIDs = append(clusterIDs, subDomain.ClusterID)
+		}
+	}
+	if len(clusterIDs) > 0 {
+		db.Unscoped().Where("id in ?", clusterIDs).Delete(&model.GenesisCluster{})
+	}
+
 	db.Delete(&domain)
 
 	// pub to tagrecorder
