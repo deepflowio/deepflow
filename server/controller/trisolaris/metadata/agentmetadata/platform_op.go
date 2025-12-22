@@ -262,17 +262,12 @@ func (p *PlatformDataOP) generatePeerConnections() {
 	// Add CEN(Cloud Enterprise Network) data to peer connection.
 	// Associate cen.vpc_ids in pairs in one direction.
 	for _, cen := range dbDataCache.GetCENs() {
-		epcIDs, err := ConvertStrToU32List(cen.VPCIDs)
-		if err != nil {
-			log.Error(p.Log(err.Error()))
-			continue
-		}
-		for i := 0; i < len(epcIDs); i++ {
-			for j := i + 1; j < len(epcIDs); j++ {
+		for i := 0; i < len(cen.VPCIDs); i++ {
+			for j := i + 1; j < len(cen.VPCIDs); j++ {
 				data := &agent.PeerConnection{
 					Id:          proto.Uint32(0),
-					LocalEpcId:  proto.Uint32(uint32(epcIDs[i])),
-					RemoteEpcId: proto.Uint32(uint32(epcIDs[j])),
+					LocalEpcId:  proto.Uint32(uint32(cen.VPCIDs[i])),
+					RemoteEpcId: proto.Uint32(uint32(cen.VPCIDs[j])),
 				}
 				dpcData.addData(data)
 				dpcData.addDomainData(cen.Domain, data)
