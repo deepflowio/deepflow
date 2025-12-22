@@ -906,7 +906,7 @@ impl L7ProtocolParserInterface for PulsarLog {
                 }
                 if let Some(perf_stats) = self.perf_stats.as_mut() {
                     if info.msg_type == LogMessageType::Response {
-                        if let Some(endpoint) = info.load_endpoint_from_cache(param) {
+                        if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
                             info.topic = Some(endpoint.to_string());
                         }
                     }

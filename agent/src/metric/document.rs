@@ -186,6 +186,30 @@ pub enum Direction {
     App = SIDE_APP,                                                         // app(for otel)
 }
 
+impl Direction {
+    pub fn reverse(&mut self) -> Direction {
+        match *self {
+            Self::ClientToServer => *self = Self::ServerToClient,
+            Self::ServerToClient => *self = Self::ClientToServer,
+            Self::ClientNodeToServer => *self = Self::ServerNodeToClient,
+            Self::ServerNodeToClient => *self = Self::ClientNodeToServer,
+            Self::ClientHypervisorToServer => *self = Self::ServerHypervisorToClient,
+            Self::ServerHypervisorToClient => *self = Self::ClientHypervisorToServer,
+            Self::ClientGatewayHypervisorToServer => *self = Self::ServerGatewayHypervisorToClient,
+            Self::ServerGatewayHypervisorToClient => *self = Self::ClientGatewayHypervisorToServer,
+            Self::ClientGatewayToServer => *self = Self::ServerGatewayToClient,
+            Self::ServerGatewayToClient => *self = Self::ClientGatewayToServer,
+            Self::ClientProcessToServer => *self = Self::ServerProcessToClient,
+            Self::ServerProcessToClient => *self = Self::ClientProcessToServer,
+            Self::ClientAppToServer => *self = Self::ServerAppToClient,
+            Self::ServerAppToClient => *self = Self::ClientAppToServer,
+            _ => {}
+        }
+
+        *self
+    }
+}
+
 impl Default for Direction {
     fn default() -> Self {
         Direction::ClientToServer
@@ -253,7 +277,7 @@ pub enum TapSide {
 impl TapSide {
     pub const MAX: Self = Self::ServerApp;
 
-    pub fn reverse(&mut self) {
+    pub fn reverse(&mut self) -> Self {
         match *self {
             Self::Client => *self = Self::Server,
             Self::Server => *self = Self::Client,
@@ -271,6 +295,8 @@ impl TapSide {
             Self::ServerApp => *self = Self::ClientApp,
             _ => {}
         }
+
+        *self
     }
 }
 
@@ -353,6 +379,19 @@ pub struct Tagger {
     pub pod_id: u32,
     // request-reponse time span
     pub time_span: u32,
+}
+
+impl Tagger {
+    pub fn reverse(&mut self, server_port: u16) {
+        std::mem::swap(&mut self.ip, &mut self.ip1);
+        std::mem::swap(&mut self.l3_epc_id, &mut self.l3_epc_id1);
+        std::mem::swap(&mut self.mac, &mut self.mac1);
+        std::mem::swap(&mut self.gpid, &mut self.gpid_1);
+
+        self.server_port = server_port;
+        self.tap_side.reverse();
+        self.direction.reverse();
+    }
 }
 
 impl Default for Tagger {

@@ -80,7 +80,9 @@ impl L7ProtocolParserInterface for WasmLog {
 
                     if let Some(perf_stats) = self.perf_stats.as_mut() {
                         if i.msg_type == LogMessageType::Response {
-                            if let Some(endpoint) = i.load_endpoint_from_cache(param) {
+                            if let Some(endpoint) =
+                                i.load_endpoint_from_cache(param, i.is_reversed())
+                            {
                                 i.req.endpoint = endpoint.to_string();
                             }
                         }

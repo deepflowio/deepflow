@@ -570,6 +570,7 @@ fn fill_l7_stats(
         time_in_second: flow_stat_time.into(),
         biz_type: 0,
         time_span: 0,
+        is_reversed: false,
     }
 }
 

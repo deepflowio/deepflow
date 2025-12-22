@@ -508,7 +508,7 @@ impl ProcessListener {
             process_datas.merge_and_dedup();
 
             if pids != value.pids {
-                info!("Feature {} update {} pids {:?}.", key, pids.len(), pids);
+                debug!("Feature {} update {} pids {:?}.", key, pids.len(), pids);
                 value.callback.as_ref().unwrap()(&pids, &process_datas);
                 value.pids = pids;
                 value.process_datas = process_datas;
