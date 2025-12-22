@@ -96,7 +96,7 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*metadbmodel.CEN, 
 		Name:   cloudItem.Name,
 		Label:  cloudItem.Label,
 		Domain: c.metadata.GetDomainLcuuid(),
-		VPCIDs: rcommon.IntSliceToString(vpcIDs),
+		VPCIDs: vpcIDs,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
