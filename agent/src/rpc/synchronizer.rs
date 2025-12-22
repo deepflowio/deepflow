@@ -1387,10 +1387,7 @@ impl Synchronizer {
         session: &Session,
         agent_id: &AgentId,
         current_k8s_image: &Option<String>,
-    ) -> Result<(), String> {
-        let Some(current_k8s_image) = current_k8s_image else {
-            return Err("empty current_k8s_image".to_owned());
-        };
+    ) -> Result<bool, String> {
         let response = session
             .grpc_upgrade_with_statsd(pb::UpgradeRequest {
                 ctrl_ip: Some(agent_id.ipmac.ip.to_string()),
@@ -1398,10 +1395,10 @@ impl Synchronizer {
                 team_id: Some(agent_id.team_id.clone()),
             })
             .await;
-        if let Err(m) = response {
-            return Err(format!("rpc error {:?}", m));
-        }
-        let mut stream = response.unwrap().into_inner();
+        let mut stream = match response {
+            Ok(stream) => stream.into_inner(),
+            Err(e) => return Err(format!("rpc error {:?}", e)),
+        };
         while let Some(message) = stream
             .message()
             .await
@@ -1416,54 +1413,63 @@ impl Synchronizer {
             if message.status() != pb::Status::Success {
                 return Err("upgrade failed in server response".to_owned());
             }
-            let new_k8s_image = message.k8s_image().to_owned();
+
+            let new_k8s_image = message.k8s_image();
+            match current_k8s_image {
+                Some(image) if image == new_k8s_image => {
+                    info!("k8s_image '{image}' has not changed, not upgraded");
+                    return Ok(false);
+                }
+                _ => (),
+            }
             info!(
-                "current_k8s_image: {}, new_k8s_image: {}",
-                current_k8s_image, &new_k8s_image
+                "upgrading k8s_image from '{}' to '{new_k8s_image}'",
+                current_k8s_image
+                    .as_ref()
+                    .map(|s| s.as_str())
+                    .unwrap_or_default(),
             );
-            if current_k8s_image != &new_k8s_image {
-                let Ok(mut config) = Config::infer().await else {
-                    return Err("failed to infer kubernetes config".to_owned());
-                };
-                config.accept_invalid_certs = true;
 
-                let Ok(client) = Client::try_from(config) else {
-                    return Err("failed to create kubernetes client".to_owned());
-                };
+            let Ok(mut config) = Config::infer().await else {
+                return Err("failed to infer kubernetes config".to_owned());
+            };
+            config.accept_invalid_certs = true;
 
-                let daemonsets: Api<DaemonSet> = Api::namespaced(client, &get_k8s_namespace());
+            let Ok(client) = Client::try_from(config) else {
+                return Err("failed to create kubernetes client".to_owned());
+            };
 
-                // Referer: https://kubernetes.io/zh-cn/docs/reference/kubernetes-api/workload-resources/pod-v1/#Container
-                let patch = serde_json::json!({
-                    "apiVersion": "apps/v1",
-                    "kind": "DaemonSet",
-                    "spec": {
-                        "template":{
-                            "spec":{
-                                "containers": [{
-                                    "name": public::consts::CONTAINER_NAME,
-                                    "image": new_k8s_image,
-                                }],
-                            }
+            let daemonsets: Api<DaemonSet> = Api::namespaced(client, &get_k8s_namespace());
+
+            // Referer: https://kubernetes.io/zh-cn/docs/reference/kubernetes-api/workload-resources/pod-v1/#Container
+            let patch = serde_json::json!({
+                "apiVersion": "apps/v1",
+                "kind": "DaemonSet",
+                "spec": {
+                    "template":{
+                        "spec":{
+                            "containers": [{
+                                "name": public::consts::CONTAINER_NAME,
+                                "image": new_k8s_image,
+                            }],
                         }
                     }
-                });
-                let params = PatchParams::default();
-                let patch = Patch::Strategic(&patch);
-                if let Err(e) = daemonsets
-                    .patch(public::consts::DAEMONSET_NAME, &params, &patch)
-                    .await
-                {
-                    return Err(format!(
-                        "patch deepflow-agent k8s image failed, current_k8s_image: {:?}, error: {:?}",
-                        &current_k8s_image, e
-                    ));
                 }
-            } else {
-                info!("k8s_image has not changed, not upgraded");
+            });
+            let params = PatchParams::default();
+            let patch = Patch::Strategic(&patch);
+            if let Err(e) = daemonsets
+                .patch(public::consts::DAEMONSET_NAME, &params, &patch)
+                .await
+            {
+                return Err(format!(
+                    "patch deepflow-agent k8s image failed, current_k8s_image: {:?}, error: {:?}",
+                    &current_k8s_image, e
+                ));
             }
+            return Ok(true);
         }
-        Ok(())
+        Ok(false)
     }
 
     async fn upgrade(
@@ -1769,9 +1775,10 @@ impl Synchronizer {
                     if running_in_k8s() {
                         #[cfg(target_os = "linux")]
                         match Self::upgrade_k8s_image(&running, &session, &id, &static_config.current_k8s_image).await {
-                            Ok(_) => {
+                            Ok(true) => {
                                 warn!("agent upgrade is successful and don't ternimate or restart it, wait for the k8s to recreate it");
                             }
+                            Ok(false) => (), // same version or no valid message
                             Err(e) => {
                                 exception_handler.set(Exception::ControllerSocketError);
                                 error!("upgrade failed: {:?}", e);
