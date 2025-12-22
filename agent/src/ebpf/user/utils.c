@@ -558,7 +558,7 @@ u64 get_process_starttime_and_comm(pid_t pid, char *name_base, int len)
 	if (sscanf(buff, "%*s %ms %*s %*s %*s %*s %*s %*s %*s %*s %*s"
 		   " %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %llu ",
 		   &start, &etime_ticks) != 2) {
-		ebpf_warning("sscanf() failed. pid %d buff %s\n", pid, buff);
+		ebpf_debug("sscanf() failed. pid %d buff %s\n", pid, buff);
 		return 0;
 	}
 
