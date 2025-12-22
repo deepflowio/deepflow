@@ -93,6 +93,8 @@ pub struct Synchronizer {
 }
 
 impl Synchronizer {
+    const VERSION_CHANGE_RESYNC_INTERVAL: Duration = Duration::from_secs(1);
+
     pub fn new(
         runtime: Arc<Runtime>,
         config: PlatformAccess,
@@ -288,6 +290,16 @@ impl Synchronizer {
                         let res = res.into_inner();
                         args.peer_version = res.version();
                         if args.version != args.peer_version {
+                            // server in initial state will return version 0, wait longer in this situation
+                            // otherwise (maybe a server switch), wait for a short time to avoid too frequent resync
+                            let wait_interval = if args.peer_version == 0 {
+                                config.sync_interval
+                            } else {
+                                Self::VERSION_CHANGE_RESYNC_INTERVAL
+                            };
+                            if !Self::wait_for_running(&args.running, &args.timer, wait_interval) {
+                                break 'outer;
+                            }
                             // resync when versions mismatch
                             info!(
                                 "local version {}, remote version {}, about to resync",
