@@ -53,7 +53,7 @@ func (f *VInterfaceMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type VInterface struct {
 	UpdaterBase[
 		cloudmodel.VInterface,
-		*diffbase.VInterface,
+		*diffbase.Vinterface,
 		*metadbmodel.VInterface,
 		metadbmodel.VInterface,
 	]
@@ -148,7 +148,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*met
 	return dbItem, true
 }
 
-func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem *cloudmodel.VInterface) (types.UpdatedFields, map[string]interface{}, bool) {
+func (i *VInterface) generateUpdateInfo(diffBase *diffbase.Vinterface, cloudItem *cloudmodel.VInterface) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedVinterfaceFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.NetworkLcuuid != cloudItem.NetworkLcuuid {

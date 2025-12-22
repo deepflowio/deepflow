@@ -49,7 +49,7 @@ func (f *LBMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type LB struct {
 	UpdaterBase[
 		cloudmodel.LB,
-		*diffbase.LB,
+		*diffbase.Lb,
 		*metadbmodel.LB,
 		metadbmodel.LB,
 	]
@@ -98,7 +98,7 @@ func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*metadbmodel.LB, boo
 	return dbItem, true
 }
 
-func (l *LB) generateUpdateInfo(diffBase *diffbase.LB, cloudItem *cloudmodel.LB) (types.UpdatedFields, map[string]interface{}, bool) {
+func (l *LB) generateUpdateInfo(diffBase *diffbase.Lb, cloudItem *cloudmodel.LB) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedLbFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

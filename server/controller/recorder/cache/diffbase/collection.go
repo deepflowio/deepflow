@@ -106,6 +106,10 @@ type collection[T CacheItem[D], D DBItem] struct {
 	lcuuidToItem map[string]T
 }
 
+func (c *collection[T, D]) GetResourceType() string {
+	return c.resourceType
+}
+
 func (c *collection[T, D]) GetByLcuuid(lcuuid string) T {
 	empty := c.cacheItemFactory()
 	if lcuuid == "" {
@@ -143,4 +147,24 @@ func (c *collection[T, D]) Update(dbItem D, seq int) {
 func (c *collection[T, D]) Delete(dbItem D) {
 	delete(c.lcuuidToItem, dbItem.GetLcuuid())
 	c.tool.GetLogFunc()(deleteDiffBase(c.resourceType, dbItem.GetLcuuid()), c.tool.Metadata().LogPrefixes)
+}
+
+// Bridge methods for CollectionOperator interface (non-generic).
+// These allow all concrete XxxCollection types to satisfy diffbase.CollectionOperator
+// without per-type boilerplate.
+
+func (c *collection[T, D]) AddItems(seq int, dbItems interface{}) {
+	items := dbItems.([]D)
+	for _, item := range items {
+		c.Add(item, seq)
+	}
+}
+
+func (c *collection[T, D]) UpdateItem(dbItem interface{}) {
+	c.Update(dbItem.(D), 0)
+}
+
+func (c *collection[T, D]) DeleteByLcuuid(lcuuid string) {
+	delete(c.lcuuidToItem, lcuuid)
+	c.tool.GetLogFunc()(deleteDiffBase(c.resourceType, lcuuid), c.tool.Metadata().LogPrefixes)
 }

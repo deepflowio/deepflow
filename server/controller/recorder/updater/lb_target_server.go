@@ -49,7 +49,7 @@ func (f *LBTargetServerMessageFactory) CreateUpdatedFields() types.UpdatedFields
 type LBTargetServer struct {
 	UpdaterBase[
 		cloudmodel.LBTargetServer,
-		*diffbase.LBTargetServer,
+		*diffbase.LbTargetServer,
 		*metadbmodel.LBTargetServer,
 		metadbmodel.LBTargetServer,
 	]
@@ -124,7 +124,7 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 	return dbItem, true
 }
 
-func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, cloudItem *cloudmodel.LBTargetServer) (types.UpdatedFields, map[string]interface{}, bool) {
+func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LbTargetServer, cloudItem *cloudmodel.LBTargetServer) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedLbTargetServerFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {

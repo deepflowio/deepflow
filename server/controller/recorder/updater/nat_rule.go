@@ -49,7 +49,7 @@ func (f *NATRuleMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type NATRule struct {
 	UpdaterBase[
 		cloudmodel.NATRule,
-		*diffbase.NATRule,
+		*diffbase.NatRule,
 		*metadbmodel.NATRule,
 		metadbmodel.NATRule,
 	]
@@ -115,6 +115,6 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*metadbmod
 }
 
 // 保留接口
-func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NATRule, cloudItem *cloudmodel.NATRule) (types.UpdatedFields, map[string]interface{}, bool) {
+func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NatRule, cloudItem *cloudmodel.NATRule) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

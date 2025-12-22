@@ -51,7 +51,7 @@ func (f *LANIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type LANIP struct {
 	UpdaterBase[
 		cloudmodel.IP,
-		*diffbase.LANIP,
+		*diffbase.LanIp,
 		*metadbmodel.LANIP,
 		metadbmodel.LANIP,
 	]
@@ -142,7 +142,7 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.LANI
 	return dbItem, true
 }
 
-func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (types.UpdatedFields, map[string]interface{}, bool) {
+func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LanIp, cloudItem *cloudmodel.IP) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedLanIpFields)
 	mapInfo := make(map[string]interface{})
 

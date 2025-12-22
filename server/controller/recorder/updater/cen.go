@@ -50,7 +50,7 @@ func (f *CENMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type CEN struct {
 	UpdaterBase[
 		cloudmodel.CEN,
-		*diffbase.CEN,
+		*diffbase.Cen,
 		*metadbmodel.CEN,
 		metadbmodel.CEN,
 	]
@@ -98,7 +98,7 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*metadbmodel.CEN, 
 	return dbItem, true
 }
 
-func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (types.UpdatedFields, map[string]interface{}, bool) {
+func (c *CEN) generateUpdateInfo(diffBase *diffbase.Cen, cloudItem *cloudmodel.CEN) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedCenFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

@@ -49,7 +49,7 @@ func (f *VMPodNodeConnectionMessageFactory) CreateUpdatedFields() types.UpdatedF
 type VMPodNodeConnection struct {
 	UpdaterBase[
 		cloudmodel.VMPodNodeConnection,
-		*diffbase.VMPodNodeConnection,
+		*diffbase.VmPodNodeConnection,
 		*metadbmodel.VMPodNodeConnection,
 		metadbmodel.VMPodNodeConnection,
 	]
@@ -93,6 +93,6 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 	return dbItem, true
 }
 
-func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *diffbase.VMPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (types.UpdatedFields, map[string]interface{}, bool) {
+func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *diffbase.VmPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

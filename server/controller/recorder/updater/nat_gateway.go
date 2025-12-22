@@ -49,7 +49,7 @@ func (f *NATGatewayMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type NATGateway struct {
 	UpdaterBase[
 		cloudmodel.NATGateway,
-		*diffbase.NATGateway,
+		*diffbase.NatGateway,
 		*metadbmodel.NATGateway,
 		metadbmodel.NATGateway,
 	]
@@ -97,7 +97,7 @@ func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*met
 	return dbItem, true
 }
 
-func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem *cloudmodel.NATGateway) (types.UpdatedFields, map[string]interface{}, bool) {
+func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NatGateway, cloudItem *cloudmodel.NATGateway) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedNatGatewayFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

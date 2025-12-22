@@ -50,7 +50,7 @@ func (f *FloatingIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type FloatingIP struct {
 	UpdaterBase[
 		cloudmodel.FloatingIP,
-		*diffbase.FloatingIP,
+		*diffbase.FloatingIp,
 		*metadbmodel.FloatingIP,
 		metadbmodel.FloatingIP,
 	]
@@ -119,7 +119,7 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*met
 	return dbItem, true
 }
 
-func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem *cloudmodel.FloatingIP) (types.UpdatedFields, map[string]interface{}, bool) {
+func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIp, cloudItem *cloudmodel.FloatingIP) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedFloatingIpFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {

@@ -53,7 +53,7 @@ func (f *WANIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type WANIP struct {
 	UpdaterBase[
 		cloudmodel.IP,
-		*diffbase.WANIP,
+		*diffbase.WanIp,
 		*metadbmodel.WANIP,
 		metadbmodel.WANIP,
 	]
@@ -121,7 +121,7 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.WANI
 	return dbItem, true
 }
 
-func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmodel.IP) (types.UpdatedFields, map[string]interface{}, bool) {
+func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WanIp, cloudItem *cloudmodel.IP) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedWanIpFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {

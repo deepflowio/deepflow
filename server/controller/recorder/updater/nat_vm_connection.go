@@ -49,7 +49,7 @@ func (f *NATVMConnectionMessageFactory) CreateUpdatedFields() types.UpdatedField
 type NATVMConnection struct {
 	UpdaterBase[
 		cloudmodel.NATVMConnection,
-		*diffbase.NATVMConnection,
+		*diffbase.NatVmConnection,
 		*metadbmodel.NATVMConnection,
 		metadbmodel.NATVMConnection,
 	]
@@ -102,6 +102,6 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 }
 
 // 保留接口
-func (c *NATVMConnection) generateUpdateInfo(diffBase *diffbase.NATVMConnection, cloudItem *cloudmodel.NATVMConnection) (types.UpdatedFields, map[string]interface{}, bool) {
+func (c *NATVMConnection) generateUpdateInfo(diffBase *diffbase.NatVmConnection, cloudItem *cloudmodel.NATVMConnection) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

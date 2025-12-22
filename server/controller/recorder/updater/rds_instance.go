@@ -49,7 +49,7 @@ func (f *RDSInstanceMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type RDSInstance struct {
 	UpdaterBase[
 		cloudmodel.RDSInstance,
-		*diffbase.RDSInstance,
+		*diffbase.RdsInstance,
 		*metadbmodel.RDSInstance,
 		metadbmodel.RDSInstance,
 	]
@@ -102,7 +102,7 @@ func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*m
 	return dbItem, true
 }
 
-func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudItem *cloudmodel.RDSInstance) (types.UpdatedFields, map[string]interface{}, bool) {
+func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RdsInstance, cloudItem *cloudmodel.RDSInstance) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedRdsInstanceFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

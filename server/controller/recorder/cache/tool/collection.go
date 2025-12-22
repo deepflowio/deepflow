@@ -148,6 +148,28 @@ func (oc *collection[T, D]) Delete(dbItem D) {
 	oc.tool.GetLogFunc()(deleteFromToolMap(oc.resourceType, dbItem.GetLcuuid()), oc.tool.metadata.LogPrefixes)
 }
 
+// Bridge methods for CollectionOperator interface (non-generic).
+// These allow all concrete XxxCollection types to satisfy tool.CollectionOperator
+// without per-type boilerplate.
+
+func (oc *collection[T, D]) AddItems(dbItems interface{}) {
+	items := dbItems.([]D)
+	for _, item := range items {
+		oc.Add(item)
+	}
+}
+
+func (oc *collection[T, D]) UpdateItem(dbItem interface{}) {
+	oc.Update(dbItem.(D))
+}
+
+func (oc *collection[T, D]) DeleteItems(dbItems interface{}) {
+	items := dbItems.([]D)
+	for _, item := range items {
+		oc.Delete(item)
+	}
+}
+
 // GetByLcuuid returns the item by lcuuid.
 // If not found, returns the zero value of T.T can be checked whether it is valid by IsValid() method.
 func (oc *collection[T, D]) GetByLcuuid(lcuuid string) T {

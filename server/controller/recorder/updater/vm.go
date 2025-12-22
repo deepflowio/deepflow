@@ -52,7 +52,7 @@ func (f *VMMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 
 type VM struct {
 	UpdaterBase[cloudmodel.VM,
-		*diffbase.VM,
+		*diffbase.Vm,
 		*metadbmodel.VM,
 		metadbmodel.VM,
 	]
@@ -138,7 +138,7 @@ func (m *VM) recordStatsd(cloudItem *cloudmodel.VM) {
 	m.statsd.GetMonitor(statsd.TagTypeVMSyncDelay).Fill(int(syncDelay))
 }
 
-func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (types.UpdatedFields, map[string]interface{}, bool) {
+func (m *VM) generateUpdateInfo(diffBase *diffbase.Vm, cloudItem *cloudmodel.VM) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedVmFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {

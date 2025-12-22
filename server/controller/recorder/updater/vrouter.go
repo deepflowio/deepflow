@@ -50,7 +50,7 @@ func (f *VRouterMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type VRouter struct {
 	UpdaterBase[
 		cloudmodel.VRouter,
-		*diffbase.VRouter,
+		*diffbase.Vrouter,
 		*metadbmodel.VRouter,
 		metadbmodel.VRouter,
 	]
@@ -97,7 +97,7 @@ func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*metadbmod
 	return dbItem, true
 }
 
-func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *cloudmodel.VRouter) (types.UpdatedFields, map[string]interface{}, bool) {
+func (r *VRouter) generateUpdateInfo(diffBase *diffbase.Vrouter, cloudItem *cloudmodel.VRouter) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedVrouterFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {

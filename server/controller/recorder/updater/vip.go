@@ -49,7 +49,7 @@ func (f *VIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type VIP struct {
 	UpdaterBase[
 		cloudmodel.VIP,
-		*diffbase.VIP,
+		*diffbase.Vip,
 		*metadbmodel.VIP,
 		metadbmodel.VIP,
 	]
@@ -84,7 +84,7 @@ func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*metadbmodel.VIP, 
 	return dbItem, true
 }
 
-func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.VIP) (types.UpdatedFields, map[string]interface{}, bool) {
+func (p *VIP) generateUpdateInfo(diffBase *diffbase.Vip, cloudItem *cloudmodel.VIP) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedVipFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {

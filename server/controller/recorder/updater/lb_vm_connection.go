@@ -49,7 +49,7 @@ func (f *LBVMConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields
 type LBVMConnection struct {
 	UpdaterBase[
 		cloudmodel.LBVMConnection,
-		*diffbase.LBVMConnection,
+		*diffbase.LbVmConnection,
 		*metadbmodel.LBVMConnection,
 		metadbmodel.LBVMConnection,
 	]
@@ -102,6 +102,6 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 }
 
 // 保留接口
-func (c *LBVMConnection) generateUpdateInfo(diffBase *diffbase.LBVMConnection, cloudItem *cloudmodel.LBVMConnection) (types.UpdatedFields, map[string]interface{}, bool) {
+func (c *LBVMConnection) generateUpdateInfo(diffBase *diffbase.LbVmConnection, cloudItem *cloudmodel.LBVMConnection) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

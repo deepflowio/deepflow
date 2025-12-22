@@ -49,7 +49,7 @@ func (f *DHCPPortMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type DHCPPort struct {
 	UpdaterBase[
 		cloudmodel.DHCPPort,
-		*diffbase.DHCPPort,
+		*diffbase.DhcpPort,
 		*metadbmodel.DHCPPort,
 		metadbmodel.DHCPPort,
 	]
@@ -94,7 +94,7 @@ func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*metadbm
 	return dbItem, true
 }
 
-func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cloudmodel.DHCPPort) (types.UpdatedFields, map[string]interface{}, bool) {
+func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DhcpPort, cloudItem *cloudmodel.DHCPPort) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedDhcpPortFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {

@@ -50,7 +50,7 @@ func (f *VPCMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 type VPC struct {
 	UpdaterBase[
 		cloudmodel.VPC,
-		*diffbase.VPC,
+		*diffbase.Vpc,
 		*metadbmodel.VPC,
 		metadbmodel.VPC,
 	]
@@ -94,7 +94,7 @@ func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*metadbmodel.VPC, 
 	return dbItem, true
 }
 
-func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.VPC) (types.UpdatedFields, map[string]interface{}, bool) {
+func (v *VPC) generateUpdateInfo(diffBase *diffbase.Vpc, cloudItem *cloudmodel.VPC) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedVpcFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
