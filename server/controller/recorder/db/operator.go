@@ -127,6 +127,10 @@ func (o *OperatorBase[MPT, MT]) DeleteBatch(lcuuids []string) ([]*MT, bool) {
 		log.Errorf("%s (lcuuids: %v) failed: %v", rcommon.LogDelete(o.resourceTypeName), lcuuids, err.Error(), o.metadata.LogPrefixes)
 		return nil, false
 	}
+	if len(deletedItems) == 0 {
+		log.Warningf("%s (lcuuids: %v) no data need to delete", rcommon.LogDelete(o.resourceTypeName), lcuuids, o.metadata.LogPrefixes)
+		return nil, true
+	}
 	err = o.metadata.DB.Delete(&deletedItems).Error
 	if err != nil {
 		log.Errorf("%s (lcuuids: %v) failed: %v", rcommon.LogDelete(o.resourceTypeName), lcuuids, err.Error(), o.metadata.LogPrefixes)
