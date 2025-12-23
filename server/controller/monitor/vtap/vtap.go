@@ -27,6 +27,7 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/monitor/vtap/version"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -398,5 +399,9 @@ func (v *VTapCheck) deleteLostVTap(db *metadb.DB) {
 			)
 		}
 	}
-	db.Delete(&vtaps, ids)
+
+	if len(ids) > 0 {
+		db.Delete(&vtaps, ids)
+		refresh.RefreshCache(db.ORGID, []common.DataChanged{common.DATA_CHANGED_VTAP})
+	}
 }
