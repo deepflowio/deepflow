@@ -9,6 +9,10 @@
 #### New Feature
 
 #### Bug Fix
+* fix: querier row close error [#11094](https://github.com/deepflowio/deepflow/pull/11094) by [xiaochaoren1](https://github.com/xiaochaoren1)
+* fix: Fix too much log in platform sync and upgrade stuck in failure [#11089](https://github.com/deepflowio/deepflow/pull/11089) by [rvql](https://github.com/rvql)
+* fix: exporters panic when get universalMaps nil [#11084](https://github.com/deepflowio/deepflow/pull/11084) by [lzf575](https://github.com/lzf575)
+* fix: reduce agent upgrade step size [#11047](https://github.com/deepflowio/deepflow/pull/11047) by [askyrie](https://github.com/askyrie)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
