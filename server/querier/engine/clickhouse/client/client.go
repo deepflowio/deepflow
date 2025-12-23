@@ -159,9 +159,6 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 	if err != nil {
 		log.Errorf("query clickhouse Error: %s, sql: %s, query_uuid: %s", err, sqlstr, c.Debug.QueryUUID)
 		c.Debug.Error = fmt.Sprintf("%s", err)
-		if rows != nil {
-			rows.Close()
-		}
 		return nil, err
 	}
 	defer rows.Close()
@@ -241,9 +238,6 @@ func (c *Client) GetVersion() (version string, err error) {
 	rows, err := c.connection.Query(ctx, sqlstr)
 	if err != nil {
 		log.Errorf("query clickhouse Error: %s, sql: %s", err, sqlstr)
-		if rows != nil {
-			rows.Close()
-		}
 		return
 	}
 	defer rows.Close()
