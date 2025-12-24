@@ -203,7 +203,7 @@ func (u *UniversalTagsManager) QueryUniversalTags(
 ) *UniversalTags {
 	tagMaps := u.universalTagMaps[orgId]
 	if tagMaps == nil {
-		return nil
+		return &UniversalTags{}
 	}
 	tags := &UniversalTags{
 		Region:       tagMaps.regionMap[regionID],
@@ -259,6 +259,9 @@ func (u *UniversalTagsManager) getAuto(orgId uint16, autoType DeviceType, autoID
 		} else {
 			return ip6.String()
 		}
+	}
+	if u.universalTagMaps[orgId] == nil {
+		return ""
 	}
 	return u.universalTagMaps[orgId].deviceMap[uint64(autoType)<<32|uint64(autoID)]
 }
