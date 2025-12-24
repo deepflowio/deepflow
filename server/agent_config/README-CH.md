@@ -1923,13 +1923,6 @@ inputs:
 rewrite_name 可定义为正则表达式捕获组索引，或 windows 风格的环境变量。
 例如：`$1-py-script-%HOSTNAME%` 中的 $1 将会替换正则表达式捕获到的第一组内容，并替换 HOSTNAME 环境变量。
 
-默认规则覆盖了常见脚本运行时：
-- Python：匹配 `python app.py` 等命令行，使用 `$4` 将进程名重写为脚本文件名。
-- PHP：沿用与 Python 相同的思路，匹配 `php script.php` 或 `php-fpm ... script.php` 等命令行，并用 `$5` 指向的脚本名重写进程名。
-- Node.js：匹配 `node server.js`/`nodejs app.js` 等命令行，使用 `$4` 重写为目标 `.js` 文件。
-- `^deepflow-`：确保 DeepFlow 自身的组件保持启用相关特性。
-- `.*`：兜底规则，仍然为剩余进程保留 `proc.gprocess_info` 功能。
-
 配置键：
 - match_regex: 用于匹配进程的表达式，缺省值为 `""`。
 - match_type: 被用于正则表达式匹配的对象，缺省值为 `process_name`，可选项为：
@@ -4946,6 +4939,9 @@ on-cpu 函数调用栈压缩，可以将带宽消耗降低 `x` 倍，但会使�
 
 #### 语言特定剖析 {#inputs.ebpf.profile.languages}
 
+控制对哪些解释型语言进行剖析。禁用不使用的语言可以节省每个语言约 5-6 MB 内存。
+总内存占用：~17-20 MB（全部启用），~6.1 MB（仅 Python），~5.2 MB（仅 PHP），~6.4 MB（仅 Node.js）。
+
 ##### 禁用 Python 剖析 {#inputs.ebpf.profile.languages.python_disabled}
 
 **标签**:
@@ -4972,19 +4968,8 @@ inputs:
 
 **详细描述**:
 
-禁用 Python 解释器剖析功能。禁用后将不会采集 Python 进程的函数调用栈，可节省约 6.1 MB 的内核内存。
-
-此配置项控制以下 eBPF maps 的创建：
-- `python_tstate_addr_map`：存储线程状态地址 (~2.8 MB)
-- `python_unwind_info_map`：存储进程级 unwinding 信息 (~3.3 MB)
-- `python_offsets_map`：存储版本特定的内存布局偏移量 (~249 bytes)
-
-适用场景：
-- 环境中确定不运行 Python 应用
-- 仅关注其他语言（PHP、Node.js、Java、Go 等）的性能分析
-- 内存受限的环境需要优化资源使用
-
-**重要提示**：修改此配置将自动触发 deepflow-agent 重启，因为 eBPF maps 无法在运行时动态创建或销毁。
+禁用 Python 解释器剖析。禁用后将不采集 Python 进程的函数调用栈，
+可节省约 6.1 MB 内核内存（python_tstate_addr_map、python_unwind_info_map、python_offsets_map）。
 
 ##### 禁用 PHP 剖析 {#inputs.ebpf.profile.languages.php_disabled}
 
@@ -5012,18 +4997,8 @@ inputs:
 
 **详细描述**:
 
-禁用 PHP 解释器剖析功能。禁用后将不会采集 PHP 进程的函数调用栈，可节省约 5.2 MB 的内核内存。
-
-此配置项控制以下 eBPF maps 的创建：
-- `php_unwind_info_map`：存储进程级 unwinding 信息，包括 executor_globals 地址、JIT 信息等 (~4.9 MB)
-- `php_offsets_map`：存储版本特定的内存布局偏移量，支持最多 4 个不同的 PHP 版本 (~324 bytes)
-
-适用场景：
-- 环境中确定不运行 PHP 应用
-- 仅关注其他语言的性能分析
-- 内存受限的环境需要优化资源使用
-
-**重要提示**：修改此配置将自动触发 deepflow-agent 重启，因为 eBPF maps 无法在运行时动态创建或销毁。
+禁用 PHP 解释器剖析。禁用后将不采集 PHP 进程的函数调用栈，
+可节省约 5.2 MB 内核内存（php_unwind_info_map、php_offsets_map）。
 
 ##### 禁用 Node.js 剖析 {#inputs.ebpf.profile.languages.nodejs_disabled}
 
@@ -5051,34 +5026,8 @@ inputs:
 
 **详细描述**:
 
-禁用 Node.js (V8 引擎) 剖析功能。禁用后将不会采集 Node.js 进程的函数调用栈，可节省约 6.4 MB 的内核内存。
-
-此配置项控制以下 eBPF map 的创建：
-- `v8_unwind_info_map`：存储进程级 unwinding 信息，包括 V8 内部结构偏移量 (~6.4 MB)
-
-适用场景：
-- 环境中确定不运行 Node.js 应用
-- 仅关注其他语言的性能分析
-- 内存受限的环境需要优化资源使用
-
-**重要提示**：修改此配置将自动触发 deepflow-agent 重启，因为 eBPF maps 无法在运行时动态创建或销毁。
-
-**内存节省效果总结**：
-
-| 配置方式 | Python | PHP | Node.js | 总计内存占用 | 节省内存 |
-| -------- | ------ | --- | ------- | ----------- | -------- |
-| 全部启用（默认） | 6.1 MB | 5.2 MB | 6.4 MB | ~17-20 MB | 0 MB |
-| 仅 Python | 6.1 MB | 0 MB | 0 MB | ~6.1 MB | ~11-14 MB |
-| 仅 PHP | 0 MB | 5.2 MB | 0 MB | ~5.2 MB | ~12-15 MB |
-| 仅 Node.js | 0 MB | 0 MB | 6.4 MB | ~6.4 MB | ~11-14 MB |
-| 全部禁用 | 0 MB | 0 MB | 0 MB | ~0 MB | ~17-20 MB |
-
-**注意事项**：
-- 修改语言开关需要重启 deepflow-agent 才能生效
-- eBPF maps 使用预分配机制，空载和满载占用相同的内核内存
-- 禁用时，对应语言的 eBPF maps 会被创建但 max_entries 设为 1（最小化内存占用）
-- 禁用时，不会创建对应语言的 unwind table，也不会加载进程的 unwinding 信息
-- 禁用不需要的语言除了节省内存，还能减少 CPU 开销
+禁用 Node.js（V8）解释器剖析。禁用后将不采集 Node.js 进程的函数调用栈，
+可节省约 6.4 MB 内核内存（v8_unwind_info_map）。
 
 ### 调优 {#inputs.ebpf.tunning}
 
@@ -6505,7 +6454,7 @@ transforms:
     type: filter
     inputs:
     - cadvisor_metrics
-    condition: "!match(string!(.name), r'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)|container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)|container_memory_(mapped_file|swap)|container_(file_descriptors|tasks_state|threads_max)|container_spec.*')"
+    condition: "!match(string!(.name), r'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)|container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)|container_memory_(mapped_file|swap)|container_(file_descriptors|tasks_state|threads_max)')"
   kubelet_relabel_filter:
     type: filter
     inputs:
@@ -11059,3 +11008,4 @@ dev:
 **详细描述**:
 
 未发布的采集器特性可以通过该选项开启。
+
