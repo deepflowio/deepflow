@@ -37,11 +37,11 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		"ClusterIP":    common.POD_SERVICE_TYPE_CLUSTERIP,
 		"LoadBalancer": common.POD_SERVICE_TYPE_LOADBALANCER,
 	}
-	servicesArrays := [][]string{k.k8sInfo["*v1.Service"]}
-	servicesArrays = append(servicesArrays, k.k8sInfo["*v1.ServiceRule"])
+	servicesArrays := [][][]byte{k.k8sEntries["*v1.Service"]}
+	servicesArrays = append(servicesArrays, k.k8sEntries["*v1.ServiceRule"])
 	for i, servicesArray := range servicesArrays {
 		for _, s := range servicesArray {
-			sData, sErr := simplejson.NewJson([]byte(s))
+			sData, sErr := simplejson.NewJson(s)
 			if sErr != nil {
 				err = sErr
 				log.Errorf("service initialization simplejson error: (%s)", sErr.Error(), logger.NewORGPrefix(k.orgID))

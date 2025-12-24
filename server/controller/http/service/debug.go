@@ -153,7 +153,7 @@ func GetGenesisSyncData(orgID int, g *genesis.Genesis) (gcommon.GenesisSyncDataR
 	return g.GetGenesisSyncResponse(orgID)
 }
 
-func GetGenesisKubernetesData(g *genesis.Genesis, orgID int, clusterID string) (map[string][]string, error) {
+func GetGenesisKubernetesData(g *genesis.Genesis, orgID int, clusterID string) (map[string][][]byte, error) {
 	return g.GetKubernetesResponse(orgID, clusterID)
 }
 
