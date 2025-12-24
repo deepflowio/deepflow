@@ -24,8 +24,8 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 
 	ctrlCommon "github.com/deepflowio/deepflow/server/controller/common"
-	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
@@ -33,13 +33,13 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
-func WhereFindPtr[T any](db *mysql.DB, query interface{}, args ...interface{}) ([]*T, error) {
+func WhereFindPtr[T any](db *metadb.DB, query interface{}, args ...interface{}) ([]*T, error) {
 	var result []*T
 	err := db.Where(query, args...).Find(&result).Error
 	return result, err
 }
 
-func formatLogDeleteABecauseBHasGone[MT mysqlmodel.AssetResourceConstraint](a, b string, items []*MT) string {
+func formatLogDeleteABecauseBHasGone[MT metadbmodel.AssetResourceConstraint](a, b string, items []*MT) string {
 	var str string
 	for _, item := range items {
 		str += fmt.Sprintf("%+v ", item)
@@ -47,7 +47,7 @@ func formatLogDeleteABecauseBHasGone[MT mysqlmodel.AssetResourceConstraint](a, b
 	return fmt.Sprintf("%s: %+v because %s has gone", common.LogDelete(a), str, b)
 }
 
-func getIDs[MT mysqlmodel.AssetResourceConstraint](db *mysql.DB, domainLcuuid string) (ids []int) {
+func getIDs[MT metadbmodel.AssetResourceConstraint](db *metadb.DB, domainLcuuid string) (ids []int) {
 	var dbItems []*MT
 	db.Where(map[string]interface{}{"domain": domainLcuuid}).Select("id").Find(&dbItems)
 	for _, item := range dbItems {
@@ -57,11 +57,11 @@ func getIDs[MT mysqlmodel.AssetResourceConstraint](db *mysql.DB, domainLcuuid st
 }
 
 func pageDeleteExpiredAndPublish[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Delete, MT constraint.MySQLSoftDeleteModel](
-	db *mysql.DB, expiredAt time.Time, resourceType string, toolData *toolData, size int) {
+	db *metadb.DB, expiredAt time.Time, resourceType string, toolData *toolData, size int) {
 	var items []*MT
 	err := db.Unscoped().Where("deleted_at < ?", expiredAt).Find(&items).Error
 	if err != nil {
-		log.Errorf("mysql delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
+		log.Errorf("metadb delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
 		return
 	}
 	if len(items) == 0 {
@@ -76,7 +76,7 @@ func pageDeleteExpiredAndPublish[MDPT msgConstraint.DeletePtr[MDT], MDT msgConst
 			end = total
 		}
 		if err := db.Unscoped().Delete(items[i:end]).Error; err != nil {
-			log.Errorf("mysql delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
+			log.Errorf("metadb delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
 		} else {
 			publishTagrecorder[MDPT, MDT, MT](db, items, resourceType, toolData)
 		}
@@ -85,7 +85,7 @@ func pageDeleteExpiredAndPublish[MDPT msgConstraint.DeletePtr[MDT], MDT msgConst
 	log.Infof("clean %s completed: %d", resourceType, len(items), db.LogPrefixORGID)
 }
 
-func publishTagrecorder[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Delete, MT constraint.MySQLSoftDeleteModel](db *mysql.DB, dbItems []*MT, resourceType string, toolData *toolData) {
+func publishTagrecorder[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Delete, MT constraint.MySQLSoftDeleteModel](db *metadb.DB, dbItems []*MT, resourceType string, toolData *toolData) {
 	msgMetadataToDBItems := make(map[*message.Metadata][]*MT)
 	for _, item := range dbItems {
 		var msgMetadata *message.Metadata
@@ -117,9 +117,9 @@ func publishTagrecorder[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Del
 	}
 }
 
-func getProcessMessageDeleteAddition(db *mysql.DB, dbItems interface{}, resourceType string, toolData *toolData) *message.DeletedProcessesAddition {
+func getProcessMessageDeleteAddition(db *metadb.DB, dbItems interface{}, resourceType string, toolData *toolData) *message.DeletedProcessesAddition {
 	addition := &message.DeletedProcessesAddition{}
-	var allProcesses []*mysqlmodel.Process
+	var allProcesses []*metadbmodel.Process
 	if err := db.Unscoped().Find(&allProcesses).Error; err != nil {
 		log.Errorf("failed to get all processes: %s", err.Error(), db.LogPrefixORGID)
 		return addition
@@ -129,7 +129,7 @@ func getProcessMessageDeleteAddition(db *mysql.DB, dbItems interface{}, resource
 		gidToCount[item.GID]++
 	}
 	deletedGIDs := mapset.NewSet[uint32]()
-	for _, item := range dbItems.([]*mysqlmodel.Process) {
+	for _, item := range dbItems.([]*metadbmodel.Process) {
 		if _, ok := gidToCount[item.GID]; !ok {
 			deletedGIDs.Add(item.GID)
 		}
@@ -156,24 +156,24 @@ func (t *toolData) clean() {
 	t.subDomainLcuuidToMsgMetadata = make(map[string]*message.Metadata)
 }
 
-func (t *toolData) load(db *mysql.DB) error {
+func (t *toolData) load(db *metadb.DB) error {
 	t.mux.Lock()
 	defer t.mux.Unlock()
 
 	t.clean()
 
-	var domains []*mysqlmodel.Domain
+	var domains []*metadbmodel.Domain
 	if err := db.Find(&domains).Error; err != nil {
 		log.Errorf("failed to get domain: %s", err.Error(), db.LogPrefixORGID)
 		return err
 	}
-	lcuuidToDomain := make(map[string]*mysqlmodel.Domain)
+	lcuuidToDomain := make(map[string]*metadbmodel.Domain)
 	for _, domain := range domains {
 		lcuuidToDomain[domain.Lcuuid] = domain
 		t.domainLcuuidToMsgMetadata[domain.Lcuuid] = message.NewMetadata(
 			message.MetadataDB(db), message.MetadataDomain(*domain))
 	}
-	var subDomains []*mysqlmodel.SubDomain
+	var subDomains []*metadbmodel.SubDomain
 	if err := db.Find(&subDomains).Error; err != nil {
 		log.Errorf("failed to get sub_domain: %s", err.Error(), db.LogPrefixORGID)
 		return err
