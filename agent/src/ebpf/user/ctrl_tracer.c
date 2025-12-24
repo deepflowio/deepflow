@@ -18,6 +18,13 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <getopt.h>
+#include <glob.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <dirent.h>
+
 #include "tracer.h"
 #include "socket.h"
 
@@ -101,6 +108,14 @@ static void match_pids_help(void)
 	fprintf(stderr, "    %s match_pids print\n", DF_BPF_NAME);
 }
 
+static void javalog_help(void)
+{
+	fprintf(stderr, "Print java hs_err_pid*.log\n");
+	fprintf(stderr, "Usage:\n" "    %s javalog show\n", DF_BPF_NAME);
+	fprintf(stderr, "For example:\n");
+	fprintf(stderr, "    %s javalog show\n", DF_BPF_NAME);
+}
+
 static void cpdbg_help(void)
 {
 	fprintf(stderr,
@@ -180,6 +195,67 @@ static void datadump_help(void)
 		DF_BPF_NAME);
 	fprintf(stderr, "    %s datadump find --match-str nginx --all-files\n",
 		DF_BPF_NAME);
+}
+
+static long count_lines(const char *path)
+{
+    FILE *f = fopen(path, "r");
+    if (!f) return -1;
+
+    long lines = 0;
+    int c;
+    while ((c = fgetc(f)) != EOF) {
+        if (c == '\n')
+            lines++;
+    }
+    fclose(f);
+    return lines;
+}
+
+static int ls_path(const char *pattern)
+{
+    glob_t g;
+    int ret = glob(pattern, GLOB_NOCHECK, NULL, &g);
+    if (ret != 0) return -1;
+
+    for (size_t i = 0; i < g.gl_pathc; ++i) {
+        const char *path = g.gl_pathv[i];
+
+        struct stat st;
+        if (stat(path, &st) != 0) {
+            fprintf(stderr, "stat %s failed: %s\n", path, strerror(errno));
+            continue;
+        }
+
+        long lines = count_lines(path);
+
+        printf("%s\n", path);
+        printf("  size : %ld bytes\n", (long)st.st_size);
+
+        if (lines >= 0)
+            printf("  lines: %ld\n", lines);
+        else
+            printf("  lines: <unreadable>\n");
+    }
+
+    globfree(&g);
+    return 0;
+}
+
+// rm_path("/var/log/datadump-*.log");
+static int rm_path(const char *pattern)
+{
+    glob_t g;
+    int ret = glob(pattern, GLOB_NOCHECK, NULL, &g);
+    if (ret != 0) return -1;
+
+    for (size_t i = 0; i < g.gl_pathc; ++i) {
+	    printf("unlink %s\n", g.gl_pathv[i]);
+            unlink(g.gl_pathv[i]);
+    }
+
+    globfree(&g);
+    return 0;
 }
 
 static int __exec_command(const char *cmd, const char *args)
@@ -635,6 +711,21 @@ static int match_pids_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 	return ETR_OK;
 }
 
+static int javalog_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
+			  struct df_bpf_conf *conf)
+{
+	switch (conf->cmd) {
+	case DF_BPF_CMD_SHOW:
+		__exec_command("cat /var/log/deepflow-agent/java-crash.log", "");
+		break;
+
+	default:
+		return ETR_NOTSUPP;
+	}
+
+	return ETR_OK;
+}
+
 static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 			   struct df_bpf_conf *conf)
 {
@@ -735,13 +826,13 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 		if (conf->argc != 0)
 			fprintf(stdout, "Invalid params.\n");
 		else
-			__exec_command("ls -sh /var/log/datadump-*.log", "");
+			ls_path("/var/log/datadump-*.log");
 		break;
 	case DF_BPF_CMD_FLUSH:
 		if (conf->argc != 0)
 			fprintf(stdout, "Invalid params.\n");
 		else
-			__exec_command("rm -rf /var/log/datadump-*.log", "");
+			rm_path("/var/log/datadump-*.log");
 		break;
 	case DF_BPF_CMD_FIND:
 		{
@@ -892,13 +983,19 @@ struct df_bpf_obj match_pids_obj = {
 	.do_cmd = match_pids_do_cmd,
 };
 
+struct df_bpf_obj javalog_obj = {
+	.name = "javalog",
+	.help = javalog_help,
+	.do_cmd = javalog_do_cmd,
+};
+
 static void usage(void)
 {
 	fprintf(stderr,
 		"Usage:\n"
 		"    " DF_BPF_NAME " [OPTIONS] OBJECT { COMMAND | help }\n"
 		"Parameters:\n"
-		"    OBJECT  := { tracer socktrace datadump cpdbg match_pids}\n"
+		"    OBJECT  := { tracer socktrace datadump cpdbg match_pids javalog}\n"
 		"    COMMAND := { show list set print}\n"
 		"Options:\n"
 		"    -v, --verbose\n"
@@ -917,7 +1014,9 @@ static struct df_bpf_obj *df_bpf_obj_get(const char *name)
 		return &cpdbg_obj;
 	} else if (strcmp(name, "match_pids") == 0) {
 		return &match_pids_obj;
-	}
+	} else if (strcmp(name, "javalog") == 0) {
+                return &javalog_obj;
+        }
 
 	return NULL;
 }

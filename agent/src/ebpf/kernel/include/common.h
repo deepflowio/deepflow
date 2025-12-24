@@ -112,6 +112,7 @@ enum process_data_extra_source {
 	DATA_SOURCE_RESERVED,
 	DATA_SOURCE_DPDK,
 	DATA_SOURCE_UNIX_SOCKET,
+	DATA_SOURCE_FILE_WRITE
 };
 
 struct protocol_message_t {
