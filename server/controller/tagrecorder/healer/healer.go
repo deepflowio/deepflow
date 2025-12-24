@@ -22,6 +22,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/common/metadata"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbquery "github.com/deepflowio/deepflow/server/controller/db/metadb/query"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	msgConstraint "github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/constraint"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
@@ -346,21 +347,28 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) republishAdd(sourceIDs []int) error
 	if len(sourceIDs) == 0 {
 		return nil
 	}
-	log.Infof("tagrecorder %s healer (source: %s) republish add (ids: %v, count: %d)", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), sourceIDs, len(sourceIDs), h.msgMetadata.LogPrefixes)
-	var dbItems []*MT
-	if err := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN (?)", h.sourceDataGen.getRealIDField()), sourceIDs).Find(&dbItems).Error; err != nil {
+
+	dbItems, err := metadbquery.FindPage[MT](
+		h.msgMetadata.DB.Unscoped().Where(fmt.Sprintf("%s IN (?)", h.sourceDataGen.getRealIDField()), sourceIDs),
+		int(h.msgMetadata.DB.Config.BatchSize1),
+	)
+	if err != nil {
 		log.Errorf("failed to find %s: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)
 		return err
 	}
+
 	targetSubscriber := tagrecorder.GetSubscriberManager().GetSubscriber(h.sourceDataGen.getResourceType(), h.targetDataGen.getResourceType())
 	if targetSubscriber == nil {
 		log.Errorf("failed to get target subscriber: %s", h.targetDataGen.getResourceType(), h.msgMetadata.LogPrefixes)
 		return fmt.Errorf("failed to get target subscriber: %s", h.targetDataGen.getResourceType())
 	}
 
+	log.Infof("tagrecorder %s healer (source: %s) republish add (ids: %v, count: %d)", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), sourceIDs, len(sourceIDs), h.msgMetadata.LogPrefixes)
+
 	msgData := MAPT(new(MAT))
 	msgData.SetMySQLItems(dbItems)
 	targetSubscriber.OnResourceBatchAdded(h.msgMetadata, msgData)
+
 	return nil
 }
 
@@ -369,12 +377,16 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) forceDelete(targetIDs []int) error 
 		return nil
 	}
 	log.Infof("tagrecorder %s healer (source: %s) force delete (ids: %v, count: %d)", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), targetIDs, len(targetIDs), h.msgMetadata.LogPrefixes)
-	var dbItems []*CT
-	delExec := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN (?)", h.targetDataGen.getRealIDField()), targetIDs)
+	delExec := h.msgMetadata.DB.Unscoped().Where(fmt.Sprintf("%s IN (?)", h.targetDataGen.getRealIDField()), targetIDs)
 	if h.targetDataGen.getResourceType() == tagrecorder.RESOURCE_TYPE_CH_DEVICE {
 		delExec = delExec.Where("devicetype IN (?)", h.targetDataGen.getChDeviceTypes())
 	}
-	if err := delExec.Delete(&dbItems).Error; err != nil {
+	dbItems, err := metadbquery.FindPage[CT](delExec, int(h.msgMetadata.DB.Config.BatchSize1))
+	if err != nil {
+		log.Errorf("failed to find %s: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)
+		return err
+	}
+	if err := metadbquery.DeletePageData(h.msgMetadata.DB.DB.Unscoped(), int(h.msgMetadata.DB.Config.BatchSize1), dbItems); err != nil {
 		log.Errorf("failed to delete %s: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)
 		return err
 	}

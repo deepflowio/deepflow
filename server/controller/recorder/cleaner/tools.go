@@ -57,7 +57,7 @@ func getIDs[MT metadbmodel.AssetResourceConstraint](db *metadb.DB, domainLcuuid 
 }
 
 func pageDeleteExpiredAndPublish[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Delete, MT constraint.MySQLSoftDeleteModel](
-	db *metadb.DB, expiredAt time.Time, resourceType string, toolData *toolData, size int) {
+	db *metadb.DB, expiredAt time.Time, resourceType string, toolData *toolData) {
 	var items []*MT
 	err := db.Unscoped().Where("deleted_at < ?", expiredAt).Find(&items).Error
 	if err != nil {
@@ -67,22 +67,25 @@ func pageDeleteExpiredAndPublish[MDPT msgConstraint.DeletePtr[MDT], MDT msgConst
 	if len(items) == 0 {
 		return
 	}
+	pageDeleteAndPublish[MDPT, MDT, MT](db, items, resourceType, toolData)
+}
 
-	log.Infof("clean %s started: %d", resourceType, len(items), db.LogPrefixORGID)
-	total := len(items)
-	for i := 0; i < total; i += size {
-		end := i + size
+func pageDeleteAndPublish[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Delete, MT constraint.MySQLSoftDeleteModel](
+	db *metadb.DB, dbItems []*MT, resourceType string, toolData *toolData) {
+	log.Infof("clean %s started: %d", resourceType, len(dbItems), db.LogPrefixORGID)
+	total := len(dbItems)
+	for i := 0; i < total; i += int(db.Config.BatchSize1) {
+		end := i + int(db.Config.BatchSize1)
 		if end > total {
 			end = total
 		}
-		if err := db.Unscoped().Delete(items[i:end]).Error; err != nil {
+		if err := db.Unscoped().Delete(dbItems[i:end]).Error; err != nil {
 			log.Errorf("metadb delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
 		} else {
-			publishTagrecorder[MDPT, MDT, MT](db, items, resourceType, toolData)
+			publishTagrecorder[MDPT, MDT, MT](db, dbItems[i:end], resourceType, toolData)
 		}
 	}
-
-	log.Infof("clean %s completed: %d", resourceType, len(items), db.LogPrefixORGID)
+	log.Infof("clean %s completed: %d", resourceType, len(dbItems), db.LogPrefixORGID)
 }
 
 func publishTagrecorder[MDPT msgConstraint.DeletePtr[MDT], MDT msgConstraint.Delete, MT constraint.MySQLSoftDeleteModel](db *metadb.DB, dbItems []*MT, resourceType string, toolData *toolData) {
