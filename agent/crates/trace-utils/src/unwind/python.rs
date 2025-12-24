@@ -18,6 +18,8 @@ use std::{
     cell::OnceCell, collections::HashMap, ffi::CStr, fs, io::Write, mem, path::PathBuf, slice,
 };
 
+#[cfg(target_arch = "x86_64")]
+use ahash::AHashMap;
 use libc::c_void;
 use log::{debug, trace, warn};
 use object::{Object, ObjectSection, ObjectSymbol};
@@ -40,6 +42,62 @@ use super::elf_utils::MappedFile;
 
 #[cfg(target_arch = "x86_64")]
 use iced_x86::{Decoder, DecoderOptions, Mnemonic, OpKind, Register};
+
+#[cfg(target_arch = "x86_64")]
+#[derive(Clone, Copy, Debug)]
+enum Value {
+    Known(u64),
+    /// Address expressed as _PyRuntime + offset (can be negative)
+    RuntimeBase(i64),
+    Unknown,
+}
+
+#[cfg(target_arch = "x86_64")]
+impl Value {
+    fn add(self, rhs: i64) -> Self {
+        match self {
+            Value::Known(v) => Value::Known(v.wrapping_add(rhs as u64)),
+            Value::RuntimeBase(off) => Value::RuntimeBase(off.saturating_add(rhs)),
+            Value::Unknown => Value::Unknown,
+        }
+    }
+
+    fn sub(self, rhs: i64) -> Self {
+        match self {
+            Value::Known(v) => Value::Known(v.wrapping_sub(rhs as u64)),
+            Value::RuntimeBase(off) => Value::RuntimeBase(off.saturating_sub(rhs)),
+            Value::Unknown => Value::Unknown,
+        }
+    }
+
+    fn shl(self, shift: u8) -> Self {
+        if shift >= 63 {
+            return Value::Unknown;
+        }
+        match self {
+            Value::Known(v) => Value::Known(v << shift),
+            Value::RuntimeBase(off) => {
+                Value::RuntimeBase(off.checked_shl(shift as u32).unwrap_or(0))
+            }
+            Value::Unknown => Value::Unknown,
+        }
+    }
+
+    fn or(self, rhs: u64) -> Self {
+        match self {
+            Value::Known(v) => Value::Known(v | rhs),
+            _ => Value::Unknown,
+        }
+    }
+
+    fn to_runtime_addr(self, runtime_addr: u64) -> Option<u64> {
+        match self {
+            Value::Known(v) => Some(v),
+            Value::RuntimeBase(off) => Some(runtime_addr.wrapping_add(off as u64)),
+            Value::Unknown => None,
+        }
+    }
+}
 
 fn error_not_python(pid: u32) -> Error {
     Error::BadInterpreterType(pid, "python")
@@ -275,48 +333,65 @@ impl Interpreter {
         runtime_addr: u64,
     ) -> Result<u64> {
         let decoder = Decoder::with_ip(64, code, code_addr, DecoderOptions::NONE);
+        let mut regs = AHashMap::new();
+        regs.insert(Register::RAX, Value::RuntimeBase(0));
         for instr in decoder {
-            if instr.mnemonic() == Mnemonic::Lea && instr.op0_register() == Register::RDI {
-                if let Some(target_addr) = Self::decode_mem_target(&instr) {
+            Self::propagate_known(&mut regs, &instr);
+
+            let op0 = Self::canon_reg(instr.op0_register());
+            if op0 == Register::RDI {
+                // Fast path: mov/lea from [_PyRuntime + disp] into EDI/RDI
+                if instr.op1_kind() == OpKind::Memory && instr.memory_base() == Register::RAX {
+                    let disp = instr.memory_displacement64() as u64;
+                    let target_addr = runtime_addr.wrapping_add(disp);
                     if let Some(addr) = self.validate_auto_tls_candidate(target_addr, runtime_addr)
                     {
-                        debug!("Found autoTLSkey address {:#x} (from LEA)", addr);
+                        debug!(
+                            "Found autoTLSkey address {:#x} (mov/lea from RAX base)",
+                            addr
+                        );
                         return Ok(addr);
                     }
                 }
-            }
 
-            if instr.mnemonic() == Mnemonic::Mov && instr.op0_register() == Register::RDI {
-                match instr.op1_kind() {
-                    OpKind::Immediate64 => {
-                        let target_addr = instr.immediate64();
-                        if let Some(addr) =
-                            self.validate_auto_tls_candidate(target_addr, runtime_addr)
-                        {
-                            debug!("Found autoTLSkey address {:#x} (imm64)", addr);
-                            return Ok(addr);
-                        }
-                    }
-                    OpKind::Immediate32 => {
-                        let target_addr = instr.immediate32() as u64;
-                        if let Some(addr) =
-                            self.validate_auto_tls_candidate(target_addr, runtime_addr)
-                        {
-                            debug!("Found autoTLSkey address {:#x} (imm32)", addr);
-                            return Ok(addr);
-                        }
-                    }
-                    OpKind::Memory => {
-                        if let Some(target_addr) = Self::decode_mem_target(&instr) {
-                            if let Some(addr) =
-                                self.validate_auto_tls_candidate(target_addr, runtime_addr)
+                if instr.mnemonic() == Mnemonic::Lea && instr.op1_kind() == OpKind::Memory {
+                    if let Some(val) = Self::compute_mem_addr(&instr, &regs).or_else(|| {
+                        Self::assume_runtime_base(&instr, runtime_addr).map(Value::Known)
+                    }) {
+                        if let Some(addr) = val.to_runtime_addr(runtime_addr) {
+                            if let Some(valid) =
+                                self.validate_auto_tls_candidate(addr, runtime_addr)
                             {
-                                debug!("Found autoTLSkey address {:#x} (from MOV)", addr);
-                                return Ok(addr);
+                                debug!("Found autoTLSkey address {:#x} (LEA)", valid);
+                                return Ok(valid);
                             }
                         }
                     }
-                    _ => {}
+                }
+
+                if instr.mnemonic() == Mnemonic::Mov && instr.op1_kind() == OpKind::Memory {
+                    if let Some(val) = Self::compute_mem_addr(&instr, &regs).or_else(|| {
+                        Self::assume_runtime_base(&instr, runtime_addr).map(Value::Known)
+                    }) {
+                        if let Some(addr) = val.to_runtime_addr(runtime_addr) {
+                            if let Some(valid) =
+                                self.validate_auto_tls_candidate(addr, runtime_addr)
+                            {
+                                debug!("Found autoTLSkey address {:#x} (MOV)", valid);
+                                return Ok(valid);
+                            }
+                        }
+                    }
+                }
+
+                if let Some(val) = regs
+                    .get(&Register::RDI)
+                    .and_then(|v| v.to_runtime_addr(runtime_addr))
+                {
+                    if let Some(addr) = self.validate_auto_tls_candidate(val, runtime_addr) {
+                        debug!("Found autoTLSkey address {:#x}", addr);
+                        return Ok(addr);
+                    }
                 }
             }
         }
@@ -353,13 +428,183 @@ impl Interpreter {
     }
 
     #[cfg(target_arch = "x86_64")]
-    fn decode_mem_target(instr: &iced_x86::Instruction) -> Option<u64> {
-        let disp = instr.memory_displacement64() as i64;
-        match instr.memory_base() {
-            Register::RIP => Some(instr.next_ip().wrapping_add(disp as u64)),
-            Register::None => Some(disp as u64),
-            _ => None,
+    fn canon_reg(reg: Register) -> Register {
+        match reg {
+            Register::RAX | Register::EAX => Register::RAX,
+            Register::RBX | Register::EBX => Register::RBX,
+            Register::RCX | Register::ECX => Register::RCX,
+            Register::RDX | Register::EDX => Register::RDX,
+            Register::RSI | Register::ESI => Register::RSI,
+            Register::RDI | Register::EDI => Register::RDI,
+            Register::R8 | Register::R8D => Register::R8,
+            Register::R9 | Register::R9D => Register::R9,
+            Register::R10 | Register::R10D => Register::R10,
+            Register::R11 | Register::R11D => Register::R11,
+            Register::R12 | Register::R12D => Register::R12,
+            Register::R13 | Register::R13D => Register::R13,
+            Register::R14 | Register::R14D => Register::R14,
+            Register::R15 | Register::R15D => Register::R15,
+            _ => reg,
         }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn propagate_known(map: &mut AHashMap<Register, Value>, instr: &iced_x86::Instruction) {
+        match instr.mnemonic() {
+            Mnemonic::Mov => {
+                if instr.op0_kind() != OpKind::Register {
+                    return;
+                }
+                let dst = Self::canon_reg(instr.op0_register());
+                let val = match instr.op1_kind() {
+                    OpKind::Immediate32 => Some(Value::Known(instr.immediate32() as u64)),
+                    OpKind::Immediate64 => Some(Value::Known(instr.immediate64())),
+                    OpKind::Register => map.get(&Self::canon_reg(instr.op1_register())).copied(),
+                    OpKind::Memory => Self::compute_mem_addr(instr, map),
+                    _ => None,
+                };
+                if let Some(v) = val {
+                    map.insert(dst, v);
+                }
+            }
+            Mnemonic::Lea => {
+                if instr.op0_kind() != OpKind::Register || instr.op1_kind() != OpKind::Memory {
+                    return;
+                }
+                if let Some(addr) = Self::compute_mem_addr(instr, map) {
+                    map.insert(Self::canon_reg(instr.op0_register()), addr);
+                }
+            }
+            Mnemonic::Add => {
+                if instr.op0_kind() != OpKind::Register {
+                    return;
+                }
+                let dst = Self::canon_reg(instr.op0_register());
+                if let Some(base) = map.get(&dst).copied() {
+                    let delta = match instr.op1_kind() {
+                        OpKind::Immediate32 => instr.immediate32() as i64,
+                        OpKind::Immediate8 => instr.immediate8() as i64,
+                        OpKind::Register => {
+                            match map.get(&Self::canon_reg(instr.op1_register())).copied() {
+                                Some(Value::Known(v)) => v as i64,
+                                Some(Value::RuntimeBase(off)) => off,
+                                _ => 0,
+                            }
+                        }
+                        _ => 0,
+                    };
+                    map.insert(dst, base.add(delta));
+                }
+            }
+            Mnemonic::Sub => {
+                if instr.op0_kind() != OpKind::Register {
+                    return;
+                }
+                let dst = Self::canon_reg(instr.op0_register());
+                if let Some(base) = map.get(&dst).copied() {
+                    let delta = match instr.op1_kind() {
+                        OpKind::Immediate32 => instr.immediate32() as i64,
+                        OpKind::Immediate8 => instr.immediate8() as i64,
+                        OpKind::Register => {
+                            match map.get(&Self::canon_reg(instr.op1_register())).copied() {
+                                Some(Value::Known(v)) => v as i64,
+                                Some(Value::RuntimeBase(off)) => off,
+                                _ => 0,
+                            }
+                        }
+                        _ => 0,
+                    };
+                    map.insert(dst, base.sub(delta));
+                }
+            }
+            Mnemonic::Shl => {
+                if instr.op0_kind() != OpKind::Register || instr.op1_kind() != OpKind::Immediate8 {
+                    return;
+                }
+                let dst = Self::canon_reg(instr.op0_register());
+                if let Some(base) = map.get(&dst).copied() {
+                    let shift = instr.immediate8();
+                    map.insert(dst, base.shl(shift));
+                }
+            }
+            Mnemonic::And => {
+                if instr.op0_kind() != OpKind::Register {
+                    return;
+                }
+                let dst = Self::canon_reg(instr.op0_register());
+                if let Some(base) = map.get(&dst).copied() {
+                    let mask = match instr.op1_kind() {
+                        OpKind::Immediate32 => instr.immediate32() as u64,
+                        OpKind::Immediate8 => instr.immediate8() as u64,
+                        _ => return,
+                    };
+                    map.insert(dst, base.or(mask));
+                }
+            }
+            Mnemonic::Or => {
+                if instr.op0_kind() != OpKind::Register {
+                    return;
+                }
+                let dst = Self::canon_reg(instr.op0_register());
+                if let Some(base) = map.get(&dst).copied() {
+                    let val = match instr.op1_kind() {
+                        OpKind::Immediate32 => instr.immediate32() as u64,
+                        OpKind::Immediate8 => instr.immediate8() as u64,
+                        _ => return,
+                    };
+                    map.insert(dst, base.or(val));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn compute_mem_addr(
+        instr: &iced_x86::Instruction,
+        map: &AHashMap<Register, Value>,
+    ) -> Option<Value> {
+        let disp = instr.memory_displacement64() as i64;
+        let base_val = match instr.memory_base() {
+            Register::RIP => Value::Known(instr.next_ip()),
+            Register::None => Value::Known(0),
+            base => map
+                .get(&Self::canon_reg(base))
+                .copied()
+                .unwrap_or(Value::Unknown),
+        };
+
+        let with_disp = match base_val {
+            Value::Known(v) => Value::Known(v.wrapping_add(disp as u64)),
+            Value::RuntimeBase(off) => Value::RuntimeBase(off.saturating_add(disp)),
+            Value::Unknown => Value::Unknown,
+        };
+
+        let result = if instr.memory_index() != Register::None {
+            let idx_val = map.get(&Self::canon_reg(instr.memory_index())).copied()?;
+            let scale = instr.memory_index_scale() as i64;
+            match (with_disp, idx_val) {
+                (Value::Known(a), Value::Known(b)) => {
+                    Value::Known(a.wrapping_add((b as i64 * scale) as u64))
+                }
+                (Value::RuntimeBase(off), Value::Known(b)) => {
+                    Value::RuntimeBase(off.saturating_add((b as i64 * scale) as i64))
+                }
+                _ => Value::Unknown,
+            }
+        } else {
+            with_disp
+        };
+
+        Some(result)
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn assume_runtime_base(instr: &iced_x86::Instruction, runtime_addr: u64) -> Option<u64> {
+        if instr.memory_base() == Register::RAX {
+            return Some(runtime_addr.wrapping_add(instr.memory_displacement64() as u64));
+        }
+        None
     }
 
     /// Decode autoTLSkey address from ARM64 assembly

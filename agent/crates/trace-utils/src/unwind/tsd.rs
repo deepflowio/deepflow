@@ -32,6 +32,7 @@ use std::cell::OnceCell;
 use std::fs;
 use std::path::PathBuf;
 
+#[cfg(target_arch = "x86_64")]
 use ahash::AHashMap;
 use log::trace;
 use object::{Object, ObjectSection, ObjectSymbol};
