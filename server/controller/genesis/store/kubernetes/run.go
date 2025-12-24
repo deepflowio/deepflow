@@ -97,8 +97,8 @@ func (g *GenesisKubernetes) GetKubernetesData(orgID int, clusterID string) (comm
 	return k8sData, true
 }
 
-func (g *GenesisKubernetes) GetKubernetesResponse(orgID int, clusterID, destIP string) (map[string][]string, error) {
-	resp := map[string][]string{}
+func (g *GenesisKubernetes) GetKubernetesResponse(orgID int, clusterID, destIP string) (map[string][][]byte, error) {
+	resp := map[string][][]byte{}
 
 	var kubernetesData common.KubernetesInfo
 	if destIP == "" {
@@ -121,7 +121,7 @@ func (g *GenesisKubernetes) GetKubernetesResponse(orgID int, clusterID, destIP s
 			OrgId:     &reqORGID,
 			ClusterId: &clusterID,
 		}
-		ret, err := client.GenesisSharingK8S(context.Background(), req)
+		ret, err := client.GenesisSharingK8S(g.ctx, req)
 		if err != nil {
 			return resp, fmt.Errorf("get (%s) genesis sharing k8s failed (%s) ", destIP, err.Error())
 		}
@@ -209,23 +209,24 @@ func (g *GenesisKubernetes) Start() {
 			entries := info.Message.GetEntries()
 			log.Debugf("k8s from %s vtap_id %v received cluster_id %s version %d entries %d", info.Peer, info.VtapID, clusterID, version, len(entries), logger.NewORGPrefix(info.ORGID))
 
+			var interrupted bool
 			var entriesJson []byte
-			if errMsg == "" && !kStorage.CheckVersion(info.ORGID, clusterID, version) {
-				entriesMap := map[string][]string{}
-				for _, e := range entries {
-					eType := e.GetType()
-					out, err := common.ParseCompressedInfo(e.GetCompressedInfo())
-					if err != nil {
-						errMsg = fmt.Sprintf("decompress error: %s", err.Error())
-						break
-					}
-					entriesMap[eType] = append(entriesMap[eType], string(out.Bytes()))
+			entriesMap := map[string][][]byte{}
+			for _, e := range entries {
+				eType := e.GetType()
+				out, err := common.ParseCompressedInfo(e.GetCompressedInfo())
+				if err != nil {
+					interrupted = true
+					errMsg = fmt.Sprintf("decompress error: %s", err.Error())
+					break
 				}
-				if errMsg == "" {
-					json, err := sonic.Marshal(entriesMap)
-					if err != nil {
-						errMsg = fmt.Sprintf("marshal error: %s", err.Error())
-					}
+				entriesMap[eType] = append(entriesMap[eType], out.Bytes())
+			}
+			if !interrupted {
+				json, err := sonic.Marshal(entriesMap)
+				if err != nil {
+					errMsg = fmt.Sprintf("marshal error: %s", err.Error())
+				} else {
 					entriesJson = json
 				}
 			}

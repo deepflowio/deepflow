@@ -68,7 +68,7 @@ type KubernetesGather struct {
 	namespaceToLcuuid            map[string]string
 	rsLcuuidToPodGroupLcuuid     map[string]string
 	serviceLcuuidToIngressLcuuid map[string]string
-	k8sInfo                      map[string][]string
+	k8sEntries                   map[string][][]byte
 	pgLcuuidToPSLcuuids          map[string][]string
 	configMapToLcuuid            map[[2]string]string
 	podLcuuidToPGInfo            map[string][2]string
@@ -209,7 +209,7 @@ func NewKubernetesGather(db *metadb.DB, domain *metadbmodel.Domain, subDomain *m
 		namespaceToLcuuid:            map[string]string{},
 		rsLcuuidToPodGroupLcuuid:     map[string]string{},
 		serviceLcuuidToIngressLcuuid: map[string]string{},
-		k8sInfo:                      map[string][]string{},
+		k8sEntries:                   map[string][][]byte{},
 		pgLcuuidToPSLcuuids:          map[string][]string{},
 		configMapToLcuuid:            map[[2]string]string{},
 		podLcuuidToPGInfo:            map[string][2]string{},
@@ -221,17 +221,17 @@ func NewKubernetesGather(db *metadb.DB, domain *metadbmodel.Domain, subDomain *m
 	}
 }
 
-func (k *KubernetesGather) getKubernetesInfo() (map[string][]string, error) {
-	kData, err := genesis.GenesisService.GetKubernetesResponse(k.orgID, k.ClusterID)
+func (k *KubernetesGather) getKubernetesEntries() (map[string][][]byte, error) {
+	entries, err := genesis.GenesisService.GetKubernetesResponse(k.orgID, k.ClusterID)
 	if err != nil {
-		return map[string][]string{}, err
+		return map[string][][]byte{}, err
 	}
 
-	for key, v := range kData {
+	for key, v := range entries {
 		// resource from genesis , so api start is 0
 		k.cloudStatsd.RefreshAPIMoniter(key, len(v), time.Time{})
 	}
-	return kData, nil
+	return entries, nil
 }
 
 func (k *KubernetesGather) GetStatter() statsd.StatsdStatter {
@@ -327,7 +327,7 @@ func (k *KubernetesGather) pgSpecGenerateConnections(nsName, pgName, pgLcuuid st
 func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherResource, error) {
 	// 任务循环的是同一个实例，所以这里要对关联关系进行初始化
 	k.azLcuuid = ""
-	k.k8sInfo = nil
+	k.k8sEntries = nil
 	k.podNetworkLcuuidCIDRs = networkLcuuidCIDRs{}
 	k.nodeNetworkLcuuidCIDRs = networkLcuuidCIDRs{}
 	k.podGroupLcuuids = mapset.NewSet()
@@ -368,7 +368,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		}, err
 	}
 
-	k8sInfo, err := k.getKubernetesInfo()
+	k.k8sEntries, err = k.getKubernetesEntries()
 	if err != nil {
 		log.Warning(err.Error(), logger.NewORGPrefix(k.orgID))
 		return model.KubernetesGatherResource{
@@ -376,7 +376,6 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 			ErrorMessage: err.Error(),
 		}, err
 	}
-	k.k8sInfo = k8sInfo
 
 	podCluster, err := k.getPodCluster()
 	if err != nil {
