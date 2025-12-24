@@ -1,24 +1,18 @@
 -- ColumnExists function
-DROP FUNCTION IF EXISTS ColumnExists;
+DROP PROCEDURE IF EXISTS ColumnExists;
 
-CREATE FUNCTION ColumnExists(
-    tableName VARCHAR(255),
-    colName VARCHAR(255)
+CREATE PROCEDURE ColumnExists(
+    IN  p_table_name VARCHAR(255),
+    IN  p_col_name   VARCHAR(255),
+    OUT p_exists     TINYINT(1)
 )
-RETURNS TINYINT(1)
-DETERMINISTIC
-READS SQL DATA
 BEGIN
-    DECLARE column_count INT;
-
-    SELECT COUNT(*)
-    INTO column_count
+    SELECT COUNT(*) > 0
+    INTO p_exists
     FROM information_schema.columns
     WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = tableName
-    AND COLUMN_NAME = colName;
-
-    RETURN column_count > 0;
+      AND TABLE_NAME   = p_table_name
+      AND COLUMN_NAME  = p_col_name;
 END;
 
 -- AddColumnIfNotExists procedure
@@ -31,7 +25,8 @@ CREATE PROCEDURE AddColumnIfNotExists(
     IN afterCol VARCHAR(255)
 )
 BEGIN
-    IF NOT ColumnExists(tableName, colName) THEN
+    CALL ColumnExists(tableName, colName, @exists);
+    IF NOT @exists THEN
         SET @sql = CONCAT('ALTER TABLE ', tableName, ' ADD COLUMN ', colName, ' ', colType, ' AFTER ', afterCol);
         PREPARE stmt FROM @sql;
         EXECUTE stmt;
@@ -52,7 +47,8 @@ CREATE PROCEDURE ChangeColumnIfExists(
     IN colType VARCHAR(255)
 )
 BEGIN
-    IF ColumnExists(tableName, oldColName) THEN
+    CALL ColumnExists(tableName, oldColName, @exists);
+    IF @exists THEN
         SET @sql = CONCAT('ALTER TABLE ', tableName, ' CHANGE ', oldColName, ' ', newColName, ' ', colType);
         PREPARE stmt FROM @sql;
         EXECUTE stmt;
@@ -74,7 +70,9 @@ CREATE PROCEDURE MigrateData(
     IN targetColName VARCHAR(255)
 )
 BEGIN
-    IF ColumnExists(tableName, sourceColName) AND ColumnExists(tableName, targetColName) THEN
+    CALL ColumnExists(tableName, sourceColName, @source_exists);
+    CALL ColumnExists(tableName, targetColName, @target_exists);
+    IF @source_exists AND @target_exists THEN
         SET @sql = CONCAT('UPDATE ', tableName, ' SET ', targetColName, ' = ', sourceColName, ' WHERE ', sourceColName, ' > 0');
         SET @sql = CONCAT('UPDATE ', tableName, ' SET ', targetColName, ' = "" WHERE ', sourceColName, ' = 0');
         PREPARE stmt FROM @sql;
@@ -87,7 +85,7 @@ CALL MigrateData('custom_service', 'pod_cluster_id_bak', 'pod_cluster_ids');
 CALL MigrateData('custom_service', 'pod_namespace_id_bak', 'pod_namespace_ids');
 
 -- Cleanup
-DROP FUNCTION IF EXISTS ColumnExists;
+DROP PROCEDURE IF EXISTS ColumnExists;
 DROP PROCEDURE IF EXISTS AddColumnIfNotExists;
 DROP PROCEDURE IF EXISTS ChangeColumnIfExists;
 DROP PROCEDURE IF EXISTS MigrateData;
