@@ -134,7 +134,7 @@ func (gs *GenesisSyncTypeOperation[T]) Load() {
 			var vtap metadbmodel.VTap
 			err = db.Where("id = ?", storage.VtapID).First(&vtap).Error
 			if err != nil {
-				log.Errorf("get vtap (%d) failed:%s", storage.VtapID, err.Error(), logger.NewORGPrefix(orgID))
+				log.Warningf("get vtap (%d) failed:%s", storage.VtapID, err.Error(), logger.NewORGPrefix(orgID))
 				continue
 			}
 			if len(items) == 0 {

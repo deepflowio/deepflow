@@ -1056,6 +1056,7 @@ func DeleteSubDomain(lcuuid string, db *metadb.DB, userInfo *httpcommon.UserInfo
 		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&metadbmodel.PodNode{})
 		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&metadbmodel.PodCluster{})
 		db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&metadbmodel.Process{})
+		db.Unscoped().Where("id = ?", subDomain.ClusterID).Delete(&model.GenesisCluster{})
 		// db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&metadbmodel.PrometheusTarget{})
 	}
 
