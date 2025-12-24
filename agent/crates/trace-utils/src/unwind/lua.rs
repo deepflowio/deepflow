@@ -20,6 +20,7 @@ use std::{
     mem::{self, MaybeUninit},
     ptr, slice, str,
     sync::{Mutex, OnceLock},
+    time::{Duration, Instant},
 };
 
 use libc::{c_char, c_int, c_void, iovec};
@@ -78,7 +79,15 @@ pub extern "C" fn is_lua_process(pid: u32) -> i32 {
     if pid <= 0 {
         return 0;
     }
-    detect_runtime(pid as u32).is_some() as i32
+
+    // Fast path: once the unwind table has been loaded successfully for a PID,
+    // it registers the PID so hot callers (e.g. stack stringifier) avoid scanning
+    // `/proc/<pid>/maps` on every sample.
+    if crate::is_registered_as(pid, crate::InterpreterType::Lua) {
+        return 1;
+    }
+
+    detect_runtime_cached(pid as u32).is_some() as i32
 }
 
 #[no_mangle]
@@ -87,7 +96,7 @@ pub unsafe extern "C" fn lua_detect(pid: u32, out: *mut LuaRuntimeInfo) -> i32 {
         return -1;
     }
 
-    match detect_runtime(pid as u32) {
+    match detect_runtime_cached(pid as u32) {
         Some(info) => {
             {
                 *out = info;
@@ -244,6 +253,15 @@ static LUA_LAYOUT_CACHE: OnceLock<Mutex<LuaLayoutCache>> = OnceLock::new();
 
 fn lua_cache() -> &'static Mutex<LuaLayoutCache> {
     LUA_LAYOUT_CACHE.get_or_init(|| Mutex::new(LuaLayoutCache::new()))
+}
+
+fn lua_layout_cache_remove(pid: u32) {
+    let cache_lock = lua_cache();
+    let mut cache = cache_lock.lock().unwrap();
+    if cache.pid == pid as i32 {
+        cache.pid = -1;
+        cache.layout = None;
+    }
 }
 
 extern "C" {
@@ -884,7 +902,7 @@ impl LuaUnwindTable {
     }
 
     pub unsafe fn load(&mut self, pid: u32) {
-        let info = match detect_runtime(pid) {
+        let info = match detect_runtime_cached(pid) {
             Some(info) => info,
             None => {
                 debug!("no Lua runtime detected for process#{pid}");
@@ -927,6 +945,11 @@ impl LuaUnwindTable {
                 );
             }
         }
+
+        // Avoid PID reuse issues by clearing any cached runtime detection and registration.
+        crate::unregister_interpreter(pid);
+        lua_layout_cache_remove(pid);
+        runtime_cache_remove(pid);
     }
 
     unsafe fn handle_lua(&mut self, pid: u32, version: &str) {
@@ -979,6 +1002,8 @@ impl LuaUnwindTable {
             }
             return;
         }
+
+        crate::register_interpreter(pid, crate::InterpreterType::Lua);
     }
 
     unsafe fn handle_luajit(&mut self, pid: u32, version: &str) {
@@ -1029,6 +1054,8 @@ impl LuaUnwindTable {
             }
             return;
         }
+
+        crate::register_interpreter(pid, crate::InterpreterType::Lua);
     }
 
     unsafe fn update_lang_flags(&self, pid: u32, mask: u32) -> Result<(), i32> {
@@ -1220,7 +1247,68 @@ pub unsafe extern "C" fn lua_unwind_table_unload(table: *mut LuaUnwindTable, pid
 
 // --------- Runtime detection ---------
 
-fn detect_runtime(pid: u32) -> Option<LuaRuntimeInfo> {
+const LUA_NEGATIVE_DETECT_TTL: Duration = Duration::from_secs(30);
+const LUA_DETECT_CACHE_MAX_ENTRIES: usize = 20_000;
+
+#[derive(Clone, Copy)]
+struct RuntimeCacheEntry {
+    runtime: Option<LuaRuntimeInfo>,
+    next_refresh_at: Option<Instant>,
+}
+
+static LUA_RUNTIME_CACHE: OnceLock<Mutex<HashMap<u32, RuntimeCacheEntry>>> = OnceLock::new();
+
+fn runtime_cache() -> &'static Mutex<HashMap<u32, RuntimeCacheEntry>> {
+    LUA_RUNTIME_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn runtime_cache_remove(pid: u32) {
+    if let Ok(mut cache) = runtime_cache().lock() {
+        cache.remove(&pid);
+    }
+}
+
+fn detect_runtime_cached(pid: u32) -> Option<LuaRuntimeInfo> {
+    let now = Instant::now();
+
+    if let Ok(cache) = runtime_cache().lock() {
+        if let Some(entry) = cache.get(&pid) {
+            if let Some(info) = entry.runtime {
+                return Some(info);
+            }
+            if let Some(next) = entry.next_refresh_at {
+                if now < next {
+                    return None;
+                }
+            }
+        }
+    }
+
+    // Slow path: parse /proc/<pid>/maps (expensive). Do this outside the lock.
+    let runtime = detect_runtime_uncached(pid);
+
+    if let Ok(mut cache) = runtime_cache().lock() {
+        if cache.len() >= LUA_DETECT_CACHE_MAX_ENTRIES {
+            // Bound memory by dropping negative entries; positives are kept for lua_detect().
+            cache.retain(|_, entry| entry.runtime.is_some());
+        }
+        cache.insert(
+            pid,
+            RuntimeCacheEntry {
+                runtime,
+                next_refresh_at: if runtime.is_some() {
+                    None
+                } else {
+                    Some(now + LUA_NEGATIVE_DETECT_TTL)
+                },
+            },
+        );
+    }
+
+    runtime
+}
+
+fn detect_runtime_uncached(pid: u32) -> Option<LuaRuntimeInfo> {
     let areas = get_memory_mappings(pid).ok()?;
 
     let mut best_prio: u8 = 0;
