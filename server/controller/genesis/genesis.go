@@ -105,27 +105,29 @@ func (g *Genesis) GetKubernetesData(orgID int, clusterID string) (common.Kuberne
 	return g.kubernetes.GetKubernetesData(orgID, clusterID)
 }
 
-func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string][]string, error) {
+func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string][][]byte, error) {
+	resp := map[string][][]byte{}
+
 	var destIP string
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		return map[string][]string{}, fmt.Errorf("get metadb session failed: %s", err.Error())
+		return resp, fmt.Errorf("get metadb session failed: %s", err.Error())
 	}
 
 	var cluster model.GenesisCluster
 	err = db.Where("id = ?", clusterID).First(&cluster).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return map[string][]string{}, fmt.Errorf("no vtap report cluster id: %s", clusterID)
+			return resp, fmt.Errorf("no vtap report cluster id: %s", clusterID)
 		}
-		return map[string][]string{}, fmt.Errorf("query cluster (%s) from genesis_cluster failed (%s)", clusterID, err.Error())
+		return resp, fmt.Errorf("query cluster (%s) from genesis_cluster failed (%s)", clusterID, err.Error())
 	}
 
 	nodeIP := os.Getenv(ccommon.NODE_IP_KEY)
 	var azControllerConns []metadbmodel.AZControllerConnection
 	err = db.Find(&azControllerConns).Error
 	if err != nil {
-		return map[string][]string{}, fmt.Errorf("query node (%s) az_controller_connection failed (%s)", nodeIP, err.Error())
+		return resp, fmt.Errorf("query node (%s) az_controller_connection failed (%s)", nodeIP, err.Error())
 	}
 	nodeIPToRegion := map[string]string{}
 	for _, conn := range azControllerConns {
@@ -133,17 +135,20 @@ func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string
 	}
 	currentRegion, ok := nodeIPToRegion[nodeIP]
 	if !ok {
-		return map[string][]string{}, fmt.Errorf("node (%s) region not found", nodeIP)
+		return resp, fmt.Errorf("node (%s) region not found", nodeIP)
 	}
 	clusterRegion, ok := nodeIPToRegion[cluster.NodeIP]
 	if !ok || clusterRegion != currentRegion {
-		return map[string][]string{}, fmt.Errorf("cluster store node (%s) not in current region (%s)", cluster.NodeIP, currentRegion)
+		return resp, fmt.Errorf("cluster store node (%s) not in current region (%s)", cluster.NodeIP, currentRegion)
 	}
 	if cluster.NodeIP != nodeIP {
 		var controller metadbmodel.Controller
 		err = db.Where("ip = ? AND state <> ?", cluster.NodeIP, ccommon.CONTROLLER_STATE_EXCEPTION).First(&controller).Error
 		if err != nil {
-			return map[string][]string{}, fmt.Errorf("query node (%s) controller failed (%s)", cluster.NodeIP, err.Error())
+			return resp, fmt.Errorf("query node (%s) controller failed (%s)", cluster.NodeIP, err.Error())
+		}
+		if controller.PodIP == "" {
+			return resp, fmt.Errorf("controller (%s) pod ip is empty", cluster.NodeIP)
 		}
 		// use pod ip communication in internal region
 		destIP = controller.PodIP

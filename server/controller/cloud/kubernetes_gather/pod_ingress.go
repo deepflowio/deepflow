@@ -27,17 +27,17 @@ import (
 
 func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingressRules []model.PodIngressRule, ingressRuleBackends []model.PodIngressRuleBackend, err error) {
 	log.Debug("get ingresses starting", logger.NewORGPrefix(k.orgID))
-	var ingressInfo []string
+	var ingressInfo [][]byte
 	switch {
-	case len(k.k8sInfo["*v1.Ingress"]) != 0:
-		ingressInfo = k.k8sInfo["*v1.Ingress"]
-	case len(k.k8sInfo["*v1.Route"]) != 0:
-		ingressInfo = k.k8sInfo["*v1.Route"]
-	case len(k.k8sInfo["*v1beta1.Ingress"]) != 0:
-		ingressInfo = k.k8sInfo["*v1beta1.Ingress"]
+	case len(k.k8sEntries["*v1.Ingress"]) != 0:
+		ingressInfo = k.k8sEntries["*v1.Ingress"]
+	case len(k.k8sEntries["*v1.Route"]) != 0:
+		ingressInfo = k.k8sEntries["*v1.Route"]
+	case len(k.k8sEntries["*v1beta1.Ingress"]) != 0:
+		ingressInfo = k.k8sEntries["*v1beta1.Ingress"]
 	}
 	for _, i := range ingressInfo {
-		iData, iErr := simplejson.NewJson([]byte(i))
+		iData, iErr := simplejson.NewJson(i)
 		if iErr != nil {
 			err = iErr
 			log.Errorf("ingress initialization simplejson error: (%s)", iErr.Error(), logger.NewORGPrefix(k.orgID))

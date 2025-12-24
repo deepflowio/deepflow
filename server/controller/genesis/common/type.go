@@ -88,3 +88,9 @@ type VIFRPCMessage struct {
 	WorkloadResourceEnabled bool
 	Message                 *agent.GenesisSyncRequest
 }
+
+type ClusterDest struct {
+	Endpoint        string
+	DomainLcuuid    string
+	SubDomainLcuuid string
+}
