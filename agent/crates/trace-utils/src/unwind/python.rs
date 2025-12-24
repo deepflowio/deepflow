@@ -38,6 +38,9 @@ const PYRUNTIME_MAX_DISTANCE: u64 = 0x10000;
 
 use super::elf_utils::MappedFile;
 
+#[cfg(target_arch = "x86_64")]
+use iced_x86::{Decoder, DecoderOptions, Mnemonic, OpKind, Register};
+
 fn error_not_python(pid: u32) -> Error {
     Error::BadInterpreterType(pid, "python")
 }
@@ -205,7 +208,7 @@ impl Interpreter {
         };
 
         // Read PyGILState_GetThisThreadState function code
-        let (sym_addr, code) = self.read_symbol_code(Self::GIL_STATE_SYMBOL, 128)?;
+        let (sym_addr, code) = self.read_symbol_code(Self::GIL_STATE_SYMBOL, 512)?;
 
         // Analyze the function to find the autoTLSkey address
         #[cfg(target_arch = "x86_64")]
@@ -271,84 +274,49 @@ impl Interpreter {
         code_addr: u64,
         runtime_addr: u64,
     ) -> Result<u64> {
-        // PyGILState_GetThisThreadState typically:
-        // 1. Loads autoTLSkey address into rdi
-        // 2. Calls PyThread_tss_get
-        //
-        // Common patterns:
-        // - lea rdi, [rip + offset]  ; load autoTLSkey address
-        // - call/jmp PyThread_tss_get
-        //
-        // We look for LEA with RIP-relative addressing
-
-        for i in 0..code.len().saturating_sub(7) {
-            // REX.W LEA rdi, [rip + disp32]
-            // 48 8d 3d XX XX XX XX
-            if code[i] == 0x48 && code[i + 1] == 0x8d && code[i + 2] == 0x3d {
-                let disp = i32::from_le_bytes([code[i + 3], code[i + 4], code[i + 5], code[i + 6]]);
-                // RIP-relative addressing: address = instruction_end + displacement
-                let instruction_end = code_addr + (i as u64) + 7;
-                let target_addr = (instruction_end as i64 + disp as i64) as u64;
-
-                trace!(
-                    "Found LEA rdi, [rip+{:#x}] at {:#x}, target={:#x}",
-                    disp,
-                    code_addr + i as u64,
-                    target_addr
-                );
-
-                // Verify the address is within _PyRuntime or nearby
-                // autoTLSkey is typically within a few KB of _PyRuntime
-                let distance = if target_addr > runtime_addr {
-                    target_addr - runtime_addr
-                } else {
-                    runtime_addr - target_addr
-                };
-
-                if distance < PYRUNTIME_MAX_DISTANCE {
-                    // Python 3.7+ uses Py_tss_t structure which has two ints
-                    // We need the second int (the actual key), so add 4
-                    let auto_tls_key_addr =
-                        if self.version >= Version::new(3, 7, 0) && target_addr % 8 == 0 {
-                            target_addr + 4
-                        } else {
-                            target_addr
-                        };
-
-                    debug!(
-                        "Found autoTLSkey address {:#x} (adjusted from {:#x})",
-                        auto_tls_key_addr, target_addr
-                    );
-                    return Ok(auto_tls_key_addr);
+        let decoder = Decoder::with_ip(64, code, code_addr, DecoderOptions::NONE);
+        for instr in decoder {
+            if instr.mnemonic() == Mnemonic::Lea && instr.op0_register() == Register::RDI {
+                if let Some(target_addr) = Self::decode_mem_target(&instr) {
+                    if let Some(addr) = self.validate_auto_tls_candidate(target_addr, runtime_addr)
+                    {
+                        debug!("Found autoTLSkey address {:#x} (from LEA)", addr);
+                        return Ok(addr);
+                    }
                 }
             }
 
-            // Also check for MOV rdi, [rip + disp32]
-            // 48 8b 3d XX XX XX XX
-            if code[i] == 0x48 && code[i + 1] == 0x8b && code[i + 2] == 0x3d {
-                let disp = i32::from_le_bytes([code[i + 3], code[i + 4], code[i + 5], code[i + 6]]);
-                let instruction_end = code_addr + (i as u64) + 7;
-                let target_addr = (instruction_end as i64 + disp as i64) as u64;
-
-                let distance = if target_addr > runtime_addr {
-                    target_addr - runtime_addr
-                } else {
-                    runtime_addr - target_addr
-                };
-
-                if distance < PYRUNTIME_MAX_DISTANCE {
-                    let auto_tls_key_addr =
-                        if self.version >= Version::new(3, 7, 0) && target_addr % 8 == 0 {
-                            target_addr + 4
-                        } else {
-                            target_addr
-                        };
-
-                    debug!(
-                        "Found autoTLSkey address {:#x} (from MOV)",
-                        auto_tls_key_addr
-                    );
-                    return Ok(auto_tls_key_addr);
+            if instr.mnemonic() == Mnemonic::Mov && instr.op0_register() == Register::RDI {
+                match instr.op1_kind() {
+                    OpKind::Immediate64 => {
+                        let target_addr = instr.immediate64();
+                        if let Some(addr) =
+                            self.validate_auto_tls_candidate(target_addr, runtime_addr)
+                        {
+                            debug!("Found autoTLSkey address {:#x} (imm64)", addr);
+                            return Ok(addr);
+                        }
+                    }
+                    OpKind::Immediate32 => {
+                        let target_addr = instr.immediate32() as u64;
+                        if let Some(addr) =
+                            self.validate_auto_tls_candidate(target_addr, runtime_addr)
+                        {
+                            debug!("Found autoTLSkey address {:#x} (imm32)", addr);
+                            return Ok(addr);
+                        }
+                    }
+                    OpKind::Memory => {
+                        if let Some(target_addr) = Self::decode_mem_target(&instr) {
+                            if let Some(addr) =
+                                self.validate_auto_tls_candidate(target_addr, runtime_addr)
+                            {
+                                debug!("Found autoTLSkey address {:#x} (from MOV)", addr);
+                                return Ok(addr);
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -361,6 +329,37 @@ impl Interpreter {
             fallback_addr
         );
         Ok(fallback_addr)
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn validate_auto_tls_candidate(&self, target_addr: u64, runtime_addr: u64) -> Option<u64> {
+        let distance = if target_addr > runtime_addr {
+            target_addr - runtime_addr
+        } else {
+            runtime_addr - target_addr
+        };
+
+        if distance < PYRUNTIME_MAX_DISTANCE {
+            let auto_tls_key_addr = if self.version >= Version::new(3, 7, 0) && target_addr % 8 == 0
+            {
+                target_addr + 4
+            } else {
+                target_addr
+            };
+            Some(auto_tls_key_addr)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn decode_mem_target(instr: &iced_x86::Instruction) -> Option<u64> {
+        let disp = instr.memory_displacement64() as i64;
+        match instr.memory_base() {
+            Register::RIP => Some(instr.next_ip().wrapping_add(disp as u64)),
+            Register::None => Some(disp as u64),
+            _ => None,
+        }
     }
 
     /// Decode autoTLSkey address from ARM64 assembly
