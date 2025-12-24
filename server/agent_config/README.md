@@ -1947,12 +1947,6 @@ inputs:
 List of advanced features enabled for specific processes.
 
 Will traverse over the entire array, so the previous ones will be matched first.
-The default matchers cover common scripting runtimes:
-- Python: matches CLI invocations like `python app.py` and rewrites the process name to the script filename (`$4`).
-- PHP: mirrors the Python pattern, capturing CLI commands such as `php script.php` (or `php-fpm -c ... script.php`) and rewriting to the target script (`$5`).
-- Node.js: follows the same idea for `node`/`nodejs` commands, keeping the executed `.js` file as the process name (`$4`).
-- `^deepflow-`: ensures DeepFlow internal binaries keep profiling enabled.
-- `.*`: final catch-all that leaves `proc.gprocess_info` enabled for any remaining processes.
 when match_type is parent_process_name, will recursive to match parent proc name,
 and rewrite_name field will ignore. rewrite_name can replace by regexp capture group
 and windows style environment variable, for example: `$1-py-script-%HOSTNAME%` will
@@ -5075,6 +5069,9 @@ it will result in an additional `y%` CPU usage for the agent.
 
 #### Language-specific Profiling {#inputs.ebpf.profile.languages}
 
+Control which interpreter languages to profile. Disabling unused languages can save ~5-6 MB memory per language.
+Total memory: ~17-20 MB (all enabled), ~6.1 MB (Python only), ~5.2 MB (PHP only), ~6.4 MB (Node.js only).
+
 ##### Python profiling disabled {#inputs.ebpf.profile.languages.python_disabled}
 
 **Tags**:
@@ -5101,9 +5098,8 @@ inputs:
 
 **Description**:
 
-Disable Python interpreter profiling. When disabled, Python process stack traces will not be collected, saving approximately 6.1 MB of kernel memory (python_tstate_addr_map, python_unwind_info_map, python_offsets_map).
-
-**Important**: Changing this configuration will automatically trigger deepflow-agent restart, as eBPF maps cannot be dynamically created or destroyed at runtime.
+Disable Python interpreter profiling. When disabled, Python process stack traces will not be collected,
+saving approximately 6.1 MB of kernel memory (python_tstate_addr_map, python_unwind_info_map, python_offsets_map).
 
 ##### PHP profiling disabled {#inputs.ebpf.profile.languages.php_disabled}
 
@@ -5131,9 +5127,8 @@ inputs:
 
 **Description**:
 
-Disable PHP interpreter profiling. When disabled, PHP process stack traces will not be collected, saving approximately 5.2 MB of kernel memory (php_unwind_info_map, php_offsets_map).
-
-**Important**: Changing this configuration will automatically trigger deepflow-agent restart, as eBPF maps cannot be dynamically created or destroyed at runtime.
+Disable PHP interpreter profiling. When disabled, PHP process stack traces will not be collected,
+saving approximately 5.2 MB of kernel memory (php_unwind_info_map, php_offsets_map).
 
 ##### Node.js profiling disabled {#inputs.ebpf.profile.languages.nodejs_disabled}
 
@@ -5161,23 +5156,8 @@ inputs:
 
 **Description**:
 
-Disable Node.js (V8) interpreter profiling. When disabled, Node.js process stack traces will not be collected, saving approximately 6.4 MB of kernel memory (v8_unwind_info_map).
-
-**Important**: Changing this configuration will automatically trigger deepflow-agent restart, as eBPF maps cannot be dynamically created or destroyed at runtime.
-
-**Memory saving summary**:
-- All enabled (default): ~17-20 MB
-- Python only: ~6.1 MB (saves ~11-14 MB)
-- PHP only: ~5.2 MB (saves ~12-15 MB)
-- Node.js only: ~6.4 MB (saves ~11-14 MB)
-- All disabled: ~0 MB (saves ~17-20 MB)
-
-**Notes**:
-- Changing language switches requires deepflow-agent restart
-- eBPF maps use pre-allocation mechanism (same memory usage whether empty or full)
-- When disabled, language-specific eBPF maps are created with max_entries=1 (minimized memory)
-- When disabled, unwind tables are not created and process unwinding info is not loaded
-- Disabling unused languages saves memory and reduces CPU overhead
+Disable Node.js (V8) interpreter profiling. When disabled, Node.js process stack traces will not be collected,
+saving approximately 6.4 MB of kernel memory (v8_unwind_info_map).
 
 ### Tunning {#inputs.ebpf.tunning}
 
@@ -6628,7 +6608,7 @@ transforms:
     type: filter
     inputs:
     - cadvisor_metrics
-    condition: "!match(string!(.name), r'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)|container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)|container_memory_(mapped_file|swap)|container_(file_descriptors|tasks_state|threads_max)|container_spec.*')"
+    condition: "!match(string!(.name), r'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)|container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)|container_memory_(mapped_file|swap)|container_(file_descriptors|tasks_state|threads_max)')"
   kubelet_relabel_filter:
     type: filter
     inputs:
@@ -11274,3 +11254,4 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
+
