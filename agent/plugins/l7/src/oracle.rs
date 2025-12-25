@@ -121,6 +121,7 @@ pub struct OracleParser {
     pub req_data_flags: DataFlags,
     pub req_data_id: Option<DataId>,
     pub req_call_id: Option<CallId>,
+    pub connect_data: Option<String>,
 
     // response
     pub ret_code: u16,
@@ -128,6 +129,7 @@ pub struct OracleParser {
     pub error_message: String,
     pub resp_data_flags: DataFlags,
     pub resp_data_id: Option<DataId>,
+    pub auth_session_id: Option<String>,
 }
 
 impl OracleParser {
