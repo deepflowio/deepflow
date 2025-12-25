@@ -25,6 +25,8 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
+	"github.com/deepflowio/deepflow/server/controller/http/model"
+	routercommon "github.com/deepflowio/deepflow/server/controller/http/router/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/agent"
 )
 
@@ -47,13 +49,13 @@ func (cgc *AgentGroupConfig) RegisterTo(e *gin.Engine) {
 	e.POST("/v1/agent-group-configuration/:group-lcuuid/json", postJsonAgentGroupConfig(cgc.cfg))
 	e.PUT("/v1/agent-group-configuration/:group-lcuuid/json", putJsonAgentGroupConfig(cgc.cfg))
 
-	e.GET("/v1/agent-group-configuration/yaml", getYAMLAgentGroupConfigs(cgc.cfg))
 	e.GET("/v1/agent-group-configuration/:group-lcuuid/yaml", getYAMLAgentGroupConfig(cgc.cfg))
 	e.POST("/v1/agent-group-configuration/:group-lcuuid/yaml", postYAMLAgentGroupConfig(cgc.cfg))
 	e.PUT("/v1/agent-group-configuration/:group-lcuuid/yaml", putYAMLAgentGroupConfig(cgc.cfg))
 
 	e.DELETE("/v1/agent-group-configuration/:group-lcuuid", deleteAgentGroupConfig(cgc.cfg))
 
+	e.GET("/v1/agent-group-configurations", getAgentGroupConfigs(cgc.cfg))
 }
 
 func getYAMLAgentGroupConfigTmpl(c *gin.Context) {
@@ -109,13 +111,6 @@ func putJsonAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 	}
 }
 
-func getYAMLAgentGroupConfigs(cfg *config.ControllerConfig) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		data, err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).GetAgentGroupConfigs(agent.DataTypeYAML)
-		response.JSON(c, response.SetData(data), response.SetError(err))
-	}
-}
-
 func getYAMLAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		groupLcuuid := c.Param("group-lcuuid")
@@ -155,5 +150,33 @@ func deleteAgentGroupConfig(cfg *config.ControllerConfig) gin.HandlerFunc {
 		groupLcuuid := c.Param("group-lcuuid")
 		err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).DeleteAgentGroupConfig(groupLcuuid)
 		response.JSON(c, response.SetError(err))
+	}
+}
+
+// Get 获取采集器配置变更记录
+// @Summary 获取采集器配置变更记录
+// @Tags AgentGroupConfig
+// @Accept json
+// @Produce json
+// @Param X-User-Id header string true "用户 ID"
+// @Param X-User-Type header string true "用户类型"
+// @Param X-Org-Id header string true "组织 ID"
+// @Param query query model.AgentGroupConfigQuery true "参数"
+// @Success 200 {object} model.AgentGroupConfigResponse "获取成功"
+// @Failure 400 {object} response.Response "请求参数错误"
+// @Failure 403 "权限不足"
+// @Failure 404 "页面不存在"
+// @Failure 500 "服务器内部错误"
+// @Router /v1/agent-group-configurations [get]
+func getAgentGroupConfigs(cfg *config.ControllerConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		header := routercommon.NewHeaderValidator(c.Request.Header, cfg.FPermit)
+		query := routercommon.NewQueryValidator[model.AgentGroupConfigQuery](c.Request.URL.Query())
+		if err := routercommon.NewValidators(header, query).Validate(); err != nil {
+			response.JSON(c, response.SetOptStatus(common.INVALID_PARAMETERS), response.SetError(err))
+		} else {
+			data, err := agent.NewAgentGroupConfig(common.GetUserInfo(c), cfg).Get(query.GetStructData())
+			response.JSON(c, response.SetData(data), response.SetError(err))
+		}
 	}
 }

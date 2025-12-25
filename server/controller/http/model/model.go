@@ -75,3 +75,13 @@ type AgentGroupConfigChangelogTrendResponse struct {
 type AgentGroupConfigChangelogResponse struct {
 	agentconf.MetadbAgentGroupConfigurationChangelog
 }
+
+// AgentGroupConfigQuery 定义了查询采集器配置的请求参数
+type AgentGroupConfigQuery struct {
+	AgentGroupLcuuid string `schema:"agent_group_lcuuid,omitempty" json:"agent_group_lcuuid,omitempty"` // 采集器组 LCUUID
+}
+
+// AgentGroupConfigResponse 定义了采集器配置的响应参数
+type AgentGroupConfigResponse struct {
+	agentconf.MySQLAgentGroupConfiguration
+}
