@@ -332,22 +332,22 @@ impl L7ProtocolParserInterface for Iso8583Log {
                         info.endpoint = format!(
                             "{}:{}-28消费一次性付款类",
                             info.mti,
-                            info.f3.chars().take(6).collect()
+                            take_first_n(&info.f3, 6)
                         );
                     } else if info.mti == "0210-金融类应答" {
                         info.endpoint = format!(
                             "{}:{}-28消费一次性付款类",
                             info.mti,
-                            info.f3.chars().take(6).collect()
+                            take_first_n(&info.f3, 6)
                         );
                     }
                 } else if info.f25 == "00" {
                     if info.mti == "0200-金融类请求" {
                         info.endpoint =
-                            format!("{}:{}-00-代收", info.mti, info.f3.chars().take(6).collect());
+                            format!("{}:{}-00-代收", info.mti, take_first_n(&info.f3, 6));
                     } else if info.mti == "0210-金融类应答" {
                         info.endpoint =
-                            format!("{}:{}-00-代收", info.mti, info.f3.chars().take(6).collect());
+                            format!("{}:{}-00-代收", info.mti, take_first_n(&info.f3, 6));
                     }
                 }
             }
@@ -375,6 +375,13 @@ impl L7ProtocolParserInterface for Iso8583Log {
 
     fn parsable_on_udp(&self) -> bool {
         false
+    }
+}
+
+fn take_first_n(s: &str, n: usize) -> &str {
+    match s.char_indices().nth(n) {
+        Some((idx, _)) => &s[..idx],
+        None => s,
     }
 }
 
