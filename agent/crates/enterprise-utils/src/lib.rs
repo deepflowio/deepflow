@@ -423,8 +423,11 @@ pub mod rpc {
             pub fn check_payload(&mut self, _: &[u8], _: &Iso8583ParseConfig) -> bool {
                 unimplemented!()
             }
-
-            pub fn parse_payload(&mut self, _: &[u8], _: bool, _: &Iso8583ParseConfig) -> bool {
+            pub fn parse_payload_multiple(
+                &mut self,
+                _: &[u8],
+                _: &Iso8583ParseConfig,
+            ) -> Vec<Vec<FieldValue>> {
                 unimplemented!()
             }
         }
