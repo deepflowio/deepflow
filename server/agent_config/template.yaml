@@ -3757,6 +3757,23 @@ inputs:
         #     禁用 Node.js（V8）解释器剖析。禁用后将不采集 Node.js 进程的函数调用栈，
         #     可节省约 6.4 MB 内核内存（v8_unwind_info_map）。
         nodejs_disabled: false
+        # type: bool
+        # name:
+        #   en: Lua profiling disabled
+        #   ch: 禁用 Lua 剖析
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Disable Lua interpreter profiling. When disabled, Lua process stack traces will not be collected,
+        #     saving approximately 13 MB of kernel memory (lua_tstate_map, lua_lang_flags_map, lua_unwind_info_map, lua_offsets_map, luajit_offsets_map).
+        #   ch: |-
+        #     禁用 Lua 解释器剖析。禁用后将不采集 Lua 进程的函数调用栈，
+        #     可节省约 13 MB 内核内存（lua_tstate_map、lua_lang_flags_map、lua_unwind_info_map、lua_offsets_map、luajit_offsets_map）。
+        lua_disabled: false
     # type: section
     # name:
     #   en: Tunning

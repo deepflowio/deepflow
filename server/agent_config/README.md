@@ -5156,8 +5156,59 @@ inputs:
 
 **Description**:
 
+<<<<<<< HEAD
 Disable Node.js (V8) interpreter profiling. When disabled, Node.js process stack traces will not be collected,
 saving approximately 6.4 MB of kernel memory (v8_unwind_info_map).
+=======
+Disable Node.js (V8) interpreter profiling. When disabled, Node.js process stack traces will not be collected, saving approximately 6.4 MB of kernel memory (v8_unwind_info_map).
+
+**Important**: Changing this configuration will automatically trigger deepflow-agent restart, as eBPF maps cannot be dynamically created or destroyed at runtime.
+
+##### Lua profiling disabled {#inputs.ebpf.profile.languages.lua_disabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.languages.lua_disabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      languages:
+        lua_disabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Disable Lua interpreter profiling. When disabled, Lua process stack traces will not be collected, saving approximately 13 MB of kernel memory (lua_tstate_map, lua_lang_flags_map, lua_unwind_info_map, lua_offsets_map, luajit_offsets_map).
+
+**Important**: Changing this configuration will automatically trigger deepflow-agent restart, as eBPF maps cannot be dynamically created or destroyed at runtime.
+
+**Memory saving summary**:
+- All enabled (default): ~17-20 MB
+- Python only: ~6.1 MB (saves ~11-14 MB)
+- PHP only: ~5.2 MB (saves ~12-15 MB)
+- Node.js only: ~6.4 MB (saves ~11-14 MB)
+- All disabled: ~0 MB (saves ~17-20 MB)
+
+**Notes**:
+- Changing language switches requires deepflow-agent restart
+- eBPF maps use pre-allocation mechanism (same memory usage whether empty or full)
+- When disabled, language-specific eBPF maps are created with max_entries=1 (minimized memory)
+- When disabled, unwind tables are not created and process unwinding info is not loaded
+- Disabling unused languages saves memory and reduces CPU overhead
+- The memory saving summary above does not include Lua maps; disabling `inputs.ebpf.profile.languages.lua_disabled` saves an additional ~13 MB of kernel memory
+>>>>>>> cd7daf6e78 (add lua disabled config)
 
 ### Tunning {#inputs.ebpf.tunning}
 

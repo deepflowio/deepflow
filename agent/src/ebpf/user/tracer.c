@@ -2018,6 +2018,11 @@ bool python_profiler_enabled(void)
 	return is_feature_regex_set(FEATURE_PROFILE_PYTHON);
 }
 
+bool lua_profiler_enabled(void)
+{
+	return is_feature_regex_set(FEATURE_PROFILE_LUA);
+}
+
 static void init_thread_ids(void)
 {
 	thread_ids.entries = NULL;

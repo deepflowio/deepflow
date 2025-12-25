@@ -307,32 +307,34 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
         pthread_mutex_unlock(&g_v8_unwind_table_lock);
     }
 
-    int lua_lang_fd = bpf_table_get_fd(tracer, MAP_LUA_LANG_FLAGS_NAME);
-    int lua_unwind_info_fd = bpf_table_get_fd(tracer, MAP_LUA_UNWIND_INFO_NAME);
-    int lua_offsets_fd = bpf_table_get_fd(tracer, MAP_LUA_OFFSETS_NAME);
-    int luajit_offsets_fd = bpf_table_get_fd(tracer, MAP_LUAJIT_OFFSETS_NAME);
+    if (lua_profiler_enabled()) {
+        int lua_lang_fd = bpf_table_get_fd(tracer, MAP_LUA_LANG_FLAGS_NAME);
+        int lua_unwind_info_fd = bpf_table_get_fd(tracer, MAP_LUA_UNWIND_INFO_NAME);
+        int lua_offsets_fd = bpf_table_get_fd(tracer, MAP_LUA_OFFSETS_NAME);
+        int luajit_offsets_fd = bpf_table_get_fd(tracer, MAP_LUAJIT_OFFSETS_NAME);
 
-    if (lua_lang_fd < 0 || lua_unwind_info_fd < 0 || lua_offsets_fd < 0 || luajit_offsets_fd < 0) {
-        ebpf_warning("Failed to get lua profiling map fds (lang:%d unwind:%d lua_ofs:%d lj_ofs:%d)\n",
-                     lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
-        return -1;
+        if (lua_lang_fd < 0 || lua_unwind_info_fd < 0 || lua_offsets_fd < 0 || luajit_offsets_fd < 0) {
+            ebpf_warning("Failed to get lua profiling map fds (lang:%d unwind:%d lua_ofs:%d lj_ofs:%d)\n",
+                         lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
+            return -1;
+        }
+
+        lua_unwind_table_t *lua_table =
+            lua_unwind_table_create(lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
+        if (lua_table == NULL) {
+            ebpf_warning("Failed to create lua unwind table\n");
+            return -1;
+        }
+        lua_set_map_fds(lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
+
+        pthread_mutex_lock(&g_lua_unwind_table_lock);
+        g_lua_unwind_table = lua_table;
+        pthread_mutex_unlock(&g_lua_unwind_table_lock);
+
+        if (dwarf_available() && get_dwarf_enabled() && tracer) {
+            lua_queue_existing_processes(tracer);
+        }
     }
-
-    lua_unwind_table_t *lua_table =
-        lua_unwind_table_create(lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
-    if (lua_table == NULL) {
-        ebpf_warning("Failed to create lua unwind table\n");
-        return -1;
-    }
-    lua_set_map_fds(lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
-
-    pthread_mutex_lock(&g_lua_unwind_table_lock);
-    g_lua_unwind_table = lua_table;
-    pthread_mutex_unlock(&g_lua_unwind_table_lock);
-
-	if (dwarf_available() && get_dwarf_enabled() && tracer) {
-		lua_queue_existing_processes(tracer);
-	}
 
     return 0;
 }
@@ -584,7 +586,7 @@ void unwind_events_handle(void) {
             // Note: V8 profiling doesn't require uprobe registration like Python
         }
 
-        if (tracer && is_lua_process(event->pid)) {
+        if (tracer && lua_profiler_enabled() && is_lua_process(event->pid)) {
             if (g_lua_unwind_table) {
                 lua_unwind_table_load(g_lua_unwind_table, event->pid);
             }
