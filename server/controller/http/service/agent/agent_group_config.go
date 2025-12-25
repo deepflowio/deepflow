@@ -34,6 +34,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
+	httpmodel "github.com/deepflowio/deepflow/server/controller/http/model"
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
 	querierConfig "github.com/deepflowio/deepflow/server/querier/config"
@@ -57,6 +58,29 @@ func NewAgentGroupConfig(userInfo *httpcommon.UserInfo, cfg *config.ControllerCo
 		cfg:            cfg,
 		resourceAccess: &service.ResourceAccess{Fpermit: cfg.FPermit, UserInfo: userInfo},
 	}
+}
+
+func (a *AgentGroupConfig) Get(query *httpmodel.AgentGroupConfigQuery) ([]httpmodel.AgentGroupConfigResponse, error) {
+	dbInfo, err := metadb.GetDB(a.resourceAccess.UserInfo.ORGID)
+	if err != nil {
+		return nil, err
+	}
+	var agentGroupConfigs []agentconf.MySQLAgentGroupConfiguration
+	dbQuery := dbInfo.DB
+	if query.AgentGroupLcuuid != "" {
+		dbQuery = dbQuery.Where("agent_group_lcuuid = ?", query.AgentGroupLcuuid)
+	}
+	if err := dbQuery.Find(&agentGroupConfigs).Error; err != nil {
+		return nil, err
+	}
+
+	var response []httpmodel.AgentGroupConfigResponse
+	for _, item := range agentGroupConfigs {
+		response = append(response, httpmodel.AgentGroupConfigResponse{
+			MySQLAgentGroupConfiguration: item,
+		})
+	}
+	return response, nil
 }
 
 func (a *AgentGroupConfig) GetAgentGroupConfigTemplateJson() ([]byte, error) {

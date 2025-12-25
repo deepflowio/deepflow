@@ -17,6 +17,8 @@
 package agent
 
 import (
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -53,7 +55,7 @@ func (cgc *AgentGroupConfigChangelog) RegisterTo(e *gin.Engine) {
 // @Param X-Org-Id header string true "组织 ID"
 // @Param config-lcuuid path string true "采集器组 LCUUID"
 // @Param query query model.AgentGroupConfigChangelogQuery true "参数"
-// @Success 200 {object} model.AgentGroupConfigChangelogResponse "获取成功"
+// @Success 200 {object} model.AgentGroupConfigChangelogTrendResponse "获取成功"
 // @Failure 400 {object} response.Response "请求参数错误"
 // @Failure 403 "权限不足"
 // @Failure 404 "页面不存在"
@@ -67,9 +69,11 @@ func (cgc *AgentGroupConfigChangelog) get(c *gin.Context) {
 	}
 	service := agent.NewAgentGroupConfigChangelogService(header.GetUserInfo(), cgc.cfg.FPermit)
 	if service == nil {
+		response.JSON(c, response.SetOptStatus(common.SERVER_ERROR), response.SetError(fmt.Errorf("failed to create agent group config changelog service")))
 		return
 	}
-	data, err := service.Get(query.GetStructData())
+	configLcuuid := c.Param("config-lcuuid")
+	data, err := service.Get(configLcuuid, query.GetStructData())
 	if err != nil {
 		response.JSON(c, response.SetOptStatus(common.SERVER_ERROR), response.SetError(err))
 		return
@@ -100,6 +104,7 @@ func (cgc *AgentGroupConfigChangelog) post(c *gin.Context) {
 	}
 	service := agent.NewAgentGroupConfigChangelogService(header.GetUserInfo(), cgc.cfg.FPermit)
 	if service == nil {
+		response.JSON(c, response.SetOptStatus(common.SERVER_ERROR), response.SetError(fmt.Errorf("failed to create agent group config changelog service")))
 		return
 	}
 	var payload model.AgentGroupConfigChangelogCreate
@@ -141,6 +146,7 @@ func (cgc *AgentGroupConfigChangelog) patch(c *gin.Context) {
 	}
 	service := agent.NewAgentGroupConfigChangelogService(header.GetUserInfo(), cgc.cfg.FPermit)
 	if service == nil {
+		response.JSON(c, response.SetOptStatus(common.SERVER_ERROR), response.SetError(fmt.Errorf("failed to create agent group config changelog service")))
 		return
 	}
 	var payload model.AgentGroupConfigChangelogUpdate
