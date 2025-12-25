@@ -195,7 +195,6 @@ impl WebSphereMqInfo {
         }
 
         if !custom.req.endpoint.is_empty() {
-            self.msg_type = LogMessageType::Request;
             self.endpoint = custom.req.endpoint;
         }
 
@@ -268,6 +267,7 @@ impl From<WebSphereMqInfo> for L7ProtocolSendLog {
             req: L7Request {
                 req_type: f.request_type,
                 domain: f.request_domain,
+                endpoint: f.endpoint,
                 ..Default::default()
             },
             resp: L7Response {
