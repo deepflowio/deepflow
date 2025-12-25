@@ -240,6 +240,7 @@ pub mod l7 {
                 pub req_data_flags: DataFlags, // 仅 TnsPacketType 为 TnsTypeData 时有值
                 pub req_data_id: Option<DataId>, // 仅 TnsPacketType 为 TnsTypeData 时有值
                 pub req_call_id: Option<CallId>, // 仅 TnsPacketType 为 TnsTypeData 时有值
+                pub connect_data: Option<String>, // 仅 TnsPacketType 为 TnsTypeConnect 时有值
             }
 
             pub struct Response {
@@ -248,6 +249,7 @@ pub mod l7 {
                 pub error_message: String,
                 pub resp_data_flags: DataFlags, // 仅 TnsPacketType 为 TnsTypeData 时有值
                 pub resp_data_id: Option<DataId>, // 仅 TnsPacketType 为 TnsTypeData 时有值
+                pub auth_session_id: Option<String>,
             }
 
             pub enum Body {

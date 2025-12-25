@@ -59,6 +59,10 @@ pub struct OracleInfo {
     pub req_data_id: Option<DataId>,
     #[serde(skip)]
     pub req_call_id: Option<CallId>,
+    #[serde(skip)]
+    pub connect_data: Option<String>,
+    #[serde(skip)]
+    pub auth_session_id: Option<String>,
 
     // response
     pub ret_code: u16,
@@ -109,6 +113,12 @@ impl OracleInfo {
         self.captured_response_byte += other.captured_response_byte;
         if other.is_on_blacklist {
             self.is_on_blacklist = other.is_on_blacklist;
+        }
+        if other.connect_data.is_some() {
+            self.connect_data = other.connect_data.take();
+        }
+        if other.auth_session_id.is_some() {
+            self.auth_session_id = other.auth_session_id.take();
         }
     }
 
@@ -166,6 +176,18 @@ impl From<OracleInfo> for L7ProtocolSendLog {
         if let Some(d) = &f.req_call_id {
             attrs.push(KeyVal {
                 key: "request_call_id".to_string(),
+                val: d.as_str().to_owned(),
+            });
+        }
+        if let Some(d) = &f.connect_data {
+            attrs.push(KeyVal {
+                key: "connect_data".to_string(),
+                val: d.as_str().to_owned(),
+            });
+        }
+        if let Some(d) = &f.auth_session_id {
+            attrs.push(KeyVal {
+                key: "auth_session_id".to_string(),
                 val: d.as_str().to_owned(),
             });
         }
@@ -269,6 +291,7 @@ impl L7ProtocolParserInterface for OracleLog {
                     req_data_id: req.req_data_id,
                     req_call_id: req.req_call_id,
                     captured_request_byte: frame.length as u32,
+                    connect_data: req.connect_data,
                     ..Default::default()
                 },
                 Body::Response(resp) => OracleInfo {
@@ -285,6 +308,7 @@ impl L7ProtocolParserInterface for OracleLog {
                     resp_data_flags: resp.resp_data_flags,
                     resp_data_id: resp.resp_data_id,
                     captured_response_byte: frame.length as u32,
+                    auth_session_id: resp.auth_session_id,
                     ..Default::default()
                 },
             };
