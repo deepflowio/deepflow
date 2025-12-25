@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-use std::net::IpAddr;
-use std::path::Path;
-use std::time::Duration;
+use std::{fmt, net::IpAddr, path::Path, time::Duration};
 
 use pcap::{self, Linktype};
 
@@ -142,5 +140,41 @@ impl Iterator for Capture {
 impl From<Capture> for Vec<Vec<u8>> {
     fn from(c: Capture) -> Self {
         c.into_iter().map(|p| p.raw.unwrap().to_vec()).collect()
+    }
+}
+
+pub struct WrappedDebugStruct<'a, 'b: 'a>(fmt::DebugStruct<'a, 'b>);
+
+impl<'a, 'b> From<fmt::DebugStruct<'a, 'b>> for WrappedDebugStruct<'a, 'b> {
+    fn from(ds: fmt::DebugStruct<'a, 'b>) -> Self {
+        Self(ds)
+    }
+}
+
+impl<'a, 'b: 'a> WrappedDebugStruct<'a, 'b> {
+    pub fn field_skip_default<F>(
+        &mut self,
+        field: &str,
+        value: &F,
+    ) -> &mut WrappedDebugStruct<'a, 'b>
+    where
+        F: fmt::Debug + Default + PartialEq,
+    {
+        if value != &F::default() {
+            self.0.field(field, value);
+        }
+        self
+    }
+
+    pub fn field<F>(&mut self, field: &str, value: &F) -> &mut WrappedDebugStruct<'a, 'b>
+    where
+        F: fmt::Debug,
+    {
+        self.0.field(field, value);
+        self
+    }
+
+    pub fn finish(&mut self) -> fmt::Result {
+        self.0.finish()
     }
 }
