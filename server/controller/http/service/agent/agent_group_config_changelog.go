@@ -42,8 +42,14 @@ type ConfigChangelog struct {
 
 // Get retrieves agent group configuration changelog records within the specified time range
 // It returns a list of changelog records grouped by the specified interval (1h or 1d)
-func (c *ConfigChangelog) Get(query *model.AgentGroupConfigChangelogQuery) ([]*model.AgentGroupConfigChangelogTrendResponse, error) {
+func (c *ConfigChangelog) Get(configLcuuid string, query *model.AgentGroupConfigChangelogQuery) ([]*model.AgentGroupConfigChangelogTrendResponse, error) {
 	dbInfo, err := metadb.GetDB(c.UserInfo.ORGID)
+	if err != nil {
+		return nil, err
+	}
+
+	var config agentconf.MySQLAgentGroupConfiguration
+	err = dbInfo.DB.Where("lcuuid = ?", configLcuuid).First(&config).Error
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +76,7 @@ func (c *ConfigChangelog) Get(query *model.AgentGroupConfigChangelogQuery) ([]*m
 
 	// Query all changelog records within time range
 	var changelogs []agentconf.MetadbAgentGroupConfigurationChangelog
-	err = dbInfo.DB.Where("created_at >= ? AND created_at <= ?", timeStart, timeEnd).
+	err = dbInfo.DB.Where("agent_group_configuration_id = ? AND created_at >= ? AND created_at <= ?", config.ID, timeStart, timeEnd).
 		Order("created_at DESC").
 		Find(&changelogs).Error
 	if err != nil {
@@ -172,7 +178,7 @@ func (c *ConfigChangelog) Create(configLcuuid string, create *model.AgentGroupCo
 
 	// Create changelog record
 	changelog := agentconf.MetadbAgentGroupConfigurationChangelog{
-		Lcuuid:             ctrlcommon.GenerateUUIDByOrgID(c.UserInfo.ORGID, configLcuuid),
+		Lcuuid:             ctrlcommon.GenerateUUID(time.Now().GoString()),
 		AgentGroupConfigID: config.ID,
 		YamlDiff:           create.YamlDiff,
 		UserID:             create.UserID,
