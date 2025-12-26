@@ -629,50 +629,41 @@ static int load_obj__progs(struct ebpf_object *obj)
 			    ("bcc_prog_load() failed. name: %s, %s errno: %d\n",
 			     new_prog->name, strerror(errno), errno);
 			// Best-effort retry with verifier logs for troubleshooting.
-			const unsigned log_buf_sz = 16 * 1024 * 1024; /* keep large to reduce truncation */
-			char *log_buf = calloc(1, log_buf_sz);
-			if (log_buf) {
-				int stderr_fd2 = suspend_stderr();
+			/* Capture verifier stderr into a temp file via bcc internal buffering */
+			char log_path[] = "/tmp/df_verifier_XXXXXX.log";
+			int tmp_fd = mkstemps(log_path, 4);
+			if (tmp_fd >= 0) {
+				int stderr_fd2 = dup(STDERR_FILENO);
 				if (stderr_fd2 < 0) {
-					ebpf_warning
-					    ("Failed to suspend stderr (retry)\n");
-				}
-				int fd2 =
-				    bcc_prog_load(new_prog->type,
-						  new_prog->name,
-						  new_prog->insns,
-						  new_prog->insns_size,
-						  obj->license,
-						  obj->kern_version,
-						  1, log_buf, log_buf_sz);
-				resume_stderr(stderr_fd2);
-				if (fd2 >= 0) {
-					new_prog->prog_fd = fd2;
+					ebpf_warning("Failed to dup stderr (retry)\n");
+					close(tmp_fd);
 				} else {
-					/* Keep original errno on ENOSPC to avoid hiding root cause */
-					retry_errno = (errno == ENOSPC) ? saved_errno : errno;
-					if (log_buf[0]) {
-						size_t len = strnlen(log_buf, log_buf_sz - 1);
-						char log_path[256];
-						snprintf(log_path, sizeof(log_path),
-							 "/tmp/df_verifier_%s.log",
-							 new_prog->name ? new_prog->name : "prog");
-						int fd = open(log_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-						if (fd >= 0) {
-							ssize_t _ = write(fd, log_buf, len);
-							(void)_;
-							close(fd);
-							ebpf_warning("Verifier log saved to %s (len=%zu)\n",
-								     log_path, len);
-						} else {
-							ebpf_warning("Verifier log (len=%zu):\n%.*s\n",
-								     len, (int)len, log_buf);
-						}
+					if (dup2(tmp_fd, STDERR_FILENO) < 0) {
+						ebpf_warning("Failed to redirect stderr (retry)\n");
+					}
+					close(tmp_fd);
+					int fd2 =
+					    bcc_prog_load(new_prog->type,
+							  new_prog->name,
+							  new_prog->insns,
+							  new_prog->insns_size,
+							  obj->license,
+							  obj->kern_version,
+							  1, NULL, 0);
+					dup2(stderr_fd2, STDERR_FILENO);
+					close(stderr_fd2);
+					if (fd2 >= 0) {
+						new_prog->prog_fd = fd2;
 					} else {
-						ebpf_warning("Verifier log empty, errno %d\n", retry_errno);
+						retry_errno = errno;
+						ebpf_warning("Verifier log saved to %s\n", log_path);
 					}
 				}
-				free(log_buf);
+			} else {
+				/* Fallback: no log capture, keep original errno */
+				ebpf_warning("Failed to create verifier log file, keeping errno %d\n",
+					     saved_errno);
+				retry_errno = saved_errno;
 			}
 			if (new_prog->prog_fd < 0) {
 				// Preserve errno from the latest attempt for better diagnostics.
