@@ -22,7 +22,7 @@ use public::l7_protocol::L7Protocol;
 use crate::config::handler::LogParserConfig;
 use crate::{
     common::{
-        flow::{L7PerfStats, PacketDirection},
+        flow::L7PerfStats,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::ApplicationFlags,
@@ -45,12 +45,16 @@ pub struct Iso8583Info {
 
     #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
     pub mti: String,
+    #[serde(skip_serializing_if = "value_is_default")]
+    pub endpoint: String,
 
     // value of field 7, 11, 32, 33
     f7: String,
     f11: String,
     f32: String,
     f33: String,
+    f3: String,
+    f25: String,
     // it is formed by connecting f7,f11,f32,f33 with -
     pub trace_ids: PrioFields,
 
@@ -150,6 +154,7 @@ impl From<Iso8583Info> for L7ProtocolSendLog {
             captured_response_byte: f.captured_response_byte,
             req: L7Request {
                 req_type: f.mti,
+                endpoint: f.endpoint,
                 ..Default::default()
             },
             resp: L7Response {
@@ -206,114 +211,158 @@ impl L7ProtocolParserInterface for Iso8583Log {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if !self.parser.parse_payload(
+        // 支持 payload 中包含多个 ISO8583 消息
+        let msgs = self.parser.parse_payload_multiple(
             payload,
-            param.direction == PacketDirection::ClientToServer,
             &Iso8583ParseConfig {
                 extract_fields: param.iso8583_parse_conf.extract_fields.clone(),
                 translation_enabled: param.iso8583_parse_conf.translation_enabled,
                 pan_obfuscate: param.iso8583_parse_conf.pan_obfuscate,
             },
-        ) {
+        );
+        if msgs.is_empty() {
             return Err(Error::L7ProtocolUnknown);
-        };
+        }
 
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default());
         };
 
-        let mut info = Iso8583Info::default();
-        for field in self.parser.fields.drain(..) {
-            if info.mti.is_empty() && field.id == 0 {
-                info.mti = field.translated.clone().unwrap_or(field.value.clone());
-                // Determine if it's a response based on MTI
-                if let Some(&b) = info.mti.as_bytes().get(2) {
-                    if b % 2 == 1 {
-                        info.msg_type = LogMessageType::Response;
-                    } else {
-                        info.msg_type = LogMessageType::Request;
-                        info.response_status = L7ResponseStatus::Ok;
+        // 对每条解析到的消息构造 Iso8583Info，并返回 Multiple 或 Single
+        let mut results: Vec<L7ProtocolInfo> = Vec::with_capacity(msgs.len());
+        for (idx, fields) in msgs.into_iter().enumerate() {
+            let mut info = Iso8583Info::default();
+            for field in fields.into_iter() {
+                if info.mti.is_empty() && field.id == 0 {
+                    info.mti = field.translated.clone().unwrap_or(field.value.clone());
+                    // Determine if it's a response based on MTI
+                    if let Some(&b) = info.mti.as_bytes().get(2) {
+                        if b % 2 == 1 {
+                            info.msg_type = LogMessageType::Response;
+                        } else {
+                            info.msg_type = LogMessageType::Request;
+                            info.response_status = L7ResponseStatus::Ok;
+                        }
                     }
-                }
-            } else if field.id == 7 {
-                info.f7 = field.value.clone();
-            } else if field.id == 11 {
-                info.f11 = field.value.clone();
-            } else if field.id == 32 {
-                info.f32 = field.value.clone();
-            } else if field.id == 33 {
-                info.f33 = field.value.clone();
-            } else if field.id == 39 {
-                info.msg_type = LogMessageType::Response;
-                if field.value == "00"
-                    || field.value == "10"
-                    || field.value == "11"
-                    || field.value == "16"
-                    || field.value == "A2"
-                    || field.value == "A4"
-                    || field.value == "A5"
-                    || field.value == "A6"
-                    || field.value == "Y1"
-                    || field.value == "Y3"
+                } else if field.id == 7 {
+                    info.f7 = field.value.clone();
+                } else if field.id == 11 {
+                    info.f11 = field.value.clone();
+                } else if field.id == 32 {
+                    info.f32 = field.value.clone();
+                } else if field.id == 33 {
+                    info.f33 = field.value.clone();
+                } else if field.id == 3 {
+                    info.f3 = field.value.clone();
+                } else if field.id == 25 {
+                    info.f25 = field.value.clone();
+                } else if field.id == 39 {
+                    info.msg_type = LogMessageType::Response;
+                    if field.value == "00"
+                        || field.value == "10"
+                        || field.value == "11"
+                        || field.value == "16"
+                        || field.value == "A2"
+                        || field.value == "A4"
+                        || field.value == "A5"
+                        || field.value == "A6"
+                        || field.value == "Y1"
+                        || field.value == "Y3"
+                    {
+                        info.response_status = L7ResponseStatus::Ok;
+                    } else {
+                        info.response_status = L7ResponseStatus::ClientError;
+                        info.response_exception =
+                            field.translated.clone().unwrap_or(field.value.clone());
+                        self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                    }
+                };
+                set_captured_byte!(info, param);
+
+                if !param
+                    .iso8583_parse_conf
+                    .extract_fields
+                    .get(field.id as usize)
+                    .unwrap_or(false)
                 {
-                    info.response_status = L7ResponseStatus::Ok;
-                } else {
-                    info.response_status = L7ResponseStatus::ClientError;
-                    info.response_exception =
-                        field.translated.clone().unwrap_or(field.value.clone());
-                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                    continue;
                 }
-            };
-            set_captured_byte!(info, param);
 
-            if !param
-                .iso8583_parse_conf
-                .extract_fields
-                .get(field.id as usize)
-                .unwrap_or(false)
-            {
-                continue;
-            }
-
-            if field.id == 2 && param.iso8583_parse_conf.pan_obfuscate {
+                if field.id == 2 && param.iso8583_parse_conf.pan_obfuscate {
+                    info.attributes.push(KeyVal {
+                        key: field.description,
+                        val: mask_card_number(&field.value),
+                    });
+                    continue;
+                }
                 info.attributes.push(KeyVal {
                     key: field.description,
-                    val: mask_card_number(&field.value),
+                    val: field.translated.unwrap_or(field.value),
                 });
-                continue;
             }
+
+            if !info.f7.is_empty()
+                && !info.f11.is_empty()
+                && !info.f32.is_empty()
+                && !info.f33.is_empty()
+            {
+                info.trace_ids.merge_field(
+                    BASE_FIELD_PRIORITY,
+                    format!("{}-{}-{}-{}", info.f7, info.f11, info.f32, info.f33),
+                );
+            }
+
+            if let Some(config) = param.parse_config {
+                info.set_is_on_blacklist(config);
+            }
+            info.is_async = true;
+
+            if let Some(perf_stats) = self.perf_stats.as_mut() {
+                if let Some(stats) = info.perf_stats(param) {
+                    perf_stats.sequential_merge(&stats);
+                    perf_stats.rrt_max = 0;
+                    perf_stats.rrt_sum = 0;
+                    perf_stats.rrt_count = 0;
+                }
+            }
+
+            if is_00x000(&info.f3) {
+                if info.f25 == "28" {
+                    if info.mti == "0200-金融类请求" {
+                        info.endpoint = format!(
+                            "{}:{}-28消费一次性付款类",
+                            info.mti,
+                            take_first_n(&info.f3, 6)
+                        );
+                    } else if info.mti == "0210-金融类应答" {
+                        info.endpoint = format!(
+                            "{}:{}-28消费一次性付款类",
+                            info.mti,
+                            take_first_n(&info.f3, 6)
+                        );
+                    }
+                } else if info.f25 == "00" {
+                    if info.mti == "0200-金融类请求" {
+                        info.endpoint =
+                            format!("{}:{}-00-代收", info.mti, take_first_n(&info.f3, 6));
+                    } else if info.mti == "0210-金融类应答" {
+                        info.endpoint =
+                            format!("{}:{}-00-代收", info.mti, take_first_n(&info.f3, 6));
+                    }
+                }
+            }
+
             info.attributes.push(KeyVal {
-                key: field.description,
-                val: field.translated.unwrap_or(field.value),
+                key: "packet_index".to_string(),
+                val: idx.to_string(),
             });
+            results.push(L7ProtocolInfo::Iso8583Info(info));
         }
-
-        if !info.f7.is_empty()
-            && !info.f11.is_empty()
-            && !info.f32.is_empty()
-            && !info.f33.is_empty()
-        {
-            info.trace_ids.merge_field(
-                BASE_FIELD_PRIORITY,
-                format!("{}-{}-{}-{}", info.f7, info.f11, info.f32, info.f33),
-            );
+        if results.len() == 1 {
+            Ok(L7ParseResult::Single(results.into_iter().next().unwrap()))
+        } else {
+            Ok(L7ParseResult::Multi(results))
         }
-
-        if let Some(config) = param.parse_config {
-            info.set_is_on_blacklist(config);
-        }
-        info.is_async = true;
-
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
-            if let Some(stats) = info.perf_stats(param) {
-                perf_stats.sequential_merge(&stats);
-                perf_stats.rrt_max = 0;
-                perf_stats.rrt_sum = 0;
-                perf_stats.rrt_count = 0;
-            }
-        }
-
-        Ok(L7ParseResult::Single(L7ProtocolInfo::Iso8583Info(info)))
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -327,6 +376,30 @@ impl L7ProtocolParserInterface for Iso8583Log {
     fn parsable_on_udp(&self) -> bool {
         false
     }
+}
+
+fn take_first_n(s: &str, n: usize) -> &str {
+    match s.char_indices().nth(n) {
+        Some((idx, _)) => &s[..idx],
+        None => s,
+    }
+}
+
+#[inline]
+fn is_00x000(s: &str) -> bool {
+    let b = s.as_bytes();
+
+    if b.len() < 6 {
+        return false;
+    }
+
+    // 00 x 000
+    b[0] == b'0'
+        && b[1] == b'0'
+        && b[2].is_ascii_digit()
+        && b[3] == b'0'
+        && b[4] == b'0'
+        && b[5] == b'0'
 }
 
 // preserve the first 6 and last 4 digits, mask the remaining characters with *

@@ -328,8 +328,8 @@ MAP_HASH(lua_offsets_map, __u32, lua_ofs, LUA_OFFSET_PROFILES, FEATURE_FLAG_PROF
  */
 MAP_HASH(luajit_offsets_map, __u32, lj_ofs, LUA_OFFSET_PROFILES, FEATURE_FLAG_PROFILE_ONCPU)
 
-static __always_inline __u64 lua_state_slot_read(const struct lua_state_cache_t *cache,
-						 __u8 idx)
+static inline __attribute__ ((always_inline))
+__u64 lua_state_slot_read(const struct lua_state_cache_t *cache, __u8 idx)
 {
 	if (idx >= LUA_STATE_STACK_DEPTH) {
 		return 0;
@@ -337,7 +337,8 @@ static __always_inline __u64 lua_state_slot_read(const struct lua_state_cache_t 
 	return cache->states[idx];
 }
 
-static __always_inline void lua_state_stack_push(__u64 id, __u64 state)
+static inline __attribute__ ((always_inline))
+void lua_state_stack_push(__u64 id, __u64 state)
 {
 	__u32 tid = (__u32)id;
 	struct lua_state_cache_t *cache_ptr = lua_tstate_map__lookup(&tid);
@@ -392,7 +393,8 @@ static __always_inline void lua_state_stack_push(__u64 id, __u64 state)
 	lua_tstate_map__update(&tid, &cache);
 }
 
-static __always_inline void lua_state_stack_pop(__u64 id)
+static inline __attribute__ ((always_inline))
+void lua_state_stack_pop(__u64 id)
 {
 	__u32 tid = (__u32)id;
 	struct lua_state_cache_t *cache_ptr = lua_tstate_map__lookup(&tid);
@@ -2113,9 +2115,9 @@ int pre_lua_unwind(void *ctx, unwind_state_t * state,
 	return 0;
 }
 
-static __always_inline int lua_unwind(struct bpf_perf_event_data *ctx,
-				      void *lua_state, lua_ofs *o, 
-					  stack_t * intp_stack)
+static inline __attribute__ ((always_inline))
+int lua_unwind(struct bpf_perf_event_data *ctx, void *lua_state, lua_ofs *o,
+	       stack_t *intp_stack)
 {
 	if (!intp_stack) {
 		return 0;
@@ -2441,7 +2443,8 @@ PROGPE(lua_unwind) (struct bpf_perf_event_data * ctx) {
 	return 0;
 }
 
-static __always_inline int probe_entry_lua(struct pt_regs *ctx)
+static inline __attribute__ ((always_inline))
+int probe_entry_lua(struct pt_regs *ctx)
 {
 	void *param1 = (void *)PT_REGS_PARM1(ctx);
 	if (!param1) {
@@ -2454,7 +2457,8 @@ static __always_inline int probe_entry_lua(struct pt_regs *ctx)
 	return 0;
 }
 
-static __always_inline int probe_entry_lua_cancel(struct pt_regs *ctx)
+static inline __attribute__ ((always_inline))
+int probe_entry_lua_cancel(struct pt_regs *ctx)
 {
 	__u64 id = bpf_get_current_pid_tgid();
 	lua_state_stack_pop(id);

@@ -18,7 +18,7 @@ package model
 
 // 各资源可支持的 query 字段定义
 type QueryConstraint interface {
-	AgentGroupConfigChangelogQuery
+	AgentGroupConfigChangelogQuery | AgentGroupConfigQuery
 
 	// GetFormat() string
 	// GetIncludedFieldsCondition() IncludedFieldsInfo
