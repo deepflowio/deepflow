@@ -590,6 +590,10 @@ impl RocketmqHeader {
     }
 
     fn decode_remark(&mut self, data: &[u8]) -> isize {
+        // Check minimum length for reading the length field itself
+        if data.len() < 4 {
+            return -1;
+        }
         let length = bytes::read_i32_be(data);
         if length < 0 || length > data.len() as i32 - 4 {
             return -1;
@@ -603,6 +607,10 @@ impl RocketmqHeader {
     }
 
     fn decode_ext_fields(&mut self, data: &[u8]) -> isize {
+        // Check minimum length for reading the length field itself
+        if data.len() < 4 {
+            return -1;
+        }
         let length = bytes::read_i32_be(data);
         if length < 0 || length > data.len() as i32 - 4 {
             return -1;
@@ -613,6 +621,10 @@ impl RocketmqHeader {
         let mut offset: usize = 4;
         let end_offset = length as usize + 4;
         while offset < end_offset {
+            // Check bounds before reading key_length (2 bytes)
+            if offset + 2 > data.len() {
+                return -1;
+            }
             let key_length = bytes::read_u16_be(&data[offset..(offset + 2)]);
             offset += 2;
             if key_length > (end_offset - offset) as u16 {
@@ -620,6 +632,10 @@ impl RocketmqHeader {
             }
             let key = &data[offset..(offset + key_length as usize)];
             offset += key_length as usize;
+            // Check bounds before reading value_length (4 bytes)
+            if offset + 4 > data.len() {
+                return -1;
+            }
             let value_length = bytes::read_i32_be(&data[offset..(offset + 4)]);
             offset += 4;
             if value_length < 0 || value_length > (end_offset - offset) as i32 {
