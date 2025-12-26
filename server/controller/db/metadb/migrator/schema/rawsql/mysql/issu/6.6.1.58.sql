@@ -54,8 +54,9 @@ CREATE PROCEDURE ChangeColumnIfExists(
     IN colType VARCHAR(255)
 )
 BEGIN
-    CALL ColumnExists(tableName, oldColName, @exists);
-    IF @exists THEN
+    CALL ColumnExists(tableName, oldColName, @oldExists);
+    CALL ColumnExists(tableName, newColName, @newExists);
+    IF @oldExists AND NOT @newExists THEN
         SET @sql = CONCAT('ALTER TABLE ', tableName, ' CHANGE ', oldColName, ' ', newColName, ' ', colType);
         PREPARE stmt FROM @sql;
         EXECUTE stmt;
