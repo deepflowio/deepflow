@@ -139,6 +139,7 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*metadbmodel.Pod, 
 	dbItem := &metadbmodel.Pod{
 		Name:            cloudItem.Name,
 		Label:           cloudItem.Label,
+		UID:             ctrlrcommon.GenerateResourceShortUUID(ctrlrcommon.RESOURCE_TYPE_POD_EN),
 		ENV:             cloudItem.ENV,
 		ContainerIDs:    cloudItem.ContainerIDs,
 		Annotation:      cloudItem.Annotation,

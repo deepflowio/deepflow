@@ -74,6 +74,9 @@ BEGIN
     CALL ColumnExists(tableName, targetColName, @target_exists);
     IF @source_exists AND @target_exists THEN
         SET @sql = CONCAT('UPDATE ', tableName, ' SET ', targetColName, ' = ', sourceColName, ' WHERE ', sourceColName, ' > 0');
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
         SET @sql = CONCAT('UPDATE ', tableName, ' SET ', targetColName, ' = "" WHERE ', sourceColName, ' = 0');
         PREPARE stmt FROM @sql;
         EXECUTE stmt;
