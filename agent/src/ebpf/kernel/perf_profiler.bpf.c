@@ -438,8 +438,8 @@ void lua_state_stack_pop(__u64 id)
 	} else {
 		lua_tstate_map__update(&tid, &cache);
 	}
-	}
-	#endif
+}
+#endif
 
 /*
  * Used for communication between user space and BPF to control the
