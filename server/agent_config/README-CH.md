@@ -5026,10 +5026,6 @@ inputs:
 
 **详细描述**:
 
-<<<<<<< HEAD
-禁用 Node.js（V8）解释器剖析。禁用后将不采集 Node.js 进程的函数调用栈，
-可节省约 6.4 MB 内核内存（v8_unwind_info_map）。
-=======
 禁用 Node.js (V8 引擎) 剖析功能。禁用后将不会采集 Node.js 进程的函数调用栈，可节省约 6.4 MB 的内核内存。
 
 此配置项控制以下 eBPF map 的创建：
@@ -5100,7 +5096,6 @@ inputs:
 - 禁用时，对应语言的 eBPF maps 会被创建但 max_entries 设为 1（最小化内存占用）
 - 禁用时，不会创建对应语言的 unwind table，也不会加载进程的 unwinding 信息
 - 禁用不需要的语言除了节省内存，还能减少 CPU 开销
->>>>>>> cd7daf6e78 (add lua disabled config)
 
 ### 调优 {#inputs.ebpf.tunning}
 

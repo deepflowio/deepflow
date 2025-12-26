@@ -5156,7 +5156,8 @@ inputs:
 
 **Description**:
 
-Disable Node.js (V8) interpreter profiling. When disabled, Node.js process stack traces will not be collected, saving approximately 6.4 MB of kernel memory (v8_unwind_info_map).
+Disable Node.js (V8) interpreter profiling. When disabled, Node.js process stack traces will not be collected,
+saving approximately 6.4 MB of kernel memory (v8_unwind_info_map).
 
 **Important**: Changing this configuration will automatically trigger deepflow-agent restart, as eBPF maps cannot be dynamically created or destroyed at runtime.
 
