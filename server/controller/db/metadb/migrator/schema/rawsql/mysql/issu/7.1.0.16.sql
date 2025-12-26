@@ -1,24 +1,18 @@
 -- ColumnExists function
-DROP FUNCTION IF EXISTS ColumnExists;
+DROP PROCEDURE IF EXISTS ColumnExists;
 
-CREATE FUNCTION ColumnExists(
-    tableName VARCHAR(255),
-    colName VARCHAR(255)
+CREATE PROCEDURE ColumnExists(
+    IN  p_table_name VARCHAR(255),
+    IN  p_col_name   VARCHAR(255),
+    OUT p_exists     TINYINT(1)
 )
-RETURNS TINYINT(1)
-DETERMINISTIC
-READS SQL DATA
 BEGIN
-    DECLARE column_count INT;
-
-    SELECT COUNT(*)
-    INTO column_count
+    SELECT COUNT(*) > 0
+    INTO p_exists
     FROM information_schema.columns
     WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = tableName
-    AND COLUMN_NAME = colName;
-
-    RETURN column_count > 0;
+      AND TABLE_NAME   = p_table_name
+      AND COLUMN_NAME  = p_col_name;
 END;
 
 -- UpdateIfColumnExists procedure
@@ -30,7 +24,8 @@ CREATE PROCEDURE UpdateIfColumnExists(
     IN updateSql TEXT
 )
 BEGIN
-    IF ColumnExists(tableName, colName) THEN
+    CALL ColumnExists(tableName, colName, @exists);
+    IF @exists THEN
         SET @sql = updateSql;
         PREPARE stmt FROM @sql;
         EXECUTE stmt;
@@ -59,7 +54,9 @@ CREATE PROCEDURE ChangeColumnIfExists(
     IN colType VARCHAR(255)
 )
 BEGIN
-    IF ColumnExists(tableName, oldColName) THEN
+    CALL ColumnExists(tableName, oldColName, @oldExists);
+    CALL ColumnExists(tableName, newColName, @newExists);
+    IF @oldExists AND NOT @newExists THEN
         SET @sql = CONCAT('ALTER TABLE ', tableName, ' CHANGE ', oldColName, ' ', newColName, ' ', colType);
         PREPARE stmt FROM @sql;
         EXECUTE stmt;
@@ -74,7 +71,7 @@ CALL ChangeColumnIfExists('pod_group', 'metadata', 'compressed_metadata', 'MEDIU
 CALL ChangeColumnIfExists('pod_group', 'spec', 'compressed_spec', 'MEDIUMBLOB COMMENT "compressed yaml"');
 
 -- Cleanup
-DROP FUNCTION IF EXISTS ColumnExists;
+DROP PROCEDURE IF EXISTS ColumnExists;
 DROP PROCEDURE IF EXISTS UpdateIfColumnExists;
 DROP PROCEDURE IF EXISTS ChangeColumnIfExists;
 
