@@ -109,6 +109,21 @@ static long
 							       const void
 							       *unsafe_ptr) =
     (void *)115;
+static int
+    __attribute__ ((__unused__)) (*bpf_sock_ops_cb_flags_set) (void *skops,
+							       int flags) =
+    (void *)59;
+static int
+    __attribute__ ((__unused__)) (*bpf_reserve_hdr_opt) (void *skops,
+							 __u32 reserve_len,
+							 __u32 flags) =
+    (void *)144;
+static int
+    __attribute__ ((__unused__)) (*bpf_store_hdr_opt) (void *skops,
+						       void *from,
+						       __u32 len,
+						       __u32 flags) =
+    (void *)143;
 
 static int
     __attribute__ ((__unused__)) (*bpf_get_stackid) (void *ctx, void *map,
