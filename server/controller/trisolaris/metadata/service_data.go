@@ -211,7 +211,18 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, dbDataCache *dbcache.
 		podGroupUIDToID[podGroup.UID] = podGroup.ID
 		podGroupNameToID[podGroup.Name] = podGroup.ID
 	}
-
+	podUIDToID := make(map[string]int)
+	podNameToID := make(map[string]int)
+	for _, pod := range dbDataCache.GetPods() {
+		podUIDToID[pod.UID] = pod.ID
+		podNameToID[pod.Name] = pod.ID
+	}
+	hostUIDToID := make(map[string]int)
+	hostNameToID := make(map[string]int)
+	for _, host := range dbDataCache.GetHostDevices() {
+		hostUIDToID[host.UID] = host.ID
+		hostNameToID[host.Name] = host.ID
+	}
 	customServices := dbDataCache.GetCustomServices()
 	customServiceIDToIPPorts := make(map[int]mapset.Set[customServiceIPPortKey])
 	customServiceIDToResourceIDs := make(map[int][]uint32)
@@ -221,10 +232,22 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, dbDataCache *dbcache.
 
 	for _, cs := range customServices {
 		resources := strings.Split(cs.Resources, ",")
-		if slices.Contains([]int{CUSTOM_SERVICE_TYPE_CHOST, CUSTOM_SERVICE_TYPE_POD_SERVICE, CUSTOM_SERVICE_TYPE_POD_GROUP}, cs.Type) {
+		if slices.Contains([]int{
+			CUSTOM_SERVICE_TYPE_HOST,
+			CUSTOM_SERVICE_TYPE_CHOST,
+			CUSTOM_SERVICE_TYPE_POD_SERVICE,
+			CUSTOM_SERVICE_TYPE_POD_GROUP,
+			CUSTOM_SERVICE_TYPE_POD,
+		}, cs.Type) {
 			resourceIDs := make([]uint32, 0)
 			var resourceIDMap map[string]int
 			switch cs.Type {
+			case CUSTOM_SERVICE_TYPE_HOST:
+				if cs.MatchType == CUSTOM_SERVICE_MATCH_TYPE_UID {
+					resourceIDMap = hostUIDToID
+				} else {
+					resourceIDMap = hostNameToID
+				}
 			case CUSTOM_SERVICE_TYPE_CHOST:
 				if cs.MatchType == CUSTOM_SERVICE_MATCH_TYPE_UID {
 					resourceIDMap = vmUIDToID
@@ -242,6 +265,12 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, dbDataCache *dbcache.
 					resourceIDMap = podGroupUIDToID
 				} else {
 					resourceIDMap = podGroupNameToID
+				}
+			case CUSTOM_SERVICE_TYPE_POD:
+				if cs.MatchType == CUSTOM_SERVICE_MATCH_TYPE_UID {
+					resourceIDMap = podUIDToID
+				} else {
+					resourceIDMap = podNameToID
 				}
 			default:
 				continue
@@ -612,7 +641,13 @@ func (s *ServiceDataOP) mergeCustomServices(dbDataCache *dbcache.DBDataCache) []
 	serviceTypeCustomService := trident.ServiceType_CUSTOM_SERVICE
 
 	for _, customService := range dbDataCache.GetCustomServices() {
-		if slices.Contains([]int{CUSTOM_SERVICE_TYPE_CHOST, CUSTOM_SERVICE_TYPE_POD_SERVICE, CUSTOM_SERVICE_TYPE_POD_GROUP}, customService.Type) {
+		if slices.Contains([]int{
+			CUSTOM_SERVICE_TYPE_HOST,
+			CUSTOM_SERVICE_TYPE_CHOST,
+			CUSTOM_SERVICE_TYPE_POD_SERVICE,
+			CUSTOM_SERVICE_TYPE_POD_GROUP,
+			CUSTOM_SERVICE_TYPE_POD,
+		}, customService.Type) {
 
 			service := &trident.ServiceInfo{
 				Type: &serviceTypeCustomService,
@@ -622,12 +657,16 @@ func (s *ServiceDataOP) mergeCustomServices(dbDataCache *dbcache.DBDataCache) []
 				// PodClusterId: proto.Uint32(uint32(customService.PodClusterID)),
 			}
 			switch customService.Type {
+			case CUSTOM_SERVICE_TYPE_HOST:
+				service.HostIds = s.serviceRawData.customServiceIDToResourceIDs[customService.ID]
 			case CUSTOM_SERVICE_TYPE_CHOST:
 				service.ChostIds = s.serviceRawData.customServiceIDToResourceIDs[customService.ID]
 			case CUSTOM_SERVICE_TYPE_POD_SERVICE:
 				service.PodServiceIds = s.serviceRawData.customServiceIDToResourceIDs[customService.ID]
 			case CUSTOM_SERVICE_TYPE_POD_GROUP:
 				service.PodGroupIds = s.serviceRawData.customServiceIDToResourceIDs[customService.ID]
+			case CUSTOM_SERVICE_TYPE_POD:
+				service.PodIds = s.serviceRawData.customServiceIDToResourceIDs[customService.ID]
 			}
 			services = append(services, service)
 			continue

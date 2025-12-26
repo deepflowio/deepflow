@@ -437,6 +437,8 @@ message ServiceInfo {
     repeated uint32 server_ports = 10;                // Availabel when type in [POD_SERVICE_IP, LB_SERVICE, CUSTOM_SERVICE], list of IP addresses
     repeated uint32 pod_service_ids = 11;             // Availabel when type in [CUSTOM_SERVICE]
     repeated uint32 chost_ids = 12;                   // Availabel when type in [CUSTOM_SERVICE]
+    repeated uint32 host_ids = 13;                    // Availabel when type in [CUSTOM_SERVICE]
+    repeated uint32 pod_ids = 14;                     // Availabel when type in [CUSTOM_SERVICE]
 }
 
 message Groups {
