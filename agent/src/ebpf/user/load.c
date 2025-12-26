@@ -546,13 +546,28 @@ static int load_obj__progs(struct ebpf_object *obj)
 			return ETR_INVAL;
 		}
 
-		char *sym_name = elf_strptr(obj->elf_info.elf,
-					    obj->elf_info.syms_sec->strtabidx,
-					    sym.st_name);
+		char *sym_name =
+		    elf_strptr(obj->elf_info.elf,
+			       obj->elf_info.syms_sec->strtabidx,
+			       sym.st_name);
 
 		// Typically, the sec_off offset value is 0
 		size_t sec_off = sym.st_value;
 		size_t prog_sz = sym.st_size;
+		if (sec_off % BPF_INSN_SZ) {
+			ebpf_warning
+			    ("Program '%s' sec offset (%zu) is not aligned to BPF instruction size (%d).\n",
+			     sym_name ? sym_name : "<unknown>", sec_off,
+			     BPF_INSN_SZ);
+			return ETR_INVAL;
+		}
+		if (sec_off >= desc->size) {
+			ebpf_warning
+			    ("Program '%s' sec offset (%zu) exceeds section size (%zu).\n",
+			     sym_name ? sym_name : "<unknown>", sec_off,
+			     desc->size);
+			return ETR_INVAL;
+		}
 
 		new_prog = NULL;
 		add_new_prog(obj->progs, obj->progs_cnt, new_prog);
@@ -570,9 +585,13 @@ static int load_obj__progs(struct ebpf_object *obj)
 			return ETR_NOMEM;
 		}
 
-		new_prog->insns = insns + sec_off;
-		new_prog->insns_cnt = desc->size / BPF_INSN_SZ;
-		new_prog->insns_size = desc->size;
+		/*
+		 * sym.st_value is a byte offset from the start of the section.
+		 * insns is a struct bpf_insn* (8 bytes each), so advance in bytes.
+		 */
+		new_prog->insns = (struct bpf_insn *)((char *)insns + sec_off);
+		new_prog->insns_size = desc->size - sec_off;
+		new_prog->insns_cnt = new_prog->insns_size / BPF_INSN_SZ;
 		new_prog->obj = obj;
 		new_prog->type = prog_type;
 		new_prog->sec_insn_off = sec_off / BPF_INSN_SZ;
@@ -599,15 +618,67 @@ static int load_obj__progs(struct ebpf_object *obj)
 		}
 		new_prog->prog_fd =
 		    bcc_prog_load(new_prog->type, new_prog->name,
-				  new_prog->insns, desc->size, obj->license,
-				  obj->kern_version, 0, NULL,
+				  new_prog->insns, new_prog->insns_size,
+				  obj->license, obj->kern_version, 0, NULL,
 				  0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
 		resume_stderr(stderr_fd);
 		if (new_prog->prog_fd < 0) {
+			int saved_errno = errno;
+			int retry_errno = saved_errno;
 			ebpf_warning
 			    ("bcc_prog_load() failed. name: %s, %s errno: %d\n",
 			     new_prog->name, strerror(errno), errno);
-			if (new_prog->insns_cnt > BPF_MAXINSNS) {
+			// Best-effort retry with verifier logs for troubleshooting.
+			/* Capture verifier stderr into a temp file via bcc internal buffering */
+			char log_path[] = "/tmp/df_verifier_XXXXXX.log";
+			int tmp_fd = mkstemps(log_path, 4);
+			if (tmp_fd >= 0) {
+				int stderr_fd2 = dup(STDERR_FILENO);
+				if (stderr_fd2 < 0) {
+					ebpf_warning("Failed to dup stderr (retry)\n");
+					close(tmp_fd);
+				} else {
+					if (dup2(tmp_fd, STDERR_FILENO) < 0) {
+						ebpf_warning("Failed to redirect stderr (retry)\n");
+					}
+					close(tmp_fd);
+					int fd2 =
+					    bcc_prog_load(new_prog->type,
+							  new_prog->name,
+							  new_prog->insns,
+							  new_prog->insns_size,
+							  obj->license,
+							  obj->kern_version,
+							  1, NULL, 0);
+					dup2(stderr_fd2, STDERR_FILENO);
+					close(stderr_fd2);
+					if (fd2 >= 0) {
+						new_prog->prog_fd = fd2;
+					} else {
+						retry_errno = errno;
+						ebpf_warning("Verifier log saved to %s\n", log_path);
+					}
+				}
+			} else {
+				/* Fallback: no log capture, keep original errno */
+				ebpf_warning("Failed to create verifier log file, keeping errno %d\n",
+					     saved_errno);
+				retry_errno = saved_errno;
+			}
+			if (new_prog->prog_fd < 0) {
+				// Preserve errno from the latest attempt for better diagnostics.
+				ebpf_warning
+				    ("bcc_prog_load() still failed. name: %s, errno after retry: %d (orig %d)\n",
+				     new_prog->name, retry_errno, saved_errno);
+				errno = retry_errno;
+			}
+
+			/*
+			 * Don't mislead users on kernels whose max insns limit
+			 * is already bumped (>=5.2). Only warn if the kernel
+			 * actually returned E2BIG.
+			 */
+			if (errno == E2BIG && new_prog->insns_cnt > BPF_MAXINSNS) {
 				ebpf_warning
 				    ("The number of EBPF instructions (%d) "
 				     "exceeded the maximum limit (%d).\n",
