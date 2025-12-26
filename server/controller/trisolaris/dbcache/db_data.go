@@ -357,9 +357,9 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 
 	podFields := []string{}
 	if d.config.ExportersEnabled {
-		podFields = []string{"id", "name", "epc_id", "container_ids", "pod_cluster_id", "pod_node_id", "pod_namespace_id", "pod_group_id", "az", "domain", "label"}
+		podFields = []string{"id", "name", "epc_id", "container_ids", "pod_cluster_id", "pod_node_id", "pod_namespace_id", "pod_group_id", "az", "domain", "uid", "label"}
 	} else {
-		podFields = []string{"id", "name", "epc_id", "container_ids", "pod_cluster_id", "pod_node_id", "pod_namespace_id", "pod_group_id", "az", "domain"}
+		podFields = []string{"id", "name", "epc_id", "container_ids", "pod_cluster_id", "pod_node_id", "pod_namespace_id", "pod_group_id", "az", "domain", "uid"}
 	}
 	pods, err := dbmgr.DBMgr[models.Pod](db).GetFields(podFields)
 	if err == nil {
