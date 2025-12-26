@@ -25,7 +25,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/common/metadata"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/tagrecorder"
 )
 
@@ -55,56 +55,56 @@ func newDataGenerator(md metadata.Platform, resourceType string) dataGenerator {
 	useLatestUpdatedAt := "ASC"
 	switch resourceType {
 	case common.RESOURCE_TYPE_AZ_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.AZ](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.AZ](md, resourceType)
 		filterSubDomain = false
 
 	case common.RESOURCE_TYPE_VM_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.VM](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.VM](md, resourceType)
 		filterSubDomain = false
 	case common.RESOURCE_TYPE_HOST_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.Host](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.Host](md, resourceType)
 		filterSubDomain = false
 
 	case common.RESOURCE_TYPE_VPC_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.VPC](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.VPC](md, resourceType)
 		filterSubDomain = false
 	case common.RESOURCE_TYPE_NETWORK_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.Network](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.Network](md, resourceType)
 	case common.RESOURCE_TYPE_VROUTER_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.VRouter](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.VRouter](md, resourceType)
 		filterSubDomain = false
 	case common.RESOURCE_TYPE_DHCP_PORT_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.DHCPPort](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.DHCPPort](md, resourceType)
 		filterSubDomain = false
 
 	case common.RESOURCE_TYPE_NAT_GATEWAY_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.NATGateway](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.NATGateway](md, resourceType)
 		filterSubDomain = false
 	case common.RESOURCE_TYPE_LB_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.LB](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.LB](md, resourceType)
 		filterSubDomain = false
 
 	case common.RESOURCE_TYPE_RDS_INSTANCE_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.RDSInstance](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.RDSInstance](md, resourceType)
 		filterSubDomain = false
 	case common.RESOURCE_TYPE_REDIS_INSTANCE_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.RedisInstance](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.RedisInstance](md, resourceType)
 		filterSubDomain = false
 
 	case common.RESOURCE_TYPE_POD_CLUSTER_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.PodCluster](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.PodCluster](md, resourceType)
 	case common.RESOURCE_TYPE_POD_NODE_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.PodNode](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.PodNode](md, resourceType)
 	case common.RESOURCE_TYPE_POD_NAMESPACE_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.PodNamespace](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.PodNamespace](md, resourceType)
 	case common.RESOURCE_TYPE_POD_INGRESS_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.PodIngress](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.PodIngress](md, resourceType)
 	case common.RESOURCE_TYPE_POD_SERVICE_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.PodService](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.PodService](md, resourceType)
 	case common.RESOURCE_TYPE_POD_GROUP_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.PodGroup](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.PodGroup](md, resourceType)
 	case common.RESOURCE_TYPE_POD_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.Pod](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.Pod](md, resourceType)
 
 	case common.RESOURCE_TYPE_PROCESS_EN:
 		dg = newDataGeneratorComponent[healerProcess](md, resourceType)
@@ -114,7 +114,7 @@ func newDataGenerator(md metadata.Platform, resourceType string) dataGenerator {
 		useLatestUpdatedAt = "DESC"
 
 	case common.RESOURCE_TYPE_CUSTOM_SERVICE_EN:
-		dg = newDataGeneratorComponent[mysqlmodel.CustomService](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.CustomService](md, resourceType)
 		filterSubDomain = false
 
 	case tagrecorder.RESOURCE_TYPE_CH_DEVICE:
@@ -122,81 +122,81 @@ func newDataGenerator(md metadata.Platform, resourceType string) dataGenerator {
 		realID = "deviceid" // ch_device uses deviceid as the real id field
 		filterSubDomain = false
 	case tagrecorder.RESOURCE_TYPE_CH_AZ:
-		dg = newDataGeneratorComponent[mysqlmodel.ChAZ](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChAZ](md, resourceType)
 		filterSubDomain = false
 
 	case tagrecorder.RESOURCE_TYPE_CH_CHOST:
-		dg = newDataGeneratorComponent[mysqlmodel.ChChost](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChChost](md, resourceType)
 		filterSubDomain = false
 
 	case tagrecorder.RESOURCE_TYPE_CH_VPC:
-		dg = newDataGeneratorComponent[mysqlmodel.ChVPC](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChVPC](md, resourceType)
 		filterSubDomain = false
 	case tagrecorder.RESOURCE_TYPE_CH_NETWORK:
-		dg = newDataGeneratorComponent[mysqlmodel.ChNetwork](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChNetwork](md, resourceType)
 
 	case tagrecorder.RESOURCE_TYPE_CH_POD_CLUSTER:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodCluster](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodCluster](md, resourceType)
 	case tagrecorder.RESOURCE_TYPE_CH_POD_NODE:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodNode](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodNode](md, resourceType)
 	case tagrecorder.RESOURCE_TYPE_CH_POD_NAMESPACE:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodNamespace](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodNamespace](md, resourceType)
 	case tagrecorder.RESOURCE_TYPE_CH_POD_INGRESS:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodIngress](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodIngress](md, resourceType)
 	case tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodService](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodService](md, resourceType)
 	case tagrecorder.RESOURCE_TYPE_CH_POD_GROUP:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodGroup](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodGroup](md, resourceType)
 	case tagrecorder.RESOURCE_TYPE_CH_POD:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPod](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPod](md, resourceType)
 
 	case tagrecorder.RESOURCE_TYPE_CH_GPROCESS:
-		dg = newDataGeneratorComponent[mysqlmodel.ChGProcess](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChGProcess](md, resourceType)
 
 	case tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAG:
-		dg = newDataGeneratorComponent[mysqlmodel.ChChostCloudTag](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChChostCloudTag](md, resourceType)
 		filterSubDomain = false
 		hasDuplicateID = true
 		tableName = "ch_chost_cloud_tag"
 	case tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAGS:
-		dg = newDataGeneratorComponent[mysqlmodel.ChChostCloudTags](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChChostCloudTags](md, resourceType)
 		filterSubDomain = false
 	case tagrecorder.RESOURCE_TYPE_CH_POD_NS_CLOUD_TAG:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodNSCloudTag](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodNSCloudTag](md, resourceType)
 		hasDuplicateID = true
 		tableName = "ch_pod_ns_cloud_tag"
 	case tagrecorder.RESOURCE_TYPE_CH_POD_NS_CLOUD_TAGS:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodNSCloudTags](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodNSCloudTags](md, resourceType)
 	case tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE_K8S_LABEL:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodServiceK8sLabel](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodServiceK8sLabel](md, resourceType)
 		hasDuplicateID = true
 		tableName = "ch_pod_service_k8s_label"
 	case tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE_K8S_LABELS:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodServiceK8sLabels](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodServiceK8sLabels](md, resourceType)
 	case tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE_K8S_ANNOTATION:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodServiceK8sAnnotation](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodServiceK8sAnnotation](md, resourceType)
 		hasDuplicateID = true
 		tableName = "ch_pod_service_k8s_annotation"
 	case tagrecorder.RESOURCE_TYPE_CH_POD_SERVICE_K8S_ANNOTATIONS:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodServiceK8sAnnotations](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodServiceK8sAnnotations](md, resourceType)
 	case tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ENV:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodK8sEnv](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodK8sEnv](md, resourceType)
 		hasDuplicateID = true
 		tableName = "ch_pod_k8s_env"
 	case tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ENVS:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodK8sEnvs](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodK8sEnvs](md, resourceType)
 	case tagrecorder.RESOURCE_TYPE_CH_POD_K8S_LABEL:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodK8sLabel](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodK8sLabel](md, resourceType)
 		hasDuplicateID = true
 		tableName = "ch_pod_k8s_label"
 	case tagrecorder.RESOURCE_TYPE_CH_POD_K8S_LABELS:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodK8sLabels](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodK8sLabels](md, resourceType)
 	case tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ANNOTATION:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodK8sAnnotation](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodK8sAnnotation](md, resourceType)
 		hasDuplicateID = true
 		tableName = "ch_pod_k8s_annotation"
 	case tagrecorder.RESOURCE_TYPE_CH_POD_K8S_ANNOTATIONS:
-		dg = newDataGeneratorComponent[mysqlmodel.ChPodK8sAnnotations](md, resourceType)
+		dg = newDataGeneratorComponent[metadbmodel.ChPodK8sAnnotations](md, resourceType)
 	default:
 		log.Errorf("unknown resource type: %s", resourceType, md.LogPrefixes)
 		return nil
@@ -382,14 +382,14 @@ func idToUpdatedAt(resourceType string, checkFields []string, data interface{}) 
 	idToUpdatedAt := make(map[int]time.Time)
 	switch resourceType {
 	case common.RESOURCE_TYPE_VM_EN:
-		for _, item := range data.([]*mysqlmodel.VM) {
+		for _, item := range data.([]*metadbmodel.VM) {
 			if len(item.LearnedCloudTags) == 0 && len(item.CustomCloudTags) == 0 {
 				continue
 			}
 			idToUpdatedAt[item.GetID()] = item.GetUpdatedAt()
 		}
 	case common.RESOURCE_TYPE_POD_NAMESPACE_EN:
-		for _, item := range data.([]*mysqlmodel.PodNamespace) {
+		for _, item := range data.([]*metadbmodel.PodNamespace) {
 			if len(item.LearnedCloudTags) == 0 && len(item.CustomCloudTags) == 0 {
 				continue
 			}
@@ -398,7 +398,7 @@ func idToUpdatedAt(resourceType string, checkFields []string, data interface{}) 
 
 	// 仅有 cloud.tag 需要支持多个字段检查，其他情况只会赋值一个字段，使用 checkFields[0] 即可
 	case common.RESOURCE_TYPE_POD_SERVICE_EN:
-		for _, item := range data.([]*mysqlmodel.PodService) {
+		for _, item := range data.([]*metadbmodel.PodService) {
 			if checkFields[0] == "label" && item.Label == "" {
 				continue
 			}
@@ -408,7 +408,7 @@ func idToUpdatedAt(resourceType string, checkFields []string, data interface{}) 
 			idToUpdatedAt[item.GetID()] = item.GetUpdatedAt()
 		}
 	case common.RESOURCE_TYPE_POD_EN:
-		for _, item := range data.([]*mysqlmodel.Pod) {
+		for _, item := range data.([]*metadbmodel.Pod) {
 			if checkFields[0] == "env" && item.ENV == "" {
 				continue
 			}

@@ -54,3 +54,31 @@ func FindInBatchesObj[T any](query *gorm.DB) ([]T, error) { // TODO unify return
 	}
 	return data, nil
 }
+
+func FindPage[T any](query *gorm.DB, pageSize int) ([]*T, error) {
+	data := make([]*T, 0)
+	pageIndex := 0
+	pageData := make([]*T, 0)
+	for pageIndex == 0 || len(pageData) == pageSize {
+		err := query.Find(&pageData).Limit(pageSize).Offset(pageIndex * pageSize).Error
+		if err != nil {
+			return []*T{}, err
+		}
+		data = append(data, pageData...)
+		pageIndex++
+	}
+	return data, nil
+}
+
+func DeletePageData[T any](query *gorm.DB, pageSize int, data []*T) error {
+	total := len(data)
+	var err error
+	for i := 0; i < total; i += pageSize {
+		end := i + pageSize
+		if end > total {
+			end = total
+		}
+		err = query.Delete(data[i:end]).Error
+	}
+	return err
+}
