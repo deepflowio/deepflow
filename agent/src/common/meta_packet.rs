@@ -145,6 +145,7 @@ bitflags! {
         const NONE = FlagBits::FlagNone as u32;
         const TLS = FlagBits::FlagTls as u32;
         const ASYNC = FlagBits::FlagAsync as u32;
+        const REVERSED = FlagBits::FlagReversed as u32;
     }
 }
 
