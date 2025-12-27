@@ -216,8 +216,9 @@ message ExtendedInfo {
 
 enum FlagBits {
   FLAG_NONE = 0;
-  FLAG_TLS = 1;   // 1<<0
-  FLAG_ASYNC = 2; // 1<<1
+  FLAG_TLS = 1;      // 1<<0
+  FLAG_ASYNC = 2;    // 1<<1
+  FLAG_REVERSED = 4; // 1<<2
 }
 
 message AppProtoLogsData {
@@ -234,9 +235,9 @@ message AppProtoLogsData {
     uint32 row_effect = 16;
     uint32 direction_score = 17;
     // Flags Bitmap (enum FlagBits):
-    // 32                           2       1     0
+    // 32                 3         2       1     0
     // +------------------------------------+-----+
-    // | Reserve                    | async | TLS |
+    // | Reserve          |reversed | async | TLS |
     // +-----------------------------------+-----+
     uint32 flags = 18;
     // Excluding L2-L4 packet header

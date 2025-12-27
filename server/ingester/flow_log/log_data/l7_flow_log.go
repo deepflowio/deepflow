@@ -209,6 +209,7 @@ type L7FlowLog struct {
 	Type          uint8  `json:"type" category:"$tag" sub:"application_layer" enumfile:"l7_log_type"`
 	IsTLS         uint8  `json:"is_tls" category:"$tag" sub:"application_layer"`
 	IsAsync       uint8  `json:"is_async" category:"$tag" sub:"application_layer"`
+	IsReversed    uint8  `json:"is_reversed" category:"$tag" sub:"application_layer"`
 
 	RequestType     string `json:"request_type" category:"$tag" sub:"application_layer"`
 	RequestDomain   string `json:"request_domain" category:"$tag" sub:"application_layer"`
@@ -271,6 +272,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 		ckdb.NewColumn("type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("日志类型, 0:请求, 1:响应, 2:会话"),
 		ckdb.NewColumn("is_tls", ckdb.UInt8),
 		ckdb.NewColumn("is_async", ckdb.UInt8),
+		ckdb.NewColumn("is_reversed", ckdb.UInt8),
 
 		ckdb.NewColumn("request_type", ckdb.LowCardinalityString).SetComment("请求类型, HTTP请求方法、SQL命令类型、NoSQL命令类型、MQ命令类型、DNS查询类型"),
 		ckdb.NewColumn("request_domain", ckdb.String).SetIndex(ckdb.IndexBloomfilter).SetComment("请求域名, HTTP主机名、RPC服务名称、DNS查询域名"),
@@ -323,6 +325,7 @@ func (h *L7FlowLog) WriteBlock(block *ckdb.Block) {
 		h.Type,
 		h.IsTLS,
 		h.IsAsync,
+		h.IsReversed,
 
 		h.RequestType,
 		h.RequestDomain,
@@ -410,6 +413,11 @@ func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 		h.IsAsync = 1
 	} else {
 		h.IsAsync = 0
+	}
+	if l.Flags&uint32(pb.FlagBits_FLAG_REVERSED) != 0 {
+		h.IsReversed = 1
+	} else {
+		h.IsReversed = 0
 	}
 	h.L7Protocol = uint8(l.Base.Head.Proto)
 	if l.ExtInfo != nil && l.ExtInfo.ProtocolStr != "" {
