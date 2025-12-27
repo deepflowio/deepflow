@@ -8751,12 +8751,10 @@ processors:
       enabled: false
       output:
         attribute_name: request
-        priority: 0
     save_response:
       enabled: false
       output:
         attribute_name: response
-        priority: 0
   fields:
   - name: "my_field" # 字段名，用于 compound_fields 中
     # 字段的提取类型，可选值及含义为：
