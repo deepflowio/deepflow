@@ -63,6 +63,7 @@ static struct symbol symbols[] = {
 static void openssl_parse_and_register(int pid, struct tracer_probes_conf *conf)
 {
 	char *path = NULL;
+	int count = 0;
 
 	if (pid <= 1)
 		return;
@@ -77,9 +78,11 @@ static void openssl_parse_and_register(int pid, struct tracer_probes_conf *conf)
 			return;
 	}
 
-	ebpf_info("openssl uprobe, pid:%d, path:%s\n", pid, path);
-	add_probe_sym_to_tracer_probes(pid, path, conf, symbols,
-				       NELEMS(symbols));
+	count = add_probe_sym_to_tracer_probes(pid, path, conf,
+					       symbols, NELEMS(symbols));
+	ebpf_info("openssl uprobes: pid:%d, path:%s, probes_count:%d\n",
+		  pid, path, count);
+	
 	free(path);
 }
 
