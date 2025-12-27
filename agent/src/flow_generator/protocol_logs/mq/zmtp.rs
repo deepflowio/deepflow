@@ -242,6 +242,9 @@ impl From<ZmtpInfo> for L7ProtocolSendLog {
         if f.is_async {
             flags = flags | ApplicationFlags::ASYNC;
         }
+        if f.is_reversed {
+            flags = flags | ApplicationFlags::REVERSED;
+        }
         L7ProtocolSendLog {
             req_len: f.req_msg_size.map(|x| x as u32),
             resp_len: f.res_msg_size.map(|x| x as u32),

@@ -794,6 +794,9 @@ impl From<HttpInfo> for L7ProtocolSendLog {
         if f.is_async {
             flags = flags | ApplicationFlags::ASYNC;
         }
+        if f.is_reversed {
+            flags = flags | ApplicationFlags::REVERSED;
+        }
 
         if f.status != L7ResponseStatus::Ok {
             if let Some(request_header) = f.request_header {

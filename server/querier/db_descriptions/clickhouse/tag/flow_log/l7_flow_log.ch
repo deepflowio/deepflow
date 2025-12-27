@@ -67,6 +67,7 @@ l7_protocol               , 应用协议                 ,
 l7_protocol_str           , 应用协议                 , 字符串形式。
 is_tls                    , TLS                      ,
 is_async                  , 异步                     ,
+is_reversed               , 反向                     ,
 version                   , 协议版本                 ,
 type                      , 日志类型                 ,
 request_type              , 请求类型                 ,
