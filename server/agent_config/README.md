@@ -8767,12 +8767,10 @@ Example:
       enabled: false
       output:
         attribute_name: request
-        priority: 0
     save_response:
       enabled: false
       output:
         attribute_name: response
-        priority: 0
   fields:
   - name: "my_field" # Configured field
     # Field extraction type, possible values and meanings:
