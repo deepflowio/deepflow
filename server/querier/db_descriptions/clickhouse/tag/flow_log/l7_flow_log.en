@@ -67,6 +67,7 @@ l7_protocol               , Application Protocol          ,
 l7_protocol_str           , Application Protocol          , In string.
 is_tls                    , TLS                           ,
 is_async                  , Async                         ,
+is_reversed               , Reversed                      ,
 version                   , Protocol Version              ,
 type                      , Log Type                      ,
 request_type              , Request Type                  ,
