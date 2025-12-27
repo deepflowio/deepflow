@@ -742,6 +742,9 @@ impl From<NatsInfo> for L7ProtocolSendLog {
         if info.is_async {
             flags = flags | ApplicationFlags::ASYNC;
         }
+        if info.is_reversed {
+            flags = flags | ApplicationFlags::REVERSED;
+        }
         let name = info.get_name();
         let subject = info
             .get_subject()

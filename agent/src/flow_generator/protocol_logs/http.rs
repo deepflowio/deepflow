@@ -773,6 +773,9 @@ impl From<HttpInfo> for L7ProtocolSendLog {
         if f.is_async {
             flags = flags | ApplicationFlags::ASYNC;
         }
+        if f.is_reversed {
+            flags = flags | ApplicationFlags::REVERSED;
+        }
 
         L7ProtocolSendLog {
             req_len: f.req_content_length,
