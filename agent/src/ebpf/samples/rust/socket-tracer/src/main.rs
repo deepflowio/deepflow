@@ -202,137 +202,6 @@ extern "C" fn debug_callback(_data: *mut c_char, len: c_int) {
 }
 
 extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, sd: *mut SK_BPF_DATA) -> c_int {
-    unsafe {
-        let mut proto_tag = String::from("");
-        if sk_proto_safe(sd) == SOCK_DATA_OTHER {
-            proto_tag.push_str("ORTHER");
-        } else if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
-            proto_tag.push_str("HTTP1");
-        } else if sk_proto_safe(sd) == SOCK_DATA_HTTP2 {
-            proto_tag.push_str("HTTP2");
-        } else if sk_proto_safe(sd) == SOCK_DATA_DNS {
-            proto_tag.push_str("DNS");
-        } else if sk_proto_safe(sd) == SOCK_DATA_MYSQL {
-            proto_tag.push_str("MYSQL");
-        } else if sk_proto_safe(sd) == SOCK_DATA_POSTGRESQL {
-            proto_tag.push_str("POSTGRESQL");
-        } else if sk_proto_safe(sd) == SOCK_DATA_REDIS {
-            proto_tag.push_str("REDIS");
-        } else if sk_proto_safe(sd) == SOCK_DATA_KAFKA {
-            proto_tag.push_str("KAFKA");
-        } else if sk_proto_safe(sd) == SOCK_DATA_MQTT {
-            proto_tag.push_str("MQTT");
-        } else if sk_proto_safe(sd) == SOCK_DATA_AMQP {
-            proto_tag.push_str("AMQP");
-        } else if sk_proto_safe(sd) == SOCK_DATA_NATS {
-            proto_tag.push_str("NATS");
-        } else if sk_proto_safe(sd) == SOCK_DATA_PULSAR {
-            proto_tag.push_str("PULSAR");
-        } else if sk_proto_safe(sd) == SOCK_DATA_DUBBO {
-            proto_tag.push_str("DUBBO");
-        } else if sk_proto_safe(sd) == SOCK_DATA_SOFARPC {
-            proto_tag.push_str("SOFARPC");
-        } else if sk_proto_safe(sd) == SOCK_DATA_FASTCGI {
-            proto_tag.push_str("FASTCGI");
-        } else if sk_proto_safe(sd) == SOCK_DATA_BRPC {
-            proto_tag.push_str("BRPC");
-        } else if sk_proto_safe(sd) == SOCK_DATA_TARS {
-            proto_tag.push_str("TARS");
-        } else if sk_proto_safe(sd) == SOCK_DATA_SOME_IP {
-            proto_tag.push_str("SomeIP");
-        } else if sk_proto_safe(sd) == SOCK_DATA_ISO8583 {
-            proto_tag.push_str("ISO8583");
-        } else if sk_proto_safe(sd) == SOCK_DATA_MONGO {
-            proto_tag.push_str("MONGO");
-        } else if sk_proto_safe(sd) == SOCK_DATA_TLS {
-            proto_tag.push_str("TLS");
-        } else if sk_proto_safe(sd) == SOCK_DATA_ORACLE {
-            proto_tag.push_str("ORACLE");
-        } else if sk_proto_safe(sd) == SOCK_DATA_OPENWIRE {
-            proto_tag.push_str("OPENWIRE");
-        } else if sk_proto_safe(sd) == SOCK_DATA_ZMTP {
-            proto_tag.push_str("ZMTP");
-        } else if sk_proto_safe(sd) == SOCK_DATA_WEBSPHEREMQ {
-            proto_tag.push_str("WEBSPHEREMQ");
-        } else {
-            proto_tag.push_str("UNSPEC");
-        }
-
-        println!("+ --------------------------------- +");
-        if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
-            let data = sk_data_str_safe(sd);
-            println!("{} <{}> BATCHLAST {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TLS {} TimeStamp {}\n{}", 
-                     date_time((*sd).timestamp),
-                     proto_tag,
-                     (*sd).batch_last_data,
-                     (*sd).direction,
-                     (*sd).msg_type,
-                     (*sd).process_id,
-                     (*sd).thread_id,
-                     (*sd).coroutine_id,
-                     sd_container_id_safe(sd),
-                     (*sd).source,
-                     (*sd).socket_role,
-                     process_name_safe(sd),
-                     flow_info(sd),
-                     (*sd).cap_len,
-                     (*sd).syscall_len,
-                     (*sd).socket_id,
-                     (*sd).syscall_trace_id_call,
-                     (*sd).tcp_seq,
-                     (*sd).cap_seq,
-                     (*sd).is_tls,
-                     (*sd).timestamp,
-                     data);
-        } else {
-            let data: Vec<u8> = sk_data_bytes_safe(sd);
-            println!("{} <{}> BATCHLAST {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} CONTAINER_ID {} SOURCE {} ROLE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TLS {} TimeStamp {}",
-                     date_time((*sd).timestamp),
-                     proto_tag,
-                     (*sd).batch_last_data,
-                     (*sd).direction,
-                     (*sd).msg_type,
-                     (*sd).process_id,
-                     (*sd).thread_id,
-                     (*sd).coroutine_id,
-                     sd_container_id_safe(sd),
-                     (*sd).source,
-                     (*sd).socket_role,
-                     process_name_safe(sd),
-                     flow_info(sd),
-                     (*sd).cap_len,
-                     (*sd).syscall_len,
-                     (*sd).socket_id,
-                     (*sd).syscall_trace_id_call,
-                     (*sd).tcp_seq,
-                     (*sd).cap_seq,
-                     (*sd).is_tls,
-                     (*sd).timestamp);
-            if (*sd).source == 2 {
-                print_uprobe_http2_info((*sd).cap_data, (*sd).cap_len);
-            } else if (*sd).source == 4 {
-                print_io_event_info((*sd).cap_data, (*sd).cap_len);
-            } else if (*sd).source == 5 {
-                print_uprobe_grpc_dataframe((*sd).cap_data, (*sd).cap_len);
-            } else if sk_proto_safe(sd) == SOCK_DATA_OTHER {
-                for x in data.into_iter() {
-                    print!("{} ", format!("{:02x}", x));
-                }
-            } else {
-                for x in data.into_iter() {
-                    if x < 32 || x > 126 {
-                        print!(".");
-                        continue;
-                    }
-                    let b = x as char;
-                    print!("{0}", b);
-                }
-            }
-            print!("\x1b[0m\n");
-        }
-
-        println!("+ --------------------------------- +\n");
-    }
 
     0
 }
@@ -416,29 +285,29 @@ fn main() {
         }
     }
     unsafe {
-        enable_ebpf_protocol(SOCK_DATA_HTTP1 as c_int);
-        enable_ebpf_protocol(SOCK_DATA_HTTP2 as c_int);
-        enable_ebpf_protocol(SOCK_DATA_DUBBO as c_int);
-        enable_ebpf_protocol(SOCK_DATA_SOFARPC as c_int);
-        enable_ebpf_protocol(SOCK_DATA_FASTCGI as c_int);
-        enable_ebpf_protocol(SOCK_DATA_BRPC as c_int);
-        enable_ebpf_protocol(SOCK_DATA_TARS as c_int);
-        enable_ebpf_protocol(SOCK_DATA_SOME_IP as c_int);
-        enable_ebpf_protocol(SOCK_DATA_ISO8583 as c_int);
-        enable_ebpf_protocol(SOCK_DATA_MYSQL as c_int);
-        enable_ebpf_protocol(SOCK_DATA_POSTGRESQL as c_int);
-        enable_ebpf_protocol(SOCK_DATA_REDIS as c_int);
-        enable_ebpf_protocol(SOCK_DATA_KAFKA as c_int);
-        enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
-        enable_ebpf_protocol(SOCK_DATA_AMQP as c_int);
-        enable_ebpf_protocol(SOCK_DATA_OPENWIRE as c_int);
-        enable_ebpf_protocol(SOCK_DATA_ZMTP as c_int);
-        enable_ebpf_protocol(SOCK_DATA_WEBSPHEREMQ as c_int);
-        enable_ebpf_protocol(SOCK_DATA_NATS as c_int);
-        enable_ebpf_protocol(SOCK_DATA_PULSAR as c_int);
-        enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
-        enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
-        enable_ebpf_protocol(SOCK_DATA_TLS as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_HTTP1 as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_HTTP2 as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_DUBBO as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_SOFARPC as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_FASTCGI as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_BRPC as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_TARS as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_SOME_IP as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_ISO8583 as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_MYSQL as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_POSTGRESQL as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_REDIS as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_KAFKA as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_MQTT as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_AMQP as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_OPENWIRE as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_ZMTP as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_WEBSPHEREMQ as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_NATS as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_PULSAR as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_DNS as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_MONGO as c_int);
+        // enable_ebpf_protocol(SOCK_DATA_TLS as c_int);
 
         //set_feature_regex(
         //    FEATURE_UPROBE_OPENSSL,
@@ -449,9 +318,9 @@ fn main() {
         //    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
         //);
 
-        //set_io_event_collect_mode(1);
+        set_io_event_collect_mode(2);
 
-        //set_io_event_minimal_duration(1000000);
+        set_io_event_minimal_duration(10);
 
         //// enable go auto traceing,
         //set_go_tracing_timeout(120);
@@ -682,11 +551,11 @@ fn main() {
         // test data limit max
         set_data_limit_max(10000);
 
-        //let empty_string = CString::new("").expect("CString::new failed");
-        //if datadump_set_config(0, empty_string.as_ptr(), 0, 60, debug_callback) != 0 {
-        //    println!("datadump_set_config() error");
-        //    ::std::process::exit(1);
-        //}
+        let empty_string = CString::new("").expect("CString::new failed");
+        if datadump_set_config(0, empty_string.as_ptr(), 0, 600000, debug_callback) != 0 {
+            println!("datadump_set_config() error");
+            ::std::process::exit(1);
+        }
 
         print!("socket_tracer_start() finish\n");
 

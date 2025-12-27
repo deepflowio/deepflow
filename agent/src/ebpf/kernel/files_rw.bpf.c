@@ -322,8 +322,8 @@ static __inline int trace_io_event_common(void *ctx,
 	}
 
 	buffer->bytes_count = data_args->bytes_count;
-	buffer->latency = latency;
-	buffer->operation = direction;
+	//buffer->latency = latency;
+	//buffer->operation = direction;
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
@@ -343,19 +343,34 @@ static __inline int trace_io_event_common(void *ctx,
 	v->fd = data_args->fd;
 	v->tgid = tgid;
 	v->pid = (__u32) pid_tgid;
-	v->coroutine_id = trace_key.goid;
+	//v->coroutine_id = trace_key.goid;
 	v->timestamp = data_args->enter_ts;
 	v->syscall_len = sizeof(*buffer);
-	v->source = DATA_SOURCE_IO_EVENT;
-	v->thread_trace_id = trace_id;
+	// hs_err_pid
+	if (buffer->filename[0] == 'h' && buffer->filename[1] == 's' &&
+	    buffer->filename[2] == '_' && buffer->filename[3] == 'e' &&
+	    buffer->filename[4] == 'r' && buffer->filename[5] == 'r' &&
+	    buffer->filename[6] == '_' && buffer->filename[7] == 'p') {
+		v->source = DATA_SOURCE_FILE_WRITE;
+		v->syscall_len = data_args->bytes_count;
+	} else {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
+		return 0;
+		//v->source = DATA_SOURCE_IO_EVENT;
+		//v->syscall_len = sizeof(*buffer);
+	}
+	//v->thread_trace_id = trace_id;
 	v->msg_type = MSG_COMMON;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
+	bool is_vecs = false;
+	if (data_args->iov != NULL)
+		is_vecs = true;
 #if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 	struct tail_calls_context *context =
 	    (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
 	context->push_reassembly_bytes = 0;
-	context->vecs = false;
+	context->vecs = is_vecs;
 	context->is_close = false;
 	context->dir = direction;
 #ifdef SUPPORTS_KPROBE_ONLY
@@ -366,7 +381,7 @@ static __inline int trace_io_event_common(void *ctx,
 	return 0;
 #else
 	return __output_data_common(ctx, tracer_ctx, v_buff, data_args,
-				    direction, false, data_max_sz, false, 0);
+				    direction, is_vecs, data_max_sz, false, 0);
 #endif
 }
 
@@ -479,7 +494,9 @@ TP_SYSCALL_PROG(exit_preadv2) (struct syscall_comm_exit_ctx * ctx) {
 #endif /* SUPPORTS_KPROBE_ONLY */
 
 // File Write Event Tracing
-static __inline int do_sys_enter_pwrite(int fd, enum syscall_src_func fn)
+static __inline int do_sys_enter_pwrite(int fd, const char *buf,
+					struct iovec *iov, int iovlen,
+					enum syscall_src_func fn)
 {
 	__u32 k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
@@ -490,6 +507,9 @@ static __inline int do_sys_enter_pwrite(int fd, enum syscall_src_func fn)
 	struct data_args_t write_args = {};
 	write_args.source_fn = fn;
 	write_args.fd = fd;
+	write_args.buf = buf;
+	write_args.iov = iov;
+	write_args.iovlen = iovlen;
 	write_args.enter_ts = bpf_ktime_get_ns();
 	active_write_args_map__update(&id, &write_args);
 	return 0;
@@ -500,7 +520,8 @@ static __inline int do_sys_enter_pwrite(int fd, enum syscall_src_func fn)
 #ifdef SUPPORTS_KPROBE_ONLY
 KPROG(ksys_pwrite64) (struct pt_regs * ctx) {
 	int fd = (int)PT_REGS_PARM1(ctx);
-	return do_sys_enter_pwrite(fd, SYSCALL_FUNC_PWRITE64);
+	const char *buf = (char *)PT_REGS_PARM2(ctx);
+	return do_sys_enter_pwrite(fd, buf, NULL, 0, SYSCALL_FUNC_PWRITE64);
 }
 
 /*
@@ -510,25 +531,32 @@ KPROG(ksys_pwrite64) (struct pt_regs * ctx) {
  */
 KPROG(do_pwritev) (struct pt_regs * ctx) {
 	int fd = (int)PT_REGS_PARM1(ctx);
-	return do_sys_enter_pwrite(fd, SYSCALL_FUNC_PWRITEV);
+	struct iovec *iov = (struct iovec *)PT_REGS_PARM2(ctx);
+	int iovlen = (int)PT_REGS_PARM3(ctx);
+	return do_sys_enter_pwrite(fd, NULL, iov, iovlen, SYSCALL_FUNC_PWRITEV);
 }
 #else
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_pwrite64/format
 TP_SYSCALL_PROG(enter_pwrite64) (struct syscall_comm_enter_ctx * ctx) {
 	int fd = ctx->fd;
-	return do_sys_enter_pwrite(fd, SYSCALL_FUNC_PWRITE64);
+	const char *buf = (const char *)ctx->buf;
+	return do_sys_enter_pwrite(fd, buf, NULL, 0, SYSCALL_FUNC_PWRITE64);
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_pwritev/format
 TP_SYSCALL_PROG(enter_pwritev) (struct syscall_comm_enter_ctx * ctx) {
 	int fd = ctx->fd;
-	return do_sys_enter_pwrite(fd, SYSCALL_FUNC_PWRITEV);
+	struct iovec *iov = (struct iovec *)ctx->buf;
+	int iovlen = (int)ctx->count;
+	return do_sys_enter_pwrite(fd, NULL, iov, iovlen, SYSCALL_FUNC_PWRITEV);
 }
 
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_pwritev2/format
 TP_SYSCALL_PROG(enter_pwritev2) (struct syscall_comm_enter_ctx * ctx) {
 	int fd = ctx->fd;
-	return do_sys_enter_pwrite(fd, SYSCALL_FUNC_PWRITEV2);
+	struct iovec *iov = (struct iovec *)ctx->buf;
+	int iovlen = (int)ctx->count;
+	return do_sys_enter_pwrite(fd, NULL, iov, iovlen, SYSCALL_FUNC_PWRITEV2);
 }
 #endif /* SUPPORTS_KPROBE_ONLY */
 

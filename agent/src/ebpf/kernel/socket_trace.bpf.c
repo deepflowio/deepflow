@@ -3282,12 +3282,14 @@ skip_copy:
 	 * 1. The delay of the periodic push event exceeds the threshold (typically 50 milliseconds).
 	 * 2. The number of events exceeds the maximum batch size (MAX_EVENTS_BURST, typically 32).
 	 * 3. The data buffer is full (not enough space for another struct __socket_data).
+	 * 4. Send the file content immediately when collecting it to prevent out-of-order issues caused by buffering.
 	 */
 	__u64 curr_time = bpf_ktime_get_ns();
 	__u64 diff = curr_time - tracer_ctx->last_period_timestamp;
 	if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS ||
 	    v_buff->events_num >= MAX_EVENTS_BURST ||
 	    (args && args->extra_iovlen) ||
+	    v->source == DATA_SOURCE_FILE_WRITE ||
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		finalize_data_output(ctx, tracer_ctx, curr_time, diff, v_buff);
 	}
@@ -3391,6 +3393,7 @@ skip_copy:
 	if (diff > PERIODIC_PUSH_DELAY_THRESHOLD_NS ||
 	    v_buff->events_num >= MAX_EVENTS_BURST ||
 	    (args && args->extra_iovlen) ||
+	    v->source == DATA_SOURCE_FILE_WRITE ||
 	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
 		finalize_data_output(ctx, tracer_ctx, curr_time, diff, v_buff);
 	}
