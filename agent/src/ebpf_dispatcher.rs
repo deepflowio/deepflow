@@ -1071,6 +1071,12 @@ impl EbpfCollector {
                     CString::new(".*").unwrap().as_c_str().as_ptr(),
                 );
             }
+            if !languages.lua_disabled {
+                ebpf::set_feature_regex(
+                    ebpf::FEATURE_PROFILE_LUA,
+                    CString::new(".*").unwrap().as_c_str().as_ptr(),
+                );
+            }
 
             #[cfg(feature = "extended_observability")]
             {
