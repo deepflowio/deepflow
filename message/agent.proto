@@ -3,8 +3,6 @@ syntax = "proto2";
 package agent;
 option go_package = "agent";
 
-import "common.proto";
-
 service Synchronizer {
     rpc Sync(SyncRequest) returns (SyncResponse) {}
     rpc Push(SyncRequest) returns (stream SyncResponse) {}
@@ -567,6 +565,12 @@ message GenesisSyncResponse {
     optional uint64 version = 1 [default = 0];
 }
 
+message KubernetesAPIInfo {
+    optional string type = 1;
+    optional string info = 2;
+    optional bytes compressed_info = 3;
+}
+
 message KubernetesAPISyncRequest {
     optional string cluster_id = 1;
     optional uint64 version = 2;
@@ -574,7 +578,7 @@ message KubernetesAPISyncRequest {
     optional uint32 agent_id = 4;
     optional string source_ip = 5;
     optional string team_id = 6;  // agent team identity
-    repeated common.KubernetesAPIInfo entries = 10;
+    repeated KubernetesAPIInfo entries = 10;
 }
 
 message KubernetesAPISyncResponse {

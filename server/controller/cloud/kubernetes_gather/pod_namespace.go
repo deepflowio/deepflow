@@ -26,8 +26,8 @@ import (
 func (k *KubernetesGather) getPodNamespaces() ([]model.PodNamespace, error) {
 	log.Debug("get pod namespaces starting", logger.NewORGPrefix(k.orgID))
 	podNamespaces := []model.PodNamespace{}
-	for _, n := range k.k8sInfo["*v1.Namespace"] {
-		nData, err := simplejson.NewJson([]byte(n))
+	for _, n := range k.k8sEntries["*v1.Namespace"] {
+		nData, err := simplejson.NewJson(n)
 		if err != nil {
 			log.Errorf("pod namespace initialization simplejson error: (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
 			return podNamespaces, err

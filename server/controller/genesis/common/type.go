@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/deepflowio/deepflow/message/agent"
-	"github.com/deepflowio/deepflow/message/common"
 	"github.com/deepflowio/deepflow/server/controller/model"
 )
 
@@ -61,12 +60,12 @@ type GenesisSyncDataResponse struct {
 }
 
 type KubernetesInfo struct {
-	ORGID     int
-	ClusterID string
-	ErrorMSG  string
-	Version   uint64
-	Epoch     time.Time
-	Entries   []*common.KubernetesAPIInfo
+	ORGID       int
+	ClusterID   string
+	ErrorMSG    string
+	Version     uint64
+	Epoch       time.Time
+	EntriesJson []byte
 }
 
 type K8SRPCMessage struct {
@@ -88,4 +87,10 @@ type VIFRPCMessage struct {
 	StorageRefresh          bool
 	WorkloadResourceEnabled bool
 	Message                 *agent.GenesisSyncRequest
+}
+
+type ClusterDest struct {
+	Endpoint        string
+	DomainLcuuid    string
+	SubDomainLcuuid string
 }

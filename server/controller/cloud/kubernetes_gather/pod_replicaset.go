@@ -29,8 +29,8 @@ import (
 
 func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []model.PodReplicaSet, podRSCs []model.PodGroup, podGroupConfigMapConnections []model.PodGroupConfigMapConnection, err error) {
 	log.Debug("get replicasets,replicasetcontrollers starting", logger.NewORGPrefix(k.orgID))
-	for _, r := range k.k8sInfo["*v1.ReplicaSet"] {
-		rData, rErr := simplejson.NewJson([]byte(r))
+	for _, r := range k.k8sEntries["*v1.ReplicaSet"] {
+		rData, rErr := simplejson.NewJson(r)
 		if rErr != nil {
 			err = rErr
 			log.Errorf("replicaset,replicasetcontroller initialization simplejson error: (%s)", rErr.Error(), logger.NewORGPrefix(k.orgID))

@@ -34,8 +34,8 @@ func (k *KubernetesGather) getPodNodes() (podNodes []model.PodNode, nodeNetwork,
 	if err != nil {
 		log.Warningf("get pod node hostname error : (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
 	}
-	for _, n := range k.k8sInfo["*v1.Node"] {
-		nData, nErr := simplejson.NewJson([]byte(n))
+	for _, n := range k.k8sEntries["*v1.Node"] {
+		nData, nErr := simplejson.NewJson(n)
 		if nErr != nil {
 			err = nErr
 			log.Errorf("node initialization simplejson error: (%s)", nErr.Error(), logger.NewORGPrefix(k.orgID))

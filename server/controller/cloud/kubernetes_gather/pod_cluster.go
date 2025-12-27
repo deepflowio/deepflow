@@ -29,12 +29,12 @@ import (
 
 func (k *KubernetesGather) getPodCluster() (model.PodCluster, error) {
 	log.Debug("get pod cluster starting", logger.NewORGPrefix(k.orgID))
-	vInfo, ok := k.k8sInfo["*version.Info"]
-	if !ok || len(vInfo) == 0 {
+	vEntries, ok := k.k8sEntries["*version.Info"]
+	if !ok || len(vEntries) == 0 {
 		return model.PodCluster{}, errors.New("not found k8s version info")
 	}
 
-	vJson, vErr := simplejson.NewJson([]byte(vInfo[0]))
+	vJson, vErr := simplejson.NewJson(vEntries[0])
 	if vErr != nil {
 		log.Errorf("pod cluster initialization version json error: (%s)", vErr.Error(), logger.NewORGPrefix(k.orgID))
 		return model.PodCluster{}, vErr
