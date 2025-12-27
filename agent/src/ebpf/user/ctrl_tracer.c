@@ -1223,8 +1223,49 @@ show_exit:
 	return 0;
 }
 
+#define LOG_PATH "/var/log/deepflow-agent/java-crash.log"
+
+int ensure_log_file(void)
+{
+    int fd;
+
+    /* 先检查文件是否存在 */
+    if (access(LOG_PATH, F_OK) == 0) {
+        return 0;  // 已存在，什么都不做
+    }
+
+    /* 确保目录存在 */
+    if (mkdir("/var/log/deepflow-agent", 0755) != 0 && errno != EEXIST) {
+        perror("mkdir");
+        return -1;
+    }
+
+    /* 创建文件（仅当不存在时创建） */
+    fd = open(LOG_PATH, O_WRONLY | O_CREAT | O_EXCL, 0644);
+    if (fd < 0) {
+        if (errno == EEXIST) return 0;
+        perror("open");
+        return -1;
+    }
+
+    /* 写入初始内容 */
+    const char *init = "-----\n";
+    if (write(fd, init, strlen(init)) < 0) {
+        perror("write");
+        close(fd);
+        return -1;
+    }
+
+    close(fd);
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
+	if (ensure_log_file() != 0) {
+		fprintf(stderr, "java log file failed\n");
+ 	}
+
 	char *prog;
 	struct df_bpf_conf conf;
 	struct df_bpf_obj *obj;
