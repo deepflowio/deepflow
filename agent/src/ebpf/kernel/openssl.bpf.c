@@ -43,7 +43,72 @@ static int get_fd_from_openssl_ssl(void *ssl)
 	int fd;
 	void *rbio;
 
-	static const int rbio_ssl_offset = 0x10;
+	/*
+	 * Explanation for distinguishing OpenSSL 'SSL' structure versions:
+	 *
+	 * 1. Before OpenSSL 3.2:
+	 *    - The SSL object is of type 'struct ssl_st', with the first 4 bytes
+	 *      representing the protocol version.
+	 *    - The version value is typically >= 0x0300 (e.g., TLS1.0 = 0x0301).
+	 *    - The 'rbio' member is located at offset 0x10.
+	 *
+	 * 2. OpenSSL 3.2 and later:
+	 *    - The SSL object is actually 'struct ssl_connection_st', where the first
+	 *      4 bytes represent a type identifier.
+	 *    - Type values are SSL_TYPE_SSL_CONNECTION = 0, SSL_TYPE_QUIC_CONNECTION = 1,
+	 *      SSL_TYPE_QUIC_XSO = 2, all less than 0x0300.
+	 *    - The 'version' field is moved to offset 0x40 (64 bytes).
+	 *    - The 'rbio' member is located at offset 0x48/0x50.
+	 *
+	 * 3. Detection logic example:
+	 *    - Read the first 4 bytes of the SSL* pointer:
+	 *      - If value >= 0x0300, it's the old structure; rbio offset = 0x10.
+	 *      - If value <= 2, it's the new structure; rbio offset = 0x48/0x50.
+	 *      - Otherwise, invalid or unknown structure.
+	 *
+	 * 4. Common protocol version macros:
+	 *      SSL2_VERSION    0x0002 (is obsolete and no longer supported.)
+	 *      SSL3_VERSION    0x0300
+	 *      TLS1_VERSION    0x0301
+	 *      TLS1_1_VERSION  0x0302
+	 *      TLS1_2_VERSION  0x0303
+	 *      TLS1_3_VERSION  0x0304
+	 *      DTLS1_VERSION   0xFEFF
+	 *      DTLS1_2_VERSION 0xFEFD
+	 *
+	 * 5. Type identifier macros (new structure):
+	 *      SSL_TYPE_SSL_CONNECTION  0
+	 *      SSL_TYPE_QUIC_CONNECTION 1
+	 *      SSL_TYPE_QUIC_XSO        2
+	 *
+	 * This comment is intended to guide how to detect OpenSSL version struct
+	 * from the first 4 bytes of SSL* pointer and correctly access the rbio field.
+	 */
+
+	int version = 0;
+	int rbio_ssl_offset = 0x10;
+	bpf_probe_read_user(&version, sizeof(version), ssl);
+	if (version < 0x0300) {
+		rbio_ssl_offset = 0x48;
+		/*
+		 * For OpenSSL versions earlier than 3.2.4, the rbio offset is 0x48;
+		 * otherwise, the rbio offset is 0x50.
+		 * Openssl3.2.4+
+		 * --------------------------
+		 * struct ssl_connection_st {
+		 *    struct ssl_st              ssl;      // 0    64
+		 *    SSL *                      user_ssl; // 64   8
+		 *    int                        version;  // 72   4
+		 *    BIO *                      rbio;     // 80   8
+		 *
+		 * The version field above is at offset 0x48; we determine rbio_ssl_offset
+		 * again based on the version value.
+		 */
+		bpf_probe_read_user(&version, sizeof(version), ssl + 0x48);
+		if (version >= 0x0300 && version <= 0x0304)
+			rbio_ssl_offset = 0x50;
+	}
+
 	static const int fd_rbio_offset_v3 = 0x38;
 	static const int fd_rbio_offset_v1_1_1 = 0x30;
 	static const int fd_rbio_offset_v1_1_0 = 0x28;
