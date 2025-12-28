@@ -1044,6 +1044,57 @@ static inline int get_additional_memory_size(struct __socket_data_buffer *buf)
 	return extra_size;
 }	
 
+// ------------------------------------ java debug -------------------
+#define JAVA_LOG_PATH "/var/log/deepflow-agent/java-crash.log"
+#include <sys/stat.h>
+static int log_fd = -1;
+static pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static int open_log_if_needed()
+{
+    if (log_fd != -1) return 0;
+
+    const char *path = "/var/log/deepflow-agent";
+
+    if (access(path, F_OK) != 0) {
+        if (mkdir(path, 0755) != 0 && errno != EEXIST) {
+            perror("mkdir");
+        }
+    }
+
+    int fd = open(JAVA_LOG_PATH,
+                  O_WRONLY | O_CREAT | O_APPEND,
+                  0644);
+    if (fd < 0) {
+        perror("open java log");
+        return -1;
+    }
+
+    log_fd = fd;
+    return 0;
+}
+
+
+void javalog_append(const char *buf, size_t len)
+{
+    pthread_mutex_lock(&log_lock);
+
+    if (open_log_if_needed() != 0) {
+        pthread_mutex_unlock(&log_lock);
+        return;
+    }
+
+    ssize_t ret = write(log_fd, buf, len);
+    if (ret < 0) {
+        perror("write java log");
+        close(log_fd);
+        log_fd = -1;
+    }
+
+    pthread_mutex_unlock(&log_lock);
+}
+
+// -------------------------------------------------------------------
 // Read datas from perf ring-buffer and dispatch.
 static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 {
@@ -1350,6 +1401,25 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		}
 		submit_data->syscall_len += offset;
 		submit_data->cap_len = len + offset;
+
+		if (sd->source == DATA_SOURCE_FILE_WRITE) {
+			char wr_tag[256];
+			if (submit_data->syscall_len != submit_data->cap_len) {
+				int java_len = snprintf(wr_tag, sizeof(wr_tag), "\n### ==== PID %d syscall_len %d cap_len %d ====\n", sd->tgid, submit_data->syscall_len, submit_data->cap_len);
+				javalog_append(wr_tag, java_len);
+			}
+			// 23(#) 20( ) 41(A) 20( ) 66(f) 61(a) 74(t) 61(a) 6C(l) 20( ) 65(e) 72(r) 72(r) 6F(o)
+			// # A fatal error has
+			if (submit_data->cap_data[0] == '#' && submit_data->cap_data[1] == ' ' && submit_data->cap_data[2] == 'A' && submit_data->cap_data[3] == ' ' && submit_data->cap_data[4] == 'f' &&
+			    submit_data->cap_data[5] == 'a' && submit_data->cap_data[6] == 't' && submit_data->cap_data[7] == 'a' && submit_data->cap_data[8] == 'l' && submit_data->cap_data[9] == ' ') {
+				char *timestamp = gen_timestamp_str(0);
+				int java_len = snprintf(wr_tag, sizeof(wr_tag), "# %s containerID %s\n", timestamp, submit_data->container_id);
+				javalog_append(wr_tag, java_len);
+				free(timestamp);
+			}
+			javalog_append(submit_data->cap_data, submit_data->cap_len);
+		}
+
 		burst_data[i] = submit_data;
 
 		start +=
