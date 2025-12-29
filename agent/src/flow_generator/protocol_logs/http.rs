@@ -1121,7 +1121,7 @@ impl HttpLog {
         param: &ParseParam,
         config: &LogParserConfig,
         payload: &[u8],
-        l7_payload: Option<&[u8]>,
+        #[allow(unused_variables)] l7_payload: Option<&[u8]>,
         info: &mut HttpInfo,
         #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) {
