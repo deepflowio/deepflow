@@ -21,10 +21,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <strings.h>
 #include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <pthread.h>
 #include "config.h"
 #include "utils.h"
 #include "log.h"
@@ -63,6 +65,9 @@ extern int btf__set_pointer_size(struct btf *btf, size_t ptr_sz);
 #define KERN_FEAT_SUP		1
 #define KERN_FEAT_NOTSUP        2
 
+#define VERIFIER_LOG_TAIL_BYTES	(2 * 1024)
+#define VERIFIER_LOG_ENV	"DF_EBPF_VERIFIER_LOG_TO_FILE"
+
 static int probe_read_kernel_feat;
 
 int suspend_stderr()
@@ -99,6 +104,155 @@ void resume_stderr(int fd)
 static inline bool str_is_empty(const char *s)
 {
 	return !s || !s[0];
+}
+
+static bool env_flag_enabled(const char *name)
+{
+	const char *val = getenv(name);
+
+	if (str_is_empty(val)) {
+		return false;
+	}
+
+	return !strcasecmp(val, "1") || !strcasecmp(val, "true") ||
+	    !strcasecmp(val, "yes") || !strcasecmp(val, "on");
+}
+
+struct log_drain_ctx {
+	int read_fd;
+	int copy_fd;
+	char *tail_buf;
+	size_t tail_buf_sz;
+	size_t tail_len;
+	bool copy_failed;
+};
+
+static void append_tail(char *dst, size_t *dst_len, size_t dst_sz,
+			const char *src, size_t src_len)
+{
+	if (src_len >= dst_sz) {
+		memcpy(dst, src + src_len - dst_sz, dst_sz);
+		*dst_len = dst_sz;
+		return;
+	}
+
+	if (*dst_len + src_len <= dst_sz) {
+		memcpy(dst + *dst_len, src, src_len);
+		*dst_len += src_len;
+		return;
+	}
+
+	size_t drop = *dst_len + src_len - dst_sz;
+
+	memmove(dst, dst + drop, *dst_len - drop);
+	*dst_len -= drop;
+
+	memcpy(dst + *dst_len, src, src_len);
+	*dst_len += src_len;
+}
+
+static void *drain_log_pipe(void *arg)
+{
+	struct log_drain_ctx *ctx = (struct log_drain_ctx *)arg;
+	char buf[256];
+
+	while (1) {
+		ssize_t n = read(ctx->read_fd, buf, sizeof(buf));
+
+		if (n == 0) {
+			break;
+		}
+
+		if (n < 0) {
+			if (errno == EINTR) {
+				continue;
+			}
+			break;
+		}
+
+		append_tail(ctx->tail_buf, &ctx->tail_len, ctx->tail_buf_sz, buf, n);
+
+		if (ctx->copy_fd < 0 || ctx->copy_failed) {
+			continue;
+		}
+
+		ssize_t written = 0;
+
+		while (written < n) {
+			ssize_t w = write(ctx->copy_fd, buf + written, n - written);
+
+			if (w < 0) {
+				if (errno == EINTR)
+					continue;
+				ebpf_warning
+				    ("Failed to write verifier log to file: %s\n",
+				     strerror(errno));
+				ctx->copy_failed = true;
+				break;
+			}
+
+			if (w == 0) {
+				ebpf_warning("Failed to write verifier log to file: zero bytes written\n");
+				ctx->copy_failed = true;
+				break;
+			}
+
+			written += w;
+		}
+	}
+
+	if (ctx->tail_len > ctx->tail_buf_sz) {
+		ctx->tail_len = ctx->tail_buf_sz;
+	}
+
+	ctx->tail_buf[ctx->tail_len] = '\0';
+
+	if (ctx->read_fd >= 0) {
+		close(ctx->read_fd);
+	}
+
+	ctx->read_fd = -1;
+
+	return NULL;
+}
+
+static void log_verifier_tail(const char *buf, size_t len)
+{
+	/*
+	 * ebpf_warning() has an internal 2KB buffer, so emit the tail in
+	 * smaller chunks to avoid truncating the final lines.
+	 */
+	const size_t max_chunk = MSG_SZ - 256;
+
+	if (!buf || len == 0) {
+		return;
+	}
+
+	ebpf_warning("Verifier log tail (last %zu bytes):", len);
+
+	const char *p = buf;
+	const char *end = buf + len;
+
+	while (p < end) {
+		const char *nl = memchr(p, '\n', end - p);
+		size_t line_len = nl ? (size_t)(nl - p + 1) : (size_t)(end - p);
+
+		while (line_len > 0) {
+			size_t emit = line_len > max_chunk ? max_chunk : line_len;
+			char line_buf[MSG_SZ];
+
+			memcpy(line_buf, p, emit);
+			line_buf[emit] = '\0';
+			ebpf_warning("%s", line_buf);
+
+			p += emit;
+			line_len -= emit;
+		}
+
+		if (nl) {
+			p = nl + 1;
+		}
+	}
 }
 
 int load_ebpf_prog(struct ebpf_prog *prog)
@@ -625,47 +779,186 @@ static int load_obj__progs(struct ebpf_object *obj)
 		if (new_prog->prog_fd < 0) {
 			int saved_errno = errno;
 			int retry_errno = saved_errno;
+			bool save_full_log = env_flag_enabled(VERIFIER_LOG_ENV);
 			ebpf_warning
 			    ("bcc_prog_load() failed. name: %s, %s errno: %d\n",
 			     new_prog->name, strerror(errno), errno);
-			// Best-effort retry with verifier logs for troubleshooting.
-			/* Capture verifier stderr into a temp file via bcc internal buffering */
 			char log_path[] = "/tmp/df_verifier_XXXXXX.log";
-			int tmp_fd = mkstemps(log_path, 4);
-			if (tmp_fd >= 0) {
+			int tmp_fd = -1;
+			char tail_buf[VERIFIER_LOG_TAIL_BYTES + 1] = { 0 };
+			bool log_file_ready = false;
+			struct log_drain_ctx ctx = {
+				.read_fd = -1,
+				.copy_fd = -1,
+				.tail_buf = tail_buf,
+				.tail_buf_sz = VERIFIER_LOG_TAIL_BYTES,
+				.tail_len = 0,
+				.copy_failed = false,
+			};
+			pthread_t drain_thread;
+			bool drain_started = false;
+			int fd2 = -1;
+			int fd2_errno = 0;
+			bool load_attempted = false;
+
+			if (save_full_log) {
+				tmp_fd = mkstemps(log_path, 4);
+				if (tmp_fd < 0) {
+					ebpf_warning
+					    ("Failed to create verifier log file %s: %s\n",
+					     log_path, strerror(errno));
+					save_full_log = false;
+				}
+			}
+
+			int log_pipe[2] = { -1, -1 };
+
+			if (pipe(log_pipe) < 0) {
+				ebpf_warning("Failed to create verifier log pipe: %s\n",
+					     strerror(errno));
+			} else {
+				ctx.read_fd = log_pipe[0];
+				ctx.copy_fd = save_full_log ? tmp_fd : -1;
+
+				if (pthread_create(&drain_thread, NULL,
+						   drain_log_pipe, &ctx) != 0) {
+					ebpf_warning
+					    ("Failed to start verifier log drain thread: %s\n",
+					     strerror(errno));
+					close(log_pipe[0]);
+					close(log_pipe[1]);
+					ctx.read_fd = -1;
+					log_pipe[0] = -1;
+					log_pipe[1] = -1;
+				} else {
+					drain_started = true;
+				}
+
+			}
+
+			if (drain_started) {
 				int stderr_fd2 = dup(STDERR_FILENO);
+
 				if (stderr_fd2 < 0) {
 					ebpf_warning("Failed to dup stderr (retry)\n");
-					close(tmp_fd);
+				} else if (dup2(log_pipe[1], STDERR_FILENO) < 0) {
+					ebpf_warning("Failed to redirect stderr (retry)\n");
 				} else {
-					if (dup2(tmp_fd, STDERR_FILENO) < 0) {
-						ebpf_warning("Failed to redirect stderr (retry)\n");
-					}
-					close(tmp_fd);
-					int fd2 =
-					    bcc_prog_load(new_prog->type,
-							  new_prog->name,
-							  new_prog->insns,
-							  new_prog->insns_size,
-							  obj->license,
-							  obj->kern_version,
-							  1, NULL, 0);
+					close(log_pipe[1]);
+					log_pipe[1] = -1;
+
+					fd2 = bcc_prog_load(new_prog->type,
+							    new_prog->name,
+							    new_prog->insns,
+							    new_prog->insns_size,
+							    obj->license,
+							    obj->kern_version,
+							    1, NULL, 0);
+					fd2_errno = errno;
+					load_attempted = true;
+
 					dup2(stderr_fd2, STDERR_FILENO);
 					close(stderr_fd2);
+					stderr_fd2 = -1;
+
 					if (fd2 >= 0) {
 						new_prog->prog_fd = fd2;
 					} else {
-						retry_errno = errno;
-						ebpf_warning("Verifier log saved to %s\n", log_path);
+						retry_errno = fd2_errno;
+						log_file_ready = save_full_log &&
+						    tmp_fd >= 0;
 					}
 				}
+
+				if (log_pipe[1] >= 0) {
+					close(log_pipe[1]);
+					log_pipe[1] = -1;
+				}
+
+				if (stderr_fd2 >= 0) {
+					close(stderr_fd2);
+					stderr_fd2 = -1;
+				}
 			} else {
-				/* Fallback: no log capture, keep original errno */
-				ebpf_warning("Failed to create verifier log file, keeping errno %d\n",
-					     saved_errno);
-				retry_errno = saved_errno;
+				/* Drain not started, close pipe ends if they are valid. */
+				if (log_pipe[0] >= 0)
+					close(log_pipe[0]);
+				if (log_pipe[1] >= 0)
+					close(log_pipe[1]);
+				log_pipe[0] = -1;
+				log_pipe[1] = -1;
+
+				int stderr_fd2 = -1;
+
+				if (save_full_log && tmp_fd >= 0) {
+					stderr_fd2 = dup(STDERR_FILENO);
+					if (stderr_fd2 < 0) {
+						ebpf_warning
+						    ("Failed to dup stderr (no-drain retry)\n");
+					} else if (dup2(tmp_fd, STDERR_FILENO) < 0) {
+						ebpf_warning
+						    ("Failed to redirect stderr to log file (no-drain retry)\n");
+					}
+				}
+
+				fd2 = bcc_prog_load(new_prog->type,
+						    new_prog->name,
+						    new_prog->insns,
+						    new_prog->insns_size,
+						    obj->license,
+						    obj->kern_version, 1, NULL,
+						    0);
+				fd2_errno = errno;
+				load_attempted = true;
+
+				if (stderr_fd2 >= 0) {
+					dup2(stderr_fd2, STDERR_FILENO);
+					close(stderr_fd2);
+					stderr_fd2 = -1;
+				}
+
+				if (save_full_log && tmp_fd >= 0)
+					log_file_ready = true;
 			}
+
+			if (drain_started)
+				pthread_join(drain_thread, NULL);
+
+			if (!load_attempted) {
+				fd2 = bcc_prog_load(new_prog->type,
+						    new_prog->name,
+						    new_prog->insns,
+						    new_prog->insns_size,
+						    obj->license,
+						    obj->kern_version, 1, NULL,
+						    0);
+				fd2_errno = errno;
+				load_attempted = true;
+			}
+
+			if (fd2 >= 0)
+				new_prog->prog_fd = fd2;
+			else
+				retry_errno = fd2_errno;
+
+			if (tmp_fd >= 0) {
+				if (log_file_ready) {
+					struct stat st;
+
+					if (fstat(tmp_fd, &st) == 0 &&
+					    st.st_size > 0) {
+						ebpf_warning
+						    ("Verifier log saved to %s\n",
+						     log_path);
+					}
+				}
+				close(tmp_fd);
+			}
+
 			if (new_prog->prog_fd < 0) {
+				if (ctx.tail_len > 0)
+					log_verifier_tail(tail_buf, ctx.tail_len);
+
 				// Preserve errno from the latest attempt for better diagnostics.
 				ebpf_warning
 				    ("bcc_prog_load() still failed. name: %s, errno after retry: %d (orig %d)\n",
