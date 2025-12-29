@@ -228,6 +228,11 @@ func NewHealers(md metadata.Platform) *Healers {
 					newDataGenerator(md, common.RESOURCE_TYPE_VM_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST)),
 
+				newHealer[metadbmodel.CustomService, metadbmodel.ChBizService, *message.AddedCustomServices](
+					msgMetadata,
+					newDataGenerator(md, common.RESOURCE_TYPE_CUSTOM_SERVICE_EN),
+					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_BIZ_SERVICE)),
+
 				newHealer[metadbmodel.VPC, metadbmodel.ChVPC, *message.AddedVPCs](
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_VPC_EN),

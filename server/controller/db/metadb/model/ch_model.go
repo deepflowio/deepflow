@@ -678,3 +678,17 @@ type ChCustomBizServiceFilter struct {
 func (ChCustomBizServiceFilter) TableName() string {
 	return "ch_custom_biz_service_filter"
 }
+
+type ChBizService struct {
+	ChIDBase         `gorm:"embedded"`
+	ChUpdatedAtBase  `gorm:"embedded"`
+	Name             string `gorm:"column:name;type:varchar(256)" json:"NAME"`
+	ServiceGroupName string `gorm:"column:service_group_name;type:varchar(256)" json:"SERVICE_GROUP_NAME"`
+	IconID           int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	TeamID           int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
+	DomainID         int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
+}
+
+func (ChBizService) TableName() string {
+	return "ch_biz_service"
+}

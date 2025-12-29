@@ -43,6 +43,7 @@ k8s.annotation             , k8s.annotation            , k8s.annotation         
 k8s.env                    , k8s.env                   , k8s.env                   , map            ,                       , Custom Tag      , 111             , 0
 cloud.tag                  , cloud.tag                 , cloud.tag                 , map            ,                       , Custom Tag      , 111             , 0
 os.app                     , os.app                    , os.app                    , map            ,                       , Custom Tag      , 111             , 0
+biz_service.group          , biz_service.group         , biz_service.group         , map_item       ,                       , Custom Tag      , 111             , 0
 
 ip                         , ip                        , ip                        , ip             ,                       , Network Layer   , 111             , 0
 is_ipv4                    , is_ipv4                   , is_ipv4                   , int_enum       , ip_type               , Network Layer   , 111             , 0

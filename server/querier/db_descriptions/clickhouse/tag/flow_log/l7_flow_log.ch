@@ -49,6 +49,7 @@ k8s.env                   , K8s Env                  ,
 attribute                 , Attribute                , OpenTelemetry Span 属性，以及应用协议特有属性。
 cloud.tag                 , Cloud Tag                ,
 os.app                    , OS APP                   ,
+biz_service.group         , 服务组                   ,
 
 ip                        , IP 地址                  ,
 is_ipv4                   , IPv4 标志                ,

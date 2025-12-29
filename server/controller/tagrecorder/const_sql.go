@@ -72,6 +72,19 @@ const (
 		"%s" +
 		SQL_LIFETIME +
 		SQL_LAYOUT_FLAT
+	CREATE_BIZ_SERVICE_DICTIONARY_SQL = SQL_CREATE_DICT +
+		"(\n" +
+		"    `id` UInt64,\n" +
+		"    `name` String,\n" +
+		"    `service_group_name` String,\n" +
+		"    `icon_id` Int64,\n" +
+		"    `team_id` UInt64,\n" +
+		"    `domain_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"%s" +
+		SQL_LIFETIME +
+		SQL_LAYOUT_FLAT
 	CREATE_VPC_DICTIONARY_SQL = SQL_CREATE_DICT +
 		"(\n" +
 		"    `id` UInt64,\n" +

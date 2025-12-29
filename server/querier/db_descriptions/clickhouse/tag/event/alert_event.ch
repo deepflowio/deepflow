@@ -63,6 +63,7 @@ k8s.annotation            , K8s Annotation           ,
 k8s.env                   , K8s Env                  ,
 cloud.tag                 , Cloud Tag                ,
 os.app                    , OS APP                   ,
+biz_service.group         , 服务组                   ,
 
 user                       , 创建人                   ,
 alert_policy               , 告警策略                 ,

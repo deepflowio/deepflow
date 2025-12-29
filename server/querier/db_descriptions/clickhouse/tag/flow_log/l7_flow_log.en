@@ -49,6 +49,7 @@ k8s.env                   , K8s Env                       ,
 attribute                 , Attribute                     ,
 cloud.tag                 , Cloud Tag                     ,
 os.app                    , OS APP                        ,
+biz_service.group         , Biz Service Group             ,
 
 ip                        , IP Address                    ,
 is_ipv4                   , IPv4 Flag                     ,
