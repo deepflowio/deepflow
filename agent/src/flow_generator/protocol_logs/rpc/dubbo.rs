@@ -50,6 +50,15 @@ use crate::{
     utils::bytes::{read_u32_be, read_u64_be},
 };
 
+cfg_if::cfg_if! {
+if #[cfg(feature = "enterprise")] {
+        use enterprise_utils::l7::custom_policy::custom_field_policy::{enums::Op, Store, PolicySlice};
+        use public::l7_protocol::NativeTag;
+
+        use crate::flow_generator::protocol_logs::{auto_merge_custom_field, consts::APM_SPAN_ID_ATTR};
+    }
+}
+
 use self::consts::*;
 
 const TRACE_ID_MAX_LEN: usize = 1024;
@@ -496,6 +505,16 @@ impl From<&DubboInfo> for LogCache {
 #[derive(Default)]
 pub struct DubboLog {
     perf_stats: Option<L7PerfStats>,
+
+    #[cfg(feature = "enterprise")]
+    custom_field_store: Store,
+}
+
+#[cfg(feature = "enterprise")]
+struct CustomFieldContext<'a> {
+    direction: PacketDirection,
+    policies: Option<PolicySlice>,
+    store: &'a mut Store,
 }
 
 impl L7ProtocolParserInterface for DubboLog {
@@ -523,16 +542,37 @@ impl L7ProtocolParserInterface for DubboLog {
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
+
+        #[cfg(feature = "enterprise")]
+        self.custom_field_store.clear();
+        #[cfg(feature = "enterprise")]
+        let custom_policies = config
+            .l7_log_dynamic
+            .get_custom_field_policies(L7Protocol::Dubbo.into(), param);
+
         let mut info = DubboInfo {
             copy_apm_trace_id: config.l7_log_dynamic.copy_apm_trace_id,
             ..Default::default()
         };
-        self.parse(&config.l7_log_dynamic, payload, &mut info, param)?;
+        self.parse(
+            &config.l7_log_dynamic,
+            payload,
+            &mut info,
+            param.direction,
+            #[cfg(feature = "enterprise")]
+            custom_policies,
+        )?;
         info.is_tls = param.is_tls();
         set_captured_byte!(info, param);
         info.endpoint = info.generate_endpoint();
+
+        #[cfg(feature = "enterprise")]
+        self.merge_custom_field_operations(custom_policies, &mut info);
+
         self.wasm_hook(param, payload, &mut info);
+
         info.set_is_on_blacklist(config);
+
         if let Some(perf_stats) = self.perf_stats.as_mut() {
             if info.msg_type == LogMessageType::Response {
                 if let Some(endpoint) = info.load_endpoint_from_cache(param, info.is_reversed) {
@@ -894,10 +934,16 @@ impl DubboLog {
         config: &L7LogDynamicConfig,
         payload: &[u8],
         info: &mut DubboInfo,
-        param: &ParseParam,
+        #[cfg(feature = "enterprise")] cf_ctx: CustomFieldContext<'_>,
     ) {
         match info.serial_id {
-            HESSIAN2_SERIALIZATION_ID => hessian2::get_req_body_info(config, payload, info, param),
+            HESSIAN2_SERIALIZATION_ID => hessian2::get_req_body_info(
+                config,
+                payload,
+                info,
+                #[cfg(feature = "enterprise")]
+                cf_ctx,
+            ),
             KRYO_SERIALIZATION2_ID => kryo::get_req_body_info(config, payload, info),
             KRYO_SERIALIZATION_ID => kryo::get_req_body_info(config, payload, info),
             FASTJSON2_SERIALIZATION_ID => fastjson2::get_req_body_info(config, payload, info),
@@ -911,7 +957,8 @@ impl DubboLog {
         payload: &[u8],
         dubbo_header: &DubboHeader,
         info: &mut DubboInfo,
-        param: &ParseParam,
+        #[allow(unused_variables)] direction: PacketDirection,
+        #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) {
         info.msg_type = LogMessageType::Request;
         info.event = dubbo_header.event;
@@ -920,7 +967,17 @@ impl DubboLog {
         info.serial_id = dubbo_header.serial_id;
         info.request_id = dubbo_header.request_id;
 
-        Self::decode_req_body(config, &payload[DUBBO_HEADER_LEN..], info, param);
+        Self::decode_req_body(
+            config,
+            &payload[DUBBO_HEADER_LEN..],
+            info,
+            #[cfg(feature = "enterprise")]
+            CustomFieldContext {
+                direction,
+                policies: custom_policies,
+                store: &mut self.custom_field_store,
+            },
+        );
     }
 
     fn set_status(&mut self, status_code: u8, info: &mut DubboInfo) {
@@ -942,10 +999,16 @@ impl DubboLog {
         config: &L7LogDynamicConfig,
         payload: &[u8],
         info: &mut DubboInfo,
-        param: &ParseParam,
+        #[cfg(feature = "enterprise")] cf_ctx: CustomFieldContext<'_>,
     ) {
         match info.serial_id {
-            HESSIAN2_SERIALIZATION_ID => hessian2::get_resp_body_info(config, payload, info, param),
+            HESSIAN2_SERIALIZATION_ID => hessian2::get_resp_body_info(
+                config,
+                payload,
+                info,
+                #[cfg(feature = "enterprise")]
+                cf_ctx,
+            ),
             _ => {}
         }
     }
@@ -956,7 +1019,8 @@ impl DubboLog {
         payload: &[u8],
         dubbo_header: &DubboHeader,
         info: &mut DubboInfo,
-        param: &ParseParam,
+        #[allow(unused_variables)] direction: PacketDirection,
+        #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) {
         info.msg_type = LogMessageType::Response;
         info.event = dubbo_header.event;
@@ -967,7 +1031,17 @@ impl DubboLog {
         info.status_code = Some(dubbo_header.status_code as i32);
         self.set_status(dubbo_header.status_code, info);
 
-        Self::decode_resp_body(config, &payload[DUBBO_HEADER_LEN..], info, param);
+        Self::decode_resp_body(
+            config,
+            &payload[DUBBO_HEADER_LEN..],
+            info,
+            #[cfg(feature = "enterprise")]
+            CustomFieldContext {
+                direction,
+                policies: custom_policies,
+                store: &mut self.custom_field_store,
+            },
+        );
     }
 
     fn parse(
@@ -975,19 +1049,34 @@ impl DubboLog {
         config: &L7LogDynamicConfig,
         payload: &[u8],
         info: &mut DubboInfo,
-        param: &ParseParam,
+        direction: PacketDirection,
+        #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) -> Result<()> {
-        let direction = param.direction;
-
         let mut dubbo_header = DubboHeader::default();
         dubbo_header.parse_headers(payload)?;
 
         match direction {
             PacketDirection::ClientToServer => {
-                self.request(&config, payload, &dubbo_header, info, param);
+                self.request(
+                    &config,
+                    payload,
+                    &dubbo_header,
+                    info,
+                    direction,
+                    #[cfg(feature = "enterprise")]
+                    custom_policies,
+                );
             }
             PacketDirection::ServerToClient => {
-                self.response(&config, payload, &dubbo_header, info, param);
+                self.response(
+                    &config,
+                    payload,
+                    &dubbo_header,
+                    info,
+                    direction,
+                    #[cfg(feature = "enterprise")]
+                    custom_policies,
+                );
             }
         }
         Ok(())
@@ -1001,6 +1090,62 @@ impl DubboLog {
         let wasm_data = WasmData::new(L7Protocol::Dubbo);
         if let Some(custom) = vm.on_custom_message(payload, param, wasm_data) {
             info.merge_custom_info(custom);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn merge_custom_field_operations(
+        &mut self,
+        policies: Option<PolicySlice>,
+        info: &mut DubboInfo,
+    ) {
+        let Some(policies) = policies else {
+            return;
+        };
+        for op in self.custom_field_store.drain_with(policies, &*info) {
+            match &op.op {
+                Op::RewriteNativeTag(tag, value) => {
+                    match tag {
+                        // request_resource priority greater than request_type
+                        NativeTag::RequestType => {
+                            if info.method_name.is_empty() {
+                                info.method_name = value.to_string();
+                            }
+                        }
+                        // trace info
+                        NativeTag::SpanId => {
+                            if CUSTOM_FIELD_POLICY_PRIORITY < info.span_id.prio() {
+                                let old = std::mem::replace(
+                                    &mut info.span_id,
+                                    PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, value.to_string()),
+                                );
+                                if !old.is_default() {
+                                    info.attributes.push(KeyVal {
+                                        key: APM_SPAN_ID_ATTR.to_string(),
+                                        val: old.into_inner(),
+                                    });
+                                }
+                            }
+                        }
+                        _ => auto_merge_custom_field(op, info),
+                    }
+                }
+                Op::AddAttribute(key, value) => {
+                    info.attributes.push(KeyVal {
+                        key: key.to_string(),
+                        val: value.to_string(),
+                    });
+                }
+                Op::AddMetric(key, value) => {
+                    info.metrics.push(MetricKeyVal {
+                        key: key.to_string(),
+                        val: *value,
+                    });
+                }
+                // not supported
+                Op::SavePayload(_) => (),
+                _ => auto_merge_custom_field(op, info),
+            }
         }
     }
 }
