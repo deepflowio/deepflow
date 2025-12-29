@@ -21,26 +21,14 @@ use public::codecs::hessian2::{consts::*, Hessian2Decoder};
 use super::consts::*;
 use super::{DubboInfo, BODY_PARAM_MAX, BODY_PARAM_MIN};
 
-use crate::{
-    common::l7_protocol_log::ParseParam,
-    config::handler::{L7LogDynamicConfig, TraceType},
-};
+use crate::config::handler::{L7LogDynamicConfig, TraceType};
 
 cfg_if::cfg_if! {
 if #[cfg(feature = "enterprise")] {
-        use crate::{
-            common::flow::L7Protocol,
-            flow_generator::{
-                protocol_logs::{
-                    auto_merge_custom_field,
-                    consts::APM_SPAN_ID_ATTR, pb_adapter::{KeyVal, MetricKeyVal}, CUSTOM_FIELD_POLICY_PRIORITY, PrioField,
-                },
-            },
-        };
         use enterprise_utils::l7::custom_policy::{
-            custom_field_policy::{enums::{Op, PayloadType, Source}, Store},
+            custom_field_policy::enums::{PayloadType, Source},
         };
-        use public::l7_protocol::NativeTag;
+        use super::CustomFieldContext;
     }
 }
 
@@ -112,7 +100,7 @@ pub fn get_req_body_info(
     config: &L7LogDynamicConfig,
     payload: &[u8],
     info: &mut DubboInfo,
-    #[allow(unused)] param: &ParseParam,
+    #[cfg(feature = "enterprise")] cf_ctx: CustomFieldContext<'_>,
 ) {
     let mut n = BODY_PARAM_MIN;
     let mut para_index = 0;
@@ -182,7 +170,7 @@ pub fn get_req_body_info(
     }
 
     #[cfg(feature = "enterprise")]
-    apply_custom_field_policies(config, param, payload, info);
+    apply_custom_field_policies(payload, cf_ctx);
 }
 
 #[allow(unused_variables)]
@@ -190,71 +178,19 @@ pub fn get_resp_body_info(
     config: &L7LogDynamicConfig,
     payload: &[u8],
     info: &mut DubboInfo,
-    param: &ParseParam,
+    #[cfg(feature = "enterprise")] cf_ctx: CustomFieldContext<'_>,
 ) {
     #[cfg(feature = "enterprise")]
-    apply_custom_field_policies(config, param, payload, info);
+    apply_custom_field_policies(payload, cf_ctx);
 }
 
 #[cfg(feature = "enterprise")]
-fn apply_custom_field_policies(
-    config: &L7LogDynamicConfig,
-    param: &ParseParam,
-    payload: &[u8],
-    info: &mut DubboInfo,
-) {
-    let Some(policies) = config.get_custom_field_policies(L7Protocol::Dubbo.into(), param) else {
-        return;
-    };
-    let mut store = Store::default();
-    policies.apply(
-        &mut store,
-        param.direction.into(),
-        Source::Payload(PayloadType::HESSIAN2, payload),
-    );
-    for op in store.into_iter_with(policies, &*info) {
-        match &op.op {
-            Op::RewriteNativeTag(tag, value) => {
-                match tag {
-                    // request_resource priority greater than request_type
-                    NativeTag::RequestType => {
-                        if info.method_name.is_empty() {
-                            info.method_name = value.to_string();
-                        }
-                    }
-                    // trace info
-                    NativeTag::SpanId => {
-                        if CUSTOM_FIELD_POLICY_PRIORITY < info.span_id.prio() {
-                            let old = std::mem::replace(
-                                &mut info.span_id,
-                                PrioField::new(CUSTOM_FIELD_POLICY_PRIORITY, value.to_string()),
-                            );
-                            if !old.is_default() {
-                                info.attributes.push(KeyVal {
-                                    key: APM_SPAN_ID_ATTR.to_string(),
-                                    val: old.into_inner(),
-                                });
-                            }
-                        }
-                    }
-                    _ => auto_merge_custom_field(op, info),
-                }
-            }
-            Op::AddAttribute(key, value) => {
-                info.attributes.push(KeyVal {
-                    key: key.to_string(),
-                    val: value.to_string(),
-                });
-            }
-            Op::AddMetric(key, value) => {
-                info.metrics.push(MetricKeyVal {
-                    key: key.to_string(),
-                    val: *value,
-                });
-            }
-            // not supported
-            Op::SavePayload(_) => (),
-            _ => auto_merge_custom_field(op, info),
-        }
+fn apply_custom_field_policies(payload: &[u8], mut cf_ctx: CustomFieldContext<'_>) {
+    if let Some(policies) = cf_ctx.policies {
+        policies.apply(
+            &mut cf_ctx.store,
+            cf_ctx.direction.into(),
+            Source::Payload(PayloadType::HESSIAN2, payload),
+        );
     }
 }

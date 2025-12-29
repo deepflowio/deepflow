@@ -8925,6 +8925,10 @@ processors:
 **Description**:
 
 Custom field extraction policy, used to extract possible custom fields from L7 protocols via simple rules.
+When both plugin extraction and custom extraction policies match, the priority is as follows:
+1. Plugin extraction
+2. Custom field policies extraction
+3. Agent default extraction
 Example:
 ```yaml
 - policy_name: "my_policy" # Policy name
@@ -11159,6 +11163,12 @@ outputs:
 Whether to compress the l4 flow log.
 
 # Plugins {#plugins}
+
+Plugin support
+When both plugins and custom extraction policies match, the priority is:
+1. Plugin extraction
+2. Custom field policies extraction
+3. Agent default extraction
 
 ## Wasm Plugins {#plugins.wasm_plugins}
 
