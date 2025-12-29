@@ -38,6 +38,7 @@ k8s.label                  , K8s Label                     ,
 k8s.annotation             , K8s Annotation                ,
 k8s.env                    , K8s Env                       ,
 cloud.tag                  , Cloud Tag                     ,
+biz_service.group          , Biz Service Group             ,
 
 ip                         , IP Address                    ,
 is_ipv4                    , IPv4 Flag                     ,
