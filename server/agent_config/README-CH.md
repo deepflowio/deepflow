@@ -8756,6 +8756,8 @@ processors:
       rewrite_native_tag:
         name: version
       priority: 0
+  # 复合字段，可以使用配置的 field 或 native_tag 作为输入字段，进行格式化输出
+  # 如果未解析到对应的 field 或 native_tag 为空，则不进行输出
   compound_fields:
   - format: "{field1_name}-{field2_name}" # 输出格式，其中 field1_name 和 field2_name 为已配置的字段名
                                           # 也可以配置 native_tag 作为输入字段，但注意已配置字段的优先级更高
