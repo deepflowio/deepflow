@@ -69,6 +69,7 @@ k8s.annotation             , k8s.annotation_0          , k8s.annotation_1       
 k8s.env                    , k8s.env_0                 , k8s.env_1                 , map           ,                        , Custom Tag        , 111          , 0             , 110
 cloud.tag                  , cloud.tag_0               , cloud.tag_1               , map           ,                        , Custom Tag        , 111          , 0             , 110
 os.app                     , os.app_0                  , os.app_1                  , map           ,                        , Custom Tag        , 111          , 0             , 110
+biz_service.group         , biz_service.group_0       , biz_service.group_1        , map_item       ,                       , Custom Tag        , 111          , 0             , 110
 
 user                       , user                      , user                      , resource       ,                       , Universal Tag     , 111          , 0             , 
 alert_policy               , alert_policy              , alert_policy              , resource       ,                       , Universal Tag     , 110          , 0             , 

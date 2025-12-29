@@ -120,6 +120,7 @@ func (c *SubscriberManager) getSubscribers() []Subscriber {
 		NewChPodClusterDevice(c.resourceTypeToIconID),
 		NewChProcessDevice(c.resourceTypeToIconID),
 		NewChCustomServiceDevice(c.resourceTypeToIconID),
+		NewChBizService(c.resourceTypeToIconID),
 
 		NewChAZ(c.domainLcuuidToIconID, c.resourceTypeToIconID),
 		NewChChost(),

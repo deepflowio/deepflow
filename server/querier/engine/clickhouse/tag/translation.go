@@ -288,6 +288,27 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 
+	// biz service group
+	for _, suffix := range []string{"", "_0", "_1"} {
+		resource := "biz_service.group"
+		resourceSuffix := resource + suffix
+		typeSuffix := "auto_service_type" + suffix
+		idNameSuffix := "auto_service_id" + suffix
+		tagResourceMap[resourceSuffix] = map[string]*Tag{
+			"default": NewTag(
+				fmt.Sprintf("if(%s=%d, dictGet('flow_tag.biz_service_map', 'service_group_name', toUInt64(%s)), '')", typeSuffix, VIF_DEVICE_TYPE_CUSTOM_SERVICE, idNameSuffix),
+				fmt.Sprintf("%s!=0 AND %s=%d", idNameSuffix, typeSuffix, VIF_DEVICE_TYPE_CUSTOM_SERVICE),
+				fmt.Sprintf("toUInt64(%s) GLOBAL IN (SELECT id FROM flow_tag.biz_service_map WHERE service_group_name %%s %%s) AND %s=%d", idNameSuffix, typeSuffix, VIF_DEVICE_TYPE_CUSTOM_SERVICE),
+				fmt.Sprintf("toUInt64(%s) GLOBAL IN (SELECT id FROM flow_tag.biz_service_map WHERE %%s(service_group_name, %%s)) AND %s=%d", idNameSuffix, typeSuffix, VIF_DEVICE_TYPE_CUSTOM_SERVICE),
+			),
+			"node_type": NewTag(
+				"'biz_service.group'",
+				"",
+				"",
+				"",
+			)}
+	}
+
 	// device资源
 	for resourceStr, deviceTypeValue := range DEVICE_MAP {
 		if common.IsValueInSliceString(resourceStr, []string{"pod_service", "natgw", "lb"}) {
