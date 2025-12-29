@@ -9121,6 +9121,8 @@ Example:
       rewrite_native_tag:
         name: version
       priority: 0
+  # Compound fields allow you to use configured fields or native_tags as input fields for formatted output
+  # If the corresponding field or native_tag is not resolved or is empty, the output will not be produced
   compound_fields:
   - format: "{field1_name}-{field2_name}" # Output format. field1_name and field2_name are the configured field names
                                           # Native tags can also be used as an input field, but note that the configured fields take precedence.
