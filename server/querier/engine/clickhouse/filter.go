@@ -617,11 +617,11 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 					return &view.Expr{Value: filter}, nil
 				}
-			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map", "gprocess_map", "pod_ingress_map", "pod_node_map", "subnet_map":
+			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map", "gprocess_map", "pod_ingress_map", "pod_node_map", "subnet_map", "biz_service_map":
 				checkTag := strings.TrimSuffix(t.Tag, "_id")
 				if slices.Contains(chCommon.SHOW_TAG_VALUE_MAP[table], checkTag) {
 					if strings.HasSuffix(t.Tag, "_id") {
-						if checkTag == strings.TrimSuffix(table, "_map") || checkTag == common.CHOST_HOSTNAME || checkTag == common.CHOST_IP {
+						if checkTag == strings.TrimSuffix(table, "_map") || checkTag == common.CHOST_HOSTNAME || checkTag == common.CHOST_IP || checkTag == common.BIZ_SERVICE_GROUP {
 							tagItem, ok := tag.GetTag("value", db, table, "default")
 							if ok {
 								switch strings.ToLower(op) {
@@ -660,7 +660,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 							}
 						}
 					} else {
-						if t.Tag == strings.TrimSuffix(table, "_map") || t.Tag == common.CHOST_HOSTNAME || t.Tag == common.CHOST_IP {
+						if t.Tag == strings.TrimSuffix(table, "_map") {
 							tagItem, ok := tag.GetTag("display_name", db, table, "default")
 							if ok {
 								switch strings.ToLower(op) {
@@ -707,19 +707,23 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 									if t.Tag == "vpc" || t.Tag == "l2_vpc" {
 										tagMap = "l3_epc_map"
 									}
+									transTag := t.Tag
+									if t.Tag == common.BIZ_SERVICE_GROUP {
+										transTag = "biz_service_group"
+									}
 									switch strings.ToLower(op) {
 									case "match":
-										filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value)
+										filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, transTag, tagMap, "match", t.Value)
 									case "not match":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value) + ")"
+										filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, transTag, tagMap, "match", t.Value) + ")"
 									case "not ilike":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "ilike", t.Value) + ")"
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, transTag, tagMap, "ilike", t.Value) + ")"
 									case "not in":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "in", t.Value) + ")"
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, transTag, tagMap, "in", t.Value) + ")"
 									case "!=":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "=", t.Value) + ")"
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, transTag, tagMap, "=", t.Value) + ")"
 									default:
-										filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, op, t.Value)
+										filter = fmt.Sprintf(tagItem.WhereTranslator, transTag, tagMap, op, t.Value)
 									}
 								}
 							}

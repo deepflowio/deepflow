@@ -34,7 +34,7 @@ type dataGeneratorModel interface {
 		metadbModel.ChPodServiceK8sLabels | metadbModel.ChPodServiceK8sLabel | metadbModel.ChPodServiceK8sAnnotation | metadbModel.ChPodServiceK8sAnnotations |
 		metadbModel.ChPodNSCloudTags | metadbModel.ChChostCloudTags | metadbModel.ChPodNSCloudTag | metadbModel.ChChostCloudTag |
 		metadbModel.ChPodK8sAnnotation | metadbModel.ChPodK8sAnnotations | metadbModel.ChPodK8sEnv | metadbModel.ChPodK8sEnvs | metadbModel.ChPodK8sLabel |
-		metadbModel.ChPodK8sLabels
+		metadbModel.ChPodK8sLabels | metadbModel.ChBizService
 
 	GetID() int
 	GetUpdatedAt() time.Time
