@@ -38,6 +38,7 @@
 #include "perf_profiler.h"
 #include "../elf.h"
 #include "../load.h"
+#include "../unwind_tracer.h"
 #include "../../kernel/include/perf_profiler.h"
 #include "../perf_reader.h"
 #include "../bihash_8_8.h"
@@ -825,6 +826,21 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 			     bpf_bin_buffer, buffer_sz, tps,
 			     0, release_profiler, create_profiler,
 			     (void *)callback, cb_ctx, freq);
+	if (tracer == NULL && k_type == K_TYPE_VER_5_2_PLUS) {
+		/* Fallback: 5.2+ variant too complex for verifier, try common binary */
+		ebpf_warning
+		    ("[CP] 5.2+ DWARF profiler load failed, falling back to common (no DWARF/unwind).\n");
+		k_type = K_TYPE_COMM;
+		snprintf(bpf_load_buffer_name, NAME_LEN,
+			 "continuous-profiler-common");
+		bpf_bin_buffer = (void *)perf_profiler_common_ebpf_data;
+		buffer_sz = sizeof(perf_profiler_common_ebpf_data);
+		set_dwarf_enabled(false);
+		tracer = setup_bpf_tracer(CP_TRACER_NAME, bpf_load_buffer_name,
+					  bpf_bin_buffer, buffer_sz, tps,
+					  0, release_profiler, create_profiler,
+					  (void *)callback, cb_ctx, freq);
+	}
 	if (tracer == NULL)
 		return (-1);
 
