@@ -37,6 +37,7 @@ pod_node_hostname          , K8s Node                      , The hostname of K8s
 k8s.label                  , K8s Label                     ,
 cloud.tag                  , Cloud Tag                     ,
 os.app                     , OS APP                        ,
+biz_service.group          , Biz Service Group             ,
 
 ip                         , IP Address                    ,
 is_ipv4                    , IPv4 Flag                     ,

@@ -37,6 +37,7 @@ pod_node_hostname          , K8s 容器节点               , 容器节点的 Ho
 k8s.label                  , K8s Label                  ,
 cloud.tag                  , Cloud Tag                  ,
 os.app                     , OS APP                     ,
+biz_service.group          , 服务组                     ,
 
 ip                         , IP 地址                    ,
 is_ipv4                    , IPv4 标志                  ,
