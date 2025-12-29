@@ -343,15 +343,26 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) Heal() {
 }
 
 func (h *healerComponent[MT, CT, MAPT, MAT]) republishAdd(sourceIDs []int) error {
-	if len(sourceIDs) == 0 {
+	total := len(sourceIDs)
+	if total == 0 {
 		return nil
 	}
-	log.Infof("tagrecorder %s healer (source: %s) republish add (ids: %v, count: %d)", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), sourceIDs, len(sourceIDs), h.msgMetadata.LogPrefixes)
-	var dbItems []*MT
-	if err := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN (?)", h.sourceDataGen.getRealIDField()), sourceIDs).Find(&dbItems).Error; err != nil {
-		log.Errorf("failed to find %s: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)
-		return err
+	log.Infof("tagrecorder %s healer (source: %s) republish add (ids: %v, count: %d)", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), sourceIDs, total, h.msgMetadata.LogPrefixes)
+
+	totalDBItems := make([]*MT, 0)
+	for i := 0; i < total; i += int(h.msgMetadata.DB.Config.BatchSize1) {
+		end := i + int(h.msgMetadata.DB.Config.BatchSize1)
+		if end > total {
+			end = total
+		}
+		dbItems := make([]*MT, 0)
+		if err := h.msgMetadata.DB.Unscoped().Where(fmt.Sprintf("%s IN (?)", h.sourceDataGen.getRealIDField()), sourceIDs[i:end]).Find(&dbItems).Error; err != nil {
+			log.Errorf("failed to find %s: %v, ids: %v", h.targetDataGen.getResourceType(), err, sourceIDs[i:end], h.msgMetadata.LogPrefixes)
+			continue
+		}
+		totalDBItems = append(totalDBItems, dbItems...)
 	}
+
 	targetSubscriber := tagrecorder.GetSubscriberManager().GetSubscriber(h.sourceDataGen.getResourceType(), h.targetDataGen.getResourceType())
 	if targetSubscriber == nil {
 		log.Errorf("failed to get target subscriber: %s", h.targetDataGen.getResourceType(), h.msgMetadata.LogPrefixes)
@@ -359,24 +370,31 @@ func (h *healerComponent[MT, CT, MAPT, MAT]) republishAdd(sourceIDs []int) error
 	}
 
 	msgData := MAPT(new(MAT))
-	msgData.SetMySQLItems(dbItems)
+	msgData.SetMySQLItems(totalDBItems)
 	targetSubscriber.OnResourceBatchAdded(h.msgMetadata, msgData)
 	return nil
 }
 
 func (h *healerComponent[MT, CT, MAPT, MAT]) forceDelete(targetIDs []int) error {
-	if len(targetIDs) == 0 {
+	total := len(targetIDs)
+	if total == 0 {
 		return nil
 	}
-	log.Infof("tagrecorder %s healer (source: %s) force delete (ids: %v, count: %d)", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), targetIDs, len(targetIDs), h.msgMetadata.LogPrefixes)
-	var dbItems []*CT
-	delExec := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN (?)", h.targetDataGen.getRealIDField()), targetIDs)
-	if h.targetDataGen.getResourceType() == tagrecorder.RESOURCE_TYPE_CH_DEVICE {
-		delExec = delExec.Where("devicetype IN (?)", h.targetDataGen.getChDeviceTypes())
-	}
-	if err := delExec.Delete(&dbItems).Error; err != nil {
-		log.Errorf("failed to delete %s: %v", h.targetDataGen.getResourceType(), err, h.msgMetadata.LogPrefixes)
-		return err
+	log.Infof("tagrecorder %s healer (source: %s) force delete (ids: %v, count: %d)", h.targetDataGen.getResourceType(), h.sourceDataGen.getResourceType(), targetIDs, total, h.msgMetadata.LogPrefixes)
+
+	for i := 0; i < total; i += int(h.msgMetadata.DB.Config.BatchSize1) {
+		end := i + int(h.msgMetadata.DB.Config.BatchSize1)
+		if end > total {
+			end = total
+		}
+		var dbItems []*CT
+		delExec := h.msgMetadata.DB.Where(fmt.Sprintf("%s IN (?)", h.targetDataGen.getRealIDField()), targetIDs[i:end])
+		if h.targetDataGen.getResourceType() == tagrecorder.RESOURCE_TYPE_CH_DEVICE {
+			delExec = delExec.Where("devicetype IN (?)", h.targetDataGen.getChDeviceTypes())
+		}
+		if err := delExec.Delete(&dbItems).Error; err != nil {
+			log.Errorf("failed to delete %s: %v, ids: %v", h.targetDataGen.getResourceType(), err, targetIDs[i:end], h.msgMetadata.LogPrefixes)
+		}
 	}
 	return nil
 }
