@@ -224,7 +224,12 @@ func processEnumField(field, db, table string, e *CHEngine) string {
 		}
 		if tagOK {
 			enumFileName := tagDescription.EnumFile
-			transField = fmt.Sprintf(tagDes.TagTranslator, nameColumn, enumFileName)
+			if tagEnum == "app_service" || tagEnum == "app_instance" {
+				enumFileName = tagEnum
+				transField = fmt.Sprintf(tagDes.TagTranslator, enumFileName)
+			} else {
+				transField = fmt.Sprintf(tagDes.TagTranslator, nameColumn, enumFileName)
+			}
 		} else {
 			transField = fmt.Sprintf(tagDes.TagTranslator, nameColumn, tagEnum)
 		}
