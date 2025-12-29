@@ -1020,10 +1020,15 @@ impl L7ProtocolParserInterface for HttpLog {
                     #[cfg(feature = "enterprise")]
                     custom_policies,
                 )?;
-                self.set_info_by_config(param, config, payload, Some(l7_payload), &mut info);
-
-                #[cfg(feature = "enterprise")]
-                self.merge_custom_fields(custom_policies, Some(l7_payload), &mut info);
+                self.set_info_by_config(
+                    param,
+                    config,
+                    payload,
+                    Some(l7_payload),
+                    &mut info,
+                    #[cfg(feature = "enterprise")]
+                    custom_policies,
+                );
 
                 if param.parse_log {
                     Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
@@ -1076,10 +1081,15 @@ impl L7ProtocolParserInterface for HttpLog {
                         }
                         Ok(n) => n,
                     };
-                    self.set_info_by_config(param, config, &payload[offset..], None, &mut info);
-
-                    #[cfg(feature = "enterprise")]
-                    self.merge_custom_fields(custom_policies, None, &mut info);
+                    self.set_info_by_config(
+                        param,
+                        config,
+                        &payload[offset..],
+                        None,
+                        &mut info,
+                        #[cfg(feature = "enterprise")]
+                        custom_policies,
+                    );
 
                     if !info.is_invalid() || info.proto == L7Protocol::Grpc {
                         if let Some(h) = info.headers_offset.as_mut() {
@@ -1164,14 +1174,8 @@ impl HttpLog {
         payload: &[u8],
         l7_payload: Option<&[u8]>,
         info: &mut HttpInfo,
+        #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) {
-        // In uprobe mode, headers are reported in a way different from other modes:
-        // one payload contains one header.
-        // Calling wasm plugin on every payload would be wasted effort,
-        // in this condition the call to the wasm plugin will be skipped.
-        if param.ebpf_type != EbpfType::GoHttp2Uprobe {
-            self.wasm_hook(param, payload, info);
-        }
         if config
             .obfuscate_enabled_protocols
             .is_enabled(L7Protocol::Http1)
@@ -1244,6 +1248,17 @@ impl HttpLog {
                     info.request_payload = Some(vec![]);
                 }
             }
+        }
+
+        #[cfg(feature = "enterprise")]
+        self.merge_custom_fields(custom_policies, l7_payload, info);
+
+        // In uprobe mode, headers are reported in a way different from other modes:
+        // one payload contains one header.
+        // Calling wasm plugin on every payload would be wasted effort,
+        // in this condition the call to the wasm plugin will be skipped.
+        if param.ebpf_type != EbpfType::GoHttp2Uprobe {
+            self.wasm_hook(param, payload, info);
         }
 
         info.is_on_blacklist = info.check_on_blacklist(config);
