@@ -290,7 +290,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 
 	// biz service group
 	for _, suffix := range []string{"", "_0", "_1"} {
-		resource := "biz_service.group"
+		resource := "biz_service_group"
 		resourceSuffix := resource + suffix
 		typeSuffix := "auto_service_type" + suffix
 		idNameSuffix := "auto_service_id" + suffix

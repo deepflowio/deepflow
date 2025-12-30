@@ -521,6 +521,16 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										selectPrefixTranslator = tagSelectPrefixTranslaterStr
 										iconIDTranslator = fmt.Sprintf("%s, 0", selectPrefixTranslator)
 										nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
+									} else if strings.HasPrefix(tagValue, common.BIZ_SERVICE_GROUP) {
+										tagValueName := tagValue + suffix
+										autoServiceIDSuffix := "auto_service_id" + suffix
+										autoServiceTypeSuffix := "auto_service_type" + suffix
+										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("dictGet('flow_tag.biz_service_map', 'service_group_name', toUInt64(%s))", autoServiceIDSuffix)
+										AlarmEventResourceMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = "tag_string_values[indexOf(tag_string_names,'" + tagValueName + "')]"
+										tagSelectPrefixTranslaterStr := fmt.Sprintf("(%s!=0 AND %s=%d)", autoServiceIDSuffix, autoServiceTypeSuffix, VIF_DEVICE_TYPE_CUSTOM_SERVICE)
+										selectPrefixTranslator = tagSelectPrefixTranslaterStr
+										iconIDTranslator = fmt.Sprintf("%s, 0", selectPrefixTranslator)
+										nodeTypeTranslator = fmt.Sprintf("%s, '%s'", selectPrefixTranslator, tagValue)
 									}
 									deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tagValue]
 									if ok {
@@ -678,6 +688,17 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagSelectFilterStr)
 										AlarmEventResourceMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = "tag_string_values[indexOf(tag_string_names,'" + tagValueName + "')]"
 										tagSelectPrefixTranslaterStr := "dictGet('flow_tag.os_app_tag_map', 'value', (toUInt64(" + processIDSuffix + "),'" + tagKey + "'))!=''"
+										selectPrefixTranslator += " OR " + tagSelectPrefixTranslaterStr
+										iconIDTranslator += fmt.Sprintf(", %s, 0", tagSelectPrefixTranslaterStr)
+										nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
+									} else if strings.HasPrefix(tagValue, common.BIZ_SERVICE_GROUP) {
+										tagValueName := tagValue + suffix
+										autoServiceIDSuffix := "auto_service_id" + suffix
+										autoServiceTypeSuffix := "auto_service_type" + suffix
+										tagSelectFilterStr := fmt.Sprintf("dictGet('flow_tag.biz_service_map', 'service_group_name', toUInt64(%s))", autoServiceIDSuffix)
+										TagResoureMap[tagNameSuffix]["default"].TagTranslatorMap[tagNameSuffix+"_"+tagValueName] = fmt.Sprintf("IF(%s, '', %s)", selectPrefixTranslator, tagSelectFilterStr)
+										AlarmEventResourceMap[tagNameSuffix]["default"].TagTranslatorMap[tagValueName] = "tag_string_values[indexOf(tag_string_names,'" + tagValueName + "')]"
+										tagSelectPrefixTranslaterStr := fmt.Sprintf("(%s!=0 AND %s=%d)", autoServiceIDSuffix, autoServiceTypeSuffix, VIF_DEVICE_TYPE_CUSTOM_SERVICE)
 										selectPrefixTranslator += " OR " + tagSelectPrefixTranslaterStr
 										iconIDTranslator += fmt.Sprintf(", %s, 0", tagSelectPrefixTranslaterStr)
 										nodeTypeTranslator += fmt.Sprintf(", %s, '%s'", tagSelectPrefixTranslaterStr, tagValue)
@@ -1058,8 +1079,8 @@ func GetDynamicMetric(db, table, metric string) (response *common.Result) {
 		return
 	}
 
-	for preffix, _ := range common.TRANS_MAP_ITEM_TAG {
-		if strings.HasPrefix(metric, preffix) {
+	for prefix, _ := range common.TRANS_MAP_ITEM_TAG {
+		if strings.HasPrefix(metric, prefix) {
 			response.Values = append(response.Values, []interface{}{
 				metric, metric, metric, metric, metric, metric, "map_item",
 				"Custom Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, []string{}, "",
@@ -1300,7 +1321,7 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID, language string, useQuer
 	}
 
 	// K8s Labels是动态的,不需要去tag_description里确认
-	if strings.HasPrefix(tag, "k8s.label.") || strings.HasPrefix(tag, "k8s.annotation.") || strings.HasPrefix(tag, "k8s.env.") || strings.HasPrefix(tag, "cloud.tag.") || strings.HasPrefix(tag, "os.app.") {
+	if strings.HasPrefix(tag, "k8s.label.") || strings.HasPrefix(tag, "k8s.annotation.") || strings.HasPrefix(tag, "k8s.env.") || strings.HasPrefix(tag, "cloud.tag.") || strings.HasPrefix(tag, "os.app.") || strings.HasPrefix(tag, common.BIZ_SERVICE_GROUP) {
 		return GetTagResourceValues(db, table, sql)
 	}
 	// 外部字段是动态的,不需要去tag_description里确认
@@ -1515,7 +1536,7 @@ func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, e
 	} else if tag == "pod_ingress" {
 		sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM pod_ingress_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 	} else if tag == "biz_service.group" {
-		sql = fmt.Sprintf("SELECT id as value, service_group_name AS display_name FROM biz_service_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+		sql = fmt.Sprintf("SELECT service_group_name as value, service_group_name AS display_name FROM biz_service_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 	} else if strings.HasPrefix(tag, "k8s.label.") {
 		labelTag := strings.TrimPrefix(tag, "k8s.label.")
 		if whereSql != "" {

@@ -110,13 +110,15 @@ func TransWhereTagFunction(db, table string, name string, args []string) (filter
 				filter = fmt.Sprintf("%s=%d", deviceTypeTagSuffix, deviceTypeValue)
 			}
 			return
-		} else if nameNoPreffix, _, transKey := common.TransMapItem(resource, table); transKey != "" {
+		} else if nameNoPrefix, _, transKey := common.TransMapItem(resource, table); transKey != "" {
 			// map item tag
 			tagItem, _ := tag.GetTag(transKey, db, table, "default")
 			if strings.HasPrefix(resource, "os.app.") || strings.HasPrefix(resource, "k8s.env.") {
-				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, "!=", "''")
+				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPrefix, "!=", "''")
+			} else if strings.HasPrefix(resource, common.BIZ_SERVICE_GROUP) {
+				filter = TransBizServiceGroupFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, "!=", "''")
 			} else {
-				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, "!=", "''")
+				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPrefix, "!=", "''")
 			}
 		} else if deviceTypeValue, ok = tag.TAP_PORT_DEVICE_MAP[resourceNoID]; ok {
 			filter = fmt.Sprintf("(toUInt64(agent_id),toUInt64(capture_nic)) GLOBAL IN (SELECT vtap_id,tap_port FROM flow_tag.vtap_port_map WHERE tap_port!=0 AND device_type=%d)", deviceTypeValue)
@@ -219,6 +221,36 @@ func TransEnvFilter(translator, regexpTranslator, key, op, value string) (filter
 		}
 	} else {
 		filter = fmt.Sprintf(trans, op, value, key)
+	}
+	return
+}
+
+// biz_service.group
+func TransBizServiceGroupFilter(translator, regexpTranslator, op, value string) (filter string) {
+	opLower := strings.ToLower(op)
+	trans := translator
+	if strings.Contains(opLower, "match") {
+		trans = regexpTranslator
+	}
+
+	positiveOperator, positiveOK := chCommon.PositiveOperatorMap[opLower]
+	inverseOperator, inverseOK := chCommon.InverseOperatorMap[opLower]
+	if inverseOK {
+		if value == "''" {
+			// trans to exist
+			filter = fmt.Sprintf(trans, op, value)
+		} else {
+			filter = "not(" + fmt.Sprintf(trans, inverseOperator, value) + ")"
+		}
+	} else if positiveOK {
+		if value == "''" {
+			// trans to not exist
+			filter = "not(" + fmt.Sprintf(trans, positiveOperator, value) + ")"
+		} else {
+			filter = fmt.Sprintf(trans, op, value)
+		}
+	} else {
+		filter = fmt.Sprintf(trans, op, value)
 	}
 	return
 }
@@ -421,13 +453,15 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 	default:
 		tagName := strings.Trim(whereTag, "`")
 		// map item tag
-		nameNoPreffix, _, transKey := common.TransMapItem(tagName, table)
+		nameNoPrefix, _, transKey := common.TransMapItem(tagName, table)
 		if transKey != "" {
 			tagItem, _ = tag.GetTag(transKey, db, table, "default")
 			if strings.HasPrefix(tagName, "os.app.") || strings.HasPrefix(tagName, "k8s.env.") {
-				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
+				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPrefix, op, value)
+			} else if strings.HasPrefix(tagName, common.BIZ_SERVICE_GROUP) {
+				filter = TransBizServiceGroupFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, value)
 			} else {
-				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPreffix, op, value)
+				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPrefix, op, value)
 			}
 		} else if strings.HasPrefix(tagName, "tag.") || strings.HasPrefix(tagName, "attribute.") {
 			if strings.HasPrefix(tagName, "tag.") {
@@ -449,13 +483,13 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 				tagItem, ok = tag.GetTag("attribute.", db, table, "default")
 			}
 			if ok {
-				nameNoPreffix := strings.TrimPrefix(tagName, "tag.")
-				nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
-				nameNoPreffix = strings.Trim(nameNoPreffix, "`")
+				nameNoPrefix := strings.TrimPrefix(tagName, "tag.")
+				nameNoPrefix = strings.TrimPrefix(nameNoPrefix, "attribute.")
+				nameNoPrefix = strings.Trim(nameNoPrefix, "`")
 				if strings.Contains(op, "match") {
-					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, nameNoPreffix, value)
+					filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, nameNoPrefix, value)
 				} else {
-					filter = fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, op, value)
+					filter = fmt.Sprintf(tagItem.WhereTranslator, nameNoPrefix, op, value)
 				}
 			}
 		} else {
@@ -618,11 +652,11 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 					return &view.Expr{Value: filter}, nil
 				}
-			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map", "gprocess_map", "pod_ingress_map", "pod_node_map", "subnet_map", "biz_service_map":
+			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map", "gprocess_map", "pod_ingress_map", "pod_node_map", "subnet_map":
 				checkTag := strings.TrimSuffix(t.Tag, "_id")
 				if slices.Contains(chCommon.SHOW_TAG_VALUE_MAP[table], checkTag) {
 					if strings.HasSuffix(t.Tag, "_id") {
-						if checkTag == strings.TrimSuffix(table, "_map") || checkTag == common.CHOST_HOSTNAME || checkTag == common.CHOST_IP || checkTag == common.BIZ_SERVICE_GROUP {
+						if checkTag == strings.TrimSuffix(table, "_map") || checkTag == common.CHOST_HOSTNAME || checkTag == common.CHOST_IP {
 							tagItem, ok := tag.GetTag("value", db, table, "default")
 							if ok {
 								switch strings.ToLower(op) {
@@ -708,23 +742,19 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 									if t.Tag == "vpc" || t.Tag == "l2_vpc" {
 										tagMap = "l3_epc_map"
 									}
-									transTag := t.Tag
-									if t.Tag == common.BIZ_SERVICE_GROUP {
-										transTag = "biz_service_group"
-									}
 									switch strings.ToLower(op) {
 									case "match":
-										filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, transTag, tagMap, "match", t.Value)
+										filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value)
 									case "not match":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, transTag, tagMap, "match", t.Value) + ")"
+										filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value) + ")"
 									case "not ilike":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, transTag, tagMap, "ilike", t.Value) + ")"
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "ilike", t.Value) + ")"
 									case "not in":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, transTag, tagMap, "in", t.Value) + ")"
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "in", t.Value) + ")"
 									case "!=":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, transTag, tagMap, "=", t.Value) + ")"
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "=", t.Value) + ")"
 									default:
-										filter = fmt.Sprintf(tagItem.WhereTranslator, transTag, tagMap, op, t.Value)
+										filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, op, t.Value)
 									}
 								}
 							}
@@ -735,7 +765,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					return nil, error
 				}
 			default:
-				if strings.HasPrefix(t.Tag, "tag.") || strings.HasPrefix(t.Tag, "attribute.") || strings.HasPrefix(t.Tag, "k8s.label.") || strings.HasPrefix(t.Tag, "k8s.env.") || strings.HasPrefix(t.Tag, "k8s.annotation.") || strings.HasPrefix(t.Tag, "cloud.tag.") || strings.HasPrefix(t.Tag, "os.app.") {
+				if strings.HasPrefix(t.Tag, "tag.") || strings.HasPrefix(t.Tag, "attribute.") || strings.HasPrefix(t.Tag, "k8s.label.") || strings.HasPrefix(t.Tag, "k8s.env.") || strings.HasPrefix(t.Tag, "k8s.annotation.") || strings.HasPrefix(t.Tag, "cloud.tag.") || strings.HasPrefix(t.Tag, "os.app.") || strings.HasPrefix(t.Tag, common.BIZ_SERVICE_GROUP) {
 					tagItem, ok := tag.GetTag("value", db, table, "default")
 					if ok {
 						switch strings.ToLower(op) {
@@ -819,7 +849,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			switch noIDTag {
 			case "pod_group_type", "host_ip", "host_hostname", "chost_ip", "chost_hostname", "pod_node_ip", "pod_node_hostname", "province",
 				"is_internet", "tcp_flags_bit", "l2_end", "l3_end", "nat_real_ip", "nat_real_port", "process_id", "process_kname", "k8s.label",
-				"k8s.annotation", "k8s.env", "cloud.tag", "os.app":
+				"k8s.annotation", "k8s.env", "cloud.tag", "os.app", common.BIZ_SERVICE_GROUP:
 				_, err := strconv.Atoi(t.Value)
 				if strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") || strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {
 					if err != nil {
@@ -845,7 +875,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 				}
 			default:
-				if strings.HasPrefix(strings.Trim(t.Tag, "`"), "k8s.label.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "k8s.annotation.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "k8s.env.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "cloud.tag.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "kos.app.") {
+				if strings.HasPrefix(strings.Trim(t.Tag, "`"), "k8s.label.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "k8s.annotation.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "k8s.env.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "cloud.tag.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "os.app.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), common.BIZ_SERVICE_GROUP) {
 					_, err := strconv.Atoi(t.Value)
 					if strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") || strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {
 						if err != nil {
@@ -1158,20 +1188,20 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 
 func GetPrometheusFilter(promTag, table, op, value string, e *CHEngine) (string, error) {
 	filter := ""
-	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
+	nameNoPrefix := strings.TrimPrefix(promTag, "tag.")
 	metricID, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return filter, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[nameNoPrefix]
 	if !ok {
 		if value == "''" {
 			filter = fmt.Sprintf("1%s1", op)
 		} else {
 			filter = "1!=1"
 		}
-		debugMessage := fmt.Sprintf("%s not found", nameNoPreffix)
+		debugMessage := fmt.Sprintf("%s not found", nameNoPrefix)
 		log.Debug(debugMessage)
 		return filter, nil
 	}
@@ -1179,7 +1209,7 @@ func GetPrometheusFilter(promTag, table, op, value string, e *CHEngine) (string,
 	isAppLabel := false
 	if appLabels, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
-			if appLabel.AppLabelName == nameNoPreffix {
+			if appLabel.AppLabelName == nameNoPrefix {
 				isAppLabel = true
 				if value == "''" {
 					filter = fmt.Sprintf("app_label_value_id_%d %s 0", appLabel.AppLabelColumnIndex, op)
@@ -1208,20 +1238,20 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	filter := ""
 	sql := ""
 	isAppLabel := false
-	nameNoPreffix := strings.TrimPrefix(promTag, "tag.")
+	nameNoPrefix := strings.TrimPrefix(promTag, "tag.")
 	metricID, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricNameToID[table]
 	if !ok {
 		errorMessage := fmt.Sprintf("%s not found", table)
 		return filter, common.NewError(common.RESOURCE_NOT_FOUND, errorMessage)
 	}
-	labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[nameNoPreffix]
+	labelNameID, ok := trans_prometheus.ORGPrometheus[e.ORGID].LabelNameToID[nameNoPrefix]
 	if !ok {
 		if value == "''" {
 			filter = fmt.Sprintf("1%s1", op)
 		} else {
 			filter = "1!=1"
 		}
-		debugMessage := fmt.Sprintf("%s not found", nameNoPreffix)
+		debugMessage := fmt.Sprintf("%s not found", nameNoPrefix)
 		log.Debug(debugMessage)
 		return filter, nil
 	}
@@ -1229,7 +1259,7 @@ func GetRemoteReadFilter(promTag, table, op, value, originFilter string, e *CHEn
 	// Determine whether the tag is app_label or target_label
 	if appLabels, ok := trans_prometheus.ORGPrometheus[e.ORGID].MetricAppLabelLayout[table]; ok {
 		for _, appLabel := range appLabels {
-			if appLabel.AppLabelName == nameNoPreffix {
+			if appLabel.AppLabelName == nameNoPrefix {
 				isAppLabel = true
 				entryKey := common.EntryKey{ORGID: e.ORGID, Filter: originFilter}
 				cacheFilter, ok := prometheusSubqueryCache.Get(entryKey)

@@ -375,8 +375,8 @@ func GetLocationType(locations []string, locationValues [][]int, profileEventTyp
 			}
 		} else {
 			hasLocationType := false
-			for preffix, locatonType := range common.LOCATION_TYPE_MAP {
-				if strings.HasPrefix(location, preffix) {
+			for prefix, locatonType := range common.LOCATION_TYPE_MAP {
+				if strings.HasPrefix(location, prefix) {
 					locationTypes[i] = locatonType
 					hasLocationType = true
 					break
