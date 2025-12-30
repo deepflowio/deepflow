@@ -53,7 +53,9 @@ use crate::plugin::c_ffi::SoPluginFunc;
 use crate::plugin::wasm::WasmVm;
 
 use public::enums::IpProtocol;
-use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolChecker, L7ProtocolEnum, LogMessageType};
+use public::l7_protocol::{
+    CustomProtocol, L7Protocol, L7ProtocolChecker, L7ProtocolEnum, LogMessageType,
+};
 
 macro_rules! count {
     () => (0);

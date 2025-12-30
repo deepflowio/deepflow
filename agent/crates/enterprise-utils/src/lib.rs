@@ -32,6 +32,8 @@ pub mod l7 {
         }
 
         pub mod custom_field_policy {
+            use std::marker::PhantomData;
+
             pub mod enums {
                 use std::sync::Arc;
 
@@ -89,8 +91,11 @@ pub mod l7 {
             }
 
             #[derive(Clone, Copy, Debug)]
-            pub struct PolicySlice;
-            impl PolicySlice {
+            pub struct PolicySlice<'a> {
+                _marker: PhantomData<&'a ()>,
+            }
+
+            impl<'a> PolicySlice<'a> {
                 pub fn apply(
                     &self,
                     _: &mut Store,
@@ -428,7 +433,11 @@ pub mod rpc {
         }
 
         impl Iso8583Parser {
-            pub fn check_payload(&mut self, _: &[u8], _: &Iso8583ParseConfig) -> Option<LogMessageType> {
+            pub fn check_payload(
+                &mut self,
+                _: &[u8],
+                _: &Iso8583ParseConfig,
+            ) -> Option<LogMessageType> {
                 unimplemented!()
             }
             pub fn parse_payload_multiple(

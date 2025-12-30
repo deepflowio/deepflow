@@ -513,7 +513,7 @@ pub struct DubboLog {
 #[cfg(feature = "enterprise")]
 struct CustomFieldContext<'a> {
     direction: PacketDirection,
-    policies: Option<PolicySlice>,
+    policies: Option<PolicySlice<'a>>,
     store: &'a mut Store,
 }
 

@@ -360,7 +360,11 @@ mod tests {
                     L7ParseResult::Single(s) => {
                         output.push_str(&serde_json::to_string(&s).unwrap());
                         output.push_str(
-                            format!(" check: {}", some_ip.check_payload(payload, param).is_some()).as_str(),
+                            format!(
+                                " check: {}",
+                                some_ip.check_payload(payload, param).is_some()
+                            )
+                            .as_str(),
                         );
                         output.push_str("\n");
                     }
@@ -368,8 +372,11 @@ mod tests {
                         for i in m {
                             output.push_str(&serde_json::to_string(&i).unwrap());
                             output.push_str(
-                                format!(" check: {}", some_ip.check_payload(payload, param).is_some())
-                                    .as_str(),
+                                format!(
+                                    " check: {}",
+                                    some_ip.check_payload(payload, param).is_some()
+                                )
+                                .as_str(),
                             );
                             output.push_str("\n");
                         }
