@@ -21,7 +21,11 @@ pub mod shared_obj;
 pub mod wasm;
 
 use prost::Message;
-use public::{bytes::read_u32_be, counter::Countable, l7_protocol::L7Protocol};
+use public::{
+    bytes::read_u32_be,
+    counter::Countable,
+    l7_protocol::{L7Protocol, LogMessageType},
+};
 use serde::Serialize;
 
 use crate::{
@@ -37,7 +41,7 @@ use crate::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal,
                 TraceInfo,
             },
-            swap_if, L7ResponseStatus, LogMessageType,
+            swap_if, L7ResponseStatus,
         },
         AppProtoHead, Error,
     },

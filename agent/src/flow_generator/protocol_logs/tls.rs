@@ -22,7 +22,7 @@ use serde::Serialize;
 use super::pb_adapter::{
     ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal,
 };
-use super::{set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
+use super::{set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus};
 use crate::config::handler::LogParserConfig;
 use crate::{
     common::{
@@ -36,7 +36,7 @@ use crate::{
     flow_generator::error::{Error, Result},
 };
 use l7::tls::TlsHeader;
-use public::l7_protocol::L7Protocol;
+use public::l7_protocol::{L7Protocol, LogMessageType};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum CipherSuite {
@@ -485,17 +485,21 @@ pub struct TlsLog {
 
 //解析器接口实现
 impl L7ProtocolParserInterface for TlsLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() || param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return None;
         }
 
         if payload.len() < TlsHeader::HEADER_LEN {
-            return false;
+            return None;
         }
 
         let tls_header = TlsHeader::new(payload);
-        tls_header.is_handshake() && tls_header.is_client_hello()
+        if tls_header.is_handshake() && tls_header.is_client_hello() {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {

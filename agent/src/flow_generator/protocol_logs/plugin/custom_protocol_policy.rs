@@ -23,7 +23,7 @@ use crate::{
     flow_generator::{
         protocol_logs::{
             pb_adapter::{KeyVal, MetricKeyVal},
-            set_captured_byte, IpProtocol, L7ResponseStatus, LogMessageType,
+            set_captured_byte, IpProtocol, L7ResponseStatus,
         },
         Error, Result,
     },
@@ -34,7 +34,7 @@ use enterprise_utils::l7::custom_policy::{
     custom_protocol_policy::{CustomPolicyInfo, CustomPolicyParser},
     enums::TrafficDirection,
 };
-use public::l7_protocol::{CustomProtocol, L7Protocol};
+use public::l7_protocol::{CustomProtocol, L7Protocol, LogMessageType};
 
 #[derive(Default)]
 pub struct CustomPolicyLog {
@@ -44,19 +44,19 @@ pub struct CustomPolicyLog {
 }
 
 impl L7ProtocolParserInterface for CustomPolicyLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return None;
         }
         let Some(config) = param.parse_config else {
-            return false;
+            return None;
         };
 
         if config.custom_protocol_config.protocol_characters.is_empty() {
-            return false;
+            return None;
         }
 
         let (port, direction) = match param.direction {
@@ -70,10 +70,10 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
         {
             Some(custom_protocol_name) => {
                 self.proto_str = custom_protocol_name;
-                return true;
+                return Some(LogMessageType::Request);
             }
             None => {
-                return false;
+                return None;
             }
         }
     }

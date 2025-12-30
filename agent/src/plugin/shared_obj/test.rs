@@ -23,7 +23,7 @@ use std::{
     time::Duration,
 };
 
-use public::enums::IpProtocol;
+use public::{enums::IpProtocol, l7_protocol::LogMessageType};
 
 use crate::{
     common::{
@@ -37,7 +37,7 @@ use crate::{
     flow_generator::protocol_logs::{
         pb_adapter::KeyVal,
         plugin::shared_obj::{get_so_parser, SoLog},
-        L7ResponseStatus, LogMessageType,
+        L7ResponseStatus,
     },
 };
 
@@ -145,7 +145,7 @@ fn test_check() {
     let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
     let param = get_req_param(rrt_cache, Rc::new(RefCell::new(Some(vec![get_plugin()]))));
     let mut p = SoLog::default();
-    assert!(p.check_payload(&REQ_PAYLOAD, &param));
+    assert!(p.check_payload(&REQ_PAYLOAD, &param) == Some(LogMessageType::Request));
 }
 
 #[test]

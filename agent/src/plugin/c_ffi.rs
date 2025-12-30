@@ -20,7 +20,6 @@ use std::sync::{Arc, Weak};
 use public::enums::IpProtocol;
 
 use crate::flow_generator::protocol_logs::pb_adapter::KeyVal;
-use crate::flow_generator::protocol_logs::LogMessageType;
 use crate::plugin::PluginCounterInfo;
 use crate::{common::l7_protocol_log::ParseParam, flow_generator::protocol_logs::L7ResponseStatus};
 
@@ -28,6 +27,7 @@ use super::{
     shared_obj::SoPluginCounter, CustomInfo, CustomInfoRequest, CustomInfoResp, CustomInfoTrace,
 };
 use public::counter::{Countable, RefCountable};
+use public::l7_protocol::LogMessageType;
 
 pub const INIT_FUNC_SYM: &'static str = "init";
 pub const CHECK_PAYLOAD_FUNC_SYM: &'static str = "on_check_payload";
@@ -326,6 +326,7 @@ impl TryFrom<ParseInfo> for CustomInfo {
 pub struct CheckResult {
     pub proto: u8,
     pub proto_name: [u8; 16],
+    pub direction: u8,
 }
 
 pub const ACTION_ERROR: u8 = 0;

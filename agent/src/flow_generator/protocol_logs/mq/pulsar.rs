@@ -22,12 +22,14 @@ use crate::{
         error::Result,
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType,
-            PrioFields, BASE_FIELD_PRIORITY,
+            set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, PrioFields,
+            BASE_FIELD_PRIORITY,
         },
     },
     utils::bytes::read_u32_be,
 };
+
+use public::l7_protocol::LogMessageType;
 
 // ProtocolVersion in PulsarApi.proto
 const MAX_PROTOCOL_VERSION: i32 = 21;
@@ -864,17 +866,21 @@ impl L7ProtocolInfoInterface for PulsarInfo {
 }
 
 impl L7ProtocolParserInterface for PulsarLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return None;
         }
         if payload.len() < 8 {
-            return false;
+            return None;
         }
-        PulsarInfo::parse(payload, param).is_some()
+        if PulsarInfo::parse(payload, param).is_some() {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -1006,7 +1012,7 @@ mod tests {
 
             param.set_log_parser_config(parse_config);
 
-            if !pulsar.check_payload(payload, param) {
+            if pulsar.check_payload(payload, param).is_none() {
                 output.push_str("not pulsar\n");
                 continue;
             }

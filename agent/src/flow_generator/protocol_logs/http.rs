@@ -26,7 +26,7 @@ use hpack::Decoder;
 use nom::{AsBytes, ParseTo};
 use serde::Serialize;
 
-use public::l7_protocol::{Field, FieldSetter, L7Log, L7ProtocolChecker};
+use public::l7_protocol::{Field, FieldSetter, L7Log, L7ProtocolChecker, LogMessageType};
 use public_derive::L7Log;
 
 use super::{
@@ -34,7 +34,7 @@ use super::{
     pb_adapter::{
         ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal, TraceInfo,
     },
-    value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType, PrioField,
+    value_is_default, AppProtoHead, L7ResponseStatus, PrioField,
 };
 
 use crate::{
@@ -934,9 +934,9 @@ pub struct HttpLog {
 }
 
 impl L7ProtocolParserInterface for HttpLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return None;
         }
 
         let mut info = HttpInfo::default();
@@ -949,7 +949,7 @@ impl L7ProtocolParserInterface for HttpLog {
             L7Protocol::Http1 => self.http1_check_protocol(payload),
             L7Protocol::Http2 | L7Protocol::Grpc => {
                 let Some(config) = param.parse_config else {
-                    return false;
+                    return None;
                 };
                 if self.http2_req_decoder.is_none() {
                     self.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
@@ -959,28 +959,40 @@ impl L7ProtocolParserInterface for HttpLog {
                     | EbpfType::GoHttp2UprobeData
                     | EbpfType::UnixSocket => {
                         if param.direction == PacketDirection::ServerToClient {
-                            return false;
+                            return None;
                         }
-                        self.check_http2_go_uprobe(
-                            &config.l7_log_dynamic,
-                            payload,
-                            param,
-                            &mut info,
-                            #[cfg(feature = "enterprise")]
-                            None,
-                        )
-                        .is_ok()
+                        if self
+                            .check_http2_go_uprobe(
+                                &config.l7_log_dynamic,
+                                payload,
+                                param,
+                                &mut info,
+                                #[cfg(feature = "enterprise")]
+                                None,
+                            )
+                            .is_ok()
+                        {
+                            Some(LogMessageType::Request)
+                        } else {
+                            None
+                        }
                     }
                     _ => {
-                        self.check_http_v2(
-                            payload,
-                            param,
-                            &mut info,
-                            #[cfg(feature = "enterprise")]
-                            None,
-                        )
-                        .is_ok()
+                        if self
+                            .check_http_v2(
+                                payload,
+                                param,
+                                &mut info,
+                                #[cfg(feature = "enterprise")]
+                                None,
+                            )
+                            .is_ok()
                             && info.msg_type != LogMessageType::Other
+                        {
+                            Some(LogMessageType::Request)
+                        } else {
+                            None
+                        }
                     }
                 }
             }
@@ -1283,14 +1295,18 @@ impl HttpLog {
         self.http2_resp_decoder = Some(Decoder::new_with_expected_headers(expected_headers_set));
     }
 
-    fn http1_check_protocol(&mut self, payload: &[u8]) -> bool {
+    fn http1_check_protocol(&mut self, payload: &[u8]) -> Option<LogMessageType> {
         let mut headers = parse_v1_headers(payload);
         let Some(first_line) = headers.next() else {
             // request is not http v1 without '\r\n'
-            return false;
+            return None;
         };
 
-        is_http_req_line(first_line)
+        if is_http_req_line(first_line) {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn set_grpc_status(&mut self, status_code: u16, info: &mut HttpInfo) {
@@ -3218,10 +3234,14 @@ mod tests {
         param.l4_protocol = IpProtocol::TCP;
 
         let mut parser = HttpLog::new_v1();
-        assert!(!parser.check_payload(
-            concat!(r#"POST","name":"一些中文""#, "\r\nblablabla\r\n").as_bytes(),
-            &param
-        ));
-        assert!(parser.check_payload("GET / HTTP/1.1\r\n\r\n".as_bytes(), &param));
+        assert!(parser
+            .check_payload(
+                concat!(r#"POST","name":"一些中文""#, "\r\nblablabla\r\n").as_bytes(),
+                &param
+            )
+            .is_none());
+        assert!(parser
+            .check_payload("GET / HTTP/1.1\r\n\r\n".as_bytes(), &param)
+            .is_some());
     }
 }

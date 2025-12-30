@@ -19,7 +19,9 @@ use std::ffi::CStr;
 use bson::{self, Document};
 use serde::Serialize;
 
-use super::super::{AppProtoHead, LogMessageType};
+use public::l7_protocol::LogMessageType;
+
+use super::super::AppProtoHead;
 use crate::common::flow::L7PerfStats;
 use crate::common::l7_protocol_log::L7ParseResult;
 use crate::config::handler::LogParserConfig;
@@ -232,21 +234,25 @@ pub struct MongoDBLog {
 }
 
 impl L7ProtocolParserInterface for MongoDBLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return None;
         }
         let mut header = MongoDBHeader::default();
         let offset = header.decode(payload);
         if offset < 0 {
-            return false;
+            return None;
         }
 
         self.info.is_tls = param.is_tls();
-        return header.is_request();
+        if header.is_request() {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -719,7 +725,7 @@ mod tests {
             );
             param.set_captured_byte(payload.len());
 
-            let is_mongo = mongo.check_payload(payload, param);
+            let is_mongo = mongo.check_payload(payload, param).is_some();
             let info = mongo.parse_payload(payload, param);
             if let Ok(info) = info {
                 match info.unwrap_single() {

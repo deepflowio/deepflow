@@ -17,10 +17,12 @@ use crate::{
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             set_captured_byte, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus,
-            LogMessageType, PrioFields, BASE_FIELD_PRIORITY,
+            PrioFields, BASE_FIELD_PRIORITY,
         },
     },
 };
+
+use public::l7_protocol::LogMessageType;
 
 /// references:
 ///   1. the JMS repository: "https://github.com/apache/activemq-openwire"
@@ -1894,8 +1896,12 @@ impl Default for OpenWireLog {
 }
 
 impl L7ProtocolParserInterface for OpenWireLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        Self::check_protocol(payload, param)
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
+        if Self::check_protocol(payload, param) {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         if self.perf_stats.is_none() && param.parse_perf {

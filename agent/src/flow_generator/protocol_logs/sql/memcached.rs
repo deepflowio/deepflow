@@ -18,6 +18,8 @@ use std::{fmt, mem, str};
 
 use serde::Serialize;
 
+use public::l7_protocol::LogMessageType;
+
 use crate::{
     common::{
         enums::IpProtocol,
@@ -31,7 +33,7 @@ use crate::{
         error::{Error, Result},
         protocol_logs::{
             pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
-            AppProtoHead, L7ResponseStatus, LogMessageType, PacketDirection,
+            AppProtoHead, L7ResponseStatus, PacketDirection,
         },
     },
 };
@@ -590,14 +592,19 @@ impl MemcachedLog {
 }
 
 impl L7ProtocolParserInterface for MemcachedLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return None;
         }
-        MemcachedLog::parse_commands(payload).is_ok()
+
+        if MemcachedLog::parse_commands(payload).is_ok() {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -725,7 +732,9 @@ mod tests {
             param.set_captured_byte(payload.len());
 
             let is_memcached = match packet.lookup_key.direction {
-                PacketDirection::ClientToServer => memcached.check_payload(payload, param),
+                PacketDirection::ClientToServer => {
+                    memcached.check_payload(payload, param).is_some()
+                }
                 PacketDirection::ServerToClient => MemcachedLog::parse_response(payload).is_ok(),
             };
 

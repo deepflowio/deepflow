@@ -25,7 +25,7 @@ use std::time::Duration;
 
 use flate2::read::GzDecoder;
 use public::enums::IpProtocol;
-use public::l7_protocol::CustomProtocol;
+use public::l7_protocol::{CustomProtocol, LogMessageType};
 
 use crate::common::ebpf::EbpfType;
 use crate::common::flow::PacketDirection;
@@ -263,7 +263,10 @@ fn test_check_payload() {
         10, 6, 100, 111, 109, 97, 105, 110, 18, 8, 114, 101, 115, 111, 117, 114, 99, 101, 26, 4,
         116, 121, 112, 101, 34, 8, 101, 110, 100, 112, 111, 105, 110, 116,
     ];
-    assert_eq!(wasm_log.check_payload(&payload[..], &param), true);
+    assert_eq!(
+        wasm_log.check_payload(&payload[..], &param),
+        Some(LogMessageType::Request)
+    );
     assert_eq!(
         wasm_log.custom_protocol().unwrap(),
         CustomProtocol::Wasm(1, "test".to_string())

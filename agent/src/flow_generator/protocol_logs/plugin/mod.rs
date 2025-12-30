@@ -15,7 +15,7 @@
  */
 
 use enum_dispatch::enum_dispatch;
-use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum};
+use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolEnum, LogMessageType};
 use wasm::WasmLog;
 
 use crate::{

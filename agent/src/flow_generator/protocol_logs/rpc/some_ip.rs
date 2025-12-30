@@ -16,6 +16,8 @@
 
 use serde::Serialize;
 
+use public::l7_protocol::LogMessageType;
+
 use crate::{
     common::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
@@ -28,7 +30,6 @@ use crate::{
         protocol_logs::{
             pb_adapter::{ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response},
             set_captured_byte, swap_if, value_is_default, AppProtoHead, L7ResponseStatus,
-            LogMessageType,
         },
     },
 };
@@ -181,16 +182,20 @@ pub struct SomeIpLog {
 }
 
 impl L7ProtocolParserInterface for SomeIpLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
 
         let Ok(header) = SomeIpHeader::try_from(payload) else {
-            return false;
+            return None;
         };
 
-        header.check()
+        if header.check() {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {

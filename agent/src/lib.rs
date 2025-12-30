@@ -72,7 +72,6 @@ pub use {
         },
         FlowPerfCounter as _FlowPerfCounter, L7FlowPerf as _L7FlowPerf,
     },
-    flow_generator::protocol_logs::LogMessageType as _LogMessageType,
     flow_generator::HttpLog,
     npb_pcap_policy::{
         DirectionType as _DirectionType, NpbAction as _NpbAction, NpbTunnelType as _NpbTunnelType,

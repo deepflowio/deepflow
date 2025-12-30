@@ -40,10 +40,11 @@ use crate::{
         protocol_logs::{
             pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
             set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
-            L7ResponseStatus, LogMessageType,
+            L7ResponseStatus,
         },
     },
 };
+use public::l7_protocol::LogMessageType;
 use public::proto::flow_log::MqttTopic;
 
 #[derive(Serialize, Clone, Debug)]
@@ -288,11 +289,15 @@ pub struct MqttLog {
 }
 
 impl L7ProtocolParserInterface for MqttLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
-        Self::check_protocol(payload, param)
+        if Self::check_protocol(payload, param) {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
