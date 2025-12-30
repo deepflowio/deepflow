@@ -144,6 +144,13 @@ impl L7ProtocolInfoInterface for Iso8583Info {
     fn is_on_blacklist(&self) -> bool {
         self.is_on_blacklist
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        if self.endpoint.is_empty() {
+            return None;
+        }
+        Some(self.endpoint.clone())
+    }
 }
 
 impl From<Iso8583Info> for L7ProtocolSendLog {
