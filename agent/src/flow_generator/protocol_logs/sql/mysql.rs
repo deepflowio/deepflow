@@ -777,6 +777,9 @@ impl L7ProtocolParserInterface for MysqlLog {
             Err(e) => return Err(e.into()),
         }
 
+        #[cfg(feature = "enterprise")]
+        self.merge_custom_field_operations(custom_policies, &mut info);
+
         set_captured_byte!(info, param);
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
@@ -793,8 +796,6 @@ impl L7ProtocolParserInterface for MysqlLog {
             }
         }
         if param.parse_log {
-            #[cfg(feature = "enterprise")]
-            self.merge_custom_field_operations(custom_policies, &mut info);
             Ok(L7ParseResult::Single(L7ProtocolInfo::MysqlInfo(info)))
         } else {
             Ok(L7ParseResult::None)

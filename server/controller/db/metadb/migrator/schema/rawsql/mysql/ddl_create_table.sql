@@ -1061,9 +1061,9 @@ CREATE TABLE IF NOT EXISTS pod_service (
     selector            TEXT COMMENT 'separated by ,',
     external_ip         TEXT COMMENT 'separated by ,',
     service_cluster_ip  CHAR(64) DEFAULT '',
-    metadata            MEDIUMTEXT COMMENT 'yaml',
+    compressed_metadata MEDIUMBLOB COMMENT 'compressed yaml',
     metadata_hash       CHAR(64) DEFAULT '',
-    spec                MEDIUMTEXT COMMENT 'yaml',
+    compressed_spec     MEDIUMBLOB COMMENT 'compressed yaml',
     spec_hash           CHAR(64) DEFAULT '',
     pod_ingress_id      INTEGER DEFAULT NULL,
     pod_namespace_id    INTEGER DEFAULT NULL,
@@ -1110,9 +1110,9 @@ CREATE TABLE IF NOT EXISTS pod_group (
     pod_num             INTEGER DEFAULT 1,
     label               TEXT COMMENT 'separated by ,',
     network_mode        INTEGER DEFAULT 1 COMMENT '1: Pod network 2: Host network',
-    metadata            MEDIUMTEXT COMMENT 'yaml',
+    compressed_metadata MEDIUMBLOB COMMENT 'compressed yaml',
     metadata_hash       CHAR(64) DEFAULT '',
-    spec                MEDIUMTEXT COMMENT 'yaml',
+    compressed_spec     MEDIUMBLOB COMMENT 'compressed yaml',
     spec_hash           CHAR(64) DEFAULT '',
     pod_namespace_id    INTEGER DEFAULT NULL,
     pod_cluster_id      INTEGER DEFAULT NULL,
@@ -1505,6 +1505,12 @@ CREATE TABLE IF NOT EXISTS genesis_storage (
     node_ip     CHAR(48)
 ) ENGINE=innodb DEFAULT CHARSET = utf8mb4;
 TRUNCATE TABLE genesis_storage;
+
+CREATE TABLE IF NOT EXISTS genesis_cluster (
+    id          CHAR(64) NOT NULL PRIMARY KEY,
+    node_ip     CHAR(48)
+) ENGINE=innodb DEFAULT CHARSET = utf8mb4;
+TRUNCATE TABLE genesis_cluster;
 
 -- ClickHouse dictionary
 CREATE TABLE IF NOT EXISTS ch_pod_k8s_env (

@@ -315,7 +315,17 @@ func getGenesisKubernetesData(g *genesis.Genesis) gin.HandlerFunc {
 			response.JSON(c, response.SetOptStatus(httpcommon.ORG_ID_INVALID), response.SetError(err))
 			return
 		}
-		data, err := service.GetGenesisKubernetesData(g, orgID, c.Param("clusterID"))
+		k8sEntries, err := service.GetGenesisKubernetesData(g, orgID, c.Param("clusterID"))
+		if err != nil {
+			response.JSON(c, response.SetOptStatus(httpcommon.RESOURCE_NOT_FOUND), response.SetError(err))
+			return
+		}
+		data := map[string][]string{}
+		for key, entries := range k8sEntries {
+			for _, entry := range entries {
+				data[key] = append(data[key], string(entry))
+			}
+		}
 		response.JSON(c, response.SetData(data), response.SetError(err))
 	})
 }

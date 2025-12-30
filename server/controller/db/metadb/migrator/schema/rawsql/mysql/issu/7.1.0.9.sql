@@ -29,8 +29,8 @@ CALL AddColumnIfNotExists('pod_namespace', 'uid', "CHAR(64) DEFAULT ''", 'domain
 CALL AddColumnIfNotExists('pod_service', 'uid', "CHAR(64) DEFAULT ''", 'domain');
 CALL AddColumnIfNotExists('pod_group', 'uid', "CHAR(64) DEFAULT ''", 'domain');
 CALL AddColumnIfNotExists('custom_service', 'match_type', "INTEGER DEFAULT 0 COMMENT '0: unkonwn 1: name match 2: uid match'", 'type');
-CALL AddColumnIfNotExists('custom_service', 'pod_namespace_id', "INTEGER DEFAULT 0", 'epc_id');
-CALL AddColumnIfNotExists('custom_service', 'pod_cluster_id', "INTEGER DEFAULT 0", 'epc_id');
+CALL AddColumnIfNotExists('custom_service', 'pod_namespace_id', "INTEGER DEFAULT 0", 'match_type');
+CALL AddColumnIfNotExists('custom_service', 'pod_cluster_id', "INTEGER DEFAULT 0", 'match_type');
 
 DROP PROCEDURE AddColumnIfNotExists;
 

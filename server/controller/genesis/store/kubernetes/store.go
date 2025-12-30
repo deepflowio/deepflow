@@ -18,9 +18,9 @@ package kubernetes
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -30,31 +30,39 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
 	"github.com/deepflowio/deepflow/server/controller/genesis/config"
+	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
+	"gorm.io/gorm/clause"
 )
 
 type KubernetesStorage struct {
-	listenPort     int
-	listenNodePort int
-	cfg            config.GenesisConfig
-	kCtx           context.Context
-	kCancel        context.CancelFunc
-	channel        chan common.KubernetesInfo
-	kubernetesData map[int]map[string]common.KubernetesInfo
-	mutex          sync.Mutex
+	nodeIP           string
+	listenPort       int
+	listenNodePort   int
+	cfg              config.GenesisConfig
+	kCtx             context.Context
+	kCancel          context.CancelFunc
+	channel          chan common.KubernetesInfo
+	kubernetesData   map[string]common.KubernetesInfo
+	clusterDestCache map[string]common.ClusterDest
+	mutex            sync.RWMutex
+	cacheMutex       sync.RWMutex
 }
 
 func NewKubernetesStorage(ctx context.Context, port, nPort int, cfg config.GenesisConfig, kChan chan common.KubernetesInfo) *KubernetesStorage {
 	kCtx, kCancel := context.WithCancel(ctx)
 	return &KubernetesStorage{
-		listenPort:     port,
-		listenNodePort: nPort,
-		cfg:            cfg,
-		kCtx:           kCtx,
-		kCancel:        kCancel,
-		channel:        kChan,
-		kubernetesData: map[int]map[string]common.KubernetesInfo{},
-		mutex:          sync.Mutex{},
+		nodeIP:           os.Getenv(ccommon.NODE_IP_KEY),
+		listenPort:       port,
+		listenNodePort:   nPort,
+		cfg:              cfg,
+		kCtx:             kCtx,
+		kCancel:          kCancel,
+		channel:          kChan,
+		kubernetesData:   map[string]common.KubernetesInfo{},
+		clusterDestCache: map[string]common.ClusterDest{},
+		mutex:            sync.RWMutex{},
+		cacheMutex:       sync.RWMutex{},
 	}
 }
 
@@ -62,100 +70,78 @@ func (k *KubernetesStorage) Clear() {
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 
-	k.kubernetesData = map[int]map[string]common.KubernetesInfo{}
+	k.kubernetesData = map[string]common.KubernetesInfo{}
 }
 
-func (k *KubernetesStorage) Add(orgID int, newInfo common.KubernetesInfo) {
+func (k *KubernetesStorage) formatKey(orgID int, clusterID string) string {
+	return fmt.Sprintf("%d-%s", orgID, clusterID)
+}
+
+func (k *KubernetesStorage) Add(orgID int, newData common.KubernetesInfo) {
 	k.mutex.Lock()
+	key := k.formatKey(orgID, newData.ClusterID)
 	unTriggerFlag := false
-	kubernetesData, ok := k.kubernetesData[orgID]
-	if ok {
-		// 上报消息中version未变化时，只更新epoch和error_msg
-		if oldInfo, ok := kubernetesData[newInfo.ClusterID]; ok && oldInfo.Version == newInfo.Version {
-			unTriggerFlag = true
-			oldInfo.Epoch = newInfo.Epoch
-			oldInfo.ErrorMSG = newInfo.ErrorMSG
-			kubernetesData[newInfo.ClusterID] = oldInfo
-		} else {
-			kubernetesData[newInfo.ClusterID] = newInfo
-		}
+	data, ok := k.kubernetesData[key]
+	// when version unchanged in the reported message, only update epoch and error_msg
+	if ok && data.Version == newData.Version {
+		unTriggerFlag = true
+		data.Epoch = newData.Epoch
+		data.ErrorMSG = newData.ErrorMSG
 	} else {
-		k.kubernetesData[orgID] = map[string]common.KubernetesInfo{
-			newInfo.ClusterID: newInfo,
-		}
+		data = newData
 	}
-	k.fetch()
+	k.kubernetesData[key] = data
+
 	k.mutex.Unlock()
 
+	k.channel <- data
+
+	db, err := metadb.GetDB(orgID)
+	if err != nil {
+		log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
+		return
+	}
+	err = db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"node_ip"}),
+	}).Create(&model.GenesisCluster{
+		ID:     newData.ClusterID,
+		NodeIP: k.nodeIP,
+	}).Error
+	if err != nil {
+		log.Errorf("update cluster (id:%s/node_ip:%s) failed: %s", newData.ClusterID, k.nodeIP, err.Error(), logger.NewORGPrefix(orgID))
+		return
+	}
+
 	if !unTriggerFlag {
-		err := k.triggerCloudRrefresh(orgID, newInfo.ClusterID, newInfo.Version)
+		err = k.triggerCloudRefresh(orgID, newData.ClusterID, newData.Version)
 		if err != nil {
-			log.Warning(fmt.Sprintf("trigger cloud kubernetes refresh failed: (%s)", err.Error()), logger.NewORGPrefix(orgID))
+			log.Warningf("trigger cloud kubernetes refresh failed: (%s)", err.Error(), logger.NewORGPrefix(orgID))
 		}
 	}
 }
 
 func (k *KubernetesStorage) fetch() {
-	for _, k8sDatas := range k.kubernetesData {
-		for _, kData := range k8sDatas {
-			k.channel <- kData
-		}
+	k.mutex.RLock()
+	defer k.mutex.RUnlock()
+	for _, data := range k.kubernetesData {
+		k.channel <- data
 	}
 }
 
-func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, version uint64) error {
-	var controllerIP, domainLcuuid, subDomainLcuuid string
-
-	db, err := metadb.GetDB(orgID)
-	if err != nil {
-		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
-		return err
+func (k *KubernetesStorage) triggerCloudRefresh(orgID int, clusterID string, version uint64) error {
+	k.cacheMutex.RLock()
+	dest, ok := k.clusterDestCache[k.formatKey(orgID, clusterID)]
+	k.cacheMutex.RUnlock()
+	if !ok {
+		return fmt.Errorf("not found cluster (%s) dest info in cache", clusterID)
 	}
 
-	var subDomains []metadbmodel.SubDomain
-	err = db.Where("cluster_id = ?", clusterID).Find(&subDomains).Error
-	if err != nil {
-		return err
-	}
-	var domain metadbmodel.Domain
-	switch len(subDomains) {
-	case 0:
-		err = db.Where("cluster_id = ? AND type = ?", clusterID, ccommon.KUBERNETES).First(&domain).Error
-		if err != nil {
-			return err
-		}
-		controllerIP = domain.ControllerIP
-		domainLcuuid = domain.Lcuuid
-		subDomainLcuuid = domain.Lcuuid
-	case 1:
-		err = db.Where("lcuuid = ?", subDomains[0].Domain).First(&domain).Error
-		if err != nil {
-			return err
-		}
-		controllerIP = domain.ControllerIP
-		domainLcuuid = domain.Lcuuid
-		subDomainLcuuid = subDomains[0].Lcuuid
-	default:
-		return errors.New(fmt.Sprintf("cluster_id (%s) is not unique in metadb table sub_domain", clusterID))
-	}
-
-	var controller metadbmodel.Controller
-	err = db.Where("ip = ? AND state <> ?", controllerIP, ccommon.CONTROLLER_STATE_EXCEPTION).First(&controller).Error
-	if err != nil {
-		return err
-	}
-	requestIP := controllerIP
-	requestPort := k.listenNodePort
-	if controller.PodIP != "" {
-		requestIP = controller.PodIP
-		requestPort = k.listenPort
-	}
-
-	requestUrl := "http://" + net.JoinHostPort(requestIP, strconv.Itoa(requestPort)) + "/v1/kubernetes-refresh/"
+	requestUrl := "http://" + dest.Endpoint + "/v1/kubernetes-refresh/"
 	queryStrings := map[string]string{
-		"domain_lcuuid":     domainLcuuid,
-		"sub_domain_lcuuid": subDomainLcuuid,
-		"version":           strconv.Itoa(int(version)),
+		"domain_lcuuid":     dest.DomainLcuuid,
+		"sub_domain_lcuuid": dest.SubDomainLcuuid,
+		"version":           fmt.Sprintf("%d", version),
 	}
 
 	log.Debugf("trigger cloud (%s) kubernetes (%s) refresh version (%d)", requestUrl, clusterID, version, logger.NewORGPrefix(orgID))
@@ -163,21 +149,123 @@ func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, ve
 	return common.RequestGet(requestUrl, 30, queryStrings)
 }
 
-func (k *KubernetesStorage) run() {
-	for {
-		time.Sleep(time.Duration(k.cfg.DataPersistenceInterval) * time.Second)
-		now := time.Now()
-		k.mutex.Lock()
-		for _, kubernetesData := range k.kubernetesData {
-			for key, s := range kubernetesData {
-				if now.Sub(s.Epoch) <= time.Duration(k.cfg.AgingTime)*time.Second {
-					continue
-				}
-				delete(kubernetesData, key)
+func (k *KubernetesStorage) generateCache() {
+	cacheMap := map[string]common.ClusterDest{}
+	for _, db := range metadb.GetDBs().All() {
+		var controllers []metadbmodel.Controller
+		err := db.Where("state <> ?", ccommon.CONTROLLER_STATE_EXCEPTION).Find(&controllers).Error
+		if err != nil {
+			log.Errorf("get controller failed: %s", err.Error(), logger.NewORGPrefix(db.ORGID))
+			return
+		}
+		controllerIPToPodIP := map[string]string{}
+		for _, controller := range controllers {
+			if controller.PodIP == "" {
+				log.Warningf("not found controller (%s) pod ip", controller.IP, logger.NewORGPrefix(db.ORGID))
+			}
+			controllerIPToPodIP[controller.IP] = controller.PodIP
+		}
+
+		var domains []metadbmodel.Domain
+		err = db.Find(&domains).Error
+		if err != nil {
+			log.Errorf("get domain failed: %s", err.Error(), logger.NewORGPrefix(db.ORGID))
+			return
+		}
+		lcuuidToDomain := map[string]metadbmodel.Domain{}
+		for _, domain := range domains {
+			if domain.Type != ccommon.KUBERNETES {
+				lcuuidToDomain[domain.Lcuuid] = domain
+				continue
+			}
+			var endpoint string
+			podIP, ok := controllerIPToPodIP[domain.ControllerIP]
+			if !ok {
+				log.Warningf("domain (%s) controller ip (%s) not in controllers", domain.Name, domain.ControllerIP, logger.NewORGPrefix(db.ORGID))
+				continue
+			}
+			if podIP != "" {
+				endpoint = net.JoinHostPort(podIP, strconv.Itoa(k.listenPort))
+			} else {
+				endpoint = net.JoinHostPort(domain.ControllerIP, strconv.Itoa(k.listenNodePort))
+			}
+			cacheMap[k.formatKey(db.ORGID, domain.ClusterID)] = common.ClusterDest{
+				Endpoint:        endpoint,
+				DomainLcuuid:    domain.Lcuuid,
+				SubDomainLcuuid: domain.Lcuuid,
 			}
 		}
-		k.fetch()
-		k.mutex.Unlock()
+
+		var subDomains []metadbmodel.SubDomain
+		err = db.Find(&subDomains).Error
+		if err != nil {
+			log.Errorf("get subdomain failed: %s", err.Error(), logger.NewORGPrefix(db.ORGID))
+			return
+		}
+		for _, subDomain := range subDomains {
+			domain, ok := lcuuidToDomain[subDomain.Domain]
+			if !ok {
+				log.Warningf("subdomain (%s) not found domain", subDomain.Name, logger.NewORGPrefix(db.ORGID))
+				continue
+			}
+			var endpoint string
+			podIP, ok := controllerIPToPodIP[domain.ControllerIP]
+			if !ok {
+				log.Warningf("subdomain (%s) controller ip (%s) not in controllers", subDomain.Name, domain.ControllerIP, logger.NewORGPrefix(db.ORGID))
+				continue
+			}
+			if podIP != "" {
+				endpoint = net.JoinHostPort(podIP, strconv.Itoa(k.listenPort))
+			} else {
+				endpoint = net.JoinHostPort(domain.ControllerIP, strconv.Itoa(k.listenNodePort))
+			}
+			cacheMap[k.formatKey(db.ORGID, domain.ClusterID)] = common.ClusterDest{
+				Endpoint:        endpoint,
+				DomainLcuuid:    domain.Lcuuid,
+				SubDomainLcuuid: subDomain.Lcuuid,
+			}
+		}
+	}
+
+	k.cacheMutex.Lock()
+	k.clusterDestCache = cacheMap
+	k.cacheMutex.Unlock()
+}
+
+func (k *KubernetesStorage) run() {
+	ticker := time.NewTicker(time.Duration(k.cfg.DataPersistenceInterval) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			go k.generateCache()
+
+			now := time.Now()
+			k.mutex.RLock()
+			toDeleteKeys := []string{}
+			for key, data := range k.kubernetesData {
+				if now.Sub(data.Epoch) <= time.Duration(k.cfg.AgingTime)*time.Second {
+					continue
+				}
+				toDeleteKeys = append(toDeleteKeys, key)
+			}
+			k.mutex.RUnlock()
+
+			if len(toDeleteKeys) == 0 {
+				continue
+			}
+
+			k.mutex.Lock()
+			for _, key := range toDeleteKeys {
+				delete(k.kubernetesData, key)
+			}
+			k.mutex.Unlock()
+
+			k.fetch()
+		case <-k.kCtx.Done():
+			return
+		}
 	}
 }
 

@@ -7683,7 +7683,7 @@ processors:
 自定义协议解析配置，支持通过简单的规则识别用户自定义的 L7 协议。
 示例：
 ```yaml
-- protorol_name: "your_protocol_name" # 协议名称，对应 l7_flow_log.l7_protocol_str，注意：必须存在一个 `processors.request_log.tag_extraction.custom_field_policies` 配置，否则无法上报识别结果
+- protocol_name: "your_protocol_name" # 协议名称，对应 l7_flow_log.l7_protocol_str，注意：必须存在一个 `processors.request_log.tag_extraction.custom_field_policies` 配置，否则无法上报识别结果
   pre_filter:
     port_list: 1-65535 # 预过滤端口，可以提高解析性能
   request_characters:  # 多个特征之间是 OR 的关系
@@ -8735,6 +8735,10 @@ processors:
 **详细描述**:
 
 自定义字段提取策略，用于通过简单的规则提取 L7 协议中可能存在的自定义字段
+同时匹配插件和自定义提取策略时，优先级为：
+1. 插件提取
+2. 自定义字段提取
+3. 采集器默认提取
 示例：
 ```yaml
 - policy_name: "my_policy" # 策略名称
@@ -10915,6 +10919,12 @@ outputs:
 开启此特性将增加 deepflow-agent 的 CPU 消耗。
 
 # 插件 {#plugins}
+
+插件支持
+同时匹配插件和自定义提取策略时，优先级为：
+1. 插件提取
+2. 自定义字段提取
+3. 采集器默认提取
 
 ## Wasm 插件列表 {#plugins.wasm_plugins}
 

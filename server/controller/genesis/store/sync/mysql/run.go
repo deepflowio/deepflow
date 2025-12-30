@@ -96,7 +96,7 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+		log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 		return common.GenesisSyncDataResponse{}, err
 	}
 
@@ -160,9 +160,7 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 		}
 		ret, err := client.GenesisSharingSync(context.Background(), req)
 		if err != nil {
-			msg := fmt.Sprintf("get genesis sharing sync faild (%s)", err.Error())
-			log.Warning(msg, logger.NewORGPrefix(orgID))
-			return common.GenesisSyncDataResponse{}, errors.New(msg)
+			return common.GenesisSyncDataResponse{}, fmt.Errorf("get genesis sharing sync faild (%s)", err.Error())
 		}
 
 		genesisSyncData := ret.GetData()

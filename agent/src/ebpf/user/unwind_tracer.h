@@ -39,6 +39,7 @@ void unwind_process_reload();
 
 // Configuration related functions
 bool get_dwarf_enabled(void);
+void set_dwarf_enabled(bool enabled);
 int get_dwarf_process_map_size(void);
 int get_dwarf_shard_map_size(void);
 

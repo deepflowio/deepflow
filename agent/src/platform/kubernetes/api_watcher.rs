@@ -51,10 +51,7 @@ use crate::{
         stats,
     },
 };
-use public::proto::{
-    agent::{Exception, KubernetesApiSyncRequest},
-    common::KubernetesApiInfo,
-};
+use public::proto::agent::{Exception, KubernetesApiInfo, KubernetesApiSyncRequest};
 
 /*
  * K8s API同步功能
