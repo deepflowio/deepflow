@@ -138,6 +138,13 @@ impl L7ProtocolInfoInterface for WebSphereMqInfo {
     fn is_reversed(&self) -> bool {
         self.is_reversed
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        if self.endpoint.is_empty() {
+            return None;
+        }
+        Some(self.endpoint.clone())
+    }
 }
 
 impl WebSphereMqInfo {
