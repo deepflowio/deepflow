@@ -32,6 +32,8 @@ pub mod l7 {
         }
 
         pub mod custom_field_policy {
+            use std::marker::PhantomData;
+
             pub mod enums {
                 use std::sync::Arc;
 
@@ -89,8 +91,11 @@ pub mod l7 {
             }
 
             #[derive(Clone, Copy, Debug)]
-            pub struct PolicySlice;
-            impl PolicySlice {
+            pub struct PolicySlice<'a> {
+                _marker: PhantomData<&'a ()>,
+            }
+
+            impl<'a> PolicySlice<'a> {
                 pub fn apply(
                     &self,
                     _: &mut Store,
@@ -339,6 +344,7 @@ pub mod l7 {
 
     pub mod mq {
         pub mod web_sphere_mq {
+            use public::l7_protocol::LogMessageType;
 
             #[derive(Default)]
             pub struct WebSphereMqParser {
@@ -349,7 +355,7 @@ pub mod l7 {
             }
 
             impl WebSphereMqParser {
-                pub fn check_payload(&mut self, _: &[u8], _: bool) -> bool {
+                pub fn check_payload(&mut self, _: &[u8], _: bool) -> Option<LogMessageType> {
                     unimplemented!()
                 }
 
