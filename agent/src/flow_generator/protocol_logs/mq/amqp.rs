@@ -36,12 +36,14 @@ use crate::{
         protocol_logs::{
             decode_base64_to_string,
             pb_adapter::{L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType,
-            PrioFields, BASE_FIELD_PRIORITY,
+            set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, PrioFields,
+            BASE_FIELD_PRIORITY,
         },
     },
     utils::bytes::{read_u16_be, read_u32_be, read_u64_be},
 };
+
+use public::l7_protocol::LogMessageType;
 
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, num_enum::FromPrimitive)]
 #[repr(u16)]
@@ -932,14 +934,18 @@ impl L7ProtocolInfoInterface for AmqpInfo {
 }
 
 impl L7ProtocolParserInterface for AmqpLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return None;
         }
-        return payload.starts_with(AMQPHEADER);
+        if payload.starts_with(AMQPHEADER) {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -1255,7 +1261,7 @@ mod tests {
             param.set_captured_byte(payload.len());
             if first_packet {
                 first_packet = false;
-                if !amqp.check_payload(payload, param) {
+                if amqp.check_payload(payload, param).is_none() {
                     output.push_str("not amqp\n");
                     break;
                 }
