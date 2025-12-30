@@ -35,11 +35,13 @@ use crate::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
             set_captured_byte, swap_if, value_is_default, AppProtoHead, L7ResponseStatus,
-            LogMessageType, PrioFields, BASE_FIELD_PRIORITY,
+            PrioFields, BASE_FIELD_PRIORITY,
         },
     },
     plugin::wasm::{wasm_plugin::NatsMessage as WasmNatsMessage, WasmData},
 };
+
+use public::l7_protocol::LogMessageType;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Info {
@@ -908,15 +910,19 @@ impl NatsLog {
 }
 
 impl L7ProtocolParserInterface for NatsLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return None;
         }
 
-        NatsInfo::try_parse(payload, param.parse_config).is_some()
+        if NatsInfo::try_parse(payload, param.parse_config).is_some() {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -1064,7 +1070,7 @@ mod tests {
 
             if first_packet {
                 first_packet = false;
-                if !nats.check_payload(payload, param) {
+                if nats.check_payload(payload, param).is_none() {
                     output.push_str("not nats\n");
                     break;
                 }

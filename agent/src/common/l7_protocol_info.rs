@@ -33,12 +33,13 @@ use crate::{
             NatsInfo, OpenWireInfo, OracleInfo, PingInfo, PostgreInfo, PulsarInfo, RedisInfo,
             SofaRpcInfo, SomeIpInfo, TarsInfo, TlsInfo, ZmtpInfo,
         },
-        AppProtoHead, LogMessageType, Result,
+        AppProtoHead, Result,
     },
     plugin::CustomInfo,
 };
 
 use super::l7_protocol_log::ParseParam;
+use public::l7_protocol::LogMessageType;
 
 macro_rules! all_protocol_info {
     ($($name:ident($info_struct:ty)),+$(,)?) => {

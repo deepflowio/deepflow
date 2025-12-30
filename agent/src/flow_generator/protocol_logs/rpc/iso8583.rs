@@ -17,7 +17,7 @@
 use serde::Serialize;
 
 use enterprise_utils::rpc::iso8583::{Iso8583ParseConfig, Iso8583Parser};
-use public::l7_protocol::L7Protocol;
+use public::l7_protocol::{L7Protocol, LogMessageType};
 
 use crate::config::handler::LogParserConfig;
 use crate::{
@@ -32,8 +32,8 @@ use crate::{
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
-            set_captured_byte, swap_if, value_is_default, L7ResponseStatus, LogMessageType,
-            PrioFields, BASE_FIELD_PRIORITY,
+            set_captured_byte, swap_if, value_is_default, L7ResponseStatus, PrioFields,
+            BASE_FIELD_PRIORITY,
         },
         AppProtoHead, Error, Result,
     },
@@ -199,7 +199,7 @@ pub struct Iso8583Log {
 }
 
 impl L7ProtocolParserInterface for Iso8583Log {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         self.parser.check_payload(
             payload,
             &Iso8583ParseConfig {

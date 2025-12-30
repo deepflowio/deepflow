@@ -27,9 +27,11 @@ use crate::{
     flow_generator::error::{Error, Result},
     flow_generator::protocol_logs::{
         pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
-        set_captured_byte, AppProtoHead, L7ResponseStatus, LogMessageType,
+        set_captured_byte, AppProtoHead, L7ResponseStatus,
     },
 };
+
+use public::l7_protocol::LogMessageType;
 
 const PING_HEADER_SIZE: u32 = 8;
 
@@ -142,16 +144,20 @@ pub struct PingLog {
 }
 
 impl L7ProtocolParserInterface for PingLog {
-    fn check_payload(&mut self, _: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, _: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if param.l4_protocol != IpProtocol::ICMPV4 && param.l4_protocol != IpProtocol::ICMPV6 {
-            return false;
+            return None;
         }
 
         let Some(icmp_data) = param.icmp_data else {
-            return false;
+            return None;
         };
 
-        icmp_data.icmp_type == IcmpTypes::EchoRequest.0
+        if icmp_data.icmp_type == IcmpTypes::EchoRequest.0 {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, _: &[u8], param: &ParseParam) -> Result<L7ParseResult> {

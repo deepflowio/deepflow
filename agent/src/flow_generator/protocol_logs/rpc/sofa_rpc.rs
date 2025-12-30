@@ -20,7 +20,7 @@ use std::borrow::Cow;
 use nom::InputTakeAtPosition;
 use public::{
     bytes::{read_u16_be, read_u32_be},
-    l7_protocol::L7Protocol,
+    l7_protocol::{L7Protocol, LogMessageType},
 };
 use serde::Serialize;
 
@@ -37,7 +37,7 @@ use crate::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             set_captured_byte, swap_if, L7ResponseStatus, PrioFields, BASE_FIELD_PRIORITY,
         },
-        AppProtoHead, Error, LogMessageType, Result,
+        AppProtoHead, Error, Result,
     },
 };
 
@@ -330,11 +330,16 @@ pub struct SofaRpcLog {
 }
 
 impl L7ProtocolParserInterface for SofaRpcLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         let mut info = SofaRpcInfo::default();
-        self.parse(payload, true, &mut info, param).is_ok()
+        if self.parse(payload, true, &mut info, param).is_ok()
             && info.msg_type == LogMessageType::Request
             && info.cmd_code != CMD_CODE_HEARTBEAT
+        {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -664,6 +669,8 @@ fn read_url_param_kv<'a>(payload: &mut &'a [u8]) -> Option<(&'a [u8], &'a [u8])>
 mod test {
     use std::{cell::RefCell, path::Path, rc::Rc};
 
+    use public::l7_protocol::LogMessageType;
+
     use crate::{
         common::{
             flow::{L7PerfStats, PacketDirection},
@@ -675,7 +682,7 @@ mod test {
                 rpc::sofa_rpc::{CMD_CODE_REQ, CMD_CODE_RESP, PROTO_BOLT_V1},
                 L7ResponseStatus,
             },
-            LogMessageType, L7_RRT_CACHE_CAPACITY,
+            L7_RRT_CACHE_CAPACITY,
         },
         utils::test::Capture,
     };
@@ -730,7 +737,10 @@ mod test {
         );
         let req_payload = p[0].get_l4_payload().unwrap();
         req_param.set_captured_byte(req_payload.len());
-        assert_eq!(parser.check_payload(req_payload, req_param), true);
+        assert_eq!(
+            parser.check_payload(req_payload, req_param),
+            Some(LogMessageType::Request)
+        );
         let req_info = parser
             .parse_payload(req_payload, req_param)
             .unwrap()
@@ -822,7 +832,10 @@ mod test {
         );
         let req_payload = p[0].get_l4_payload().unwrap();
         req_param.set_captured_byte(req_payload.len());
-        assert_eq!(parser.check_payload(req_payload, req_param), true);
+        assert_eq!(
+            parser.check_payload(req_payload, req_param),
+            Some(LogMessageType::Request)
+        );
         let req_info = parser
             .parse_payload(req_payload, req_param)
             .unwrap()
