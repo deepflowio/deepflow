@@ -129,6 +129,10 @@ func newDataGenerator(md metadata.Platform, resourceType string) dataGenerator {
 		dg = newDataGeneratorComponent[metadbModel.ChChost](md, resourceType)
 		filterSubDomain = false
 
+	case tagrecorder.RESOURCE_TYPE_CH_BIZ_SERVICE:
+		dg = newDataGeneratorComponent[metadbModel.ChBizService](md, resourceType)
+		filterSubDomain = false
+
 	case tagrecorder.RESOURCE_TYPE_CH_VPC:
 		dg = newDataGeneratorComponent[metadbModel.ChVPC](md, resourceType)
 		filterSubDomain = false

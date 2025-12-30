@@ -36,6 +36,7 @@ const (
 	CHOST_IP          = "chost_ip"
 	POD_NODE_HOSTNAME = "pod_node_hostname"
 	POD_NODE_IP       = "pod_node_ip"
+	BIZ_SERVICE_GROUP = "biz_service.group"
 
 	TAP_PORT_HOST        = "tap_port_host"
 	TAP_PORT_CHOST       = "tap_port_chost"
