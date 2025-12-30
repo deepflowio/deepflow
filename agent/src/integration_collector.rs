@@ -637,6 +637,18 @@ async fn handler(
                 .body(doc_bytes.as_slice().into())
                 .unwrap())
         }
+        // Health check endpoint for liveness probe
+        (&Method::GET, "/v1/health/") => Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .body(r#"{"status":"healthy"}"#.into())
+            .unwrap()),
+        // Readiness probe endpoint - returns 200 when the server is ready to accept traffic
+        (&Method::GET, "/v1/ready/") => Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .body(r#"{"status":"ready"}"#.into())
+            .unwrap()),
         // OpenTelemetry trace integration
         (&Method::POST, "/api/v1/otel/trace") => {
             if external_trace_integration_disabled {
