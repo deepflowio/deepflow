@@ -34,8 +34,8 @@ use crate::{
         protocol_logs::{
             decode_base64_to_string,
             pb_adapter::{L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus,
-            PrioFields, BASE_FIELD_PRIORITY,
+            set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, PrioFields,
+            BASE_FIELD_PRIORITY,
         },
     },
     utils::bytes::{read_u16_be, read_u32_be, read_u64_be},

@@ -17,8 +17,8 @@
 use std::fmt;
 
 use bitflags::bitflags;
-use serde::Serialize;
 use public::l7_protocol::LogMessageType;
+use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum TnsPacketType {

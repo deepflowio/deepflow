@@ -433,7 +433,11 @@ pub mod rpc {
         }
 
         impl Iso8583Parser {
-            pub fn check_payload(&mut self, _: &[u8], _: &Iso8583ParseConfig) -> Option<LogMessageType> {
+            pub fn check_payload(
+                &mut self,
+                _: &[u8],
+                _: &Iso8583ParseConfig,
+            ) -> Option<LogMessageType> {
                 unimplemented!()
             }
             pub fn parse_payload_multiple(
