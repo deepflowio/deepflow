@@ -325,11 +325,7 @@ const RESPONSE_CODE_OK_SUFFIX: &str = "0000";
 impl L7ProtocolParserInterface for WebSphereMqLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         let has_wasm = param.wasm_vm.borrow().is_some();
-        if self.parser.check_payload(payload, has_wasm) {
-            Some(LogMessageType::Request)
-        } else {
-            None
-        }
+        self.parser.check_payload(payload, has_wasm)
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
