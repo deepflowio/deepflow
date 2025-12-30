@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use public::l7_protocol::{CustomProtocol, L7Protocol};
+use public::l7_protocol::{CustomProtocol, L7Protocol, LogMessageType};
 
 use crate::{
     common::{
@@ -23,7 +23,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
-        protocol_logs::{set_captured_byte, L7ResponseStatus, LogMessageType},
+        protocol_logs::{set_captured_byte, L7ResponseStatus},
         Error, Result,
     },
 };
@@ -36,18 +36,20 @@ pub struct WasmLog {
 }
 
 impl L7ProtocolParserInterface for WasmLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         let mut vm_ref = param.wasm_vm.borrow_mut();
         let Some(vm) = vm_ref.as_mut() else {
-            return false;
+            return None;
         };
 
-        let res = vm.on_check_payload(&payload, &param);
-        res.map(|(proto_num, proto_str)| {
-            self.proto_num = Some(proto_num);
-            self.proto_str = proto_str;
-        });
-        self.proto_num.is_some()
+        let Some((proto_num, proto_str, message_type)) = vm.on_check_payload(&payload, &param)
+        else {
+            return None;
+        };
+        self.proto_num = Some(proto_num);
+        self.proto_str = proto_str;
+
+        Some(message_type)
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {

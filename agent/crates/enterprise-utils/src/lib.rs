@@ -238,6 +238,7 @@ pub mod l7 {
         pub mod oracle {
             use std::fmt;
 
+            use public::l7_protocol::LogMessageType;
             use serde::Serialize;
 
             pub struct Request {
@@ -314,7 +315,11 @@ pub mod l7 {
             }
 
             impl OracleParser {
-                pub fn check_payload(&mut self, _: &[u8], _: &OracleParseConfig) -> bool {
+                pub fn check_payload(
+                    &mut self,
+                    _: &[u8],
+                    _: &OracleParseConfig,
+                ) -> Option<LogMessageType> {
                     unimplemented!()
                 }
 
@@ -339,6 +344,7 @@ pub mod l7 {
 
     pub mod mq {
         pub mod web_sphere_mq {
+            use public::l7_protocol::LogMessageType;
 
             #[derive(Default)]
             pub struct WebSphereMqParser {
@@ -349,7 +355,7 @@ pub mod l7 {
             }
 
             impl WebSphereMqParser {
-                pub fn check_payload(&mut self, _: &[u8], _: bool) -> bool {
+                pub fn check_payload(&mut self, _: &[u8], _: bool) -> Option<LogMessageType> {
                     unimplemented!()
                 }
 
@@ -405,6 +411,8 @@ pub mod rpc {
     pub mod iso8583 {
         use public::bitmap::Bitmap;
 
+        use public::l7_protocol::LogMessageType;
+
         pub struct Iso8583ParseConfig {
             pub extract_fields: Bitmap,
             pub translation_enabled: bool,
@@ -425,7 +433,7 @@ pub mod rpc {
         }
 
         impl Iso8583Parser {
-            pub fn check_payload(&mut self, _: &[u8], _: &Iso8583ParseConfig) -> bool {
+            pub fn check_payload(&mut self, _: &[u8], _: &Iso8583ParseConfig) -> Option<LogMessageType> {
                 unimplemented!()
             }
             pub fn parse_payload_multiple(

@@ -16,7 +16,7 @@
 
 use serde::Serialize;
 
-use super::super::{value_is_default, LogMessageType};
+use super::super::value_is_default;
 use crate::{
     common::{
         flow::{L7PerfStats, PacketDirection},
@@ -34,7 +34,7 @@ use crate::{
 };
 
 use l7::oracle::{CallId, DataFlags, DataId, OracleParseConfig, OracleParser, TnsPacketType};
-use public::l7_protocol::L7Protocol;
+use public::l7_protocol::{L7Protocol, LogMessageType};
 
 #[derive(Serialize, Debug, Default, Clone, PartialEq)]
 pub struct OracleInfo {
@@ -246,7 +246,7 @@ pub struct OracleLog {
 }
 
 impl L7ProtocolParserInterface for OracleLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         self.parser.check_payload(
             payload,
             &OracleParseConfig {

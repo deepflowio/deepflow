@@ -35,7 +35,6 @@ pub use mq::{
     AmqpInfo, AmqpLog, KafkaInfo, KafkaLog, MqttInfo, MqttLog, NatsInfo, NatsLog, OpenWireInfo,
     OpenWireLog, PulsarInfo, PulsarLog, ZmtpInfo, ZmtpLog,
 };
-use num_enum::TryFromPrimitive;
 pub use parser::{AppProto, MetaAppProto, SessionAggregator};
 pub use ping::{PingInfo, PingLog};
 pub use rpc::{
@@ -80,6 +79,7 @@ use crate::{
     },
     metric::document::TapSide,
 };
+use public::l7_protocol::LogMessageType;
 use public::proto::flow_log;
 use public::sender::{SendMessageType, Sendable};
 use public::utils::net::MacAddr;
@@ -87,31 +87,6 @@ use public::utils::net::MacAddr;
 const NANOS_PER_MICRO: u64 = 1000;
 
 pub use public::enums::L7ResponseStatus;
-
-#[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive)]
-#[repr(u8)]
-pub enum LogMessageType {
-    Request,
-    Response,
-    Session,
-    Other,
-    Max,
-}
-
-impl Default for LogMessageType {
-    fn default() -> Self {
-        LogMessageType::Other
-    }
-}
-
-impl From<PacketDirection> for LogMessageType {
-    fn from(d: PacketDirection) -> LogMessageType {
-        match d {
-            PacketDirection::ClientToServer => LogMessageType::Request,
-            PacketDirection::ServerToClient => LogMessageType::Response,
-        }
-    }
-}
 
 // 应用层协议原始数据类型
 #[derive(Debug, PartialEq, Copy, Clone, Serialize)]

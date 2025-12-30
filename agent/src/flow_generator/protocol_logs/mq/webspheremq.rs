@@ -17,6 +17,7 @@
 use serde::Serialize;
 
 use enterprise_utils::l7::mq::web_sphere_mq::WebSphereMqParser;
+use public::l7_protocol::LogMessageType;
 
 use crate::plugin::{wasm::WasmData, CustomInfo};
 use crate::{
@@ -35,7 +36,7 @@ use crate::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
             set_captured_byte, swap_if, value_is_default, AppProtoHead, L7ResponseStatus,
-            LogMessageType, PrioFields, BASE_FIELD_PRIORITY, PLUGIN_FIELD_PRIORITY,
+            PrioFields, BASE_FIELD_PRIORITY, PLUGIN_FIELD_PRIORITY,
         },
     },
 };
@@ -322,7 +323,7 @@ pub struct WebSphereMqLog {
 
 const RESPONSE_CODE_OK_SUFFIX: &str = "0000";
 impl L7ProtocolParserInterface for WebSphereMqLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         let has_wasm = param.wasm_vm.borrow().is_some();
         self.parser.check_payload(payload, has_wasm)
     }

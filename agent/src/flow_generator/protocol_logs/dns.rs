@@ -23,7 +23,7 @@ use simple_dns::{rdata::RData, Packet, PacketFlag, SimpleDnsError, OPCODE, QTYPE
 
 use super::{
     pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
-    AppProtoHead, L7ResponseStatus, LogMessageType,
+    AppProtoHead, L7ResponseStatus,
 };
 use crate::{
     common::{
@@ -40,7 +40,7 @@ use crate::{
     },
     utils::bytes::read_u16_be,
 };
-use public::l7_protocol::L7Protocol;
+use public::l7_protocol::{L7Protocol, LogMessageType};
 
 const TCP_PAYLOAD_OFFSET: usize = 2;
 const DNS_HEADER_LEN: usize = 12;
@@ -395,9 +395,9 @@ pub struct DnsLog {
 
 //解析器接口实现
 impl L7ProtocolParserInterface for DnsLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
 
         match self.parse(payload, param, true) {
@@ -405,11 +405,11 @@ impl L7ProtocolParserInterface for DnsLog {
                 Some(info)
                     if info.msg_type == LogMessageType::Request && !info.query_name.is_empty() =>
                 {
-                    true
+                    Some(LogMessageType::Request)
                 }
-                _ => false,
+                _ => None,
             },
-            _ => false,
+            _ => None,
         }
     }
 
@@ -587,7 +587,7 @@ mod tests {
                 true,
             );
             param.set_captured_byte(payload.len());
-            let is_dns = dns.check_payload(payload, param);
+            let is_dns = dns.check_payload(payload, param).is_some();
             let info = dns.parse_payload(payload, param);
             if let Ok(info) = info {
                 for i in info.unwrap_multi() {

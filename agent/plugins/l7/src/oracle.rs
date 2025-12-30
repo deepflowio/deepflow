@@ -18,6 +18,7 @@ use std::fmt;
 
 use bitflags::bitflags;
 use serde::Serialize;
+use public::l7_protocol::LogMessageType;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum TnsPacketType {
@@ -133,8 +134,8 @@ pub struct OracleParser {
 }
 
 impl OracleParser {
-    pub fn check_payload(&mut self, _: &[u8], _: &OracleParseConfig) -> bool {
-        false
+    pub fn check_payload(&mut self, _: &[u8], _: &OracleParseConfig) -> Option<LogMessageType> {
+        None
     }
 
     pub fn parse_payload(&mut self, _: &[u8], _: bool, _: &OracleParseConfig) -> bool {

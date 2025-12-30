@@ -22,9 +22,9 @@ use std::{net::Ipv4Addr, time::Instant};
 use criterion::*;
 use deepflow_agent::{
     _L7PerfCache as L7PerfCache, _LogCache as LogCache, _LogCacheKey as LogCacheKey,
-    _LogMessageType as LogMessageType,
 };
 use lru::LruCache;
+use public::l7_protocol::LogMessageType;
 use rand::prelude::*;
 use uluru::LRUCache;
 

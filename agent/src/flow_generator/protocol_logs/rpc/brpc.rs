@@ -3,6 +3,7 @@
 mod brpc_policy;
 
 use brpc_policy::RpcMeta;
+use public::l7_protocol::LogMessageType;
 
 use crate::{
     common::{
@@ -17,7 +18,7 @@ use crate::{
         error::Result,
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            set_captured_byte, swap_if, AppProtoHead, L7ResponseStatus, LogMessageType, PrioFields,
+            set_captured_byte, swap_if, AppProtoHead, L7ResponseStatus, PrioFields,
             BASE_FIELD_PRIORITY,
         },
     },
@@ -272,17 +273,21 @@ impl L7ProtocolInfoInterface for BrpcInfo {
 }
 
 impl L7ProtocolParserInterface for BrpcLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return None;
         }
         if payload.len() < 12 {
-            return false;
+            return None;
         }
-        BrpcInfo::parse(payload, param).is_some()
+        if BrpcInfo::parse(payload, param).is_some() {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -415,7 +420,7 @@ mod tests {
 
             param.set_log_parser_config(parse_config);
 
-            if !brpc.check_payload(payload, param) {
+            if brpc.check_payload(payload, param).is_none() {
                 output.push_str("not brpc\n");
                 continue;
             }

@@ -41,10 +41,12 @@ use crate::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
             set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
-            L7ResponseStatus, LogMessageType, PrioFields, BASE_FIELD_PRIORITY,
+            L7ResponseStatus, PrioFields, BASE_FIELD_PRIORITY,
         },
     },
 };
+
+use public::l7_protocol::LogMessageType;
 
 // Keys are from:
 //     https://github.com/apache/kafka/blob/56a3c6dde929763aaf74a801bd043fdd474a8ed2/clients/src/main/java/org/apache/kafka/common/protocol/ApiKeys.java#L41
@@ -822,14 +824,18 @@ impl Default for KafkaLog {
 }
 
 impl L7ProtocolParserInterface for KafkaLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() || param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return None;
         }
         let mut info = KafkaInfo::default();
         let ok = self.request(payload, true, &mut info).is_ok() && info.check();
         self.reset();
-        ok
+        if ok {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(
@@ -1693,7 +1699,7 @@ mod tests {
             );
             param.set_captured_byte(payload.len());
 
-            let is_kafka = kafka.check_payload(payload, param);
+            let is_kafka = kafka.check_payload(payload, param).is_some();
             let info = kafka.parse_payload(payload, param);
             if let Ok(info) = info {
                 match info.unwrap_single() {

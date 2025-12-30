@@ -16,6 +16,8 @@
 
 use std::sync::{Arc, Weak};
 
+use public::l7_protocol::LogMessageType;
+
 use wasmtime::{
     AsContextMut, Instance, Linker, Memory, Module, Store, TypedFunc, WasmParams, WasmResults,
 };
@@ -42,7 +44,7 @@ pub(super) trait VmParser {
     fn on_http_req(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
     fn on_http_resp(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
     fn on_custom_message(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
-    fn check_payload(&self, store: &mut Store<StoreDataType>) -> Result<u8>;
+    fn check_payload(&self, store: &mut Store<StoreDataType>) -> Result<(u8, LogMessageType)>;
     fn parse_payload(&self, store: &mut Store<StoreDataType>) -> Result<bool>;
     fn get_hook_bitmap(&self, store: &mut Store<StoreDataType>) -> Result<HookPointBitmap>;
     fn get_custom_message_hook(&self, store: &mut Store<StoreDataType>) -> Result<Option<u64>>;
@@ -129,7 +131,7 @@ pub(super) struct InstanceWrap {
 }
 
 impl VmParser for InstanceWrap {
-    fn check_payload(&self, store: &mut Store<StoreDataType>) -> Result<u8> {
+    fn check_payload(&self, store: &mut Store<StoreDataType>) -> Result<(u8, LogMessageType)> {
         let proto = self
             .vm_func_check_payload
             .call(&mut *store, ())
@@ -141,12 +143,23 @@ impl VmParser for InstanceWrap {
             })?;
 
         match proto {
-            0 => Ok(0),
-            1..=255 => Ok(proto as u8),
-            v => Err(WasmVmError(format!(
-                "vm call check_payload return unexpect value : {}",
-                v
-            ))),
+            0 => Ok((0, LogMessageType::Other)),
+            1..=255 => Ok((proto as u8, LogMessageType::Request)),
+            v => {
+                let proto = (v & 0xff) as u8;
+                if proto == 0 {
+                    return Ok((0, LogMessageType::Other));
+                }
+                let direction = v >> 8;
+                match direction {
+                    1 => Ok((proto, LogMessageType::Request)),
+                    2 => Ok((proto, LogMessageType::Response)),
+                    _ => Err(WasmVmError(format!(
+                        "vm call check_payload return unexpect value : {}",
+                        v
+                    ))),
+                }
+            }
         }
     }
 

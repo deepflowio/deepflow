@@ -16,10 +16,13 @@
 
 use std::borrow::{Borrow, Cow};
 
-use num_enum::{FromPrimitive, IntoPrimitive};
+use num_enum::{FromPrimitive, IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
 
-use super::{enums::L7ResponseStatus, types::PrioField};
+use super::{
+    enums::{L7ResponseStatus, PacketDirection},
+    types::PrioField,
+};
 
 pub const DEFAULT_DNS_PORT: u16 = 53;
 pub const DEFAULT_TLS_PORT: u16 = 443;
@@ -192,6 +195,31 @@ impl L7ProtocolEnum {
         match self {
             L7ProtocolEnum::L7Protocol(p) => *p,
             L7ProtocolEnum::Custom(_) => L7Protocol::Custom,
+        }
+    }
+}
+
+#[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive)]
+#[repr(u8)]
+pub enum LogMessageType {
+    Request,
+    Response,
+    Session,
+    Other,
+    Max,
+}
+
+impl Default for LogMessageType {
+    fn default() -> Self {
+        LogMessageType::Other
+    }
+}
+
+impl From<PacketDirection> for LogMessageType {
+    fn from(d: PacketDirection) -> LogMessageType {
+        match d {
+            PacketDirection::ClientToServer => LogMessageType::Request,
+            PacketDirection::ServerToClient => LogMessageType::Response,
         }
     }
 }

@@ -29,7 +29,7 @@ use arc_swap::access::Access;
 use log::{debug, info};
 use serde::Serialize;
 
-use super::{AppProtoHead, AppProtoLogsBaseInfo, BoxAppProtoLogsData, LogMessageType};
+use super::{AppProtoHead, AppProtoLogsBaseInfo, BoxAppProtoLogsData};
 
 use crate::{
     common::{
@@ -51,6 +51,7 @@ use crate::{
 use public::utils::string::get_string_from_chars;
 use public::{
     chrono_map::ChronoMap,
+    l7_protocol::LogMessageType,
     queue::{self, DebugSender, Receiver},
     throttle::Throttle,
     utils::net::MacAddr,

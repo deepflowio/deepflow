@@ -22,6 +22,7 @@ use std::{
 use anyhow::Result;
 use log::error;
 use prost::Message as ProstMessage;
+use public::l7_protocol::LogMessageType;
 use wasmtime::{Engine, Linker, Store, StoreLimits, StoreLimitsBuilder};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder};
 
@@ -177,7 +178,11 @@ impl WasmVm {
         self.instance.len()
     }
 
-    pub fn on_check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<(u8, String)> {
+    pub fn on_check_payload(
+        &mut self,
+        payload: &[u8],
+        param: &ParseParam,
+    ) -> Option<(u8, String, LogMessageType)> {
         if self.instance.len() == 0 {
             return None;
         }
@@ -233,12 +238,12 @@ impl WasmVm {
                 Ordering::Relaxed,
             );
 
-            let result = result.unwrap();
-            if result == 0 {
+            let (protocol, message_type) = result.unwrap();
+            if protocol == 0 {
                 continue;
             }
 
-            res = Some((result, "".to_string()));
+            res = Some((protocol, "".to_string(), message_type));
             self.store
                 .data_mut()
                 .parse_ctx
