@@ -114,6 +114,8 @@ func TransWhereTagFunction(db, table string, name string, args []string) (filter
 			tagItem, _ := tag.GetTag(transKey, db, table, "default")
 			if strings.HasPrefix(resource, "os.app.") || strings.HasPrefix(resource, "k8s.env.") {
 				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPrefix, "!=", "''")
+			} else if strings.HasPrefix(resource, common.BIZ_SERVICE_GROUP) {
+				filter = TransBizServiceGroupFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, "!=", "''")
 			} else {
 				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPrefix, "!=", "''")
 			}
@@ -218,6 +220,36 @@ func TransEnvFilter(translator, regexpTranslator, key, op, value string) (filter
 		}
 	} else {
 		filter = fmt.Sprintf(trans, op, value, key)
+	}
+	return
+}
+
+// biz_service.group
+func TransBizServiceGroupFilter(translator, regexpTranslator, op, value string) (filter string) {
+	opLower := strings.ToLower(op)
+	trans := translator
+	if strings.Contains(opLower, "match") {
+		trans = regexpTranslator
+	}
+
+	positiveOperator, positiveOK := chCommon.PositiveOperatorMap[opLower]
+	inverseOperator, inverseOK := chCommon.InverseOperatorMap[opLower]
+	if inverseOK {
+		if value == "''" {
+			// trans to exist
+			filter = fmt.Sprintf(trans, op, value)
+		} else {
+			filter = "not(" + fmt.Sprintf(trans, inverseOperator, value) + ")"
+		}
+	} else if positiveOK {
+		if value == "''" {
+			// trans to not exist
+			filter = "not(" + fmt.Sprintf(trans, positiveOperator, value) + ")"
+		} else {
+			filter = fmt.Sprintf(trans, op, value)
+		}
+	} else {
+		filter = fmt.Sprintf(trans, op, value)
 	}
 	return
 }
@@ -425,6 +457,8 @@ func TransTagFilter(whereTag, postAsTag, value, op, db, table, originFilter stri
 			tagItem, _ = tag.GetTag(transKey, db, table, "default")
 			if strings.HasPrefix(tagName, "os.app.") || strings.HasPrefix(tagName, "k8s.env.") {
 				filter = TransEnvFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPrefix, op, value)
+			} else if strings.HasPrefix(tagName, common.BIZ_SERVICE_GROUP) {
+				filter = TransBizServiceGroupFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, op, value)
 			} else {
 				filter = TransLabelFilter(tagItem.WhereTranslator, tagItem.WhereRegexpTranslator, nameNoPrefix, op, value)
 			}
@@ -617,11 +651,11 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 					return &view.Expr{Value: filter}, nil
 				}
-			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map", "gprocess_map", "pod_ingress_map", "pod_node_map", "subnet_map", "biz_service_map":
+			case "pod_ns_map", "pod_group_map", "pod_service_map", "pod_map", "chost_map", "gprocess_map", "pod_ingress_map", "pod_node_map", "subnet_map":
 				checkTag := strings.TrimSuffix(t.Tag, "_id")
 				if slices.Contains(chCommon.SHOW_TAG_VALUE_MAP[table], checkTag) {
 					if strings.HasSuffix(t.Tag, "_id") {
-						if checkTag == strings.TrimSuffix(table, "_map") || checkTag == common.CHOST_HOSTNAME || checkTag == common.CHOST_IP || checkTag == common.BIZ_SERVICE_GROUP {
+						if checkTag == strings.TrimSuffix(table, "_map") || checkTag == common.CHOST_HOSTNAME || checkTag == common.CHOST_IP {
 							tagItem, ok := tag.GetTag("value", db, table, "default")
 							if ok {
 								switch strings.ToLower(op) {
@@ -707,23 +741,19 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 									if t.Tag == "vpc" || t.Tag == "l2_vpc" {
 										tagMap = "l3_epc_map"
 									}
-									transTag := t.Tag
-									if t.Tag == common.BIZ_SERVICE_GROUP {
-										transTag = "biz_service_group"
-									}
 									switch strings.ToLower(op) {
 									case "match":
-										filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, transTag, tagMap, "match", t.Value)
+										filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value)
 									case "not match":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, transTag, tagMap, "match", t.Value) + ")"
+										filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, t.Tag, tagMap, "match", t.Value) + ")"
 									case "not ilike":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, transTag, tagMap, "ilike", t.Value) + ")"
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "ilike", t.Value) + ")"
 									case "not in":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, transTag, tagMap, "in", t.Value) + ")"
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "in", t.Value) + ")"
 									case "!=":
-										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, transTag, tagMap, "=", t.Value) + ")"
+										filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, "=", t.Value) + ")"
 									default:
-										filter = fmt.Sprintf(tagItem.WhereTranslator, transTag, tagMap, op, t.Value)
+										filter = fmt.Sprintf(tagItem.WhereTranslator, t.Tag, tagMap, op, t.Value)
 									}
 								}
 							}
@@ -734,7 +764,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					return nil, error
 				}
 			default:
-				if strings.HasPrefix(t.Tag, "tag.") || strings.HasPrefix(t.Tag, "attribute.") || strings.HasPrefix(t.Tag, "k8s.label.") || strings.HasPrefix(t.Tag, "k8s.env.") || strings.HasPrefix(t.Tag, "k8s.annotation.") || strings.HasPrefix(t.Tag, "cloud.tag.") || strings.HasPrefix(t.Tag, "os.app.") {
+				if strings.HasPrefix(t.Tag, "tag.") || strings.HasPrefix(t.Tag, "attribute.") || strings.HasPrefix(t.Tag, "k8s.label.") || strings.HasPrefix(t.Tag, "k8s.env.") || strings.HasPrefix(t.Tag, "k8s.annotation.") || strings.HasPrefix(t.Tag, "cloud.tag.") || strings.HasPrefix(t.Tag, "os.app.") || strings.HasPrefix(t.Tag, common.BIZ_SERVICE_GROUP) {
 					tagItem, ok := tag.GetTag("value", db, table, "default")
 					if ok {
 						switch strings.ToLower(op) {
@@ -818,7 +848,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			switch noIDTag {
 			case "pod_group_type", "host_ip", "host_hostname", "chost_ip", "chost_hostname", "pod_node_ip", "pod_node_hostname", "province",
 				"is_internet", "tcp_flags_bit", "l2_end", "l3_end", "nat_real_ip", "nat_real_port", "process_id", "process_kname", "k8s.label",
-				"k8s.annotation", "k8s.env", "cloud.tag", "os.app":
+				"k8s.annotation", "k8s.env", "cloud.tag", "os.app", common.BIZ_SERVICE_GROUP:
 				_, err := strconv.Atoi(t.Value)
 				if strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") || strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {
 					if err != nil {
@@ -844,7 +874,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 				}
 			default:
-				if strings.HasPrefix(strings.Trim(t.Tag, "`"), "k8s.label.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "k8s.annotation.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "k8s.env.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "cloud.tag.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "kos.app.") {
+				if strings.HasPrefix(strings.Trim(t.Tag, "`"), "k8s.label.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "k8s.annotation.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "k8s.env.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "cloud.tag.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), "os.app.") || strings.HasPrefix(strings.Trim(t.Tag, "`"), common.BIZ_SERVICE_GROUP) {
 					_, err := strconv.Atoi(t.Value)
 					if strings.HasSuffix(strings.Trim(t.Tag, "`"), "_0") || strings.HasSuffix(strings.Trim(t.Tag, "`"), "_1") {
 						if err != nil {

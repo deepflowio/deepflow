@@ -525,6 +525,8 @@ func GetTagDBField(name, db, table, orgID string) (string, string, error) {
 			tagItem, _ = tag.GetTag(transKey, db, table, "default")
 			if strings.HasPrefix(name, "os.app.") || strings.HasPrefix(name, "k8s.env.") {
 				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPrefix)
+			} else if strings.HasPrefix(name, common.BIZ_SERVICE_GROUP) {
+				tagTranslatorStr = tagItem.TagTranslator
 			} else {
 				tagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPrefix, nameNoPrefix, nameNoPrefix)
 			}

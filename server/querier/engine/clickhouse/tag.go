@@ -125,6 +125,8 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 			TagTranslatorStr := name
 			if strings.HasPrefix(name, "os.app.") || strings.HasPrefix(name, "k8s.env.") {
 				TagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPrefix)
+			} else if strings.HasPrefix(name, common.BIZ_SERVICE_GROUP) {
+				TagTranslatorStr = tagItem.TagTranslator
 			} else {
 				TagTranslatorStr = fmt.Sprintf(tagItem.TagTranslator, nameNoPrefix, nameNoPrefix, nameNoPrefix)
 			}
