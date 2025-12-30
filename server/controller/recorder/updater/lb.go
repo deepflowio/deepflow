@@ -73,11 +73,6 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 	return updater
 }
 
-func (l *LB) getDiffBaseByCloudItem(cloudItem *cloudmodel.LB) (diffBase *diffbase.LB, exists bool) {
-	diffBase, exists = l.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*metadbmodel.LB, bool) {
 	vpcID, exists := l.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {

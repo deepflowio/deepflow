@@ -73,11 +73,6 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 	return updater
 }
 
-func (z *AZ) getDiffBaseByCloudItem(cloudItem *cloudmodel.AZ) (diffBase *diffbase.AZ, exists bool) {
-	diffBase, exists = z.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (z *AZ) generateDBItemToAdd(cloudItem *cloudmodel.AZ) (*metadbmodel.AZ, bool) {
 	dbItem := &metadbmodel.AZ{
 		Name:   cloudItem.Name,

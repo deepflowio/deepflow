@@ -73,11 +73,6 @@ func NewPodGroupConfigMapConnection(wholeCache *cache.Cache, cloudData []cloudmo
 	return updater
 }
 
-func (h *PodGroupConfigMapConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodGroupConfigMapConnection) (diffBase *diffbase.PodGroupConfigMapConnection, exists bool) {
-	diffBase, exists = h.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (h *PodGroupConfigMapConnection) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupConfigMapConnection) (*metadbmodel.PodGroupConfigMapConnection, bool) {
 	podGroupID, exists := h.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
 	if !exists {

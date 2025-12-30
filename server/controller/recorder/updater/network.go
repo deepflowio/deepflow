@@ -73,11 +73,6 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 	return updater
 }
 
-func (n *Network) getDiffBaseByCloudItem(cloudItem *cloudmodel.Network) (diffBase *diffbase.Network, exists bool) {
-	diffBase, exists = n.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*metadbmodel.Network, bool) {
 	vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
