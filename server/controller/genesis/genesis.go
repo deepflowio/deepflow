@@ -139,7 +139,7 @@ func (g *Genesis) GetKubernetesResponse(orgID int, clusterID string) (map[string
 	}
 	clusterRegion, ok := nodeIPToRegion[cluster.NodeIP]
 	if !ok || clusterRegion != currentRegion {
-		return resp, fmt.Errorf("cluster store node (%s) not in current region (%s)", cluster.NodeIP, currentRegion)
+		return resp, fmt.Errorf("cluster store controller mode (%s) not in current region", cluster.NodeIP)
 	}
 	if cluster.NodeIP != nodeIP {
 		var controller metadbmodel.Controller

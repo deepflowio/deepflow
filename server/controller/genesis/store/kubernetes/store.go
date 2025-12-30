@@ -23,6 +23,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	ccommon "github.com/deepflowio/deepflow/server/controller/common"
@@ -47,6 +48,7 @@ type KubernetesStorage struct {
 	clusterDestCache map[string]common.ClusterDest
 	mutex            sync.RWMutex
 	cacheMutex       sync.RWMutex
+	cacheRunning     atomic.Bool
 }
 
 func NewKubernetesStorage(ctx context.Context, port, nPort int, cfg config.GenesisConfig, kChan chan common.KubernetesInfo) *KubernetesStorage {
@@ -63,6 +65,7 @@ func NewKubernetesStorage(ctx context.Context, port, nPort int, cfg config.Genes
 		clusterDestCache: map[string]common.ClusterDest{},
 		mutex:            sync.RWMutex{},
 		cacheMutex:       sync.RWMutex{},
+		cacheRunning:     atomic.Bool{},
 	}
 }
 
@@ -130,11 +133,9 @@ func (k *KubernetesStorage) fetch() {
 }
 
 func (k *KubernetesStorage) triggerCloudRefresh(orgID int, clusterID string, version uint64) error {
-	k.cacheMutex.RLock()
-	dest, ok := k.clusterDestCache[k.formatKey(orgID, clusterID)]
-	k.cacheMutex.RUnlock()
+	dest, ok := k.getDest(orgID, clusterID)
 	if !ok {
-		return fmt.Errorf("not found cluster (%s) dest info in cache", clusterID)
+		return fmt.Errorf("not found cluster (%s) dest info", clusterID)
 	}
 
 	requestUrl := "http://" + dest.Endpoint + "/v1/kubernetes-refresh/"
@@ -149,7 +150,31 @@ func (k *KubernetesStorage) triggerCloudRefresh(orgID int, clusterID string, ver
 	return common.RequestGet(requestUrl, 30, queryStrings)
 }
 
+func (k *KubernetesStorage) getDest(orgID int, clusterID string) (common.ClusterDest, bool) {
+	clusterKey := k.formatKey(orgID, clusterID)
+	k.cacheMutex.RLock()
+	dest, ok := k.clusterDestCache[clusterKey]
+	k.cacheMutex.RUnlock()
+	if ok {
+		return dest, true
+	}
+
+	k.generateCache()
+
+	k.cacheMutex.RLock()
+	dest, ok = k.clusterDestCache[clusterKey]
+	k.cacheMutex.RUnlock()
+	return dest, ok
+}
+
 func (k *KubernetesStorage) generateCache() {
+	if k.cacheRunning.Load() {
+		return
+	}
+
+	k.cacheRunning.Swap(true)
+	defer k.cacheRunning.Swap(false)
+
 	cacheMap := map[string]common.ClusterDest{}
 	for _, db := range metadb.GetDBs().All() {
 		var controllers []metadbmodel.Controller
