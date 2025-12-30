@@ -270,6 +270,8 @@ func GetNotNullFilter(name string, e *CHEngine) (view.Node, bool) {
 					filter := name
 					if strings.HasPrefix(preAsTag, "os.app.") || strings.HasPrefix(preAsTag, "k8s.env.") {
 						filter = fmt.Sprintf(tagItem.NotNullFilter, filterName)
+					} else if strings.HasPrefix(preAsTag, common.BIZ_SERVICE_GROUP) {
+						filter = tagItem.NotNullFilter
 					} else {
 						filter = fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 					}
@@ -307,6 +309,8 @@ func GetNotNullFilter(name string, e *CHEngine) (view.Node, bool) {
 				filter := name
 				if strings.HasPrefix(noBackQuoteName, "os.app.") || strings.HasPrefix(noBackQuoteName, "k8s.env.") {
 					filter = fmt.Sprintf(tagItem.NotNullFilter, filterName)
+				} else if strings.HasPrefix(noBackQuoteName, common.BIZ_SERVICE_GROUP) {
+					filter = tagItem.NotNullFilter
 				} else {
 					filter = fmt.Sprintf(tagItem.NotNullFilter, filterName, filterName)
 				}
