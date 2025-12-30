@@ -92,9 +92,9 @@ func readFile(fileName string) ([][]interface{}, error) {
 	return data, nil
 }
 
-func TransMapItem(name, table string) (nameNoPreffix string, nameNoSuffix string, transKey string) {
-	for preffix, tag := range TRANS_MAP_ITEM_TAG {
-		if strings.HasPrefix(name, preffix) {
+func TransMapItem(name, table string) (nameNoPrefix string, nameNoSuffix string, transKey string) {
+	for prefix, tag := range TRANS_MAP_ITEM_TAG {
+		if strings.HasPrefix(name, prefix) {
 			nameNoSuffix = name
 			transKey = tag
 			if slices.Contains(PEER_TABLES, table) {
@@ -105,7 +105,7 @@ func TransMapItem(name, table string) (nameNoPreffix string, nameNoSuffix string
 					}
 				}
 			}
-			nameNoPreffix = strings.TrimPrefix(nameNoSuffix, preffix)
+			nameNoPrefix = strings.TrimPrefix(nameNoSuffix, prefix)
 			return
 		}
 	}
