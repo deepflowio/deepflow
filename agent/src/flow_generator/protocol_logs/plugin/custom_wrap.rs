@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use public::l7_protocol::L7Protocol;
+use public::l7_protocol::{L7Protocol, LogMessageType};
 
 use crate::common::l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface};
 
@@ -30,14 +30,14 @@ impl L7ProtocolParserInterface for CustomWrapLog {
         &mut self,
         payload: &[u8],
         param: &crate::common::l7_protocol_log::ParseParam,
-    ) -> bool {
+    ) -> Option<LogMessageType> {
         for mut p in all_plugin_log_parser().into_iter() {
-            if p.check_payload(payload, param) {
+            if let Some(l7_inference) = p.check_payload(payload, param) {
                 self.parser = Some(p);
-                return true;
+                return Some(l7_inference);
             }
         }
-        false
+        None
     }
 
     fn parse_payload(

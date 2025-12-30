@@ -32,9 +32,7 @@ pub use flow_map::FlowMap;
 use flow_node::{FlowMapKey, FlowNode};
 pub use flow_state::FlowState;
 pub use packet_sequence::PacketSequenceParser; // Enterprise Edition Feature: packet-sequence
-pub use protocol_logs::{
-    AppProto, AppProtoHead, DnsLog, HttpLog, LogMessageType, MemcachedLog, MetaAppProto,
-};
+pub use protocol_logs::{AppProto, AppProtoHead, DnsLog, HttpLog, MemcachedLog, MetaAppProto};
 
 use std::time::Duration;
 

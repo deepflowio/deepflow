@@ -28,7 +28,9 @@ use std::sync::Arc;
 
 use enum_dispatch::enum_dispatch;
 use public::bitmap::Bitmap;
-use public::l7_protocol::{L7ProtocolChecker as L7ProtocolCheckerBitmap, L7ProtocolEnum};
+use public::l7_protocol::{
+    L7ProtocolChecker as L7ProtocolCheckerBitmap, L7ProtocolEnum, LogMessageType,
+};
 
 use super::protocol_logs::sql::ObfuscateCache;
 use super::{
@@ -383,7 +385,7 @@ impl FlowLog {
                 {
                     parser.set_obfuscate_cache(self.obfuscate_cache.as_ref().map(|o| o.clone()));
                 }
-                if parser.check_payload(cut_payload, &param) {
+                if let Some(message_type) = parser.check_payload(cut_payload, &param) {
                     self.l7_protocol_enum = parser.l7_protocol_enum();
 
                     // redis can not determine direction by RESP protocol when packet is from ebpf, special treatment
@@ -405,8 +407,13 @@ impl FlowLog {
                             2. eBPF: If the `server_port` can not be determined in `FlowMap::init_flow`,
                                 use the first packet's `dst_port` as `server_port`.
                         */
-                        self.server_port = packet.lookup_key.dst_port;
-                        packet.lookup_key.direction = PacketDirection::ClientToServer;
+                        if message_type == LogMessageType::Request {
+                            self.server_port = packet.lookup_key.dst_port;
+                            packet.lookup_key.direction = PacketDirection::ClientToServer;
+                        } else {
+                            self.server_port = packet.lookup_key.src_port;
+                            packet.lookup_key.direction = PacketDirection::ServerToClient;
+                        }
                     }
 
                     self.l7_protocol_log_parser = Some(Box::new(parser));

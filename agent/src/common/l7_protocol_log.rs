@@ -47,33 +47,15 @@ use crate::flow_generator::protocol_logs::{
     RedisLog, RocketmqLog, SofaRpcLog, TarsLog, ZmtpLog,
 };
 
-use crate::flow_generator::{LogMessageType, Result};
+use crate::flow_generator::Result;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::plugin::c_ffi::SoPluginFunc;
 use crate::plugin::wasm::WasmVm;
 
 use public::enums::IpProtocol;
-use public::l7_protocol::{CustomProtocol, L7Protocol, L7ProtocolChecker, L7ProtocolEnum};
-
-/*
- 所有协议都需要实现L7ProtocolLogInterface这个接口.
- 其中，check_payload 用于MetaPacket判断应用层协议，parse_payload 用于解析具体协议.
- 更具体就是遍历ALL_PROTOCOL的协议，用check判断协议，再用parse解析整个payload，得到L7ProtocolInfo.
- 最后发送到server之前，调用into() 转成通用结构L7ProtocolSendLog.
-
- all protocol need implement L7ProtocolLogInterface trait.
- check_payload use to determine what protocol the payload is.
- parse_payload use to parse whole payload.
- more specifically, traversal all protocol from get_all_protocol,check the payload and then parse it,
- get the L7ProtocolInfo enum, finally convert to L7ProtocolSendLog struct and send to server.
-
- the parser flow:
-
-    check_payload -> parse_payload -> reset --
-                        /|\                  |
-                         |                   |
-                         |_____next packet___|
-*/
+use public::l7_protocol::{
+    CustomProtocol, L7Protocol, L7ProtocolChecker, L7ProtocolEnum, LogMessageType,
+};
 
 macro_rules! count {
     () => (0);
@@ -267,7 +249,11 @@ impl L7ParseResult {
 
 #[enum_dispatch]
 pub trait L7ProtocolParserInterface {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool;
+    // Determine whether the current payload belongs to this protocol, with the return values meaning as follows:
+    // - None: Does not belong to this protocol
+    // - LogMessageType::Request: It is a request that belongs to this protocol
+    // - LogMessageType::Response: It is a response that belongs to this protocol
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType>;
     // 协议解析
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult>;
     // 返回协议号和协议名称，由于的bitmap使用u128，所以协议号不能超过128.

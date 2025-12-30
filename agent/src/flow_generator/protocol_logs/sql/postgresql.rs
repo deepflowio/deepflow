@@ -16,7 +16,7 @@
 
 use public::{
     bytes::{read_u32_be, read_u64_be},
-    l7_protocol::L7Protocol,
+    l7_protocol::{L7Protocol, LogMessageType},
 };
 
 use serde::Serialize;
@@ -34,7 +34,7 @@ use crate::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
             set_captured_byte, L7ResponseStatus,
         },
-        AppProtoHead, Error, LogMessageType, Result,
+        AppProtoHead, Error, Result,
     },
 };
 
@@ -211,15 +211,19 @@ pub struct PostgresqlLog {
 }
 
 impl L7ProtocolParserInterface for PostgresqlLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         let mut info = PostgreInfo::default();
         self.set_msg_type(PacketDirection::ClientToServer, &mut info);
         info.is_tls = param.is_tls();
         if self.check_is_ssl_req(payload, &mut info) {
-            return true;
+            return Some(LogMessageType::Request);
         }
 
-        self.parse(payload, &mut info).is_ok()
+        if self.parse(payload, &mut info).is_ok() {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -475,6 +479,8 @@ fn strip_string_end_with_zero(data: &[u8]) -> Result<&[u8]> {
 mod test {
     use std::{cell::RefCell, path::Path, rc::Rc};
 
+    use public::l7_protocol::LogMessageType;
+
     use crate::{
         common::{
             flow::{L7PerfStats, PacketDirection},
@@ -592,7 +598,10 @@ mod test {
         );
         let req_payload = p[0].get_l4_payload().unwrap();
         req_param.set_captured_byte(req_payload.len());
-        assert_eq!((&mut parser).check_payload(req_payload, req_param), true);
+        assert_eq!(
+            (&mut parser).check_payload(req_payload, req_param),
+            Some(LogMessageType::Request)
+        );
         let info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
         let mut req = info.unwrap_single();
 
@@ -609,7 +618,7 @@ mod test {
         );
         let resp_payload = p[1].get_l4_payload().unwrap();
         resp_param.set_captured_byte(resp_payload.len());
-        assert_eq!((&mut parser).check_payload(resp_payload, resp_param), false);
+        assert_eq!((&mut parser).check_payload(resp_payload, resp_param), None);
         let mut resp = (&mut parser)
             .parse_payload(resp_payload, resp_param)
             .unwrap()

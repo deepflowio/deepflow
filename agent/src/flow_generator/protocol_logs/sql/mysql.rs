@@ -51,13 +51,13 @@ use crate::{
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
-            set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType,
-            PrioStrings, BASE_FIELD_PRIORITY,
+            set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus, PrioStrings,
+            BASE_FIELD_PRIORITY,
         },
     },
     utils::bytes,
 };
-use public::l7_protocol::{Field, FieldSetter, L7Log, L7ProtocolChecker};
+use public::l7_protocol::{Field, FieldSetter, L7Log, L7ProtocolChecker, LogMessageType};
 use public_derive::L7Log;
 
 cfg_if::cfg_if! {
@@ -659,14 +659,14 @@ pub struct MysqlLog {
 }
 
 impl L7ProtocolParserInterface for MysqlLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() || param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return None;
         }
 
         if self.has_compressed_header.is_none() {
             if let Err(_) = self.check_compressed_header(payload) {
-                return false;
+                return None;
             }
         }
 
@@ -679,7 +679,11 @@ impl L7ProtocolParserInterface for MysqlLog {
         );
         give_buffer(decompress_buffer);
 
-        ret
+        if ret {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(
@@ -1713,7 +1717,7 @@ mod tests {
             param.parse_config = Some(&log_config);
             param.set_captured_byte(payload.len());
 
-            let is_mysql = mysql.check_payload(payload, &param);
+            let is_mysql = mysql.check_payload(payload, &param).is_some();
             let info = mysql.parse_payload(payload, &param);
 
             if let Ok(info) = info {
