@@ -74,11 +74,6 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 	return updater
 }
 
-func (v *VPC) getDiffBaseByCloudItem(cloudItem *cloudmodel.VPC) (diffBase *diffbase.VPC, exists bool) {
-	diffBase, exists = v.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*metadbmodel.VPC, bool) {
 	if cloudItem.Label == "" {
 		cloudItem.Label = common.GenerateResourceShortUUID(v.resourceType)

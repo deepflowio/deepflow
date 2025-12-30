@@ -73,11 +73,6 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 	return updater
 }
 
-func (c *NATVMConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.NATVMConnection) (diffBase *diffbase.NATVMConnection, exists bool) {
-	diffBase, exists = c.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnection) (*metadbmodel.NATVMConnection, bool) {
 	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {

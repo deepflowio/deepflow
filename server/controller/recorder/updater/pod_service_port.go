@@ -73,11 +73,6 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 	return updater
 }
 
-func (s *PodServicePort) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodServicePort) (diffBase *diffbase.PodServicePort, exists bool) {
-	diffBase, exists = s.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePort) (*metadbmodel.PodServicePort, bool) {
 	podServiceID, exists := p.cache.ToolDataSet.GetPodServiceIDByLcuuid(cloudItem.PodServiceLcuuid)
 	if !exists {

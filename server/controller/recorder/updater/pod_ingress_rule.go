@@ -73,11 +73,6 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 	return updater
 }
 
-func (r *PodIngressRule) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodIngressRule) (diffBase *diffbase.PodIngressRule, exists bool) {
-	diffBase, exists = r.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRule) (*metadbmodel.PodIngressRule, bool) {
 	podIngressID, exists := r.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
 	if !exists {

@@ -73,11 +73,6 @@ func NewPodCluster(wholeCache *cache.Cache, cloudData []cloudmodel.PodCluster) *
 	return updater
 }
 
-func (c *PodCluster) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodCluster) (diffBase *diffbase.PodCluster, exists bool) {
-	diffBase, exists = c.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (c *PodCluster) generateDBItemToAdd(cloudItem *cloudmodel.PodCluster) (*metadbmodel.PodCluster, bool) {
 	vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {

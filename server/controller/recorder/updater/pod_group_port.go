@@ -73,11 +73,6 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 	return updater
 }
 
-func (p *PodGroupPort) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodGroupPort) (diffBase *diffbase.PodGroupPort, exists bool) {
-	diffBase, exists = p.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (p *PodGroupPort) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupPort) (*metadbmodel.PodGroupPort, bool) {
 	podGroupID, exists := p.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
 	if !exists {

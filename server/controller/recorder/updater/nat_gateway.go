@@ -73,11 +73,6 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 	return updater
 }
 
-func (g *NATGateway) getDiffBaseByCloudItem(cloudItem *cloudmodel.NATGateway) (diffBase *diffbase.NATGateway, exists bool) {
-	diffBase, exists = g.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*metadbmodel.NATGateway, bool) {
 	vpcID, exists := g.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {

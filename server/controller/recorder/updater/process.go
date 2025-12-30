@@ -80,11 +80,6 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 	return updater
 }
 
-func (p *Process) getDiffBaseByCloudItem(cloudItem *cloudmodel.Process) (diffBase *diffbase.Process, exits bool) {
-	diffBase, exits = p.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*metadbmodel.Process, bool) {
 	deviceType, deviceID := p.cache.ToolDataSet.GetProcessDeviceTypeAndID(cloudItem.ContainerID, cloudItem.VTapID)
 	// add pod node id

@@ -73,11 +73,6 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 	return updater
 }
 
-func (s *LBTargetServer) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBTargetServer) (diffBase *diffbase.LBTargetServer, exists bool) {
-	diffBase, exists = s.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServer) (*metadbmodel.LBTargetServer, bool) {
 	lbID, exists := s.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {

@@ -73,11 +73,6 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 	return updater
 }
 
-func (r *RedisInstance) getDiffBaseByCloudItem(cloudItem *cloudmodel.RedisInstance) (diffBase *diffbase.RedisInstance, exists bool) {
-	diffBase, exists = r.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (r *RedisInstance) generateDBItemToAdd(cloudItem *cloudmodel.RedisInstance) (*metadbmodel.RedisInstance, bool) {
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {

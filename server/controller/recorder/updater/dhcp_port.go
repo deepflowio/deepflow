@@ -73,11 +73,6 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 	return updater
 }
 
-func (p *DHCPPort) getDiffBaseByCloudItem(cloudItem *cloudmodel.DHCPPort) (diffBase *diffbase.DHCPPort, exists bool) {
-	diffBase, exists = p.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*metadbmodel.DHCPPort, bool) {
 	vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {

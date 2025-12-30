@@ -76,11 +76,6 @@ func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodG
 	return updater
 }
 
-func (p *PodGroup) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodGroup) (diffBase *diffbase.PodGroup, exists bool) {
-	diffBase, exists = p.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*metadbmodel.PodGroup, bool) {
 	podNamespaceID, exists := p.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {

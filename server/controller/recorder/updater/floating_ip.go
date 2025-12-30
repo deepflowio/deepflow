@@ -74,11 +74,6 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 	return updater
 }
 
-func (f *FloatingIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.FloatingIP) (diffBase *diffbase.FloatingIP, exists bool) {
-	diffBase, exists = f.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*metadbmodel.FloatingIP, bool) {
 	networkID, exists := f.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 	if !exists {

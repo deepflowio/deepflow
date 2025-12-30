@@ -74,11 +74,6 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 	return updater
 }
 
-func (s *Subnet) getDiffBaseByCloudItem(cloudItem *cloudmodel.Subnet) (diffBase *diffbase.Subnet, exists bool) {
-	diffBase, exists = s.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*metadbmodel.Subnet, bool) {
 	networkID, exists := s.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
 	if !exists {

@@ -73,11 +73,6 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 	return updater
 }
 
-func (c *LBVMConnection) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBVMConnection) (diffBase *diffbase.LBVMConnection, exists bool) {
-	diffBase, exists = c.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnection) (*metadbmodel.LBVMConnection, bool) {
 	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
 	if !exists {

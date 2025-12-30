@@ -78,11 +78,6 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 	return updater
 }
 
-func (i *VInterface) getDiffBaseByCloudItem(cloudItem *cloudmodel.VInterface) (diffBase *diffbase.VInterface, exists bool) {
-	diffBase, exists = i.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*metadbmodel.VInterface, bool) {
 	var networkID int
 	if cloudItem.NetworkLcuuid != "" {

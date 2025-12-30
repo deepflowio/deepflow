@@ -82,11 +82,6 @@ func (i *WANIP) SetCloudData(cloudData []cloudmodel.IP) {
 	i.cloudData = cloudData
 }
 
-func (i *WANIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.IP) (diffBase *diffbase.WANIP, exists bool) {
-	diffBase, exists = i.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.WANIP, bool) {
 	vinterfaceID, exists := i.cache.ToolDataSet.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
 	if !exists {

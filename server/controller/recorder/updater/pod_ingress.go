@@ -73,11 +73,6 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 	return updater
 }
 
-func (i *PodIngress) getDiffBaseByCloudItem(cloudItem *cloudmodel.PodIngress) (diffBase *diffbase.PodIngress, exists bool) {
-	diffBase, exists = i.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*metadbmodel.PodIngress, bool) {
 	podNamespaceID, exists := i.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
