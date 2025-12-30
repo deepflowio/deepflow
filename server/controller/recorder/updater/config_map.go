@@ -78,11 +78,6 @@ func NewConfigMap(wholeCache *cache.Cache, cloudData []cloudmodel.ConfigMap) *Co
 	return updater
 }
 
-func (h *ConfigMap) getDiffBaseByCloudItem(cloudItem *cloudmodel.ConfigMap) (diffBase *diffbase.ConfigMap, exists bool) {
-	diffBase, exists = h.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (h *ConfigMap) generateDBItemToAdd(cloudItem *cloudmodel.ConfigMap) (*metadbmodel.ConfigMap, bool) {
 	podClusterID, exists := h.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
 	if !exists {

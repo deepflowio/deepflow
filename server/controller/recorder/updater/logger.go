@@ -18,7 +18,6 @@ package updater
 
 import (
 	"fmt"
-	"reflect"
 	"slices"
 
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
@@ -40,7 +39,7 @@ func debugCloudItem[CT constraint.CloudModel](resourceType string, cloudItem CT)
 	if config.Get().LogDebug.DetailEnabled {
 		return fmt.Sprintf("debug %s: %#v", resourceType, cloudItem)
 	}
-	return fmt.Sprintf("debug %s: %s", resourceType, getCloudItemLcuuid(cloudItem))
+	return fmt.Sprintf("debug %s: %s", resourceType, cloudItem.GetLcuuid())
 }
 
 func logDebugResourceTypeEnabled(resourceType string) bool {
@@ -50,16 +49,4 @@ func logDebugResourceTypeEnabled(resourceType string) bool {
 		}
 	}
 	return false
-}
-
-func logDebugEnabled() bool {
-	return config.Get().LogDebug.Enabled
-}
-
-func getCloudItemLcuuid[CT constraint.CloudModel](cloudItem CT) string {
-	value := reflect.ValueOf(cloudItem).FieldByName("Lcuuid")
-	if value.IsValid() {
-		return value.String()
-	}
-	return ""
 }

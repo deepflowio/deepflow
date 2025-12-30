@@ -54,8 +54,6 @@ type StatsdBuilder interface {
 }
 
 type DataGenerator[CT constraint.CloudModel, MT metadbmodel.AssetResourceConstraint, BT constraint.DiffBase, MFUPT msg.FieldsUpdatePtr[MFUT], MFUT msg.FieldsUpdate] interface {
-	// 根据 cloud 数据获取对应的 diff base 数据
-	getDiffBaseByCloudItem(*CT) (BT, bool)
 	// 生成插入 DB 所需的数据
 	generateDBItemToAdd(*CT) (*MT, bool)
 	// 生产更新 DB 所需的数据
@@ -190,7 +188,7 @@ func (u *UpdaterBase[CT, BT, MPT, MT, MAPT, MAT, MAAT, MUPT, MUT, MFUPT, MFUT, M
 		if logDebug {
 			log.Info(debugCloudItem(u.resourceType, cloudItem), u.metadata.LogPrefixes)
 		}
-		diffBase, exists := u.dataGenerator.getDiffBaseByCloudItem(&cloudItem)
+		diffBase, exists := u.diffBaseData[cloudItem.GetLcuuid()]
 		if !exists {
 			log.Infof("to %s (cloud item: %#v)", common.LogAdd(u.resourceType), common.ToLoggable(u.toLoggable, cloudItem), u.metadata.LogPrefixes)
 			dbItem, ok := u.dataGenerator.generateDBItemToAdd(&cloudItem)

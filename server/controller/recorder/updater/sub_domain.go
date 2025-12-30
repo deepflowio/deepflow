@@ -73,11 +73,6 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 	return updater
 }
 
-func (d *SubDomain) getDiffBaseByCloudItem(cloudItem *cloudmodel.SubDomain) (diffBase *diffbase.SubDomain, exists bool) {
-	diffBase, exists = d.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (d *SubDomain) generateDBItemToAdd(cloudItem *cloudmodel.SubDomain) (*metadbmodel.SubDomain, bool) {
 	dbItem := &metadbmodel.SubDomain{
 		TeamID:      cloudItem.TeamID,

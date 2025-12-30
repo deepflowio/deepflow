@@ -35,6 +35,8 @@ type CloudModel interface {
 		cloudmodel.PodIngressRule | cloudmodel.PodIngressRuleBackend | cloudmodel.PodService |
 		cloudmodel.PodServicePort | cloudmodel.PodGroup | cloudmodel.ConfigMap | cloudmodel.PodGroupConfigMapConnection |
 		cloudmodel.PodGroupPort | cloudmodel.PodReplicaSet | cloudmodel.Pod | cloudmodel.Process | cloudmodel.VIP
+
+	GetLcuuid() string
 }
 
 // 资源用于比对的缓存对象

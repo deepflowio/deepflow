@@ -74,11 +74,6 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 	return updater
 }
 
-func (r *VRouter) getDiffBaseByCloudItem(cloudItem *cloudmodel.VRouter) (diffBase *diffbase.VRouter, exists bool) {
-	diffBase, exists = r.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*metadbmodel.VRouter, bool) {
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {

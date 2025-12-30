@@ -73,11 +73,6 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 	return updater
 }
 
-func (l *LBListener) getDiffBaseByCloudItem(cloudItem *cloudmodel.LBListener) (diffBase *diffbase.LBListener, exists bool) {
-	diffBase, exists = l.diffBaseData[cloudItem.Lcuuid]
-	return
-}
-
 func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*metadbmodel.LBListener, bool) {
 	lbID, exists := l.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
 	if !exists {
