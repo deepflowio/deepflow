@@ -75,6 +75,7 @@ struct java_symbol_map_key {
 // The address is saved in "uprobe_addr" and should be appended to stack string
 // if this flag is on.
 #define STACK_TRACE_FLAGS_URETPROBE 0x2
+#define STACK_TRACE_FLAGS_CUDA_MEMORY 0x4
 
 struct stack_trace_key_t {
 	__u32 pid;		// processID or threadID

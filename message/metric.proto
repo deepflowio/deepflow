@@ -200,6 +200,8 @@ enum ProfileEventType {
     EbpfOffCpu = 2;
     EbpfMemAlloc = 3;
     EbpfMemInUse = 4;
+    EbpfHbmAlloc = 5;
+    EbpfHbmInUse = 6;
 }
 
 message Profile {
