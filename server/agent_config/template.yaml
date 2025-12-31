@@ -3292,6 +3292,27 @@ inputs:
         #     的文件 IO 事件将被忽略。
         # upgrade_from: static_config.ebpf.io-event-minimal-duration
         minimal_duration: 1ms
+        # type: bool
+        # name:
+        #   en: Virtual File Collection Enabled
+        #   ch: 启用虚拟文件采集
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When set to true, the agent will collect file I/O events generated on
+        #     virtual file systems (such as /proc, /sys, /run, and other kernel
+        #     pseudo file systems).
+        #     When set to false, the agent will not collect file I/O events from
+        #     virtual file systems.
+        #   ch: |-
+        #     当设置为 true 时，deepflow-agent 将采集发生在虚拟文件系统上的文件
+        #     I/O 事件（例如 /proc、/sys、/run 等由内核动态生成的伪文件系统）。
+        #     当设置为 false 时，将不会采集虚拟文件系统上的文件 I/O 事件。
+        enable_virtual_file_collect: false
     # type: section
     # name: Profile
     # description:
