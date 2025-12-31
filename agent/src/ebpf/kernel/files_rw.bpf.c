@@ -21,19 +21,14 @@
 
 // Default value set when file read/write latency timestamp rollback occurs.
 #define TIME_ROLLBACK_DEFAULT_LATENCY_NS 50000
+#define FILE_CHECK_ERROR      (-1)  /* Error or exceptional condition */
+#define FILE_TYPE_REGULAR      0    /* Regular (non-virtual) file */
+#define FILE_TYPE_VIRTUAL      1    /* Virtual file */
 
-static __inline bool is_regular_file(int fd,
-				     bool disable_vfile_collect,
-				     struct member_fields_offset *off_ptr)
+static __inline int check_virtual_file(void *file, struct member_fields_offset *offset)
 {
-	struct member_fields_offset *offset = off_ptr;
-	if (offset == NULL) {
-		__u32 k0 = 0;
-		offset = members_offset__lookup(&k0);
-	}
-	void *file = fd_to_file(fd, offset);
-	if (file == NULL)
-		return false;
+	if (!file || !offset)
+		return FILE_CHECK_ERROR;
 
 	/*
 	 * Determine whether a file belongs to a regular VFS filesystem
@@ -56,19 +51,37 @@ static __inline bool is_regular_file(int fd,
 	 *     - certain character devices or special driver files
 	 *     - kernel objects without regular VFS file semantics
 	 */
-	if (disable_vfile_collect) {
-		void *f_op, *read_iter;
-		bpf_probe_read_kernel(&f_op, sizeof(f_op),
-				      file + offset->struct_file_f_op_offset);
-		if (f_op == NULL)
-			return false;
+	void *f_op, *read_iter;
+	bpf_probe_read_kernel(&f_op, sizeof(f_op),
+			      file + offset->struct_file_f_op_offset);
+	if (f_op == NULL)
+		return FILE_CHECK_ERROR;
 
-		bpf_probe_read_kernel(&read_iter, sizeof(read_iter),
-				      f_op +
-				      offset->struct_file_operations_read_iter_offset);
-		if (read_iter == NULL)
-			return false;
+	bpf_probe_read_kernel(&read_iter, sizeof(read_iter),
+			      f_op +
+			      offset->struct_file_operations_read_iter_offset);
+	if (read_iter == NULL)
+		return FILE_TYPE_VIRTUAL;
+
+	return FILE_TYPE_REGULAR;
+}
+
+static __inline bool is_readable_file(int fd,
+				      bool disable_vfile_collect,
+				      struct member_fields_offset *off_ptr)
+{
+	struct member_fields_offset *offset = off_ptr;
+	if (offset == NULL) {
+		__u32 k0 = 0;
+		offset = members_offset__lookup(&k0);
 	}
+	void *file = fd_to_file(fd, offset);
+	if (file == NULL)
+		return false;
+
+	if (disable_vfile_collect &&
+	    check_virtual_file(file, offset) != FILE_TYPE_REGULAR)
+			return false;
 
 	__u32 i_mode = file_to_i_mode(file, offset);
 	return S_ISREG(i_mode);
@@ -334,9 +347,9 @@ static __inline int trace_io_event_common(void *ctx,
 
 	int data_max_sz = tracer_ctx->data_limit_max;
 
-	if (!is_regular_file(data_args->fd,
-			     !tracer_ctx->virtual_file_collect_enabled,
-			     offset)) {
+	if (!is_readable_file(data_args->fd,
+			      !tracer_ctx->virtual_file_collect_enabled,
+			      offset)) {
 		return -1;
 	}
 
