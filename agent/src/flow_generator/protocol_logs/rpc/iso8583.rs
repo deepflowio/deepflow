@@ -75,6 +75,7 @@ pub struct Iso8583Info {
     is_on_blacklist: bool,
 
     is_async: bool,
+    is_reversed: bool,
 }
 
 impl Iso8583Info {
@@ -93,6 +94,9 @@ impl Iso8583Info {
         self.attributes.append(&mut other.attributes);
         if other.is_async {
             self.is_async = other.is_async;
+        }
+        if other.is_reversed {
+            self.is_reversed = other.is_reversed;
         }
     }
 
@@ -140,15 +144,25 @@ impl L7ProtocolInfoInterface for Iso8583Info {
     fn is_on_blacklist(&self) -> bool {
         self.is_on_blacklist
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        if self.endpoint.is_empty() {
+            return None;
+        }
+        Some(self.endpoint.clone())
+    }
 }
 
 impl From<Iso8583Info> for L7ProtocolSendLog {
     fn from(f: Iso8583Info) -> Self {
-        let flags = if f.is_async {
+        let mut flags = if f.is_async {
             ApplicationFlags::ASYNC
         } else {
             ApplicationFlags::NONE
         };
+        if f.is_reversed {
+            flags = flags | ApplicationFlags::REVERSED;
+        }
         let log = L7ProtocolSendLog {
             captured_request_byte: f.captured_request_byte,
             captured_response_byte: f.captured_response_byte,

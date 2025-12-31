@@ -441,6 +441,9 @@ impl From<DubboInfo> for L7ProtocolSendLog {
         if f.is_async {
             flags = flags | ApplicationFlags::ASYNC;
         };
+        if f.is_reversed {
+            flags = flags | ApplicationFlags::REVERSED;
+        };
         L7ProtocolSendLog {
             captured_request_byte: f.captured_request_byte,
             captured_response_byte: f.captured_response_byte,

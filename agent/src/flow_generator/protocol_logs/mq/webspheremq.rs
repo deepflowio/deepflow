@@ -139,6 +139,13 @@ impl L7ProtocolInfoInterface for WebSphereMqInfo {
     fn is_reversed(&self) -> bool {
         self.is_reversed
     }
+
+    fn get_endpoint(&self) -> Option<String> {
+        if self.endpoint.is_empty() {
+            return None;
+        }
+        Some(self.endpoint.clone())
+    }
 }
 
 impl WebSphereMqInfo {
@@ -261,6 +268,9 @@ impl From<WebSphereMqInfo> for L7ProtocolSendLog {
         };
         if f.is_async {
             flags = flags | ApplicationFlags::ASYNC;
+        }
+        if f.is_reversed {
+            flags = flags | ApplicationFlags::REVERSED;
         }
         L7ProtocolSendLog {
             captured_request_byte: f.captured_request_byte,
