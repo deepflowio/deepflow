@@ -8893,6 +8893,7 @@ processors:
       rewrite_native_tag:
         # 可以填写以下几种字段之一，用于覆写对应字段的值
         # 注意对应的协议需要支持，否则配置无效
+        # 当重写 response_code 时，自动将原来的非空值以 `sys_response_code` 为名写入 attribute 中
         # - version
         # - request_type
         # - request_domain
@@ -8912,6 +8913,9 @@ processors:
         # - biz_code
         # - biz_scenario
         name: version
+        # 映射字典名称，配置不为空时将输入用所配置的字典进行映射。配置为空时不生效
+        # 注意：condition 中的黑白名单匹配映射后的结果
+        remap: dict_1
         condition:
           enum_whitelist: [] # 枚举白名单，当提取结果在白名单中时，进行重写。配置为空时不生效
           enum_blacklist: [] # 枚举黑名单，当提取结果在黑名单中时，不进行重写
@@ -8928,7 +8932,7 @@ processors:
   # 直接用常量值作为字段值
   const_fields:
   - value: "123"
-    # 输出配置，参考 fields 中 output 的说明进行配置，但不支持 metric，rewrite_response_status 和 rewrite_native_tag 中的 condition
+    # 输出配置，参考 fields 中 output 的说明进行配置，但不支持 metric，rewrite_response_status 和 rewrite_native_tag 中的 remap/condition
     output:
       attribute_name: "xyz"
       rewrite_native_tag:
@@ -8944,6 +8948,7 @@ processors:
       metric_name: "xyz"
       rewrite_native_tag:
         name: version
+        remap: dict_1
         condition:
           enum_whitelist: []
           enum_blacklist: []
