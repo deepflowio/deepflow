@@ -30,7 +30,8 @@ const TRACE_TREE_VERSION_0X12 = 0x12 // before 20240827
 const TRACE_TREE_VERSION_0X13 = 0x13
 const TRACE_TREE_VERSION_0x14 = 0x14 // before 20251027
 const TRACE_TREE_VERSION_0x15 = 0x15 // before 20251206
-const TRACE_TREE_VERSION = 0x16
+const TRACE_TREE_VERSION_0x16 = 0x16 // before 20251231
+const TRACE_TREE_VERSION = 0x17
 
 func HashSearchIndex(key string) uint64 {
 	return utils.DJBHash(17, key)
@@ -40,6 +41,7 @@ type TraceTree struct {
 	Time        uint32
 	SearchIndex uint64
 	OrgId       uint16
+	TraceScore  uint8
 
 	TraceId, TraceId2 string
 	UID               uint64 // uid for deduplicated metrics by same trace_tree
@@ -142,6 +144,7 @@ func (t *TraceTree) Encode() {
 	encoder.Init(t.encodedTreeNodes)
 	encoder.WriteU8(TRACE_TREE_VERSION)
 	encoder.WriteU64(t.UID)
+	encoder.WriteU8(t.TraceScore)
 	encoder.WriteU16(uint16(len(t.TreeNodes)))
 	for _, node := range t.TreeNodes {
 		// encode uniq parent span infos
@@ -216,6 +219,7 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		return fmt.Errorf("trace tree data version is %d expect version is %d", version, TRACE_TREE_VERSION)
 	}
 	t.UID = decoder.ReadU64()
+	t.TraceScore = decoder.ReadU8()
 	treeNodeCount := int(decoder.ReadU16())
 	if cap(t.TreeNodes) < treeNodeCount {
 		t.TreeNodes = make([]TreeNode, treeNodeCount)
