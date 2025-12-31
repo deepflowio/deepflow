@@ -32,6 +32,8 @@ pub mod l7 {
         }
 
         pub mod custom_field_policy {
+            use std::marker::PhantomData;
+
             pub mod enums {
                 use std::sync::Arc;
 
@@ -89,8 +91,11 @@ pub mod l7 {
             }
 
             #[derive(Clone, Copy, Debug)]
-            pub struct PolicySlice;
-            impl PolicySlice {
+            pub struct PolicySlice<'a> {
+                _marker: PhantomData<&'a ()>,
+            }
+
+            impl<'a> PolicySlice<'a> {
                 pub fn apply(
                     &self,
                     _: &mut Store,
@@ -233,6 +238,7 @@ pub mod l7 {
         pub mod oracle {
             use std::fmt;
 
+            use public::l7_protocol::LogMessageType;
             use serde::Serialize;
 
             pub struct Request {
@@ -309,7 +315,11 @@ pub mod l7 {
             }
 
             impl OracleParser {
-                pub fn check_payload(&mut self, _: &[u8], _: &OracleParseConfig) -> bool {
+                pub fn check_payload(
+                    &mut self,
+                    _: &[u8],
+                    _: &OracleParseConfig,
+                ) -> Option<LogMessageType> {
                     unimplemented!()
                 }
 
@@ -334,6 +344,7 @@ pub mod l7 {
 
     pub mod mq {
         pub mod web_sphere_mq {
+            use public::l7_protocol::LogMessageType;
 
             #[derive(Default)]
             pub struct WebSphereMqParser {
@@ -344,7 +355,7 @@ pub mod l7 {
             }
 
             impl WebSphereMqParser {
-                pub fn check_payload(&mut self, _: &[u8], _: bool) -> bool {
+                pub fn check_payload(&mut self, _: &[u8], _: bool) -> Option<LogMessageType> {
                     unimplemented!()
                 }
 
@@ -358,6 +369,8 @@ pub mod l7 {
     pub mod rpc {
         pub mod iso8583 {
             use public::bitmap::Bitmap;
+
+            use public::l7_protocol::LogMessageType;
 
             pub struct Iso8583ParseConfig {
                 pub extract_fields: Bitmap,
@@ -379,7 +392,11 @@ pub mod l7 {
             }
 
             impl Iso8583Parser {
-                pub fn check_payload(&mut self, _: &[u8], _: &Iso8583ParseConfig) -> bool {
+                pub fn check_payload(
+                    &mut self,
+                    _: &[u8],
+                    _: &Iso8583ParseConfig,
+                ) -> Option<LogMessageType> {
                     unimplemented!()
                 }
 

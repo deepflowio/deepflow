@@ -30,13 +30,13 @@ import (
 
 func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupConfigMapConnections []model.PodGroupConfigMapConnection, err error) {
 	log.Debug("get podgroups starting", logger.NewORGPrefix(k.orgID))
-	podControllers := [5][]string{}
-	podControllers[0] = k.k8sInfo["*v1.Deployment"]
-	podControllers[1] = k.k8sInfo["*v1.StatefulSet"]
-	podControllers[1] = append(podControllers[1], k.k8sInfo["*v1.OpenGaussCluster"]...)
-	podControllers[2] = k.k8sInfo["*v1.DaemonSet"]
-	podControllers[3] = k.k8sInfo["*v1.CloneSet"]
-	podControllers[4] = k.k8sInfo["*v1.Pod"]
+	podControllers := [5][][]byte{}
+	podControllers[0] = k.k8sEntries["*v1.Deployment"]
+	podControllers[1] = k.k8sEntries["*v1.StatefulSet"]
+	podControllers[1] = append(podControllers[1], k.k8sEntries["*v1.OpenGaussCluster"]...)
+	podControllers[2] = k.k8sEntries["*v1.DaemonSet"]
+	podControllers[3] = k.k8sEntries["*v1.CloneSet"]
+	podControllers[4] = k.k8sEntries["*v1.Pod"]
 	pgNameToTypeID := map[string]int{
 		"deployment":            common.POD_GROUP_DEPLOYMENT,
 		"statefulset":           common.POD_GROUP_STATEFULSET,
@@ -48,7 +48,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 	for t, podController := range podControllers {
 		for _, c := range podController {
 			podTargetPorts := map[string]int{}
-			cData, cErr := simplejson.NewJson([]byte(c))
+			cData, cErr := simplejson.NewJson(c)
 			if cErr != nil {
 				err = cErr
 				log.Errorf("podgroup initialization simplejson error: (%s)", cErr.Error(), logger.NewORGPrefix(k.orgID))
@@ -231,9 +231,9 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 
 func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGroup, podGroupConfigMapConnections []model.PodGroupConfigMapConnection, err error) {
 	log.Debug("get replicationcontrollers starting", logger.NewORGPrefix(k.orgID))
-	for _, r := range k.k8sInfo["*v1.ReplicationController"] {
+	for _, r := range k.k8sEntries["*v1.ReplicationController"] {
 		podTargetPorts := map[string]int{}
-		rData, rErr := simplejson.NewJson([]byte(r))
+		rData, rErr := simplejson.NewJson(r)
 		if rErr != nil {
 			err = rErr
 			log.Errorf("replicationcontroller initialization simplejson error: (%s)", rErr.Error(), logger.NewORGPrefix(k.orgID))

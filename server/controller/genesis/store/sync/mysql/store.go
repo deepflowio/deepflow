@@ -74,7 +74,7 @@ func (s *SyncStorage) Renew(orgID int, vtapID uint32, vtapKey string, refresh, w
 	}
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+		log.Errorf("get metadb session failed", logger.NewORGPrefix(orgID))
 		return
 	}
 	err = db.Model(&model.GenesisStorage{}).Where("vtap_id = ? AND node_ip <> ?", vtapID, s.nodeIP).Update("node_ip", s.nodeIP).Error
@@ -103,7 +103,7 @@ func (s *SyncStorage) Update(orgID int, vtapID uint32, vtapKey string, items com
 	}
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+		log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 		return
 	}
 	err = db.Clauses(clause.OnConflict{
@@ -184,7 +184,7 @@ func (s *SyncStorage) refreshDatabase() {
 		for _, orgID := range orgIDs {
 			db, err := metadb.GetDB(orgID)
 			if err != nil {
-				log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+				log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 				continue
 			}
 			vTaps := []metadbmodel.VTap{}
@@ -224,12 +224,12 @@ func (s *SyncStorage) onEvicted(k string, v interface{}) {
 	}
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+		log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 		return
 	}
 	err = db.Delete(&v).Error
 	if err != nil {
-		log.Errorf("delete vtap (%s) stale data failed: %s", k, err.Error(), logger.NewORGPrefix(orgID))
+		log.Errorf("delete vtap (%s) stale data (%#v) failed: %s", k, v, err.Error(), logger.NewORGPrefix(orgID))
 	}
 }
 

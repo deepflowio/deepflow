@@ -20,7 +20,7 @@ use std::{
 };
 
 use log::error;
-use public::l7_protocol::{CustomProtocol, L7Protocol};
+use public::l7_protocol::{CustomProtocol, L7Protocol, LogMessageType};
 
 use crate::{
     common::{
@@ -28,10 +28,7 @@ use crate::{
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
     },
-    flow_generator::{
-        protocol_logs::{set_captured_byte, LogMessageType},
-        Error, Result,
-    },
+    flow_generator::{protocol_logs::set_captured_byte, Error, Result},
     plugin::{
         c_ffi::{c_str_to_string, ParseCtx, ParseInfo, ACTION_CONTINUE, ACTION_ERROR, ACTION_OK},
         CustomInfo,
@@ -48,10 +45,10 @@ pub struct SoLog {
 }
 
 impl L7ProtocolParserInterface for SoLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         let so_func_ref = param.so_func.borrow();
         let Some(c_funcs) = &*so_func_ref else {
-            return false;
+            return None;
         };
         let ctx = &ParseCtx::from((param, payload));
 
@@ -93,13 +90,18 @@ impl L7ProtocolParserInterface for SoLog {
                     None => {
                         error!("read proto str from so plugin fail");
                         counter.fail_cnt.fetch_add(1, Ordering::Relaxed);
-                        return false;
+                        return None;
                     }
                 }
-                return true;
+
+                return match res.direction {
+                    1 => Some(LogMessageType::Request),
+                    2 => Some(LogMessageType::Response),
+                    _ => None,
+                };
             }
         }
-        false
+        None
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {

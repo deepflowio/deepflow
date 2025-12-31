@@ -1633,6 +1633,12 @@ CREATE TABLE IF NOT EXISTS genesis_storage (
 );
 TRUNCATE TABLE genesis_storage;
 
+CREATE TABLE IF NOT EXISTS genesis_cluster (
+    id          VARCHAR(64) NOT NULL PRIMARY KEY,
+    node_ip     VARCHAR(48)
+);
+TRUNCATE TABLE genesis_cluster;
+
 -- ClickHouse dictionary
 
 CREATE TABLE IF NOT EXISTS ch_region (
@@ -2068,6 +2074,18 @@ CREATE TABLE IF NOT EXISTS ch_chost (
 );
 TRUNCATE TABLE ch_chost;
 CREATE INDEX ch_chost_updated_at_index ON ch_chost(updated_at);
+
+CREATE TABLE IF NOT EXISTS ch_biz_service (
+    id                      INTEGER NOT NULL PRIMARY KEY,
+    name                    VARCHAR(256),
+    service_group_name      VARCHAR(256),
+    icon_id                 INTEGER,
+    team_id                 INTEGER,
+    domain_id               INTEGER,
+    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+TRUNCATE TABLE ch_biz_service;
+CREATE INDEX ch_biz_service_updated_at_index ON ch_biz_service(updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_vtap_port (
     vtap_id                 INTEGER NOT NULL,

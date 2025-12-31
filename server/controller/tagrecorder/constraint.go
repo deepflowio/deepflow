@@ -33,7 +33,7 @@ type MySQLChModel interface {
 		metadbmodel.ChDevice | metadbmodel.ChIPRelation | metadbmodel.ChPodGroup | metadbmodel.ChNetwork | metadbmodel.ChPod | metadbmodel.ChPodCluster |
 		metadbmodel.ChPodNode | metadbmodel.ChPodNamespace | metadbmodel.ChTapType | metadbmodel.ChVTap | metadbmodel.ChPodK8sLabels | metadbmodel.ChNodeType | metadbmodel.ChGProcess | metadbmodel.ChPodK8sAnnotation | metadbmodel.ChPodK8sAnnotations |
 		metadbmodel.ChPodServiceK8sAnnotation | metadbmodel.ChPodServiceK8sAnnotations |
-		metadbmodel.ChPodK8sEnv | metadbmodel.ChPodK8sEnvs | metadbmodel.ChPodService | metadbmodel.ChChost | metadbmodel.ChPolicy | metadbmodel.ChNpbTunnel | metadbmodel.ChCustomBizService | metadbmodel.ChCustomBizServiceFilter
+		metadbmodel.ChPodK8sEnv | metadbmodel.ChPodK8sEnvs | metadbmodel.ChPodService | metadbmodel.ChChost | metadbmodel.ChPolicy | metadbmodel.ChNpbTunnel | metadbmodel.ChCustomBizService | metadbmodel.ChCustomBizServiceFilter | metadbmodel.ChBizService
 }
 
 type SubscriberMetaDBChModel interface {
@@ -43,7 +43,7 @@ type SubscriberMetaDBChModel interface {
 		metadbmodel.ChPodServiceK8sLabels | metadbmodel.ChPodServiceK8sLabel | metadbmodel.ChPodServiceK8sAnnotation | metadbmodel.ChPodServiceK8sAnnotations |
 		metadbmodel.ChPodNSCloudTags | metadbmodel.ChChostCloudTags | metadbmodel.ChPodNSCloudTag | metadbmodel.ChChostCloudTag |
 		metadbmodel.ChPodK8sAnnotation | metadbmodel.ChPodK8sAnnotations | metadbmodel.ChPodK8sEnv | metadbmodel.ChPodK8sEnvs | metadbmodel.ChPodK8sLabel |
-		metadbmodel.ChPodK8sLabels
+		metadbmodel.ChPodK8sLabels | metadbmodel.ChBizService
 
 	GetID() int
 	GetUpdatedAt() time.Time

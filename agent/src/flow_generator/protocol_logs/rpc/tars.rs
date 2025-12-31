@@ -24,6 +24,8 @@ use nom::{
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::Serialize;
 
+use public::l7_protocol::LogMessageType;
+
 use crate::{
     common::{
         flow::{L7PerfStats, L7Protocol},
@@ -35,7 +37,7 @@ use crate::{
         error::{Error, Result},
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
-            AppProtoHead, L7ResponseStatus, LogMessageType,
+            AppProtoHead, L7ResponseStatus,
         },
     },
 };
@@ -440,11 +442,15 @@ pub struct TarsLog {
 }
 
 impl L7ProtocolParserInterface for TarsLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
-        TarsInfo::parse(payload).is_ok()
+        if TarsInfo::parse(payload).is_ok() {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -636,7 +642,7 @@ mod tests {
 
             param.set_log_parser_config(parse_config);
 
-            if !tars.check_payload(payload, param) {
+            if tars.check_payload(payload, param).is_none() {
                 output.push_str("not tars\n");
                 continue;
             }

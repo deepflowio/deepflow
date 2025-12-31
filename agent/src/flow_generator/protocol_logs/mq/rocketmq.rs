@@ -30,11 +30,13 @@ use crate::{
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
             set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
-            L7ResponseStatus, LogMessageType, PrioFields, BASE_FIELD_PRIORITY,
+            L7ResponseStatus, PrioFields, BASE_FIELD_PRIORITY,
         },
     },
     utils::bytes,
 };
+
+use public::l7_protocol::LogMessageType;
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct RocketmqInfo {
@@ -279,11 +281,15 @@ pub struct RocketmqLog {
 }
 
 impl L7ProtocolParserInterface for RocketmqLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
-        self.check(payload, param.l4_protocol)
+        if self.check(payload, param.l4_protocol) {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -1768,7 +1774,7 @@ mod tests {
             );
             param.set_captured_byte(payload.len());
 
-            let is_rocketmq = rocketmq.check_payload(payload, param);
+            let is_rocketmq = rocketmq.check_payload(payload, param).is_some();
             let info = rocketmq.parse_payload(payload, param);
             if let Ok(info) = info {
                 match info.unwrap_single() {

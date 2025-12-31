@@ -21,7 +21,7 @@ use std::{borrow::Cow, mem::replace};
 
 use serde::Serialize;
 
-use public::l7_protocol::{Field, FieldSetter, L7Log};
+use public::l7_protocol::{Field, FieldSetter, L7Log, LogMessageType};
 use public_derive::L7Log;
 
 use crate::{
@@ -42,7 +42,7 @@ use crate::{
                 TraceInfo,
             },
             set_captured_byte, swap_if, value_is_default, value_is_negative, AppProtoHead,
-            L7ResponseStatus, LogMessageType, PrioField, PrioFields, BASE_FIELD_PRIORITY,
+            L7ResponseStatus, PrioField, PrioFields, BASE_FIELD_PRIORITY,
             CUSTOM_FIELD_POLICY_PRIORITY, PLUGIN_FIELD_PRIORITY,
         },
     },
@@ -516,26 +516,30 @@ pub struct DubboLog {
 #[cfg(feature = "enterprise")]
 struct CustomFieldContext<'a> {
     direction: PacketDirection,
-    policies: Option<PolicySlice>,
+    policies: Option<PolicySlice<'a>>,
     store: &'a mut Store,
 }
 
 impl L7ProtocolParserInterface for DubboLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
         if !param.ebpf_type.is_raw_protocol() {
-            return false;
+            return None;
         }
         if param.l4_protocol != IpProtocol::TCP {
-            return false;
+            return None;
         }
 
         let mut header = DubboHeader::default();
         let ret = header.parse_headers(payload);
         if ret.is_err() {
-            return false;
+            return None;
         }
 
-        header.check()
+        if header.check() {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -1305,7 +1309,7 @@ mod tests {
             );
             param.set_captured_byte(payload.len());
             param.set_log_parser_config(&config);
-            let is_dubbo = dubbo.check_payload(payload, param);
+            let is_dubbo = dubbo.check_payload(payload, param).is_some();
 
             let i = dubbo.parse_payload(payload, param);
             let info = if let Ok(info) = i {
@@ -1403,7 +1407,7 @@ mod tests {
         );
         param.set_captured_byte(payload.len());
         param.set_log_parser_config(&config);
-        let is_dubbo = dubbo.check_payload(payload, param);
+        let is_dubbo = dubbo.check_payload(payload, param).is_some();
 
         let i = dubbo.parse_payload(payload, param);
         let info = if let Ok(info) = i {

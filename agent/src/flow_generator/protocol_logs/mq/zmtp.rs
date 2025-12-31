@@ -1,3 +1,5 @@
+use public::l7_protocol::LogMessageType;
+
 use crate::{
     common::{
         flow::{L7PerfStats, L7Protocol, PacketDirection},
@@ -10,7 +12,7 @@ use crate::{
         error::{Error, Result},
         protocol_logs::{
             pb_adapter::{ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response},
-            set_captured_byte, AppProtoHead, L7ResponseStatus, LogMessageType,
+            set_captured_byte, AppProtoHead, L7ResponseStatus,
         },
     },
     plugin::wasm::{
@@ -680,8 +682,12 @@ impl ZmtpLog {
 }
 
 impl L7ProtocolParserInterface for ZmtpLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        Self::check_protocol(payload, param)
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
+        if Self::check_protocol(payload, param) {
+            Some(LogMessageType::Request)
+        } else {
+            None
+        }
     }
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         if self.perf_stats.is_none() && param.parse_perf {

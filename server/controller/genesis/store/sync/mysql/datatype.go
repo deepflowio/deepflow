@@ -68,13 +68,21 @@ func (gs *GenesisSyncTypeOperation[T]) Fetch() map[int][]T {
 }
 
 func (gs *GenesisSyncTypeOperation[T]) Renew(orgID int, vtapID uint32, vtapKey string, items []T) {
+	if len(items) == 0 {
+		return
+	}
+
 	gs.store.SetDefault(gs.formatKey(orgID, vtapID, vtapKey), items)
 }
 
 func (gs *GenesisSyncTypeOperation[T]) Update(orgID int, vtapID uint32, vtapKey string, items []T) {
+	if len(items) == 0 {
+		return
+	}
+
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+		log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 		return
 	}
 
@@ -88,10 +96,6 @@ func (gs *GenesisSyncTypeOperation[T]) Update(orgID int, vtapID uint32, vtapKey 
 	err = db.Where("vtap_id = ?", vtapID).Where("node_ip = ?", gs.nodeIP).Delete(&toDelete).Error
 	if err != nil {
 		log.Warningf("delete vtap (%d) old data failed: %s", vtapID, err.Error(), logger.NewORGPrefix(orgID))
-	}
-
-	if len(items) == 0 {
-		return
 	}
 
 	err = db.CreateInBatches(items, 100).Error
@@ -109,7 +113,7 @@ func (gs *GenesisSyncTypeOperation[T]) Load() {
 	for _, orgID := range orgIDs {
 		db, err := metadb.GetDB(orgID)
 		if err != nil {
-			log.Error("get metadb session failed", logger.NewORGPrefix(orgID))
+			log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 			continue
 		}
 		storages := []model.GenesisStorage{}
@@ -130,7 +134,10 @@ func (gs *GenesisSyncTypeOperation[T]) Load() {
 			var vtap metadbmodel.VTap
 			err = db.Where("id = ?", storage.VtapID).First(&vtap).Error
 			if err != nil {
-				log.Errorf("get vtap (%d) failed:%s", storage.VtapID, err.Error(), logger.NewORGPrefix(orgID))
+				log.Warningf("get vtap (%d) failed:%s", storage.VtapID, err.Error(), logger.NewORGPrefix(orgID))
+				continue
+			}
+			if len(items) == 0 {
 				continue
 			}
 			gs.store.SetDefault(gs.formatKey(orgID, storage.VtapID, vtap.CtrlIP+"-"+vtap.CtrlMac), items)
