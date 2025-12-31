@@ -673,7 +673,15 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 	strcpy_s_inline(msg->comm, sizeof(msg->comm), v->comm, strlen(v->comm));
 	msg->stime = stime;
 	msg->netns_id = ns_id;
-	msg->profiler_type = ctx->type;
+        if (ctx->type == PROFILER_TYPE_MEMORY) {
+                if (v->flags & STACK_TRACE_FLAGS_CUDA_MEMORY) {
+                        msg->profiler_type = PROFILER_TYPE_GPU_MEMORY;
+                } else {
+                        msg->profiler_type = ctx->type;
+                }
+        } else {
+                msg->profiler_type = ctx->type;
+        }
 	if (ctx->type == PROFILER_TYPE_MEMORY) {
 		msg->mem_addr = v->memory.addr;
 	}

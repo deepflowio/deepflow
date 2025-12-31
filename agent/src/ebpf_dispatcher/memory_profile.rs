@@ -272,7 +272,8 @@ pub struct MemoryContext {
 
 impl MemoryContext {
     pub unsafe fn update(&self, data: *mut ebpf::stack_profile_data) {
-        assert_eq!((*data).profiler_type, ebpf::PROFILER_TYPE_MEMORY);
+        let type_ = (*data).profiler_type;
+        assert!(type_ == ebpf::PROFILER_TYPE_MEMORY || type_ == ebpf::PROFILER_TYPE_GPU_MEMORY);
 
         let data = Data {
             ptr: NonNull::new_unchecked(data),
@@ -379,9 +380,16 @@ impl Interior {
             + self.time_diff.load(Ordering::Relaxed)) as u64;
 
         for (_, data) in processor.allocs.drain() {
+            let type_ = data.borrow().as_ref().profiler_type;
+            let event_type = if type_ == ebpf::PROFILER_TYPE_GPU_MEMORY {
+                metric::ProfileEventType::EbpfHbmAlloc
+            } else {
+                metric::ProfileEventType::EbpfMemAlloc
+            };
+
             let profile = metric::Profile {
                 timestamp: doc_timestamp,
-                event_type: metric::ProfileEventType::EbpfMemAlloc.into(),
+                event_type: event_type.into(),
                 ..Self::generate_profile(compress, &self.policy_getter, data.borrow().as_ref())
             };
             if let Err(e) = self.output.send(Profile(profile)) {
@@ -427,9 +435,16 @@ impl Interior {
                 }
             }
 
+            let type_ = data.profiler_type;
+            let event_type = if type_ == ebpf::PROFILER_TYPE_GPU_MEMORY {
+                metric::ProfileEventType::EbpfHbmInUse
+            } else {
+                metric::ProfileEventType::EbpfMemInUse
+            };
+
             let profile = metric::Profile {
                 timestamp: doc_timestamp,
-                event_type: metric::ProfileEventType::EbpfMemInUse.into(),
+                event_type: event_type.into(),
                 ..Self::generate_profile(compress, &self.policy_getter, data)
             };
 

@@ -224,6 +224,8 @@ cfg_if::cfg_if! {
         pub const PROFILER_TYPE_OFFCPU: u8 = 2;
         #[allow(dead_code)]
         pub const PROFILER_TYPE_MEMORY: u8 = 3;
+        #[allow(dead_code)]
+        pub const PROFILER_TYPE_GPU_MEMORY: u8 = 4;
     }
 }
 

@@ -88,6 +88,8 @@ var eBPFEventType = []string{
 	pb.ProfileEventType_EbpfOffCpu:   "off-cpu",
 	pb.ProfileEventType_EbpfMemAlloc: "mem-alloc",
 	pb.ProfileEventType_EbpfMemInUse: "mem-inuse",
+	pb.ProfileEventType_EbpfHbmAlloc: "hbm-alloc",
+	pb.ProfileEventType_EbpfHbmInUse: "hbm-inuse",
 }
 
 const (

@@ -384,7 +384,8 @@ func (t *Table) IsAggrTableWrong(createTableSQL string) bool {
 }
 
 func (t *Table) IsLocalTableWrong(createTableSql string) bool {
-	return strings.Contains(createTableSql, "mem-inuse")
+	return strings.Contains(createTableSql, "mem-inuse") ||
+		strings.Contains(createTableSql, "hbm-inuse")
 }
 
 func (t *Table) AggrTable(orgID uint16, aggrInterval AggregationInterval) string {
