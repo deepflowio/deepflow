@@ -26,7 +26,9 @@ use hpack::Decoder;
 use nom::{AsBytes, ParseTo};
 use serde::Serialize;
 
-use public::l7_protocol::{Field, FieldSetter, L7Log, L7ProtocolChecker, LogMessageType};
+use public::l7_protocol::{
+    Field, FieldSetter, L7Log, L7LogAttribute, L7ProtocolChecker, LogMessageType,
+};
 use public_derive::L7Log;
 
 use super::{
@@ -293,10 +295,9 @@ pub struct HttpInfo {
     #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
     pub resp_content_length: Option<u32>,
 
-    // status_code == 0 means None
     #[l7_log(response_code)]
-    #[serde(rename = "response_code", skip_serializing_if = "value_is_default")]
-    pub status_code: u16,
+    #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
+    pub status_code: Option<u16>,
     #[l7_log(response_status)]
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
@@ -335,6 +336,15 @@ pub struct HttpInfo {
     is_async: bool,
     #[serde(skip_serializing_if = "value_is_default")]
     is_reversed: bool,
+}
+
+impl L7LogAttribute for HttpInfo {
+    fn add_attribute(&mut self, name: Cow<'_, str>, value: Cow<'_, str>) {
+        self.attributes.push(KeyVal {
+            key: name.into_owned(),
+            val: value.into_owned(),
+        });
+    }
 }
 
 impl L7ProtocolInfoInterface for HttpInfo {
@@ -414,7 +424,10 @@ impl L7ProtocolInfoInterface for HttpInfo {
 
 impl HttpInfo {
     fn is_invalid_status_code(&self) -> bool {
-        !(HTTP_STATUS_CODE_MIN..=HTTP_STATUS_CODE_MAX).contains(&self.status_code)
+        match self.status_code {
+            Some(code) => !(HTTP_STATUS_CODE_MIN..=HTTP_STATUS_CODE_MAX).contains(&code),
+            None => true,
+        }
     }
 
     fn is_invalid(&self) -> bool {
@@ -425,10 +438,12 @@ impl HttpInfo {
 
     // when response_code is overwritten, put it into the attributes.
     fn response_code_to_attribute(&mut self) {
-        self.attributes.push(KeyVal {
-            key: SYS_RESPONSE_CODE_ATTR.to_string(),
-            val: self.status_code.to_string(),
-        });
+        if let Some(code) = self.status_code {
+            self.attributes.push(KeyVal {
+                key: SYS_RESPONSE_CODE_ATTR.to_string(),
+                val: code.to_string(),
+            });
+        }
     }
 
     pub fn merge_custom_to_http(&mut self, custom: CustomInfo, dir: PacketDirection) {
@@ -461,7 +476,7 @@ impl HttpInfo {
         if dir == PacketDirection::ServerToClient {
             if let Some(code) = custom.resp.code {
                 self.response_code_to_attribute();
-                self.status_code = code as u16;
+                self.status_code = Some(code as u16);
             }
 
             if custom.resp.status != self.status {
@@ -557,7 +572,7 @@ impl HttpInfo {
                 if other.status != L7ResponseStatus::default() {
                     self.status = other.status;
                 }
-                if self.status_code == 0 {
+                if self.status_code.is_none() {
                     self.status_code = other.status_code;
                 }
                 if self.grpc_status_code.is_none() && other.grpc_status_code.is_some() {
@@ -602,10 +617,10 @@ impl HttpInfo {
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.host.is_empty()
+        self.host.is_empty()
             && self.method.is_none()
             && self.path.is_empty()
-            && self.status_code == 0;
+            && self.status_code.is_none()
     }
 
     pub fn is_req_resp_end(&self) -> (bool, bool) {
@@ -795,15 +810,15 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                     L7Protocol::Grpc => {
                         if let Some(code) = f.grpc_status_code {
                             Some(code as i32)
-                        } else if f.status_code > 0 {
-                            Some(f.status_code as i32)
+                        } else if let Some(code) = f.status_code {
+                            Some(code as i32)
                         } else {
                             None
                         }
                     }
                     _ => {
-                        if f.status_code > 0 {
-                            Some(f.status_code as i32)
+                        if let Some(code) = f.status_code {
+                            Some(code as i32)
                         } else {
                             None
                         }
@@ -1164,8 +1179,11 @@ impl HttpLog {
         if param.direction == PacketDirection::ServerToClient {
             if let Some(code) = info.grpc_status_code {
                 self.set_grpc_status(code, info);
+            } else if let Some(code) = info.status_code {
+                self.set_status(code, info);
             } else {
-                self.set_status(info.status_code, info);
+                // default to ok
+                info.status = L7ResponseStatus::Ok;
             }
         }
 
@@ -1412,7 +1430,7 @@ impl HttpLog {
                 return Err(Error::HttpHeaderParseFailed);
             }
             info.version = version;
-            info.status_code = status_code;
+            info.status_code = Some(status_code);
 
             info.msg_type = LogMessageType::Response;
         } else {
@@ -1543,8 +1561,9 @@ impl HttpLog {
                 }
                 (PacketDirection::ServerToClient, Method::_ResponseHeader) => {
                     if info.grpc_status_code.is_none() {
-                        if info.status_code == 0 {
-                            return Err(Error::HttpHeaderParseFailed);
+                        match info.status_code {
+                            None | Some(0) => return Err(Error::HttpHeaderParseFailed),
+                            _ => (),
                         }
                         if !grpc_streaming_data_enabled {
                             info.msg_type = LogMessageType::Response;
@@ -1826,8 +1845,8 @@ impl HttpLog {
             }
             ":status" => {
                 info.msg_type = LogMessageType::Response;
-                let code = val.parse_to().unwrap_or_default();
-                info.status_code = code;
+                let code: u16 = val.parse_to().unwrap_or_default();
+                info.status_code = Some(code);
             }
             "host" | ":authority" => info.host = String::from_utf8_lossy(val).into_owned(),
             ":path" => {
@@ -1988,11 +2007,6 @@ impl HttpLog {
                                 info.method = Method::try_from(value.as_str()).unwrap_or_default();
                             }
                         }
-                        // resp
-                        NativeTag::ResponseCode => {
-                            info.response_code_to_attribute();
-                            info.status_code = value.parse::<u16>().unwrap_or_default();
-                        }
                         // trace
                         NativeTag::SpanId => {
                             if CUSTOM_FIELD_POLICY_PRIORITY <= info.span_id.prio() {
@@ -2010,12 +2024,6 @@ impl HttpLog {
                         }
                         _ => auto_merge_custom_field(op, info),
                     }
-                }
-                Op::AddAttribute(key, value) => {
-                    info.attributes.push(KeyVal {
-                        key: key.to_string(),
-                        val: value.to_string(),
-                    });
                 }
                 Op::AddMetric(key, value) => {
                     info.metrics.push(MetricKeyVal {
