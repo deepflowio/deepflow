@@ -90,3 +90,20 @@ int __attribute__ ((weak)) print_extra_pkt_info(bool datadump_enable,
 {
 	return 0;
 }
+
+char * __attribute__ ((weak)) extended_resolve_frame(int pid, u64 addr, u8 frame_type, u64 extra_a, u64 extra_b)
+{
+	return NULL;
+}
+
+int __attribute__ ((weak)) extended_merge_stacks(char *dst, int len, const char *i_trace, const char *u_trace, int pid)
+{
+	return 0;
+}
+
+char * __attribute__ ((weak)) extended_format_lua_stack(void *tracer, int pid, int stack_id,
+                                                        const char *stack_map_name, void *h,
+                                                        bool new_cache, void *info_p)
+{
+	return NULL;
+}
