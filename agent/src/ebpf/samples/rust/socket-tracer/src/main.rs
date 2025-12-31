@@ -642,7 +642,8 @@ fn main() {
         );
 	// dpdk enable
 	// set_dpdk_trace_enabled(true);
-
+	// disable_kprobe_feature();
+	// set_virtual_file_collect(true);
         if running_socket_tracer(
             socket_trace_callback, /* Callback interface rust -> C */
             1, /* Number of worker threads, indicating how many user-space threads participate in data processing */

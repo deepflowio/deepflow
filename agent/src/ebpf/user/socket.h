@@ -480,5 +480,18 @@ void enable_kprobe_feature(void);
  */
 void insert_adapt_kern_data_to_map(struct bpf_tracer *tracer,
 				   int mnt_id, u32 mntns_id);
+
+/**
+ * Enable or disable virtual file collection.
+ *
+ * This function sets the global flag controlling whether
+ * virtual file collection is enabled.
+ *
+ * @param enabled  Boolean flag to enable (true) or disable (false)
+ *                 the virtual file collection feature.
+ *
+ * @return 0 on success, or a negative error code on failure.
+ */
+int set_virtual_file_collect(bool enabled);
 bool is_pure_kprobe_ebpf(void);
 #endif /* DF_USER_SOCKET_H */

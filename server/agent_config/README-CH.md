@@ -4318,6 +4318,36 @@ inputs:
 deepflow-agent 所采集的文件 IO 事件的时延下限阈值，操作系统中时延低于此阈值
 的文件 IO 事件将被忽略。
 
+##### 启用虚拟文件采集 {#inputs.ebpf.file.io_event.enable_virtual_file_collect}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.file.io_event.enable_virtual_file_collect`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    file:
+      io_event:
+        enable_virtual_file_collect: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+当设置为 true 时，deepflow-agent 将采集发生在虚拟文件系统上的文件
+I/O 事件（例如 /proc、/sys、/run 等由内核动态生成的伪文件系统）。
+当设置为 false 时，将不会采集虚拟文件系统上的文件 I/O 事件。
+
 ### Profile {#inputs.ebpf.profile}
 
 #### 栈回溯 {#inputs.ebpf.profile.unwinding}

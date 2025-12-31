@@ -4423,6 +4423,38 @@ inputs:
 
 Only collect IO events with delay exceeding this threshold.
 
+##### Virtual File Collection Enabled {#inputs.ebpf.file.io_event.enable_virtual_file_collect}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.file.io_event.enable_virtual_file_collect`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    file:
+      io_event:
+        enable_virtual_file_collect: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When set to true, the agent will collect file I/O events generated on
+virtual file systems (such as /proc, /sys, /run, and other kernel
+pseudo file systems).
+When set to false, the agent will not collect file I/O events from
+virtual file systems.
+
 ### Profile {#inputs.ebpf.profile}
 
 #### Unwinding {#inputs.ebpf.profile.unwinding}
