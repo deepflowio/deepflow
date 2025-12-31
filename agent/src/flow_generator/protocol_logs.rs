@@ -724,16 +724,27 @@ cfg_if::cfg_if! {
         use log::warn;
 
         use enterprise_utils::l7::custom_policy::custom_field_policy::enums::{Op, Operation};
-        use public::l7_protocol::{FieldSetter, L7Log};
+        use public::l7_protocol::{Field, FieldSetter, L7Log, NativeTag};
+
+        use consts::SYS_RESPONSE_CODE_ATTR;
 
         pub fn auto_merge_custom_field<L: L7Log>(op: Operation, log: &mut L) {
             let Operation { op, prio } = op;
             match op {
                 Op::RewriteResponseStatus(status) => log.set_response_status(status),
                 Op::RewriteNativeTag(tag, value) => {
+                    // append to sys_response_code if response_code is not empty
+                    if tag == NativeTag::ResponseCode {
+                        match log.get_response_code() {
+                            Field::Str(s) => log.add_attribute(Cow::Borrowed(SYS_RESPONSE_CODE_ATTR), Cow::Owned(s.to_string())),
+                            Field::Int(i) => log.add_attribute(Cow::Borrowed(SYS_RESPONSE_CODE_ATTR), Cow::Owned(i.to_string())),
+                            Field::None => (),
+                        }
+                    }
                     let field = FieldSetter::new(CUSTOM_FIELD_POLICY_PRIORITY + prio, value.as_str().into());
                     log.set(tag, field);
                 }
+                Op::AddAttribute(name, value) => log.add_attribute(Cow::Borrowed(name.as_str()), Cow::Borrowed(value.as_str())),
                 _ => warn!("Ignored operation {op:?} that is not supported by auto custom field merging"),
             }
         }
