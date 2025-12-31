@@ -56,8 +56,9 @@ static enum linux_kernel_type g_k_type;
 static bool use_kfunc_bin;		// Whether to use fentry/fexit binary eBPF bytecode
 static struct list_head events_list;	// Use for extra register events
 static pthread_t proc_events_pthread;	// Process exec/exit thread
-static bool kprobe_feature_disable;	// Whether to disable the kprobe feature.
-static bool unix_socket_feature_enable; // Whether to enable the kprobe feature.
+static bool kprobe_feature_disable;	// Whether to disable the kprobe feature?
+static bool unix_socket_feature_enable; // Whether to enable the kprobe feature?
+static bool virtual_file_collect_enable; // Whether to enable virtual file collect?
 /*
  * Control whether to disable the tracing feature.
  * 'true' disables the tracing feature, and 'false' enables it.
@@ -1713,37 +1714,45 @@ static int update_offset_map_default(struct bpf_tracer *t,
 	switch (kern_type) {
 	case K_TYPE_VER_3_10:
 		offset.struct_files_struct_fdt_offset = 0x8;
-		offset.struct_files_private_data_offset = 0xa8;
+		offset.struct_file_private_data_offset = 0xa8;
 		offset.struct_file_f_pos_offset = 0x68;
 		offset.struct_ns_common_inum_offset = 0x4;
 		break;
 	case K_TYPE_KYLIN:
 		offset.struct_files_struct_fdt_offset = 0x20;
-		offset.struct_files_private_data_offset = 0xc0;
+		offset.struct_file_private_data_offset = 0xc0;
 		offset.struct_file_f_pos_offset = 0x60;
 		offset.struct_ns_common_inum_offset = 0x10;
 		break;
 	default:
 		offset.struct_files_struct_fdt_offset = 0x20;
-		offset.struct_files_private_data_offset = 0xc8;
+		offset.struct_file_private_data_offset = 0xc8;
 		offset.struct_file_f_pos_offset = 0x68;
 		offset.struct_ns_common_inum_offset = 0x10;
 	};
 
 	/*
 	 * In Tencent Linux (4.14.105-1-tlinux3-0023.1), there is a difference in
-	 * `struct_files_private_data_offset`. If the offset value of the generic
+	 * `struct_file_private_data_offset`. If the offset value of the generic
 	 * eBPF program is used, it will result in the kernel being unable to adapt.
 	 * A separate correction is made here.
 	 */
 	if (strstr(linux_release, "tlinux3"))
-		offset.struct_files_private_data_offset = 0xc0;
+		offset.struct_file_private_data_offset = 0xc0;
 
 	// For 4.19.90-2211.5.0.0178.22.uel20.x86_64
 	if (strstr(linux_release, "uel20"))
-		offset.struct_files_private_data_offset = 0xc0;
+		offset.struct_file_private_data_offset = 0xc0;
 
-	offset.struct_file_f_inode_offset = 0x20;
+	/*
+	 * The corresponding offset is used to access `file->f_op->read_iter`, which
+	 * is then used to determine whether the file belongs to a standard VFS
+	 * filesystem or is a virtual file.
+	 */
+	offset.struct_file_f_op_offset = 0x28;
+	offset.struct_file_operations_read_iter_offset = 0x20;
+
+	offset.struct_file_f_inode_offset = 0x20;	
 	offset.struct_inode_i_mode_offset = 0x0;
 	offset.struct_inode_i_sb_offset = 0x28;
 	offset.struct_super_block_s_dev_offset = 0x10;
@@ -1819,8 +1828,12 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 
 	int struct_files_struct_fdt_offset =
 	    kernel_struct_field_offset(obj, "files_struct", "fdt");
-	int struct_files_private_data_offset =
+	int struct_file_private_data_offset =
 	    kernel_struct_field_offset(obj, "file", "private_data");
+	int struct_file_f_op_offset =
+	    kernel_struct_field_offset(obj, "file", "f_op");
+	int struct_file_operations_read_iter_offset =
+	    kernel_struct_field_offset(obj, "file_operations", "read_iter");
 	int struct_file_f_inode_offset =
 	    kernel_struct_field_offset(obj, "file", "f_inode");
 	int struct_file_f_pos_offset =
@@ -1887,7 +1900,9 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	    kernel_struct_field_offset(obj, "mount", "mnt_id");
 	if (copied_seq_offs < 0 || write_seq_offs < 0 || files_offs < 0 ||
 	    sk_flags_offs < 0 || struct_files_struct_fdt_offset < 0 ||
-	    struct_files_private_data_offset < 0 ||
+	    struct_file_private_data_offset < 0 ||
+	    struct_file_f_op_offset < 0 ||
+	    struct_file_operations_read_iter_offset < 0 ||
 	    struct_file_f_inode_offset < 0 || struct_inode_i_mode_offset < 0 ||
 	    struct_inode_i_sb_offset < 0 || 
 	    struct_super_block_s_dev_offset < 0 || struct_file_dentry_offset < 0 ||
@@ -1912,8 +1927,12 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	ebpf_info("    sk_flags_offs: 0x%x\n", sk_flags_offs);
 	ebpf_info("    struct_files_struct_fdt_offset: 0x%x\n",
 		  struct_files_struct_fdt_offset);
-	ebpf_info("    struct_files_private_data_offset: 0x%x\n",
-		  struct_files_private_data_offset);
+	ebpf_info("    struct_file_private_data_offset: 0x%x\n",
+		  struct_file_private_data_offset);
+	ebpf_info("    struct_file_f_op_offset: 0x%x\n",
+		  struct_file_f_op_offset);
+	ebpf_info("    struct_file_operations_read_iter_offset: 0x%x\n",
+		  struct_file_operations_read_iter_offset);
 	ebpf_info("    struct_file_f_inode_offset: 0x%x\n",
 		  struct_file_f_inode_offset);
 	ebpf_info("    struct_file_f_pos_offset: 0x%x\n",
@@ -1980,8 +1999,11 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	offset.tcp_sock__copied_seq_offset = copied_seq_offs;
 	offset.tcp_sock__write_seq_offset = write_seq_offs;
 	offset.struct_files_struct_fdt_offset = struct_files_struct_fdt_offset;
-	offset.struct_files_private_data_offset =
-	    struct_files_private_data_offset;
+	offset.struct_file_private_data_offset =
+	    struct_file_private_data_offset;
+	offset.struct_file_f_op_offset = struct_file_f_op_offset;
+	offset.struct_file_operations_read_iter_offset =
+	    struct_file_operations_read_iter_offset;
 	offset.struct_file_f_inode_offset = struct_file_f_inode_offset;
 	offset.struct_file_f_pos_offset = struct_file_f_pos_offset;
 	offset.struct_inode_i_mode_offset = struct_inode_i_mode_offset;
@@ -2042,8 +2064,12 @@ static void display_kern_offsets(bpf_offset_param_t * offset)
 		  offset->struct_files_struct_fdt_offset);
 	ebpf_info("\tstruct_file_f_pos_offset: 0x%x\n",
 		  offset->struct_file_f_pos_offset);
-	ebpf_info("\tstruct_files_private_data_offset: 0x%x\n",
-		  offset->struct_files_private_data_offset);
+	ebpf_info("\tstruct_file_private_data_offset: 0x%x\n",
+		  offset->struct_file_private_data_offset);
+	ebpf_info("\tstruct_file_f_op_offset: 0x%x\n",
+		  offset->struct_file_f_op_offset);
+	ebpf_info("\tstruct_file_operations_read_iter_offset: 0x%x\n",
+		  offset->struct_file_operations_read_iter_offset);
 	ebpf_info("\tstruct_file_f_inode_offset: 0x%x\n",
 		  offset->struct_file_f_inode_offset);
 	ebpf_info("\tstruct_inode_i_mode_offset: 0x%x\n",
@@ -2356,6 +2382,7 @@ int set_io_event_collect_mode(uint32_t mode)
 		return ETR_UPDATE_MAP_FAILD;
 	}
 
+	ebpf_info("Set io_event_collect_mode %d\n", io_event_collect_mode);
 	return 0;
 }
 
@@ -2389,6 +2416,42 @@ int set_io_event_minimal_duration(uint64_t duration)
 		return ETR_UPDATE_MAP_FAILD;
 	}
 
+	ebpf_info("Set io_event_minimal_duration %llu ns\n", io_event_minimal_duration);
+	return 0;
+}
+
+int set_virtual_file_collect(bool enabled)
+{
+	virtual_file_collect_enable = enabled;
+
+	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
+	if (tracer == NULL) {
+		return 0;
+	}
+
+	int cpu;
+	int nr_cpus = get_num_possible_cpus();
+	struct tracer_ctx_s values[nr_cpus];
+	memset(values, 0, sizeof(values));
+
+	if (!bpf_table_get_value(tracer, MAP_TRACER_CTX_NAME, 0, values)) {
+		ebpf_warning("Get map '%s' failed.\n", MAP_TRACER_CTX_NAME);
+		return ETR_NOTEXIST;
+	}
+
+	for (cpu = 0; cpu < nr_cpus; cpu++) {
+		values[cpu].virtual_file_collect_enabled =
+					virtual_file_collect_enable;
+	}
+
+	if (!bpf_table_set_value
+	    (tracer, MAP_TRACER_CTX_NAME, 0, (void *)&values)) {
+		ebpf_warning("Set '%s' failed\n", MAP_TRACER_CTX_NAME);
+		return ETR_UPDATE_MAP_FAILD;
+	}
+
+	ebpf_info("IO event virtual_file_collect_enable set to %s\n",
+		   virtual_file_collect_enable ? "true" : "false");
 	return 0;
 }
 
@@ -2923,6 +2986,7 @@ int running_socket_tracer(tracer_callback_t handle,
 		t_conf[cpu].io_event_collect_mode = io_event_collect_mode;
 		t_conf[cpu].io_event_minimal_duration =
 		    io_event_minimal_duration;
+		t_conf[cpu].virtual_file_collect_enabled = virtual_file_collect_enable;
 		t_conf[cpu].disable_tracing = g_disable_syscall_tracing;
 		if (!g_disable_syscall_tracing)
 			t_conf[cpu].go_tracing_timeout = go_tracing_timeout;
@@ -2931,6 +2995,13 @@ int running_socket_tracer(tracer_callback_t handle,
 	if (!bpf_table_set_value
 	    (tracer, MAP_TRACER_CTX_NAME, 0, (void *)&t_conf))
 		return -EINVAL;
+
+	ebpf_info("Config socket_data_limit_max: %d\n", socket_data_limit_max);
+	ebpf_info("Config io_event_collect_mode: %d\n", io_event_collect_mode);
+	ebpf_info("Config io_event_minimal_duration: %llu ns\n", io_event_minimal_duration);
+	ebpf_info("Config virtual_file_collect_enable: %d\n", virtual_file_collect_enable);
+	ebpf_info("Config g_disable_syscall_tracing: %d\n", g_disable_syscall_tracing);
+	ebpf_info("Config go_tracing_timeout: %d\n", go_tracing_timeout);
 
 	tracer->data_limit_max = socket_data_limit_max;
 

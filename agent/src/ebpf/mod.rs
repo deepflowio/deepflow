@@ -776,6 +776,7 @@ extern "C" {
     pub fn enable_unix_socket_feature();
     pub fn disable_fentry();
     pub fn enable_fentry();
+    pub fn set_virtual_file_collect(enabled: bool) -> c_int;
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_observability")] {
             pub fn enable_offcpu_profiler() -> c_int;
