@@ -89,6 +89,9 @@ func (c *Cloud) generateSubDomainResource(lcuuid string, kubernetesGatherResourc
 	existMacs := map[string]bool{}
 	vinterfaceLcuuids := map[string]bool{}
 	for _, v := range cResource.VInterfaces {
+		if v.Mac == common.VIF_DEFAULT_MAC {
+			continue
+		}
 		if _, ok := vmLcuuids[v.DeviceLcuuid]; !ok {
 			continue
 		}
