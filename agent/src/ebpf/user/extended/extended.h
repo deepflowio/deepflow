@@ -17,6 +17,11 @@
 #ifndef DF_EXTENDED_H
 #define DF_EXTENDED_H
 
+#include <stdbool.h>
+#include <stdint.h>
+#include "../types.h"
+#include "../tracer.h"
+
 /**
  * @brief **extended_reader_create()** create an extended reader to
  * receive perfbuf data.
@@ -103,4 +108,27 @@ void extended_print_cp_tracer_status(void);
  */
 int print_extra_pkt_info(bool datadump_enable, const char *pkt_data, int len,
 			 char *buf, int buf_len, u8 direction);
+
+/**
+ * @brief **extended_resolve_frame()** Resolve a custom/interpreter frame
+ * @param pid Process ID
+ * @param addr Frame address/ID
+ * @param frame_type Frame type identifier
+ * @param extra_a Extra data A from stack map
+ * @param extra_b Extra data B from stack map
+ * @return Resolved symbol string (must be freed) or NULL
+ */
+char *extended_resolve_frame(int pid, u64 addr, u8 frame_type, u64 extra_a, u64 extra_b);
+
+/**
+ * @brief **extended_merge_stacks()** Merge interpreter and user stacks
+ * @param dst Destination buffer
+ * @param len Buffer length
+ * @param i_trace Interpreter stack string
+ * @param u_trace User stack string
+ * @param pid Process ID
+ * @return Bytes written
+ */
+int extended_merge_stacks(char *dst, int len, const char *i_trace, const char *u_trace, int pid);
+
 #endif /* DF_EXTENDED_H */
