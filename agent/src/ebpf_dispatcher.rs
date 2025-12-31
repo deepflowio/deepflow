@@ -939,6 +939,15 @@ impl EbpfCollector {
             return Err(Error::EbpfInitError);
         }
 
+        if ebpf::set_virtual_file_collect(config.ebpf.file.io_event.enable_virtual_file_collect)
+            != 0
+        {
+            info!(
+                "ebpf set_virtual_file_collect error: {}",
+                config.ebpf.file.io_event.enable_virtual_file_collect
+            );
+        }
+
         if ebpf::set_io_event_minimal_duration(
             config.ebpf.file.io_event.minimal_duration.as_nanos() as c_ulonglong,
         ) != 0

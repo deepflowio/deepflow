@@ -3278,6 +3278,14 @@ impl ConfigHandler {
             io_event.minimal_duration = new_io_event.minimal_duration;
             restart_agent = !first_run;
         }
+        if io_event.enable_virtual_file_collect != new_io_event.enable_virtual_file_collect {
+            info!(
+                "Update inputs.ebpf.file.io_event.enable_virtual_file_collect from {:?} to {:?}.",
+                io_event.enable_virtual_file_collect, new_io_event.enable_virtual_file_collect
+            );
+            io_event.enable_virtual_file_collect = new_io_event.enable_virtual_file_collect;
+            restart_agent = !first_run;
+        }
         if ebpf.java_symbol_file_refresh_defer_interval
             != new_ebpf.java_symbol_file_refresh_defer_interval
         {

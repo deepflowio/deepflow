@@ -200,6 +200,7 @@ struct tracer_ctx_s {
 	__u32 go_tracing_timeout; /**< Go tracing timeout */
 	__u32 io_event_collect_mode; /**< IO event collection mode */
 	__u64 io_event_minimal_duration; /**< Minimum duration for IO events */
+	bool virtual_file_collect_enabled;    /**< Enable virtual file collection */
 	int push_buffer_refcnt;	/**< Reference count of the data push buffer */
 	__u64 last_period_timestamp; /**< Record the timestamp of the last periodic check of the push buffer. */
 	__u64 period_timestamp;	/**< Record the timestamp of the periodic check of the push buffer. */
@@ -371,7 +372,9 @@ struct member_fields_offset {
 
 	__u16 struct_files_struct_fdt_offset;	// offsetof(struct files_struct, fdt)
 	__u16 struct_file_f_pos_offset;		// offsetof(struct file, f_pos)
-	__u32 struct_files_private_data_offset;	// offsetof(struct file, private_data)
+	__u32 struct_file_private_data_offset;	// offsetof(struct file, private_data)
+	__u32 struct_file_f_op_offset;		// offsetof(struct file, f_op)
+	__u32 struct_file_operations_read_iter_offset; // offsetof(struct file_operations, read_iter)
 	__u32 struct_file_f_inode_offset;	// offsetof(struct file, f_inode)
 	__u32 struct_inode_i_mode_offset;	// offsetof(struct inode, i_mode)
 	__u32 struct_inode_i_sb_offset;		// offsetof(struct inode, i_sb)
