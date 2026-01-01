@@ -21,14 +21,14 @@
 
 // Default value set when file read/write latency timestamp rollback occurs.
 #define TIME_ROLLBACK_DEFAULT_LATENCY_NS 50000
-#define FILE_CHECK_ERROR      (-1)  /* Error or exceptional condition */
-#define FILE_TYPE_REGULAR      0    /* Regular (non-virtual) file */
-#define FILE_TYPE_VIRTUAL      1    /* Virtual file */
+#define FILE_TYPE_ERROR    (-1)  /* Error or invalid file */
+#define FILE_TYPE_REGULAR   0    /* Regular VFS-backed file */
+#define FILE_TYPE_VIRTUAL   1    /* Non-VFS / virtual / special file */
 
-static __inline int check_virtual_file(void *file, struct member_fields_offset *offset)
+static __inline int check_file_type(void *file, struct member_fields_offset *offset)
 {
 	if (!file || !offset)
-		return FILE_CHECK_ERROR;
+		return FILE_TYPE_ERROR;
 
 	/*
 	 * Determine whether a file belongs to a regular VFS filesystem
@@ -55,7 +55,7 @@ static __inline int check_virtual_file(void *file, struct member_fields_offset *
 	bpf_probe_read_kernel(&f_op, sizeof(f_op),
 			      file + offset->struct_file_f_op_offset);
 	if (f_op == NULL)
-		return FILE_CHECK_ERROR;
+		return FILE_TYPE_ERROR;
 
 	bpf_probe_read_kernel(&read_iter, sizeof(read_iter),
 			      f_op +
@@ -80,9 +80,13 @@ static __inline bool is_readable_file(int fd,
 		return false;
 
 	if (disable_vfile_collect &&
-	    check_virtual_file(file, offset) != FILE_TYPE_REGULAR)
+	    check_file_type(file, offset) != FILE_TYPE_REGULAR)
 			return false;
 
+	/*
+	 * Further ensure that it is a regular inode file, exclude
+	 * socket / pipe / anon_inode / directories / symbolic links.
+	 */
 	__u32 i_mode = file_to_i_mode(file, offset);
 	return S_ISREG(i_mode);
 }
