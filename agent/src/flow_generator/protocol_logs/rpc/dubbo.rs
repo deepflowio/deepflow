@@ -21,7 +21,7 @@ use std::{borrow::Cow, mem::replace};
 
 use serde::Serialize;
 
-use public::l7_protocol::{Field, FieldSetter, L7Log, LogMessageType};
+use public::l7_protocol::{Field, FieldSetter, L7Log, L7LogAttribute, LogMessageType};
 use public_derive::L7Log;
 
 use crate::{
@@ -169,6 +169,15 @@ pub struct DubboInfo {
     biz_code: String,
     #[serde(skip_serializing_if = "value_is_default")]
     biz_scenario: String,
+}
+
+impl L7LogAttribute for DubboInfo {
+    fn add_attribute(&mut self, name: Cow<'_, str>, value: Cow<'_, str>) {
+        self.attributes.push(KeyVal {
+            key: name.into_owned(),
+            val: value.into_owned(),
+        });
+    }
 }
 
 impl DubboInfo {
@@ -1136,12 +1145,6 @@ impl DubboLog {
                         }
                         _ => auto_merge_custom_field(op, info),
                     }
-                }
-                Op::AddAttribute(key, value) => {
-                    info.attributes.push(KeyVal {
-                        key: key.to_string(),
-                        val: value.to_string(),
-                    });
                 }
                 Op::AddMetric(key, value) => {
                     info.metrics.push(MetricKeyVal {

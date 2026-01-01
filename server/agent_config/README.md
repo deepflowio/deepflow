@@ -9115,6 +9115,7 @@ Example:
       rewrite_native_tag:
         # Fill one of the following fields to overwrite the corresponding value
         # Note: This requires support in the corresponding protocol, otherwise the configuration will not take effect
+        # When overwriting response_code, the original non-empty value will be saved into the attribute as `sys_response_code`
         # - version
         # - request_type
         # - request_domain
@@ -9134,6 +9135,9 @@ Example:
         # - biz_code
         # - biz_scenario
         name: version
+        # When remapping, the input will be mapped using the configured dictionary. If empty, it will not take effect
+        # Note: The whitelist/blacklist in condition match the remapped result
+        remap: dict_1
         condition:
           enum_whitelist: [] # Whitelist: when the extraction result is in the list, overwrite. If empty, does not take effect.
           enum_blacklist: [] # Blacklist: when result matches any in the list, do not update.
@@ -9151,7 +9155,7 @@ Example:
   const_fields:
   - value: "123"
     # Output configuration, refer to the "output" section of "fields"
-    # "metric", "rewrite_response_status", and the "condition" in "rewrite_native_tag" are not supported here
+    # "metric", "rewrite_response_status", and the "condition" and "remap" in "rewrite_native_tag" are not supported here
     output:
       attribute_name: "xyz"
       rewrite_native_tag:
@@ -9167,6 +9171,7 @@ Example:
       metric_name: "xyz"
       rewrite_native_tag:
         name: version
+        remap: dict_1
         condition:
           enum_whitelist: []
           enum_blacklist: []
