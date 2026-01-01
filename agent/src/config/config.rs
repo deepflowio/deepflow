@@ -1033,6 +1033,7 @@ pub struct EbpfFileIoEvent {
     pub collect_mode: usize,
     #[serde(with = "humantime_serde")]
     pub minimal_duration: Duration,
+    pub enable_virtual_file_collect: bool,
 }
 
 impl Default for EbpfFileIoEvent {
@@ -1040,6 +1041,7 @@ impl Default for EbpfFileIoEvent {
         Self {
             collect_mode: 1,
             minimal_duration: Duration::from_millis(1),
+            enable_virtual_file_collect: false,
         }
     }
 }
