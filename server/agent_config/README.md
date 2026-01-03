@@ -4476,6 +4476,38 @@ inputs:
 
 Only collect IO events with delay exceeding this threshold.
 
+##### Virtual File Collection Enabled {#inputs.ebpf.file.io_event.enable_virtual_file_collect}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.file.io_event.enable_virtual_file_collect`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    file:
+      io_event:
+        enable_virtual_file_collect: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When set to true, the agent will collect file I/O events generated on
+virtual file systems (such as /proc, /sys, /run, and other kernel
+pseudo file systems).
+When set to false, the agent will not collect file I/O events from
+virtual file systems.
+
 ### Profile {#inputs.ebpf.profile}
 
 #### Unwinding {#inputs.ebpf.profile.unwinding}
@@ -9083,6 +9115,7 @@ Example:
       rewrite_native_tag:
         # Fill one of the following fields to overwrite the corresponding value
         # Note: This requires support in the corresponding protocol, otherwise the configuration will not take effect
+        # When overwriting response_code, the original non-empty value will be saved into the attribute as `sys_response_code`
         # - version
         # - request_type
         # - request_domain
@@ -9102,6 +9135,9 @@ Example:
         # - biz_code
         # - biz_scenario
         name: version
+        # When remapping, the input will be mapped using the configured dictionary. If empty, it will not take effect
+        # Note: The whitelist/blacklist in condition match the remapped result
+        remap: dict_1
         condition:
           enum_whitelist: [] # Whitelist: when the extraction result is in the list, overwrite. If empty, does not take effect.
           enum_blacklist: [] # Blacklist: when result matches any in the list, do not update.
@@ -9119,7 +9155,7 @@ Example:
   const_fields:
   - value: "123"
     # Output configuration, refer to the "output" section of "fields"
-    # "metric", "rewrite_response_status", and the "condition" in "rewrite_native_tag" are not supported here
+    # "metric", "rewrite_response_status", and the "condition" and "remap" in "rewrite_native_tag" are not supported here
     output:
       attribute_name: "xyz"
       rewrite_native_tag:
@@ -9135,6 +9171,7 @@ Example:
       metric_name: "xyz"
       rewrite_native_tag:
         name: version
+        remap: dict_1
         condition:
           enum_whitelist: []
           enum_blacklist: []

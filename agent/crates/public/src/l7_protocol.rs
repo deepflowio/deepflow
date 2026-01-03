@@ -389,7 +389,11 @@ pub enum NativeTag {
     BizScenario,
 }
 
-pub trait L7Log {
+pub trait L7LogAttribute {
+    fn add_attribute(&mut self, _name: Cow<'_, str>, _value: Cow<'_, str>) {}
+}
+
+pub trait L7Log: L7LogAttribute {
     fn get_response_status(&self) -> L7ResponseStatus;
     fn set_response_status(&mut self, response_status: L7ResponseStatus);
 

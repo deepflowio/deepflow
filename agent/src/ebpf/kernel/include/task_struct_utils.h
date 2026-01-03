@@ -137,7 +137,7 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num, struct member_fie
 						      sizeof(private_data),
 						      file +
 						      offset->
-						      struct_files_private_data_offset);
+						      struct_file_private_data_offset);
 				if (private_data != NULL) {
 					socket = private_data;
 					bpf_probe_read_kernel(&__socket,
@@ -165,7 +165,7 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num, struct member_fie
 	}
 
 	bpf_probe_read_kernel(&private_data, sizeof(private_data),
-			      file + offset->struct_files_private_data_offset);
+			      file + offset->struct_file_private_data_offset);
 
 	if (private_data == NULL) {
 		return NULL;
@@ -225,7 +225,7 @@ static __inline void *get_socket_from_fd(int fd_num,
 			      file + data_off);
 #else
 	bpf_probe_read_kernel(&private_data, sizeof(private_data),
-			      file + offset->struct_files_private_data_offset);
+			      file + offset->struct_file_private_data_offset);
 #endif
 	if (private_data == NULL) {
 		return NULL;
