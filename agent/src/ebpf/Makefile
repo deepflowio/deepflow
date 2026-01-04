@@ -37,21 +37,22 @@ GNU_CC ?= gcc
 MUSL_CC ?= musl-gcc
 OBJDIR ?= .
 STATIC_OBJDIR := $(OBJDIR)/staticobjs
+KERNEL_OUTPUT_DIR ?= .output
 
 -include user/extended/feature.top.mk
 
 define compile_socket_trace_elf
 	@echo "  COMPILE ELF kernel version $(1)"
-	@cd kernel && make clean --no-print-directory && make socket_trace.bpf.elf $(2) --no-print-directory && cd ../
+	@$(MAKE) -C kernel --no-print-directory OUTPUT=$(KERNEL_OUTPUT_DIR)/$(strip $1) $(2) $(KERNEL_OUTPUT_DIR)/$(strip $1)/socket_trace.bpf.elf
 	@echo "  Generate file user/socket_trace_bpf_$(strip $1).c"
-	@./tools/bintobuffer kernel/socket_trace.bpf.elf user/socket_trace_bpf_$(strip $1).c socket_trace_$(strip $1)_ebpf_data
+	@./tools/bintobuffer kernel/$(KERNEL_OUTPUT_DIR)/$(strip $1)/socket_trace.bpf.elf user/socket_trace_bpf_$(strip $1).c socket_trace_$(strip $1)_ebpf_data
 endef
 
 define compile_perf_profiler_elf
 	@echo "  COMPILE ELF kernel version $(1)"
-	@cd kernel && make clean --no-print-directory && make perf_profiler.bpf.elf $(2) --no-print-directory && cd ../
+	@$(MAKE) -C kernel --no-print-directory OUTPUT=$(KERNEL_OUTPUT_DIR)/$(strip $1) $(2) $(KERNEL_OUTPUT_DIR)/$(strip $1)/perf_profiler.bpf.elf
 	@echo "  Generate file user/perf_profiler_bpf_$(strip $1).c"
-	@./tools/bintobuffer kernel/perf_profiler.bpf.elf user/perf_profiler_bpf_$(strip $1).c perf_profiler_$(strip $1)_ebpf_data
+	@./tools/bintobuffer kernel/$(KERNEL_OUTPUT_DIR)/$(strip $1)/perf_profiler.bpf.elf user/perf_profiler_bpf_$(strip $1).c perf_profiler_$(strip $1)_ebpf_data
 endef
 
 define check_gcc_version
@@ -326,6 +327,7 @@ clean:
 	$(Q)$(MAKE) -C test clean --no-print-directory
 	$(Q)$(MAKE) -C libs/jattach clean --no-print-directory
 	$(Q)rm -rf $(ELFFILES) data deepflow-ebpfctl $(STATIC_OBJDIR) $(LIBTRACE) *.a
+	$(Q)rm -rf kernel/$(KERNEL_OUTPUT_DIR)
 	$(Q)rm -rf .profiler .socket-tracer
 	$(Q)rm -rf samples/rust/socket-tracer/target
 	$(Q)rm -rf samples/rust/profiler/target

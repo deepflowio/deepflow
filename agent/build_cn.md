@@ -93,3 +93,8 @@ git clone --recursive https://github.com/deepflowio/deepflow.git
 cd deepflow/agent
 cargo build
 ```
+
+## 构建提速建议
+
+- 强制重新生成 eBPF/C 相关产物：`DF_EBPF_CLEAN=1 cargo build --release`
+- eBPF 的 `*.objdump` 默认生成，如需提速可关闭：`DF_EBPF_OBJDUMP=0 cargo build --release`

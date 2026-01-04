@@ -16,6 +16,7 @@
 
 use std::{
     env,
+    fs,
     path::{Path, PathBuf},
     process::Command,
     str,
@@ -90,7 +91,7 @@ fn set_build_info() -> Result<()> {
 //
 // rerun build script when one of the following file changes
 // - C source files, except for
-//   - generated bpf bytecode files (socket_trace_*.c / perf_profiler_*.c)
+//   - generated bpf bytecode files (`*_bpf_*.c`, e.g. socket_trace_bpf_*.c / perf_profiler_bpf_*.c)
 //   - java agent so files and jattach bin
 // - Header files
 // - `src/ebpf/mod.rs` (to exclude rust sources in `samples` folder)
@@ -101,6 +102,9 @@ fn set_libtrace_rerun_files() -> Result<()> {
             match ext {
                 "c" => {
                     if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
+                        if name.contains("_bpf_") {
+                            return false;
+                        }
                         if name.starts_with("socket_trace_") || name.starts_with("perf_profiler_") {
                             return false;
                         }
@@ -141,21 +145,89 @@ fn set_libtrace_rerun_files() -> Result<()> {
 
 fn set_build_libtrace() -> Result<()> {
     set_libtrace_rerun_files()?;
-    let output = match env::var("CARGO_CFG_TARGET_ENV")?.as_str() {
-        "gnu" => Command::new("sh").arg("-c")
-            .arg("cd src/ebpf && make clean && make --no-print-directory && make tools --no-print-directory")
-            .output()?,
-        "musl" => Command::new("sh").arg("-c")
-            .arg("cd src/ebpf && make clean && CC=musl-gcc CLANG=musl-clang make --no-print-directory && CC=musl-gcc CLANG=musl-clang make tools --no-print-directory")
-            .output()?,
-        _ => panic!("Unsupported target"),
-    };
-    if !output.status.success() {
-        eprintln!("{}", str::from_utf8(&output.stderr)?);
-        panic!("compile libtrace.a error!");
-    }
-    let library_name = "trace";
+    println!("cargo:rerun-if-env-changed=DF_EBPF_CLEAN");
+    println!("cargo:rerun-if-env-changed=DF_EBPF_OBJDUMP");
+    println!("cargo:rerun-if-env-changed=PROFILE");
+
+    let target_env = env::var("CARGO_CFG_TARGET_ENV")?;
+
+    let target_id = format!(
+        "{}-{}-{}",
+        env::var("CARGO_CFG_TARGET_OS").unwrap_or_default(),
+        env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default(),
+        target_env
+    );
+    let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_owned());
+
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
+    let state_file = root.join("src/ebpf/.last_ebpf_build_target");
+    let previous_target = fs::read_to_string(&state_file)
+        .ok()
+        .map(|s| s.trim().to_owned());
+
+    let force_clean = match env::var("DF_EBPF_CLEAN") {
+        Ok(s) => !s.is_empty() && s != "0" && s.to_lowercase() != "false",
+        Err(_) => false,
+    };
+    let need_clean = force_clean
+        || previous_target
+            .as_deref()
+            .map(|t| t != target_id)
+            .unwrap_or(false);
+
+    // NOTE:
+    // Keep default behavior consistent with historical builds: always generate `*.objdump`.
+    // Override with `DF_EBPF_OBJDUMP=0/false` to disable.
+    let objdump_enabled = match env::var("DF_EBPF_OBJDUMP") {
+        Ok(s) => {
+            let v = s.trim().to_lowercase();
+            !(v == "0" || v == "false" || v == "off" || v == "no")
+        }
+        Err(_) => true,
+    };
+    let objdump_value = if objdump_enabled { "1" } else { "0" };
+    let kernel_output_dir = format!(".output/{}/{}/objdump{}", target_id, profile, objdump_value);
+
+    let cargo_makeflags = env::var("CARGO_MAKEFLAGS").ok();
+    let num_jobs = env::var("NUM_JOBS").ok();
+
+    let mut run_make = |targets: &[&str]| -> Result<()> {
+        let mut cmd = Command::new("make");
+        cmd.current_dir(root.join("src/ebpf"));
+        if let Some(makeflags) = &cargo_makeflags {
+            cmd.env("MAKEFLAGS", makeflags);
+        } else if let Some(jobs) = &num_jobs {
+            cmd.arg(format!("-j{}", jobs));
+        }
+        cmd.arg("--no-print-directory");
+        cmd.arg(format!("VMLINUX_OBJDUMP={}", objdump_value));
+        cmd.arg(format!("KERNEL_OUTPUT_DIR={}", kernel_output_dir));
+        match target_env.as_str() {
+            "gnu" => {}
+            "musl" => {
+                cmd.env("CC", "musl-gcc");
+                cmd.env("CLANG", "musl-clang");
+            }
+            _ => panic!("Unsupported target"),
+        }
+        cmd.args(targets);
+
+        let output = cmd.output()?;
+        if !output.status.success() {
+            eprintln!("{}", str::from_utf8(&output.stderr)?);
+            eprintln!("{}", str::from_utf8(&output.stdout)?);
+            panic!("compile libtrace.a error!");
+        }
+        Ok(())
+    };
+
+    if need_clean {
+        run_make(&["clean"])?;
+    }
+    run_make(&["build", "tools"])?;
+    fs::write(&state_file, format!("{}\n", target_id))?;
+
+    let library_name = "trace";
     let library_dir = dunce::canonicalize(root.join("src/ebpf/"))?;
     println!("cargo:rustc-link-lib=static={}", library_name);
     println!(
