@@ -32,6 +32,7 @@ target/
 /agent/src/ebpf/kernel/*.ll
 /agent/src/ebpf/kernel/*.objdump
 /agent/src/ebpf/kernel/*.elf
+/agent/src/ebpf/kernel/*.elf.debug
 /agent/src/ebpf/user/socket_trace_bpf_5_2.c
 /agent/src/ebpf/user/socket_trace_bpf_core.c
 /agent/src/ebpf/user/socket_trace_bpf_common.c
@@ -55,5 +56,4 @@ target/
 /agent/src/ebpf/kernel/*.tmp
 /agent/src/ebpf/kernel/.output/
 /agent/src/ebpf/.last_ebpf_build_target
-
 

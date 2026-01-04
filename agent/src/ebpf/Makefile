@@ -35,25 +35,27 @@ CLANG ?= /usr/bin/clang
 CC ?= gcc
 GNU_CC ?= gcc
 MUSL_CC ?= musl-gcc
+LLVM_STRIP ?= /usr/bin/llvm-strip
+LLVM_OBJDUMP ?= /usr/bin/llvm-objdump
+VMLINUX_OBJDUMP ?= 1
 OBJDIR ?= .
 STATIC_OBJDIR := $(OBJDIR)/staticobjs
 KERNEL_OUTPUT_DIR ?= .output
 
 -include user/extended/feature.top.mk
 
-define compile_socket_trace_elf
-	@echo "  COMPILE ELF kernel version $(1)"
-	@$(MAKE) -C kernel --no-print-directory OUTPUT=$(KERNEL_OUTPUT_DIR)/$(strip $1) $(2) $(KERNEL_OUTPUT_DIR)/$(strip $1)/socket_trace.bpf.elf
-	@echo "  Generate file user/socket_trace_bpf_$(strip $1).c"
-	@./tools/bintobuffer kernel/$(KERNEL_OUTPUT_DIR)/$(strip $1)/socket_trace.bpf.elf user/socket_trace_bpf_$(strip $1).c socket_trace_$(strip $1)_ebpf_data
-endef
+VMLINUX_VARIANT_ARGS_common :=
+VMLINUX_VARIANT_ARGS_3_10_0 := LINUX_VER_3_10_0=1
+VMLINUX_VARIANT_ARGS_5_2_plus := LINUX_VER_5_2_PLUS=1
+VMLINUX_VARIANT_ARGS_kfunc := LINUX_VER_KFUNC=1
+VMLINUX_VARIANT_ARGS_kylin := LINUX_VER_KYLIN=1
+VMLINUX_VARIANT_ARGS_rt := LINUX_VER_RT=1
+VMLINUX_VARIANT_ARGS_kprobe := LINUX_VER_KPROBE=1
 
-define compile_perf_profiler_elf
-	@echo "  COMPILE ELF kernel version $(1)"
-	@$(MAKE) -C kernel --no-print-directory OUTPUT=$(KERNEL_OUTPUT_DIR)/$(strip $1) $(2) $(KERNEL_OUTPUT_DIR)/$(strip $1)/perf_profiler.bpf.elf
-	@echo "  Generate file user/perf_profiler_bpf_$(strip $1).c"
-	@./tools/bintobuffer kernel/$(KERNEL_OUTPUT_DIR)/$(strip $1)/perf_profiler.bpf.elf user/perf_profiler_bpf_$(strip $1).c perf_profiler_$(strip $1)_ebpf_data
-endef
+VMLINUX_KERNEL_BPF_SRCS := $(wildcard kernel/*.bpf.c)
+VMLINUX_KERNEL_HDRS := kernel/config.h $(wildcard kernel/include/*.h)
+TRACE_UTILS_HDRS := $(wildcard ../../crates/trace-utils/src/*.h)
+VMLINUX_KERNEL_BUILD_DEPS := kernel/Makefile $(VMLINUX_KERNEL_BPF_SRCS) $(VMLINUX_KERNEL_HDRS) $(TRACE_UTILS_HDRS)
 
 define check_gcc_version
         @GCC_VER=`gcc --version | grep ^gcc | cut -f3 -d' '|cut -f1-2 -d.`; \
@@ -112,6 +114,7 @@ JAVA_AGENT_MACROS := -DAGENT_LIB_NAME="\"$(JAVA_AGENT_GNU_SO)\"" -DAGENT_MUSL_LI
 
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
 CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -Wall -Wno-strict-aliasing -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers -I/usr/include/bcc -I../../../crates/trace-utils/src/
+DEPFLAGS ?= -MMD -MP
 # '-Wformat-truncation' : The warning was added in gcc7.1
 GCC_VER_GTE71 := $(shell echo `gcc --version | grep ^gcc | cut -f3 -d' '|cut -f1-2 -d.` \>= 7.1 | sed -e 's/\./*100+/g' | bc )
 ifeq ($(GCC_VER_GTE71),1)
@@ -168,41 +171,91 @@ define check_clang
 	@rm -rf data
 endef
 
-user/socket_trace_bpf_common.c: tools/bintobuffer kernel/socket_trace.bpf.c
+kernel/$(KERNEL_OUTPUT_DIR)/%/socket_trace.bpf.elf.debug: $(VMLINUX_KERNEL_BUILD_DEPS)
 	$(call check_clang)
-	$(call compile_socket_trace_elf, common)
+	$(call msg,BPF,$@)
+	$(Q)$(MAKE) -C kernel --no-print-directory \
+		OUTPUT=$(KERNEL_OUTPUT_DIR)/$* \
+		$(VMLINUX_VARIANT_ARGS_$*) \
+		$(KERNEL_OUTPUT_DIR)/$*/socket_trace.bpf.elf.debug
 
-user/socket_trace_bpf_3_10_0.c: tools/bintobuffer kernel/socket_trace.bpf.c
+kernel/$(KERNEL_OUTPUT_DIR)/%/perf_profiler.bpf.elf.debug: $(VMLINUX_KERNEL_BUILD_DEPS)
 	$(call check_clang)
-	$(call compile_socket_trace_elf, 3_10_0, LINUX_VER_3_10_0=1)
+	$(call msg,BPF,$@)
+	$(Q)$(MAKE) -C kernel --no-print-directory \
+		OUTPUT=$(KERNEL_OUTPUT_DIR)/$* \
+		$(VMLINUX_VARIANT_ARGS_$*) \
+		$(KERNEL_OUTPUT_DIR)/$*/perf_profiler.bpf.elf.debug
 
-user/socket_trace_bpf_5_2_plus.c: tools/bintobuffer kernel/socket_trace.bpf.c
-	$(call check_clang)
-	$(call compile_socket_trace_elf, 5_2_plus, LINUX_VER_5_2_PLUS=1)
+kernel/$(KERNEL_OUTPUT_DIR)/%/socket_trace.bpf.elf: kernel/$(KERNEL_OUTPUT_DIR)/%/socket_trace.bpf.elf.debug
+	$(call msg,STRIP,$@)
+	$(Q)cp $< $@
+	$(Q)$(LLVM_STRIP) -g $@
 
-user/socket_trace_bpf_kfunc.c: tools/bintobuffer kernel/socket_trace.bpf.c
-	$(call check_clang)
-	$(call compile_socket_trace_elf, kfunc, LINUX_VER_KFUNC=1)
+kernel/$(KERNEL_OUTPUT_DIR)/%/perf_profiler.bpf.elf: kernel/$(KERNEL_OUTPUT_DIR)/%/perf_profiler.bpf.elf.debug
+	$(call msg,STRIP,$@)
+	$(Q)cp $< $@
+	$(Q)$(LLVM_STRIP) -g $@
 
-user/socket_trace_bpf_kylin.c: tools/bintobuffer kernel/socket_trace.bpf.c
-	$(call check_clang)
-	$(call compile_socket_trace_elf, kylin, LINUX_VER_KYLIN=1)
+kernel/$(KERNEL_OUTPUT_DIR)/%/socket_trace.bpf.objdump: kernel/$(KERNEL_OUTPUT_DIR)/%/socket_trace.bpf.elf.debug
+	$(call msg,OBJDUMP,$@)
+	$(Q)$(LLVM_OBJDUMP) --source --debug-vars --line-numbers --symbol-description $< > $@
 
-user/socket_trace_bpf_rt.c: tools/bintobuffer kernel/socket_trace.bpf.c
-	$(call check_clang)
-	$(call compile_socket_trace_elf, rt, LINUX_VER_RT=1)
+kernel/$(KERNEL_OUTPUT_DIR)/%/perf_profiler.bpf.objdump: kernel/$(KERNEL_OUTPUT_DIR)/%/perf_profiler.bpf.elf.debug
+	$(call msg,OBJDUMP,$@)
+	$(Q)$(LLVM_OBJDUMP) --source --debug-vars --line-numbers --symbol-description $< > $@
 
-user/socket_trace_bpf_kprobe.c: tools/bintobuffer kernel/socket_trace.bpf.c
-	$(call check_clang)
-	$(call compile_socket_trace_elf, kprobe, LINUX_VER_KPROBE=1)
+VMLINUX_SOCKET_TRACE_VARIANTS := common 3_10_0 5_2_plus kfunc kylin rt kprobe
+VMLINUX_PERF_PROFILER_VARIANTS := common 5_2_plus
 
-user/perf_profiler_bpf_common.c: tools/bintobuffer kernel/perf_profiler.bpf.c
-	$(call check_clang)
-	$(call compile_perf_profiler_elf, common)
+VMLINUX_SOCKET_TRACE_ELF_DEBUGS := $(addprefix kernel/$(KERNEL_OUTPUT_DIR)/,$(addsuffix /socket_trace.bpf.elf.debug,$(VMLINUX_SOCKET_TRACE_VARIANTS)))
+VMLINUX_PERF_PROFILER_ELF_DEBUGS := $(addprefix kernel/$(KERNEL_OUTPUT_DIR)/,$(addsuffix /perf_profiler.bpf.elf.debug,$(VMLINUX_PERF_PROFILER_VARIANTS)))
 
-user/perf_profiler_bpf_5_2_plus.c: tools/bintobuffer kernel/perf_profiler.bpf.c
-	$(call check_clang)
-	$(call compile_perf_profiler_elf, 5_2_plus, LINUX_VER_5_2_PLUS=1)
+VMLINUX_SOCKET_TRACE_OBJDUMPS := $(VMLINUX_SOCKET_TRACE_ELF_DEBUGS:.elf.debug=.objdump)
+VMLINUX_PERF_PROFILER_OBJDUMPS := $(VMLINUX_PERF_PROFILER_ELF_DEBUGS:.elf.debug=.objdump)
+
+.SECONDARY: $(VMLINUX_SOCKET_TRACE_ELF_DEBUGS) $(VMLINUX_PERF_PROFILER_ELF_DEBUGS)
+
+VMLINUX_KERNEL_OBJDUMP_FILES =
+ifneq ($(VMLINUX_OBJDUMP),0)
+VMLINUX_KERNEL_OBJDUMP_FILES += $(VMLINUX_SOCKET_TRACE_OBJDUMPS) $(VMLINUX_PERF_PROFILER_OBJDUMPS)
+endif
+
+user/socket_trace_bpf_common.c: kernel/$(KERNEL_OUTPUT_DIR)/common/socket_trace.bpf.elf tools/bintobuffer
+	@echo "  Generate file $@"
+	@./tools/bintobuffer $< $@ socket_trace_common_ebpf_data
+
+user/socket_trace_bpf_3_10_0.c: kernel/$(KERNEL_OUTPUT_DIR)/3_10_0/socket_trace.bpf.elf tools/bintobuffer
+	@echo "  Generate file $@"
+	@./tools/bintobuffer $< $@ socket_trace_3_10_0_ebpf_data
+
+user/socket_trace_bpf_5_2_plus.c: kernel/$(KERNEL_OUTPUT_DIR)/5_2_plus/socket_trace.bpf.elf tools/bintobuffer
+	@echo "  Generate file $@"
+	@./tools/bintobuffer $< $@ socket_trace_5_2_plus_ebpf_data
+
+user/socket_trace_bpf_kfunc.c: kernel/$(KERNEL_OUTPUT_DIR)/kfunc/socket_trace.bpf.elf tools/bintobuffer
+	@echo "  Generate file $@"
+	@./tools/bintobuffer $< $@ socket_trace_kfunc_ebpf_data
+
+user/socket_trace_bpf_kylin.c: kernel/$(KERNEL_OUTPUT_DIR)/kylin/socket_trace.bpf.elf tools/bintobuffer
+	@echo "  Generate file $@"
+	@./tools/bintobuffer $< $@ socket_trace_kylin_ebpf_data
+
+user/socket_trace_bpf_rt.c: kernel/$(KERNEL_OUTPUT_DIR)/rt/socket_trace.bpf.elf tools/bintobuffer
+	@echo "  Generate file $@"
+	@./tools/bintobuffer $< $@ socket_trace_rt_ebpf_data
+
+user/socket_trace_bpf_kprobe.c: kernel/$(KERNEL_OUTPUT_DIR)/kprobe/socket_trace.bpf.elf tools/bintobuffer
+	@echo "  Generate file $@"
+	@./tools/bintobuffer $< $@ socket_trace_kprobe_ebpf_data
+
+user/perf_profiler_bpf_common.c: kernel/$(KERNEL_OUTPUT_DIR)/common/perf_profiler.bpf.elf tools/bintobuffer
+	@echo "  Generate file $@"
+	@./tools/bintobuffer $< $@ perf_profiler_common_ebpf_data
+
+user/perf_profiler_bpf_5_2_plus.c: kernel/$(KERNEL_OUTPUT_DIR)/5_2_plus/perf_profiler.bpf.elf tools/bintobuffer
+	@echo "  Generate file $@"
+	@./tools/bintobuffer $< $@ perf_profiler_5_2_plus_ebpf_data
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 	$(call msg,MKDIR,$@)
@@ -211,15 +264,15 @@ $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 
 $(STATIC_OBJDIR)/user/socket.o: user/socket.c $(SOCKET_TRACE_ELFS) | $(STATIC_OBJDIR)
 	$(call msg,CC,$@)
-	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) $(DEPFLAGS) -MF $(@:.o=.d) -MT $@ -c $< -o $@
 
 $(STATIC_OBJDIR)/user/profile/perf_profiler.o: user/profile/perf_profiler.c $(PERF_PROFILER_ELFS) | $(STATIC_OBJDIR)
 	$(call msg,CC,$@)
-	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) $(DEPFLAGS) -MF $(@:.o=.d) -MT $@ -c $< -o $@
 
 $(STATIC_OBJDIR)/%.o: %.c | $(STATIC_OBJDIR)
 	$(call msg,CC,$@)
-	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+	$(Q)$(CC) $(CFLAGS) $(DEPFLAGS) -MF $(@:.o=.d) -MT $@ -c $< -o $@
 
 $(LIBTRACE): $(STATIC_OBJS)
 	$(call msg,AR,$@)
@@ -237,7 +290,7 @@ $(JAVA_AGENT_MUSL_SO): tools/bintobuffer $(JAVA_AGENT_SRC)
 	@rm -rf user/profile/java_agent_so_musl.c
 	@./tools/bintobuffer ./$@ user/profile/java_agent_so_musl.c java_agent_so_musl
 
-build: $(ELFFILES) $(JAVA_TOOL) $(LIBTRACE)
+build: $(ELFFILES) $(JAVA_TOOL) $(LIBTRACE) $(VMLINUX_KERNEL_OBJDUMP_FILES)
 
 tools: $(LIBTRACE)
 	$(call msg,TOOLS,deepflow-ebpfctl)
@@ -255,6 +308,7 @@ libs/jattach/build/libjattach.a:
 	$(Q)$(MAKE) -sC libs/jattach dll --no-print-directory
 
 -include user/extended/feature.bottom.mk
+-include $(STATIC_OBJS:.o=.d)
 
 rust-sample: .socket-tracer .profiler
 socket-tracer: .socket-tracer

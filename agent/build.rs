@@ -140,6 +140,20 @@ fn set_libtrace_rerun_files() -> Result<()> {
         }
         println!("cargo:rerun-if-changed={}", relative_path.display());
     }
+
+    // eBPF/C code also includes headers from trace-utils.
+    for entry in WalkDir::new(base_dir.join("crates/trace-utils/src")) {
+        let entry = entry?;
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("h") {
+            continue;
+        }
+        let relative_path = path.strip_prefix(&base_dir)?;
+        println!("cargo:rerun-if-changed={}", relative_path.display());
+    }
     Ok(())
 }
 
@@ -147,7 +161,6 @@ fn set_build_libtrace() -> Result<()> {
     set_libtrace_rerun_files()?;
     println!("cargo:rerun-if-env-changed=DF_EBPF_CLEAN");
     println!("cargo:rerun-if-env-changed=DF_EBPF_OBJDUMP");
-    println!("cargo:rerun-if-env-changed=PROFILE");
 
     let target_env = env::var("CARGO_CFG_TARGET_ENV")?;
 
@@ -157,8 +170,6 @@ fn set_build_libtrace() -> Result<()> {
         env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default(),
         target_env
     );
-    let profile = env::var("PROFILE").unwrap_or_else(|_| "debug".to_owned());
-
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
     let state_file = root.join("src/ebpf/.last_ebpf_build_target");
     let previous_target = fs::read_to_string(&state_file)
@@ -186,12 +197,12 @@ fn set_build_libtrace() -> Result<()> {
         Err(_) => true,
     };
     let objdump_value = if objdump_enabled { "1" } else { "0" };
-    let kernel_output_dir = format!(".output/{}/{}/objdump{}", target_id, profile, objdump_value);
+    let kernel_output_dir = format!(".output/{}", target_id);
 
     let cargo_makeflags = env::var("CARGO_MAKEFLAGS").ok();
     let num_jobs = env::var("NUM_JOBS").ok();
 
-    let mut run_make = |targets: &[&str]| -> Result<()> {
+    let run_make = |targets: &[&str]| -> Result<()> {
         let mut cmd = Command::new("make");
         cmd.current_dir(root.join("src/ebpf"));
         if let Some(makeflags) = &cargo_makeflags {
