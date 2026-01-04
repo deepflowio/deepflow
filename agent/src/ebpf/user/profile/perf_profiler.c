@@ -327,7 +327,11 @@ static int create_profiler(struct bpf_tracer *tracer)
 	if ((ret = maps_config(tracer, MAP_STACK_B_NAME, cap)))
 		return ret;
 
-	if (get_dwarf_enabled() && (major > 5 || (major == 5 && minor >= 2))) {
+	bool kernel_supports_custom_stack_maps =
+	    (major > 5 || (major == 5 && minor >= 2));
+	bool need_custom_stack_maps =
+	    get_dwarf_enabled() || lua_profiler_enabled();
+	if (kernel_supports_custom_stack_maps && need_custom_stack_maps) {
 		if ((ret = maps_config(tracer, MAP_CUSTOM_STACK_A_NAME, cap))) {
 			return ret;
 		}
@@ -335,7 +339,9 @@ static int create_profiler(struct bpf_tracer *tracer)
 		if ((ret = maps_config(tracer, MAP_CUSTOM_STACK_B_NAME, cap))) {
 			return ret;
 		}
+	}
 
+	if (get_dwarf_enabled() && kernel_supports_custom_stack_maps) {
 		if ((ret =
 		     maps_config(tracer, MAP_PROCESS_SHARD_LIST_NAME,
 				 get_dwarf_process_map_size()))) {
