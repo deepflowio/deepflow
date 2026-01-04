@@ -1264,7 +1264,7 @@ CREATE TABLE IF NOT EXISTS custom_service (
     epc_ids             TEXT COMMENT 'separated by ,',
     pod_cluster_ids     TEXT COMMENT 'separated by ,',
     pod_namespace_ids   TEXT COMMENT 'separated by ,',
-    resource            TEXT COMMENT 'separated by ,',
+    resources           TEXT COMMENT 'separated by ,',
     domain_id           INTEGER DEFAULT 0,
     domain              CHAR(64) DEFAULT '' COMMENT 'reserved for backend',
     team_id             INTEGER DEFAULT 1,
