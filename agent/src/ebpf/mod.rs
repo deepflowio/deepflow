@@ -224,14 +224,17 @@ cfg_if::cfg_if! {
         pub const PROFILER_TYPE_OFFCPU: u8 = 2;
         #[allow(dead_code)]
         pub const PROFILER_TYPE_MEMORY: u8 = 3;
-        #[allow(dead_code)]
-        pub const PROFILER_TYPE_GPU_MEMORY: u8 = 4;
     }
 }
 
 #[cfg(feature = "extended_observability")]
 pub const PROFILER_CTX_MEMORY_IDX: usize = 2;
 pub const PROFILER_CTX_NUM: usize = 3;
+
+// Stack trace flags
+#[cfg(feature = "extended_observability")]
+#[allow(dead_code)]
+pub const STACK_TRACE_FLAGS_CUDA_MEMORY: u8 = 0x4;
 
 // set this flag to notify caller not to free the data
 pub const TRACER_CALLBACK_FLAG_KEEP_DATA: u8 = 0x1;
@@ -466,8 +469,9 @@ pub struct SK_TRACE_STATS {
 #[derive(Debug, Copy, Clone)]
 pub struct stack_profile_data {
     pub profiler_type: u8, // Profiler type, such as 1(PROFILER_TYPE_ONCPU).
-    pub timestamp: u64,    // Timestamp of the stack trace data(unit: nanoseconds).
-    pub pid: u32,          // User-space process-ID.
+    pub flags: u8,
+    pub timestamp: u64, // Timestamp of the stack trace data(unit: nanoseconds).
+    pub pid: u32,       // User-space process-ID.
     /*
      * Identified within the eBPF program in kernel space.
      * If the current is a process and not a thread this field(tid) is filled

@@ -273,7 +273,7 @@ pub struct MemoryContext {
 impl MemoryContext {
     pub unsafe fn update(&self, data: *mut ebpf::stack_profile_data) {
         let type_ = (*data).profiler_type;
-        assert!(type_ == ebpf::PROFILER_TYPE_MEMORY || type_ == ebpf::PROFILER_TYPE_GPU_MEMORY);
+        assert!(type_ == ebpf::PROFILER_TYPE_MEMORY);
 
         let data = Data {
             ptr: NonNull::new_unchecked(data),
@@ -380,8 +380,10 @@ impl Interior {
             + self.time_diff.load(Ordering::Relaxed)) as u64;
 
         for (_, data) in processor.allocs.drain() {
-            let type_ = data.borrow().as_ref().profiler_type;
-            let event_type = if type_ == ebpf::PROFILER_TYPE_GPU_MEMORY {
+            let data_ref = data.borrow();
+            let data_ref = data_ref.as_ref();
+            let flags = data_ref.flags;
+            let event_type = if (flags & ebpf::STACK_TRACE_FLAGS_CUDA_MEMORY) != 0 {
                 metric::ProfileEventType::EbpfHbmAlloc
             } else {
                 metric::ProfileEventType::EbpfMemAlloc
@@ -435,8 +437,8 @@ impl Interior {
                 }
             }
 
-            let type_ = data.profiler_type;
-            let event_type = if type_ == ebpf::PROFILER_TYPE_GPU_MEMORY {
+            let flags = data.flags;
+            let event_type = if (flags & ebpf::STACK_TRACE_FLAGS_CUDA_MEMORY) != 0 {
                 metric::ProfileEventType::EbpfHbmInUse
             } else {
                 metric::ProfileEventType::EbpfMemInUse
