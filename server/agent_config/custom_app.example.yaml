@@ -1,0 +1,139 @@
+custom_protocol_policies:
+- protocol_name: "your_protocol_name"
+  pre_filter:
+    port_list: 1-65535
+  request_characters:
+    - character:
+      - match_keyword: abc
+        match_type: "string"
+        match_ignore_case: false
+        match_from_beginning: false
+  response_characters:
+    - character:
+      - match_keyword: 0123af
+        match_type: "hex"
+        match_from_beginning: false
+custom_field:
+  dictionaries: []
+  - name: dict_1
+    entries:
+    - key: key1
+      value: value1
+    - key: key2
+      value: value2
+    default: value3
+  policies:
+  - policy_name: "my_policy"
+    protocol_name: HTTP
+    custom_protocol_name: "my_protocol"
+    filters:
+      traffic_direction: both
+      port_list: 1-65535
+      feature_string: ""
+    raw:
+      save_request:
+        enabled: false
+        output:
+          attribute_name: request
+      save_response:
+        enabled: false
+        output:
+          attribute_name: response
+    fields:
+    - name: "my_field"
+      type: "http_url_field"
+      match:
+        type: "string"
+        keyword: "abc"
+        ignore_case: false
+        all_leaves: false
+      post:
+      - type: remap
+        settings:
+        - key: dictionary_name
+          value: dict_1
+      - type: obfuscate
+        settings:
+        - key: mask
+          value: *
+        - key: preset
+          value: id-card-name
+        - key: range
+          value: "1, -1"
+        - key: range
+          value: "6, -5"
+      - type: url_decode
+      - type: base64_decode
+      - type: parse_json_value
+        settings:
+        - key: keyword
+          value: xyz
+        - key: type
+          value: string
+        - key: ignore_case
+          value: false
+        - key: skip
+          value: 0
+      - type: parse_xml_value
+        settings:
+        - key: keyword
+          value: xyz
+        - key: type
+          value: string
+        - key: ignore_case
+          value: false
+        - key: skip
+          value: 0
+      - type: parse_key_value
+        settings:
+        - key: key_value_pair_separator
+          value: ","
+        - key: key_value_separator
+          value: "="
+        - key: keyword
+          value: xyz
+        - key: ignore_case
+          value: true
+      verify:
+        check_charset: false
+        primary_charset: ["digits", "alphabets", "hanzi"]
+        special_characters: ".-_"
+      output:
+        attribute_name: "xyz"
+        metric_name: "xyz"
+        rewrite_native_tag:
+          name: version
+          remap: dict_1
+          condition:
+            enum_whitelist: []
+            enum_blacklist: []
+        rewrite_response_status:
+          ok_values: []
+          client_error_values: []
+          server_error_values: []
+          default_status: ""
+        priority: 0
+    const_fields:
+    - value: "123"
+      output:
+        attribute_name: "xyz"
+        rewrite_native_tag:
+          name: version
+        priority: 0
+    compound_fields:
+    - format: "{field1_name}-{field2_name}"
+      output:
+        attribute_name: "xyz"
+        metric_name: "xyz"
+        rewrite_native_tag:
+          name: version
+          remap: dict_1
+          condition:
+            enum_whitelist: []
+            enum_blacklist: []
+        rewrite_response_status:
+          ok_values: []
+          client_error_values: []
+          server_error_values: []
+          default_status: ""
+        priority: 0
