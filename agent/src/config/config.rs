@@ -1223,21 +1223,24 @@ impl Default for EbpfSocketPreprocess {
 }
 
 impl EbpfSocketPreprocess {
-    fn adjust_http2_and_grpc(protocols: &mut Vec<String>) {
+    fn adjust_http2(protocols: &mut Vec<String>) {
         let bitmap = L7ProtocolBitmap::from(protocols.as_slice());
 
-        if bitmap.is_enabled(L7Protocol::Grpc) && bitmap.is_disabled(L7Protocol::Http2) {
+        if bitmap.is_enabled(L7Protocol::Http2)
+            || bitmap.is_enabled(L7Protocol::Grpc)
+            || bitmap.is_enabled(L7Protocol::Triple)
+        {
             protocols.push("HTTP2".to_string());
-        }
-
-        if bitmap.is_enabled(L7Protocol::Http2) && bitmap.is_disabled(L7Protocol::Grpc) {
+            protocols.push("Triple".to_string());
             protocols.push("gRPC".to_string());
         }
+        protocols.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+        protocols.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
     }
 
     fn adjust(&mut self) {
-        Self::adjust_http2_and_grpc(&mut self.out_of_order_reassembly_protocols);
-        Self::adjust_http2_and_grpc(&mut self.segmentation_reassembly_protocols);
+        Self::adjust_http2(&mut self.out_of_order_reassembly_protocols);
+        Self::adjust_http2(&mut self.segmentation_reassembly_protocols);
     }
 }
 
@@ -1835,6 +1838,7 @@ impl Default for Filters {
                 ("Tars".to_string(), "1-65535".to_string()),
                 ("SomeIP".to_string(), "1-65535".to_string()),
                 ("ISO8583".to_string(), "1-65535".to_string()),
+                ("Triple".to_string(), "1-65535".to_string()),
                 ("MySQL".to_string(), "1-65535".to_string()),
                 ("PostgreSQL".to_string(), "1-65535".to_string()),
                 ("Oracle".to_string(), "1521".to_string()),
@@ -1866,6 +1870,7 @@ impl Default for Filters {
                 ("Tars".to_string(), vec![]),
                 ("SomeIP".to_string(), vec![]),
                 ("ISO8583".to_string(), vec![]),
+                ("Triple".to_string(), vec![]),
                 ("MySQL".to_string(), vec![]),
                 ("PostgreSQL".to_string(), vec![]),
                 ("Oracle".to_string(), vec![]),
