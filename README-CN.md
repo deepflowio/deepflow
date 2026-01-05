@@ -1,4 +1,4 @@
-<img width="458" height="461" alt="Snipaste_2026-01-05_10-35-44" src="https://github.com/user-attachments/assets/0082b942-6783-4ac5-9135-8f0ce46b71a9" /><p align="center">
+<p align="center">
   <img src="./docs/deepflow-logo.png" alt="DeepFlow" width="300" />
 
   <p align="center">Instant Observability for Cloud & AI Applications</p>
