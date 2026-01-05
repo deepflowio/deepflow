@@ -123,7 +123,6 @@ enum {
 	PROFILER_TYPE_ONCPU,
 	PROFILER_TYPE_OFFCPU,
 	PROFILER_TYPE_MEMORY,
-	PROFILER_TYPE_GPU_MEMORY,
 	PROFILER_TYPE_NUM,
 };
 
@@ -173,6 +172,7 @@ enum {
  */
 typedef struct {
 	u8 profiler_type;
+	u8 flags;
 	u64 time_stamp;
 	u32 pid;
 	u32 tid;
