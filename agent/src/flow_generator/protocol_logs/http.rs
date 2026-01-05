@@ -342,6 +342,9 @@ pub struct HttpInfo {
     is_async: bool,
     #[serde(skip_serializing_if = "value_is_default")]
     is_reversed: bool,
+
+    #[serde(skip)]
+    dubbo_service_version: String,
 }
 
 impl L7LogAttribute for HttpInfo {
@@ -618,12 +621,17 @@ impl HttpInfo {
         if other_is_grpc {
             self.proto = L7Protocol::Grpc;
         }
+        if other.proto == L7Protocol::Triple {
+            self.proto = L7Protocol::Triple;
+        }
         if other.is_reversed {
             self.is_reversed = other.is_reversed;
         }
         if other.biz_type > 0 {
             self.biz_type = other.biz_type;
         }
+
+        super::swap_if!(self, dubbo_service_version, is_empty, other);
         super::swap_if!(self, biz_code, is_empty, other);
         super::swap_if!(self, biz_scenario, is_empty, other);
 
@@ -706,12 +714,21 @@ impl HttpInfo {
     }
 
     fn get_version(&self) -> Field {
+        if self.proto == L7Protocol::Triple {
+            return Field::Str(Cow::Borrowed(&self.dubbo_service_version.as_str()));
+        }
         Field::Str(Cow::Borrowed(&self.version.as_str()))
     }
 
     fn set_version(&mut self, version: FieldSetter) {
         match version.into_inner() {
-            Field::Str(s) => self.version = Version::try_from(s.borrow()).unwrap_or_default(),
+            Field::Str(s) => {
+                if self.proto == L7Protocol::Triple {
+                    self.dubbo_service_version = s.as_ref().to_string();
+                } else {
+                    self.version = Version::try_from(s.borrow()).unwrap_or_default();
+                }
+            }
             _ => self.version = Version::Unknown,
         }
     }
@@ -845,7 +862,11 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             resp_len: f.resp_content_length,
             captured_request_byte: f.captured_request_byte,
             captured_response_byte: f.captured_response_byte,
-            version: Some(f.version.as_str().to_owned()),
+            version: if f.proto == L7Protocol::Triple {
+                Some(f.dubbo_service_version)
+            } else {
+                Some(f.version.as_str().to_owned())
+            },
             req: L7Request {
                 req_type,
                 resource,
@@ -962,7 +983,7 @@ impl L7ProtocolParserInterface for HttpLog {
         // http2 有两个版本, 现在可以直接通过proto区分解析哪个版本的协议.
         match self.proto {
             L7Protocol::Http1 => self.http1_check_protocol(payload),
-            L7Protocol::Http2 | L7Protocol::Grpc => {
+            L7Protocol::Http2 | L7Protocol::Grpc | L7Protocol::Triple => {
                 let Some(config) = param.parse_config else {
                     return None;
                 };
@@ -1063,7 +1084,7 @@ impl L7ProtocolParserInterface for HttpLog {
                     Ok(L7ParseResult::None)
                 }
             }
-            L7Protocol::Http2 | L7Protocol::Grpc => {
+            L7Protocol::Http2 | L7Protocol::Grpc | L7Protocol::Triple => {
                 let mut infos = vec![];
                 let mut offset = 0;
                 let mut last_error = Err(Error::HttpHeaderParseFailed);
@@ -1118,7 +1139,10 @@ impl L7ProtocolParserInterface for HttpLog {
                         custom_policies,
                     );
 
-                    if !info.is_invalid() || info.proto == L7Protocol::Grpc {
+                    if !info.is_invalid()
+                        || info.proto == L7Protocol::Grpc
+                        || info.proto == L7Protocol::Triple
+                    {
                         if let Some(h) = info.headers_offset.as_mut() {
                             *h += offset as u32;
                         }
@@ -1161,6 +1185,10 @@ impl L7ProtocolParserInterface for HttpLog {
                 proto: L7Protocol::Grpc,
                 ..Default::default()
             },
+            L7Protocol::Triple => Self {
+                proto: L7Protocol::Triple,
+                ..Default::default()
+            },
             _ => unreachable!(),
         };
         new_log.perf_stats = self.perf_stats.take();
@@ -1190,6 +1218,13 @@ impl HttpLog {
         };
         Self {
             proto: l7_protcol,
+            ..Default::default()
+        }
+    }
+
+    pub fn new_triple() -> Self {
+        Self {
+            proto: L7Protocol::Triple,
             ..Default::default()
         }
     }
@@ -1630,7 +1665,7 @@ impl HttpLog {
         }
 
         match info.proto {
-            L7Protocol::Grpc => match (direction, info.method) {
+            L7Protocol::Grpc | L7Protocol::Triple => match (direction, info.method) {
                 (PacketDirection::ClientToServer, Method::_RequestData) => {
                     if !grpc_streaming_data_enabled {
                         return Err(Error::HttpHeaderParseFailed);
@@ -1830,7 +1865,9 @@ impl HttpLog {
                     is_httpv2 = true;
                     break;
                 }
-            } else if (header_frame_parsed || self.proto == L7Protocol::Grpc)
+            } else if (header_frame_parsed
+                || self.proto == L7Protocol::Grpc
+                || self.proto == L7Protocol::Triple)
                 && httpv2_header.frame_type == HTTPV2_FRAME_DATA_TYPE
             {
                 // HTTPv2协议中存在可以通过Headers帧中携带“Content-Length”字段，即可直接进行解析
@@ -1939,7 +1976,7 @@ impl HttpLog {
                 info.status_code = Some(code);
             }
             "host" | ":authority" => info.host = String::from_utf8_lossy(val).into_owned(),
-            ":path" => {
+            ":path" if info.path.is_empty() => {
                 info.path = String::from_utf8_lossy(val).into_owned();
             }
             "grpc-status" if config.grpc_streaming_data_enabled => {
@@ -1947,7 +1984,14 @@ impl HttpLog {
                 let code = val.parse_to().unwrap_or_default();
                 info.grpc_status_code = Some(code);
             }
-            "content-type" => {
+            "tri-service-version" => {
+                // change to triple protocol
+                self.proto = L7Protocol::Triple;
+                info.proto = L7Protocol::Triple;
+                info.method = Method::Post;
+                info.dubbo_service_version = String::from_utf8_lossy(val).into_owned();
+            }
+            "content-type" if self.proto != L7Protocol::Triple => {
                 // change to grpc protocol
                 if val.starts_with(b"application/grpc") {
                     self.proto = L7Protocol::Grpc;
@@ -2041,7 +2085,9 @@ impl HttpLog {
         ) {
             let field_iter = match info.proto {
                 L7Protocol::Http1 => config.extra_log_fields.http.iter(),
-                L7Protocol::Http2 | L7Protocol::Grpc => config.extra_log_fields.http2.iter(),
+                L7Protocol::Http2 | L7Protocol::Grpc | L7Protocol::Triple => {
+                    config.extra_log_fields.http2.iter()
+                }
                 _ => return,
             };
 

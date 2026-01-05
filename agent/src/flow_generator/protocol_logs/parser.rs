@@ -235,7 +235,7 @@ impl MetaAppProto {
         //     | 64b flow_id | 24b 0 | 8b proto | 32b cap_seq |
         let mut key = (flow_id as u128) << 64;
 
-        if proto == L7Protocol::Grpc {
+        if proto == L7Protocol::Grpc || proto == L7Protocol::Triple {
             proto = L7Protocol::Http2;
         }
         key |= (proto as u128) << 32;
