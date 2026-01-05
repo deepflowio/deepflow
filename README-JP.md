@@ -45,7 +45,7 @@ DeepFlowコミュニティ版は、エンタープライズ版のコアコンポ
 
 [ドキュメント](https://deepflow.io/docs/ce-install/all-in-one/?from=github)に従って、DeepFlow Communityをデプロイしてください。
 
-また、完全な[DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/?from=github)も構築していますので、ぜひ体験してみてください。ログインアカウント/パスワード：deepflow/deepflow。
+また、完全な[DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/?from=github)も構築していますので、ぜひ体験してみてください。ログインアカウント/パスワード：deepflow / 2026deepflow
 
 ## DeepFlow Enterpriseを体験する
 
