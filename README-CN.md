@@ -1,4 +1,4 @@
-<p align="center">
+<img width="458" height="461" alt="Snipaste_2026-01-05_10-35-44" src="https://github.com/user-attachments/assets/0082b942-6783-4ac5-9135-8f0ce46b71a9" /><p align="center">
   <img src="./docs/deepflow-logo.png" alt="DeepFlow" width="300" />
 
   <p align="center">Instant Observability for Cloud & AI Applications</p>
@@ -45,7 +45,7 @@ DeepFlow 社区版由企业版的核心组件构成。通过开源，我们希�
 
 请参考[文档](https://deepflow.io/docs/zh/ce-install/all-in-one/?from=github)部署 DeepFlow Community。
 
-同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/?from=github)，欢迎体验。登录账号 / 密码：deepflow / deepflow。
+同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/?from=github)，欢迎体验。登录账号 / 密码：deepflow / 2026deepflow
 
 ## 体验 DeepFlow Enterprise
 
