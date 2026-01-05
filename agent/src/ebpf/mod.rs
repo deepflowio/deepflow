@@ -796,19 +796,6 @@ extern "C" {
     pub fn enable_fentry();
     pub fn set_virtual_file_collect(enabled: bool) -> c_int;
 
-    /**
-     * @brief Enable or disable the TCP option tracing feature.
-     *
-     * When enabled, the tcp_option_tracing eBPF program is loaded and attached
-     * to the root cgroup to insert custom TCP options while processing
-     * sockops callbacks. Disabling this feature detaches the program and
-     * releases associated resources.
-     *
-     * @param enabled Set to `true` to enable the feature or `false` to disable.
-     * @return 0 on success, non-zero on error.
-     */
-    pub fn set_tcp_option_tracing_enabled(enabled: bool) -> c_int;
-    pub fn set_tcp_option_tracing_sample_window(bytes: c_uint) -> c_int;
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_observability")] {
             pub fn enable_offcpu_profiler() -> c_int;
@@ -900,6 +887,20 @@ extern "C" {
                */
                pub fn set_socket_fanout_ebpf(socket: c_int, group_id: c_int) -> c_int;
                pub fn envoy_trace_start() -> c_int;
+
+               /**
+                * @brief Enable or disable the TCP option tracing feature.
+                *
+                * When enabled, the tcp_option_tracing eBPF program is loaded and attached
+                * to the root cgroup to insert custom TCP options while processing
+                * sockops callbacks. Disabling this feature detaches the program and
+                * releases associated resources.
+                *
+                * @param enabled Set to `true` to enable the feature or `false` to disable.
+                * @return 0 on success, non-zero on error.
+                */
+                pub fn set_tcp_option_tracing_enabled(enabled: bool) -> c_int;
+                pub fn set_tcp_option_tracing_sample_window(bytes: c_uint) -> c_int;
         }
     }
 }

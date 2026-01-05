@@ -1033,22 +1033,26 @@ impl EbpfCollector {
         #[cfg(feature = "extended_observability")]
         ebpf::set_dpdk_trace_enabled(config.dpdk_enabled);
 
-        let tcp_option_trace = &config.ebpf.socket.sock_ops.tcp_option_trace;
-
-        if ebpf::set_tcp_option_tracing_sample_window(tcp_option_trace.sampling_window_bytes as u32)
-            != 0
+        #[cfg(feature = "extended_observability")]
         {
-            warn!(
-                "failed to set tcp option tracing sampling window to {}",
-                tcp_option_trace.sampling_window_bytes
-            );
-        }
+            let tcp_option_trace = &config.ebpf.socket.sock_ops.tcp_option_trace;
 
-        if ebpf::set_tcp_option_tracing_enabled(tcp_option_trace.enabled) != 0 {
-            warn!(
-                "failed to set tcp option tracing enabled to {}",
-                tcp_option_trace.enabled
-            );
+            if ebpf::set_tcp_option_tracing_sample_window(
+                tcp_option_trace.sampling_window_bytes as u32,
+            ) != 0
+            {
+                warn!(
+                    "failed to set tcp option tracing sampling window to {}",
+                    tcp_option_trace.sampling_window_bytes
+                );
+            }
+
+            if ebpf::set_tcp_option_tracing_enabled(tcp_option_trace.enabled) != 0 {
+                warn!(
+                    "failed to set tcp option tracing enabled to {}",
+                    tcp_option_trace.enabled
+                );
+            }
         }
 
         if ebpf::running_socket_tracer(
@@ -1334,8 +1338,11 @@ impl EbpfCollector {
         info!("ebpf collector stopping ebpf-kernel.");
         unsafe {
             ebpf::socket_tracer_stop();
-            if ebpf::set_tcp_option_tracing_enabled(false) != 0 {
-                warn!("failed to disable tcp option tracing while stopping");
+            #[cfg(feature = "extended_observability")]
+            {
+                if ebpf::set_tcp_option_tracing_enabled(false) != 0 {
+                    warn!("failed to disable tcp option tracing while stopping");
+                }
             }
         }
     }
@@ -1503,23 +1510,26 @@ impl EbpfCollector {
 
             Self::ebpf_on_config_change(config.l7_log_packet_size);
 
-            let tcp_option_trace = &config.ebpf.socket.sock_ops.tcp_option_trace;
-
-            if ebpf::set_tcp_option_tracing_sample_window(
-                tcp_option_trace.sampling_window_bytes as u32,
-            ) != 0
+            #[cfg(feature = "extended_observability")]
             {
-                warn!(
-                    "failed to set tcp option tracing sampling window to {}",
-                    tcp_option_trace.sampling_window_bytes
-                );
-            }
+                let tcp_option_trace = &config.ebpf.socket.sock_ops.tcp_option_trace;
 
-            if ebpf::set_tcp_option_tracing_enabled(tcp_option_trace.enabled) != 0 {
-                warn!(
-                    "failed to set tcp option tracing enabled to {}",
-                    tcp_option_trace.enabled
-                );
+                if ebpf::set_tcp_option_tracing_sample_window(
+                    tcp_option_trace.sampling_window_bytes as u32,
+                ) != 0
+                {
+                    warn!(
+                        "failed to set tcp option tracing sampling window to {}",
+                        tcp_option_trace.sampling_window_bytes
+                    );
+                }
+
+                if ebpf::set_tcp_option_tracing_enabled(tcp_option_trace.enabled) != 0 {
+                    warn!(
+                        "failed to set tcp option tracing enabled to {}",
+                        tcp_option_trace.enabled
+                    );
+                }
             }
         }
         if config.l7_log_enabled() || config.dpdk_enabled {
