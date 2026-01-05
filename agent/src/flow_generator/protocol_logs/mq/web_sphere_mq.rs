@@ -228,6 +228,14 @@ impl WebSphereMqInfo {
             self.response_exception = custom.resp.exception;
         }
 
+        if !custom.resp.req_type.is_empty() {
+            self.request_type = custom.resp.req_type;
+        }
+
+        if !custom.resp.endpoint.is_empty() {
+            self.endpoint = custom.resp.endpoint;
+        }
+
         //trace info rewrite
         self.trace_ids
             .merge_same_priority(PLUGIN_FIELD_PRIORITY, custom.trace.trace_ids);
