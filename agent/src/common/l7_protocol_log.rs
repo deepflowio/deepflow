@@ -78,6 +78,7 @@ macro_rules! impl_protocol_parser {
                         match p.protocol() {
                             L7Protocol::Http1 => return "HTTP",
                             L7Protocol::Http2 => return "HTTP2",
+                            L7Protocol::Triple => return "Triple",
                             _ => unreachable!()
                         }
                     },
@@ -96,6 +97,7 @@ macro_rules! impl_protocol_parser {
                 match value {
                     "HTTP" => Ok(Self::Http(HttpLog::new_v1())),
                     "HTTP2" => Ok(Self::Http(HttpLog::new_v2(false))),
+                    "Triple" => Ok(Self::Http(HttpLog::new_triple())),
                     "Custom"=>Ok(Self::Custom(Default::default())),
                     #[cfg(feature = "enterprise")]
                     "ISO-8583"=>Ok(Self::Iso8583(Default::default())),
@@ -115,6 +117,7 @@ macro_rules! impl_protocol_parser {
                     L7Protocol::Http1 => Some(L7ProtocolParser::Http(HttpLog::new_v1())),
                     L7Protocol::Http2 => Some(L7ProtocolParser::Http(HttpLog::new_v2(false))),
                     L7Protocol::Grpc => Some(L7ProtocolParser::Http(HttpLog::new_v2(true))),
+                    L7Protocol::Triple => Some(L7ProtocolParser::Http(HttpLog::new_triple())),
 
                     // in check_payload, need to get the default Custom by L7Protocol.
                     // due to Custom not in macro, need to define explicit
