@@ -38,9 +38,9 @@ MUSL_CC ?= musl-gcc
 LLVM_STRIP ?= /usr/bin/llvm-strip
 LLVM_OBJDUMP ?= /usr/bin/llvm-objdump
 VMLINUX_OBJDUMP ?= 1
-OBJDIR ?= .
+OBJDIR ?= .output
 STATIC_OBJDIR := $(OBJDIR)/staticobjs
-KERNEL_OUTPUT_DIR ?= .output
+KERNEL_OUTPUT_DIR ?= ../.output/kernel
 
 -include user/extended/feature.top.mk
 
@@ -382,6 +382,7 @@ clean:
 	$(Q)$(MAKE) -C libs/jattach clean --no-print-directory
 	$(Q)rm -rf $(ELFFILES) data deepflow-ebpfctl $(STATIC_OBJDIR) $(LIBTRACE) *.a
 	$(Q)rm -rf kernel/$(KERNEL_OUTPUT_DIR)
+	$(Q)rm -rf .output
 	$(Q)rm -rf .profiler .socket-tracer
 	$(Q)rm -rf samples/rust/socket-tracer/target
 	$(Q)rm -rf samples/rust/profiler/target

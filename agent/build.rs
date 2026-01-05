@@ -15,8 +15,7 @@
  */
 
 use std::{
-    env,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
     process::Command,
     str,
@@ -171,7 +170,10 @@ fn set_build_libtrace() -> Result<()> {
         target_env
     );
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
-    let state_file = root.join("src/ebpf/.last_ebpf_build_target");
+    let state_file = root.join("src/ebpf/.output/.last_ebpf_build_target");
+    if let Some(parent) = state_file.parent() {
+        fs::create_dir_all(parent)?;
+    }
     let previous_target = fs::read_to_string(&state_file)
         .ok()
         .map(|s| s.trim().to_owned());
@@ -197,7 +199,8 @@ fn set_build_libtrace() -> Result<()> {
         Err(_) => true,
     };
     let objdump_value = if objdump_enabled { "1" } else { "0" };
-    let kernel_output_dir = format!(".output/{}", target_id);
+    let ebpf_output_dir = format!(".output/{}", target_id);
+    let kernel_output_dir = format!("../{}/kernel", ebpf_output_dir);
 
     let cargo_makeflags = env::var("CARGO_MAKEFLAGS").ok();
     let num_jobs = env::var("NUM_JOBS").ok();
@@ -213,6 +216,7 @@ fn set_build_libtrace() -> Result<()> {
         cmd.arg("--no-print-directory");
         cmd.arg(format!("VMLINUX_OBJDUMP={}", objdump_value));
         cmd.arg(format!("KERNEL_OUTPUT_DIR={}", kernel_output_dir));
+        cmd.arg(format!("OBJDIR={}", ebpf_output_dir));
         match target_env.as_str() {
             "gnu" => {}
             "musl" => {
