@@ -24,6 +24,10 @@ pub struct AppResponse {
     pub exception: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "4")]
     pub result: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "5")]
+    pub r#type: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "6")]
+    pub endpoint: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

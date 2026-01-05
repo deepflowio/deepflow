@@ -181,6 +181,8 @@ impl From<(&CustomPolicyInfo, PacketDirection)> for CustomInfo {
                 code: info.response_code.clone(),
                 exception: info.response_exception.clone(),
                 result: info.response_result.clone(),
+                endpoint: info.endpoint.clone(),
+                req_type: info.request_type.clone(),
             },
             trace: CustomInfoTrace {
                 trace_ids,

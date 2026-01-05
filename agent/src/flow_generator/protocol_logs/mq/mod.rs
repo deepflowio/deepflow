@@ -34,7 +34,7 @@ pub use zmtp::{ZmtpInfo, ZmtpLog};
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
-        mod webspheremq;
-        pub use webspheremq::{WebSphereMqInfo, WebSphereMqLog};
+        mod web_sphere_mq;
+        pub use web_sphere_mq::{WebSphereMqInfo, WebSphereMqLog};
     }
 }
