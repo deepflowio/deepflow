@@ -131,6 +131,8 @@ pub struct Response {
     pub(super) code: i32,
     pub(super) exception: [u8; 128],
     pub(super) result: [u8; 512],
+    pub(super) req_type: [u8; 64],
+    pub(super) endpoint: [u8; 128],
 }
 impl std::fmt::Debug for Response {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -277,6 +279,8 @@ impl TryFrom<ParseInfo> for CustomInfo {
                         code: Some(resp.code),
                         exception: c_str_to_string(&resp.exception).unwrap_or_default(),
                         result: c_str_to_string(&resp.result).unwrap_or_default(),
+                        req_type: c_str_to_string(&resp.req_type).unwrap_or_default(),
+                        endpoint: c_str_to_string(&resp.endpoint).unwrap_or_default(),
                     },
                 )
             }

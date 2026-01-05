@@ -24,6 +24,8 @@ message AppResponse {
     optional int32 code = 2;
     optional string exception = 3;
     optional string result = 4;
+    optional string type = 5;
+    optional string endpoint = 6;
 }
 
 message AppTrace {
