@@ -64,6 +64,8 @@ pub struct CustomInfoResp {
     pub code: Option<i32>,
     pub exception: String,
     pub result: String,
+    pub req_type: String,
+    pub endpoint: String,
 }
 
 #[derive(Debug, Default, Serialize, Clone)]
@@ -485,6 +487,8 @@ impl CustomInfo {
                     code: r.code,
                     result: r.result.unwrap_or_default(),
                     exception: r.exception.unwrap_or_default(),
+                    req_type: r.r#type.unwrap_or_default(),
+                    endpoint: r.endpoint.unwrap_or_default(),
                 };
             }
             _ => (),
