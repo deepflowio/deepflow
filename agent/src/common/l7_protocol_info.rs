@@ -244,6 +244,10 @@ where
                 || self.session_id().is_some() && cur_info.multi_merge_info.is_some()
         );
 
+        if !self.needs_session_aggregation() {
+            return Some(L7PerfStats::from(&cur_info));
+        }
+
         if cur_info.msg_type == LogMessageType::Session {
             if cur_info.on_blacklist {
                 return None;
