@@ -19,7 +19,7 @@ use serde::Serialize;
 use enterprise_utils::l7::mq::web_sphere_mq::WebSphereMqParser;
 use public::l7_protocol::LogMessageType;
 
-use crate::plugin::{wasm::WasmData, CustomInfo};
+use crate::plugin::CustomInfo;
 use crate::{
     common::{
         flow::{L7PerfStats, L7Protocol},
@@ -361,13 +361,51 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
         if let Some(code) = &self.parser.ret_code {
             info.msg_type = LogMessageType::Response;
             if !code.ends_with(RESPONSE_CODE_OK_SUFFIX) {
-                info.status = L7ResponseStatus::ClientError;
+                info.status = L7ResponseStatus::ServerError;
             }
         }
 
         info.is_async = true;
-        let has_wasm_result = self.wasm_hook(param, payload, &mut info);
-        if has_wasm && !has_wasm_result {
+        let wasm_results = self.wasm_hook(param, payload);
+        if has_wasm && wasm_results.is_none() {
+            return Err(Error::L7ProtocolUnknown);
+        }
+        if let Some(customs) = wasm_results {
+            if !customs.is_empty() {
+                let mut results: Vec<L7ProtocolInfo> = Vec::with_capacity(customs.len());
+                for custom in customs {
+                    let mut custom_info = WebSphereMqInfo::default();
+                    custom_info.status = L7ResponseStatus::Ok;
+                    custom_info.msg_type = LogMessageType::Request;
+                    set_captured_byte!(custom_info, param);
+                    custom_info.is_tls = param.is_tls();
+                    custom_info.merge_custom_info(custom);
+                    match custom_info.status {
+                        L7ResponseStatus::ServerError => {
+                            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                        }
+                        L7ResponseStatus::ClientError => {
+                            self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                        }
+                        _ => {}
+                    }
+                    match custom_info.msg_type {
+                        LogMessageType::Request => {
+                            self.perf_stats.as_mut().map(|p| p.inc_req());
+                        }
+                        LogMessageType::Response => {
+                            self.perf_stats.as_mut().map(|p| p.inc_resp());
+                        }
+                        _ => {}
+                    }
+                    results.push(L7ProtocolInfo::WebSphereMqInfo(custom_info));
+                }
+                if results.len() == 1 {
+                    return Ok(L7ParseResult::Single(results.into_iter().next().unwrap()));
+                } else {
+                    return Ok(L7ParseResult::Multi(results));
+                }
+            }
             return Err(Error::L7ProtocolUnknown);
         }
 
@@ -396,21 +434,12 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
 }
 
 impl WebSphereMqLog {
-    fn wasm_hook(
-        &mut self,
-        param: &ParseParam,
-        payload: &[u8],
-        info: &mut WebSphereMqInfo,
-    ) -> bool {
+    fn wasm_hook(&mut self, param: &ParseParam, payload: &[u8]) -> Option<Vec<CustomInfo>> {
         let mut vm_ref = param.wasm_vm.borrow_mut();
         let Some(vm) = vm_ref.as_mut() else {
-            return false;
+            return None;
         };
-        let wasm_data = WasmData::new(L7Protocol::WebSphereMq);
-        if let Some(custom) = vm.on_custom_message(payload, param, wasm_data) {
-            info.merge_custom_info(custom);
-            return true;
-        }
-        false
+        let proto = L7Protocol::WebSphereMq as u8;
+        vm.on_parse_payload(payload, param, proto)
     }
 }
