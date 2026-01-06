@@ -362,7 +362,6 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
             info.msg_type = LogMessageType::Response;
             if !code.ends_with(RESPONSE_CODE_OK_SUFFIX) {
                 info.status = L7ResponseStatus::ClientError;
-                self.perf_stats.as_mut().map(|p| p.inc_req_err());
             }
         }
 
@@ -377,9 +376,6 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
         if let Some(perf_stats) = self.perf_stats.as_mut() {
             if let Some(stats) = info.perf_stats(param) {
                 perf_stats.sequential_merge(&stats);
-                perf_stats.rrt_max = 0;
-                perf_stats.rrt_sum = 0;
-                perf_stats.rrt_count = 0;
             }
         }
 
