@@ -21,6 +21,7 @@
 #include <sys/prctl.h>
 #include <arpa/inet.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <bcc/perf_reader.h>
 #include <linux/version.h>
 #include "clib.h"
@@ -2782,6 +2783,38 @@ static void reconfig_load_resources(struct bpf_tracer *tracer, char *load_name,
 	socket_tracer_set_probes(tps);
 }
 
+static int ensure_datadump_dir_exists(const char *path)
+{
+	struct stat st;
+
+	// Check if the directory exists
+	if (stat(path, &st) == 0) {
+		// Check if the path is actually a directory
+		if (S_ISDIR(st.st_mode)) {
+			return 0; // Directory exists
+		} else {
+			ebpf_warning("Path exists but is not a "
+				     "directory: %s\n", path);
+			return -1;
+		}
+	} else {
+		// Directory does not exist, attempt to create it
+		if (mkdir(path, 0755) != 0) {
+			if (errno == EEXIST) {
+				// Directory was created by another thread/process
+				return 0;
+			} else {
+				ebpf_warning("Failed to create "
+					     "directory %s, %s (errno %d)\n",
+					     path, strerror(errno), errno);
+				return -1;
+			}
+		}
+	}
+
+	return 0;
+}
+
 /**
  * Start socket tracer
  *
@@ -2846,6 +2879,11 @@ int running_socket_tracer(tracer_callback_t handle,
 	/*
 	 * Initialize datadump
 	 */
+	if (ensure_datadump_dir_exists(DATADUMP_SAVE_DIR) == 0) {
+		ebpf_info("Datadump directory (%s) created or already"
+			  " exists.\n", DATADUMP_SAVE_DIR);
+	}
+
 	pthread_mutex_init(&datadump_mutex, NULL);
 	datadump_enable = false;
 	datadump_use_remote = false;
