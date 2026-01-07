@@ -94,6 +94,16 @@ custom_field:
           value: xyz
         - key: ignore_case
           value: true
+      - type: parse_dict_value
+        settings:
+        - key: keyword
+          value: xyz
+        - key: type
+          value: string
+        - key: ignore_case
+          value: false
+        - key: skip
+          value: 0
       verify:
         check_charset: false
         primary_charset: ["digits", "alphabets", "hanzi"]
@@ -104,9 +114,18 @@ custom_field:
         rewrite_native_tag:
           name: version
           remap: dict_1
-          condition:
-            enum_whitelist: []
-            enum_blacklist: []
+          pre_condition:
+            blacklist:
+            - '= xxx'
+            - '!= xxx'
+            whitelist:
+            - ': xxx'
+            - '!: xxx'
+          post_condition:
+            blacklist:
+            - '~ xxx'
+            whitelist:
+            - '!~ xxx'
         rewrite_response_status:
           ok_values: []
           client_error_values: []
@@ -119,6 +138,13 @@ custom_field:
         attribute_name: "xyz"
         rewrite_native_tag:
           name: version
+          pre_condition:
+            blacklist:
+            - '= xxx'
+            - '!= xxx'
+            whitelist:
+            - ': xxx'
+            - '!: xxx'
         priority: 0
     compound_fields:
     - format: "{field1_name}-{field2_name}"
@@ -128,9 +154,18 @@ custom_field:
         rewrite_native_tag:
           name: version
           remap: dict_1
-          condition:
-            enum_whitelist: []
-            enum_blacklist: []
+          pre_condition:
+            blacklist:
+            - '= xxx'
+            - '!= xxx'
+            whitelist:
+            - ': xxx'
+            - '!: xxx'
+          post_condition:
+            blacklist:
+            - '~ xxx'
+            whitelist:
+            - '!~ xxx'
         rewrite_response_status:
           ok_values: []
           client_error_values: []
