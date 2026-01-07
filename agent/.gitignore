@@ -12,6 +12,7 @@ src/flow_generator/protocol_logs/mq/pulsar.proto.rs
 src/ebpf/data
 src/ebpf/.data_done
 src/ebpf/libtrace.a
+src/ebpf/.output/
 src/ebpf/deepflow-ebpfctl
 src/ebpf/kernel/*.elf.tmp
 src/ebpf/kernel/socket_trace.ll

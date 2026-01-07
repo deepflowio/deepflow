@@ -16,11 +16,14 @@ LLC ?= /usr/bin/llc
 CLANG ?= /usr/bin/clang
 LLVM_STRIP ?= /usr/bin/llvm-strip
 LLVM_OBJDUMP ?= /usr/bin/llvm-objdump
+OUTPUT ?= .
+VMLINUX_OBJDUMP ?= 1
 CC ?= gcc
 TAEGET_KERN_SRC := socket_trace.bpf.c perf_profiler.bpf.c
 TAEGET_KERN_SRC += $(KERN_SRC_EXTRA)
-TAEGET_KERN_LL = $(TAEGET_KERN_SRC:c=ll)
-TAEGET_KERN_ELF = $(TAEGET_KERN_SRC:c=elf)
+OUTPUT_PREFIX := $(if $(filter .,$(OUTPUT)),,$(OUTPUT)/)
+TAEGET_KERN_LL = $(addprefix $(OUTPUT_PREFIX),$(TAEGET_KERN_SRC:c=ll))
+TAEGET_KERN_ELF = $(addprefix $(OUTPUT_PREFIX),$(TAEGET_KERN_SRC:c=elf))
 ifeq ($(V),1)
 	Q =
 	msg =
@@ -47,34 +50,54 @@ else ifeq ($(LINUX_VER_KPROBE),1)
 	EXTRA_EBPF_CLAGS = -DSUPPORTS_KPROBE_ONLY
 endif
 
-FINAL_TARGET = -emit-llvm -D__TARGET_ARCH_$(ARCH) -o ${@:.elf=.ll} -c $^ && $(LLC) -march=bpf -filetype=obj -mcpu=v2 -o $@ ${@:.elf=.ll}
+VMLINUX_DEPFLAGS ?= -MMD -MP
 
-all: $(TAEGET_KERN_ELF)
+VMLINUX_OBJDUMP_TARGETS =
+ifneq ($(VMLINUX_OBJDUMP),0)
+VMLINUX_OBJDUMP_TARGETS = $(TAEGET_KERN_ELF:.elf=.objdump)
+endif
+
+all: $(TAEGET_KERN_ELF) $(VMLINUX_OBJDUMP_TARGETS)
 
 EBPF_CLAGS ?= -I. -Ivmlinux -Iinclude -I../../../crates/trace-utils/src \
         -D__BPF_TRACING__ -D GROUP_LEADER_OFFSET_OVERRIDE=0 \
         -DSTART_BOOTTIME_OFFSET_OVERRIDE=0      \
         -DSTART_BOOTTIME_VARNAME=real_start_time
 
-%.elf: %.c
-	$(call msg,BPF,$@,$(CORE))	
-	$(Q)$(CLANG) $(EBPF_CLAGS) $(EXTRA_EBPF_CLAGS) -DCOMPILE_MUSL=$(C_USE_STATIC) -std=gnu99 -Wimplicit-function-declaration \
-		-ffreestanding -fno-builtin -Wall \
-		-Wno-deprecated-declarations \
-		-Wno-gnu-variable-sized-type-not-at-end \
-		-Wno-pragma-once-outside-header \
-		-Wno-address-of-packed-member \
-		-Wno-unknown-warning-option \
-		-fno-color-diagnostics \
-		-fno-unwind-tables \
-		-fno-stack-protector \
-		-fno-asynchronous-unwind-tables -g -O2 $(FINAL_TARGET)
-	$(Q)$(LLVM_OBJDUMP) --source --debug-vars --line-numbers --symbol-description $@ > ${@:.elf=.objdump} 
+VMLINUX_CLANG_CFLAGS = $(EBPF_CLAGS) $(EXTRA_EBPF_CLAGS) -DCOMPILE_MUSL=$(C_USE_STATIC) -std=gnu99 -Wimplicit-function-declaration \
+	-ffreestanding -fno-builtin -Wall \
+	-Wno-deprecated-declarations \
+	-Wno-gnu-variable-sized-type-not-at-end \
+	-Wno-pragma-once-outside-header \
+	-Wno-address-of-packed-member \
+	-Wno-unknown-warning-option \
+	-fno-color-diagnostics \
+	-fno-unwind-tables \
+	-fno-stack-protector \
+	-fno-asynchronous-unwind-tables -g -O2
+
+VMLINUX_LLC_FLAGS = -march=bpf -filetype=obj -mcpu=v2
+
+$(OUTPUT_PREFIX)%.elf.debug: %.c
+	$(call msg,BPF,$@,$(CORE))
+	$(Q)mkdir -p $(dir $@)
+	$(Q)$(CLANG) $(VMLINUX_CLANG_CFLAGS) $(VMLINUX_DEPFLAGS) -MF ${@:.elf.debug=.d} -MT $@ \
+		-emit-llvm -D__TARGET_ARCH_$(ARCH) -o ${@:.elf.debug=.ll} -c $<
+	$(Q)$(LLC) $(VMLINUX_LLC_FLAGS) -o $@ ${@:.elf.debug=.ll}
+
+$(OUTPUT_PREFIX)%.elf: $(OUTPUT_PREFIX)%.elf.debug
+	$(call msg,STRIP,$@)
+	$(Q)cp $< $@
 	$(Q)$(LLVM_STRIP) -g $@ # strip useless DWARF info
+
+$(OUTPUT_PREFIX)%.objdump: $(OUTPUT_PREFIX)%.elf.debug
+	$(call msg,OBJDUMP,$@)
+	$(Q)$(LLVM_OBJDUMP) --source --debug-vars --line-numbers --symbol-description $< > $@
 
 clean:
 	@rm -f ../user/extended/bpf/*.bpf.elf ../user/extended/bpf/*.bpf.ll
-	@rm $(TAEGET_KERN_ELF) $(TARGET) ${TAEGET_KERN_ELF:.elf=.ll} *.S *.objdump -rf
+	@rm -rf $(TAEGET_KERN_ELF) $(TAEGET_KERN_ELF:.elf=.elf.debug) $(TAEGET_KERN_LL) $(TAEGET_KERN_ELF:.elf=.d) $(TAEGET_KERN_ELF:.elf=.objdump) $(OUTPUT_PREFIX)*.S $(OUTPUT_PREFIX)*.tmp
 
 .PHONY: all clean
 
+-include $(TAEGET_KERN_ELF:.elf=.d)
