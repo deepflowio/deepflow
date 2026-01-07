@@ -36,21 +36,23 @@ import (
 var log = logger.MustGetLogger("trisolaris.metadata")
 
 type MetaData struct {
-	dbDataCache    *atomic.Value // *DBDataCache 数据库缓存
-	platformDataOP *PlatformDataOP
-	groupDataOP    *GroupDataOP
-	tapType        *TapType
-	policyDataOP   *PolicyDataOP
-	startTime      int64
-	chPlatformData chan struct{}
-	chTapType      chan struct{}
-	chPolicy       chan struct{}
-	chGroup        chan struct{}
-	config         *config.Config
-	db             *gorm.DB
-	ctx            context.Context
-	cancel         context.CancelFunc
-	agentMetaData  *agentmetadata.MetaData
+	dbDataCache       *atomic.Value // *DBDataCache 数据库缓存
+	platformDataOP    *PlatformDataOP
+	groupDataOP       *GroupDataOP
+	tapType           *TapType
+	policyDataOP      *PolicyDataOP
+	customAPPConfig   *CustomAppConfig
+	startTime         int64
+	chCustomAppConfig chan struct{}
+	chPlatformData    chan struct{}
+	chTapType         chan struct{}
+	chPolicy          chan struct{}
+	chGroup           chan struct{}
+	config            *config.Config
+	db                *gorm.DB
+	ctx               context.Context
+	cancel            context.CancelFunc
+	agentMetaData     *agentmetadata.MetaData
 	ORGID
 }
 
@@ -59,21 +61,23 @@ func NewMetaData(db *gorm.DB, cfg *config.Config, orgID int, pctx context.Contex
 	dbDataCache := &atomic.Value{}
 	dbDataCache.Store(NewDBDataCache(ORGID(orgID), cfg))
 	metaData := &MetaData{
-		dbDataCache:    dbDataCache,
-		tapType:        newTapType(db),
-		chPlatformData: make(chan struct{}, 1),
-		chTapType:      make(chan struct{}, 1),
-		chPolicy:       make(chan struct{}, 1),
-		chGroup:        make(chan struct{}, 1),
-		config:         cfg,
-		db:             db,
-		ctx:            ctx,
-		cancel:         cancel,
-		ORGID:          ORGID(orgID),
+		dbDataCache:       dbDataCache,
+		tapType:           newTapType(db),
+		chCustomAppConfig: make(chan struct{}, 1),
+		chPlatformData:    make(chan struct{}, 1),
+		chTapType:         make(chan struct{}, 1),
+		chPolicy:          make(chan struct{}, 1),
+		chGroup:           make(chan struct{}, 1),
+		config:            cfg,
+		db:                db,
+		ctx:               ctx,
+		cancel:            cancel,
+		ORGID:             ORGID(orgID),
 	}
 	metaData.platformDataOP = newPlatformDataOP(db, metaData)
 	metaData.groupDataOP = newGroupDataOP(metaData)
 	metaData.policyDataOP = newPolicyDaTaOP(metaData, cfg.BillingMethod)
+	metaData.customAPPConfig = newCustomAppConfig(orgID, metaData)
 	metaData.agentMetaData = agentmetadata.NewMetaData(db, cfg, orgID)
 	metaData.agentMetaData.UpdateDBDataCache(metaData.GetDBDataCache())
 	return metaData
@@ -96,6 +100,13 @@ func (m *MetaData) GetDBDataCache() *DBDataCache {
 
 func (m *MetaData) updateDBDataCache(d *DBDataCache) {
 	m.dbDataCache.Store(d)
+}
+
+func (m *MetaData) PutChCustomAppConfig() {
+	select {
+	case m.chCustomAppConfig <- struct{}{}:
+	default:
+	}
 }
 
 func (m *MetaData) PutChPlatformData() {
@@ -124,6 +135,18 @@ func (m *MetaData) PutChTapType() {
 	case m.chTapType <- struct{}{}:
 	default:
 	}
+}
+
+func (m *MetaData) GetCustomAppConfig() *CustomAppConfig {
+	return m.customAPPConfig
+}
+
+func (m *MetaData) GetCustomAppConfigByte(teamID, agentGroupID int) []byte {
+	return m.customAPPConfig.GetCustomAppConfigByte(teamID, agentGroupID)
+}
+
+func (m *MetaData) GetCustomAppConfigVersion() uint64 {
+	return m.customAPPConfig.GetVersion()
 }
 
 func (m *MetaData) GetPlatformDataOP() *PlatformDataOP {
@@ -191,6 +214,7 @@ func (m *MetaData) InitData(startTime int64) {
 	m.tapType.generateTapTypes()
 	m.policyDataOP.generatePolicyData()
 	m.agentMetaData.InitData(startTime)
+	m.customAPPConfig.generateCache()
 }
 
 func (m *MetaData) timedRefreshMetaData() {
@@ -206,7 +230,13 @@ func (m *MetaData) timedRefreshMetaData() {
 			m.groupDataOP.generateGroupData()
 			m.policyDataOP.generatePolicyData()
 			m.tapType.generateTapTypes()
+			m.customAPPConfig.generateCache()
 			log.Info(m.Log("end generate metaData from timed"))
+		case <-m.chCustomAppConfig:
+			log.Info(m.Log("start generate custom app config from rpc"))
+			m.generateDbDataCache()
+			m.customAPPConfig.generateCache()
+			log.Info(m.Log("end generate custom app config from rpc"))
 		case <-m.chPlatformData:
 			log.Info(m.Log("start generate platform data from rpc"))
 			time.Sleep(time.Duration(m.config.PlatformDataRefreshDelayTime) * time.Second)

@@ -129,6 +129,12 @@ const (
 )
 
 const (
+	CONFIG_KEY_CUSTOM_PROTOCOL_POLICIES  = "custom_protocol_policies"
+	CONFIG_KEY_CUSTOM_FIELD_DICTIONARIES = "custom_field.dictionaries"
+	CONFIG_KEY_CUSTOM_FIELD_POLICIES     = "custom_field.policies"
+)
+
+const (
 	CONFIG_KEY_NTP_ENABLED                 = "global.ntp.enabled"
 	CONFIG_KEY_INGESTER_IP                 = "global.communication.ingester_ip"
 	CONFIG_KEY_INGESTER_PORT               = "global.communication.ingester_port"

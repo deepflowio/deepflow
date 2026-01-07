@@ -220,27 +220,32 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		}
 		return e.noAgentResponse(in, orgID), nil
 	}
-
+	inCustomAppConfigVersion := in.GetCustomAppConfig().GetVersion()
 	vtapID := int(vtapCache.GetVTapID())
 	functions := vtapCache.GetFunctions()
 	versionPlatformData := vtapCache.GetAgentPlatformDataVersion()
+	versionCustomAppConfig := gAgentInfo.GetCustomAppConfigVersion()
 	versionGroups := gAgentInfo.GetAgentGroupDataVersion()
 	versionPolicy := gAgentInfo.GetAgentPolicyVersion(vtapID, functions)
 	changedInfo := fmt.Sprintf("ctrl_ip is %s, ctrl_mac is %s, team_id is (str=%s,int=%d), host_ips is %s, "+
 		"(platform data version  %d -> %d), "+
 		"(acls version %d -> %d), "+
 		"(groups version %d -> %d), "+
+		"(custom app config version %d -> %d), "+
 		"(current grpc buffer size %d), "+
 		"NAME:%s  REVISION:%s  BOOT_TIME:%d AGENT_GROUP_ID:%s",
 		ctrlIP, ctrlMac, teamIDStr, teamIDInt, in.GetHostIps(),
 		versionPlatformData, in.GetVersionPlatformData(),
 		versionPolicy, in.GetVersionAcls(),
 		versionGroups, in.GetVersionGroups(),
+		versionCustomAppConfig, inCustomAppConfigVersion,
 		currentBufferSize,
 		in.GetProcessName(), in.GetRevision(), in.GetBootTime(), in.GetAgentGroupIdRequest())
 	platformDataVerChange := versionPlatformData != in.GetVersionPlatformData()
 	if platformDataVerChange || versionPlatformData == 0 ||
-		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
+		versionGroups != in.GetVersionGroups() ||
+		versionPolicy != in.GetVersionAcls() ||
+		versionCustomAppConfig != inCustomAppConfigVersion {
 		log.Info(changedInfo, logger.NewORGPrefix(orgID))
 	} else {
 		log.Debug(changedInfo, logger.NewORGPrefix(orgID))
@@ -289,6 +294,11 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	} else {
 		vtapCache.UpdatePushVersionPolicy(versionPolicy)
 	}
+	if inCustomAppConfigVersion != 0 {
+		vtapCache.UpdatePushVersionCustomAppConfig(inCustomAppConfigVersion)
+	} else {
+		vtapCache.UpdatePushVersionCustomAppConfig(versionCustomAppConfig)
+	}
 
 	platformData := []byte{}
 	if platformDataVerChange {
@@ -301,6 +311,13 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	acls := []byte{}
 	if versionPolicy != in.GetVersionAcls() {
 		acls = gAgentInfo.GetAgentPolicyData(vtapID, functions)
+	}
+	customAppConfigBytes := []byte{}
+	if versionCustomAppConfig != inCustomAppConfigVersion {
+		customAppConfigBytes = []byte("# custom_field = '', set by feature controller")
+		if vtapCache.EnabledTraceBiz() || vtapCache.EnabledDevTraceBiz() {
+			customAppConfigBytes = gAgentInfo.GetCustomAppConfigByte(teamIDInt, vtapCache.GetVTapGroupID())
+		}
 	}
 
 	// 只有专属采集器下发tap_types
@@ -356,6 +373,10 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	containers := gAgentInfo.GetAgentContainers(int(vtapCache.GetVTapID()))
 	userConfigData := e.marshalUserConfig(userConfig, vtapCache)
 	selfUpdateURL := gAgentInfo.GetSelfUpdateUrl()
+	customAppConfig := api.CustomAppConfig{
+		Version: proto.Uint64(versionCustomAppConfig),
+		Configs: customAppConfigBytes,
+	}
 	syncResponse := api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
@@ -373,6 +394,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		SkipInterface:       skipInterface,
 		SelfUpdateUrl:       proto.String(selfUpdateURL),
 		Revision:            proto.String(upgradeRevision),
+		CustomAppConfig:     &customAppConfig,
 	}
 	syncBytesSize := uint64(proto.Size(&syncResponse))
 	sendSize := vtapCache.GetGRPCBufferFromLastSync(syncBytesSize)
@@ -395,6 +417,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		Containers:        containers,
 		SelfUpdateUrl:     proto.String(selfUpdateURL),
 		Revision:          proto.String(upgradeRevision),
+		CustomAppConfig:   &customAppConfig,
 	}, nil
 }
 
@@ -535,29 +558,35 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 	if vtapCache == nil {
 		return e.noAgentResponse(in, orgID), fmt.Errorf("no find vtap(%s %s) cache", ctrlIP, ctrlMac)
 	}
+	inCustomAppConfigVersion := in.GetCustomAppConfig().GetVersion()
 	vtapID := int(vtapCache.GetVTapID())
 	functions := vtapCache.GetFunctions()
 	versionPlatformData := vtapCache.GetAgentPlatformDataVersion()
 	pushVersionPlatformData := vtapCache.GetPushVersionPlatformData()
-	versionGroups := gAgentInfo.GetAgentGroupDataVersion()
 	pushVersionGroups := vtapCache.GetPushVersionGroups()
-	versionPolicy := gAgentInfo.GetAgentPolicyVersion(vtapID, functions)
 	pushVersionPolicy := vtapCache.GetPushVersionPolicy()
+	versionGroups := gAgentInfo.GetAgentGroupDataVersion()
+	versionCustomAppConfig := gAgentInfo.GetCustomAppConfigVersion()
+	versionPolicy := gAgentInfo.GetAgentPolicyVersion(vtapID, functions)
 	newAcls := gAgentInfo.GetAgentPolicyData(vtapID, functions)
 	changedInfo := fmt.Sprintf("push data ctrl_ip is %s, ctrl_mac is %s, "+
 		"team_id is (str=%s,int=%d) "+
 		"(platform data version  %d -> %d), "+
 		"(acls version %d -> %d datalen: %d), "+
 		"(groups version %d -> %d), "+
+		"(custom app config version %d -> %d), "+
 		"NAME:%s  REVISION:%s  BOOT_TIME:%d",
 		ctrlIP, ctrlMac,
 		teamIDStr, teamIDInt,
 		versionPlatformData, pushVersionPlatformData,
 		versionPolicy, pushVersionPolicy, len(newAcls),
 		versionGroups, pushVersionGroups,
+		versionCustomAppConfig, inCustomAppConfigVersion,
 		in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	if versionPlatformData != pushVersionPlatformData ||
-		versionGroups != pushVersionGroups || versionPolicy != pushVersionPolicy {
+		versionGroups != pushVersionGroups ||
+		versionPolicy != pushVersionPolicy ||
+		versionCustomAppConfig != inCustomAppConfigVersion {
 		log.Infof(changedInfo, logger.NewORGPrefix(orgID))
 	} else {
 		log.Debug(changedInfo, logger.NewORGPrefix(orgID))
@@ -580,6 +609,14 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 		}
 		if versionPolicy != pushVersionPolicy {
 			acls = gAgentInfo.GetAgentPolicyData(vtapID, functions)
+		}
+	}
+
+	customAppConfigBytes := []byte{}
+	if versionCustomAppConfig != inCustomAppConfigVersion {
+		customAppConfigBytes = []byte("# custom_field = '', set by feature controller")
+		if vtapCache.EnabledTraceBiz() || vtapCache.EnabledDevTraceBiz() {
+			customAppConfigBytes = gAgentInfo.GetCustomAppConfigByte(teamIDInt, vtapCache.GetVTapGroupID())
 		}
 	}
 
@@ -633,6 +670,10 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 	remoteSegments := vtapCache.GetAgentRemoteSegments()
 	skipInterface := gAgentInfo.GetAgentSkipInterface(vtapCache)
 	containers := gAgentInfo.GetAgentContainers(int(vtapCache.GetVTapID()))
+	customAppConfig := api.CustomAppConfig{
+		Version: proto.Uint64(versionCustomAppConfig),
+		Configs: customAppConfigBytes,
+	}
 	syncResponse := api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
@@ -648,6 +689,7 @@ func (e *AgentEvent) pushResponse(in *api.SyncRequest, all bool) (*api.SyncRespo
 		VersionAcls:         proto.Uint64(versionPolicy),
 		CaptureNetworkTypes: tapTypes,
 		Containers:          containers,
+		CustomAppConfig:     &customAppConfig,
 	}
 	pushBytesSize := uint64(proto.Size(&syncResponse))
 	currentBufferSize := vtapCache.GetGRPCBufferFromLastPush(pushBytesSize)
