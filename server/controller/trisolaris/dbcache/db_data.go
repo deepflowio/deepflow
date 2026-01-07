@@ -82,6 +82,11 @@ type DBDataCache struct {
 	vtapGroups []*models.VTapGroup
 	chDevices  []*models.ChDevice
 
+	bizDecodeDictionaries                []*models.BizDecodeDictionary
+	bizDecodePolicies                    []*models.BizDecodePolicy
+	bizDecodePolicyFields                []*models.BizDecodePolicyField
+	bizDecodePolicyAgentGroupConnections []*models.BizDecodePolicyAgentGroupConnection
+
 	config *config.Config
 
 	ORGID
@@ -293,6 +298,22 @@ func (d *DBDataCache) GetVIPs() []*models.VIP {
 
 func (d *DBDataCache) GetCustomServices() []*models.CustomService {
 	return d.customServices
+}
+
+func (d *DBDataCache) GetBizDecodeDictionaries() []*models.BizDecodeDictionary {
+	return d.bizDecodeDictionaries
+}
+
+func (d *DBDataCache) GetBizDecodePolicies() []*models.BizDecodePolicy {
+	return d.bizDecodePolicies
+}
+
+func (d *DBDataCache) GetBizDecodePolicyFields() []*models.BizDecodePolicyField {
+	return d.bizDecodePolicyFields
+}
+
+func (d *DBDataCache) GetBizDecodePolicyAgentGroupConnections() []*models.BizDecodePolicyAgentGroupConnection {
+	return d.bizDecodePolicyAgentGroupConnections
 }
 
 // SetCustomServices sets the custom services for testing purposes
@@ -659,6 +680,34 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	err = db.Order("type asc, id asc").Find(&customServices).Error
 	if err == nil {
 		d.customServices = customServices
+	} else {
+		log.Error(d.Log(err.Error()))
+	}
+
+	bizDecodeDictionaries, err := dbmgr.DBMgr[models.BizDecodeDictionary](db).Gets()
+	if err == nil {
+		d.bizDecodeDictionaries = bizDecodeDictionaries
+	} else {
+		log.Error(d.Log(err.Error()))
+	}
+
+	bizDecodePolicies, err := dbmgr.DBMgr[models.BizDecodePolicy](db).Gets()
+	if err == nil {
+		d.bizDecodePolicies = bizDecodePolicies
+	} else {
+		log.Error(d.Log(err.Error()))
+	}
+
+	bizDecodePolicyFields, err := dbmgr.DBMgr[models.BizDecodePolicyField](db).Gets()
+	if err == nil {
+		d.bizDecodePolicyFields = bizDecodePolicyFields
+	} else {
+		log.Error(d.Log(err.Error()))
+	}
+
+	bizDecodePolicyAgentGroupConnections, err := dbmgr.DBMgr[models.BizDecodePolicyAgentGroupConnection](db).Gets()
+	if err == nil {
+		d.bizDecodePolicyAgentGroupConnections = bizDecodePolicyAgentGroupConnections
 	} else {
 		log.Error(d.Log(err.Error()))
 	}

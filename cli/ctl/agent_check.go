@@ -131,6 +131,14 @@ func agentRegiterCommand() []*cobra.Command {
 			agentInitCmd(cmd, []AgentCmdExecute{AskipInterface})
 		},
 	}
+	CustomAppConfigCmd := &cobra.Command{
+		Use:   "custom-app-config",
+		Short: "get custom app config from deepflow-server",
+		Run: func(cmd *cobra.Command, args []string) {
+			agentInitCmd(cmd, []AgentCmdExecute{AGRPCCustomAppConfig})
+		},
+	}
+
 	gpidAgentResponseCmd := &cobra.Command{
 		Use:   "gpid-agent-response",
 		Short: "get gpid-agent-response from deepflow-server",
@@ -145,7 +153,6 @@ func agentRegiterCommand() []*cobra.Command {
 			AgpidGlobalTable(cmd)
 		},
 	}
-
 	gpidAgentRequestCmd := &cobra.Command{
 		Use:   "gpid-agent-request",
 		Short: "get gpid-agent-request from deepflow-server",
@@ -153,6 +160,7 @@ func agentRegiterCommand() []*cobra.Command {
 			AgpidAgentRequest(cmd)
 		},
 	}
+
 	realGlobalCmd := &cobra.Command{
 		Use:   "realclient-to-realserver",
 		Short: "get realclient-to-realserver from deepflow-server",
@@ -182,13 +190,14 @@ func agentRegiterCommand() []*cobra.Command {
 		Short: "get all data from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			agentInitCmd(cmd, []AgentCmdExecute{AplatformData, AipGroups, AflowAcls,
-				Asegments, AtapTypes, Acontainers, AconfigData, AGRPCBufferSize, AskipInterface})
+				Asegments, AtapTypes, Acontainers, AconfigData, AGRPCBufferSize,
+				AskipInterface, AGRPCCustomAppConfig})
 		},
 	}
 
 	commands := []*cobra.Command{agentCacheCmd, platformDataCmd, ipGroupsCmd,
 		flowAclsCmd, configCmd, grpcBufferSizeCmd, tapTypesCmd, segmentsCmd, containersCmd,
-		skipInterfaceCmd, gpidAgentResponseCmd, gpidGlobalTableCmd,
+		skipInterfaceCmd, gpidAgentResponseCmd, CustomAppConfigCmd, gpidGlobalTableCmd,
 		gpidAgentRequestCmd, realGlobalCmd, ripToVipCmd, pluginCmd, allCmd}
 	return commands
 }
@@ -600,6 +609,10 @@ func AskipInterface(response *agent.SyncResponse) {
 	for index, skipInterface := range response.GetSkipInterface() {
 		AJsonFormat(index+1, fmt.Sprintf("mac: %s", Uint64ToMac(skipInterface.GetMac())))
 	}
+}
+
+func AGRPCCustomAppConfig(response *agent.SyncResponse) {
+	fmt.Println(string(response.GetCustomAppConfig().GetConfigs()))
 }
 
 func AtapTypes(response *agent.SyncResponse) {
