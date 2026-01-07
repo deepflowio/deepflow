@@ -51,17 +51,24 @@ struct df_bpf_conf {
 	int af;
 	int verbose;
 	int stats;
-	int interval;
 	int count;
+
+	// For datadump config
+	int interval;
 	int timeout;
-	char *match_str;
 	int pid;
 	int fd;
 	int l7_proto;
+	char *ip;
+	unsigned int port;
+
+	// For search datadump files
+	char *match_str;
 	bool is_all_files;
 	char *file_name;
 	unsigned int start_line;
 	unsigned int end_line;
+
 	char *comm_str;
 	bool color;
 	bool only_stdout;
@@ -181,7 +188,7 @@ static void datadump_help(void)
 	fprintf(stderr, "    %s datadump clear\n", DF_BPF_NAME);
 	fprintf(stderr, "    %s datadump find <Match string>\n", DF_BPF_NAME);
 	fprintf(stderr,
-		"    %s datadump set --pid 1234 --comm nginx --l7-proto 20\n",
+		"    %s datadump set --pid 1234 --comm nginx --l7-proto 20 --ipaddr 127.0.0.1 --port 53\n",
 		DF_BPF_NAME);
 	fprintf(stderr, "    %s datadump find --match-str nginx\n",
 		DF_BPF_NAME);
@@ -764,8 +771,12 @@ static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 		printf("  datadump_pid:\t%d\n", sk_trace_params->datadump_pid);
 		printf("  datadump_proto:\t%d\n",
 		       sk_trace_params->datadump_proto);
+		printf("  datadump_port:\t%d\n",
+		       sk_trace_params->datadump_port);
 		printf("  datadump_comm:\t%s\n",
 		       sk_trace_params->datadump_comm);
+		printf("  datadump_ipaddr:\t%s\n",
+		       sk_trace_params->datadump_ipaddr);
 		printf("  datadump_file_path:\t%s\n\n",
 		       sk_trace_params->datadump_file_path);
 
@@ -844,12 +855,17 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 					msg.is_params = true;
 					msg.pid = conf->pid;
 					msg.proto = conf->l7_proto;
-					memset(msg.comm, 0, sizeof(msg.comm));
-					memcpy(msg.comm, conf->comm_str,
-					       sizeof(msg.comm) - 1);
-					fprintf(stdout,
-						" == pid %d l7-proto %d comm %s\n",
-						msg.pid, msg.proto, msg.comm);
+					msg.port = conf->port;
+					if (conf->comm_str)
+						snprintf(msg.comm, sizeof(msg.comm), "%s", conf->comm_str);
+					else
+						msg.comm[0] = '\0';
+
+					if (conf->ip)
+						snprintf(msg.ipaddr, sizeof(msg.ipaddr), "%s", conf->ip);
+					else
+						msg.ipaddr[0] = '\0';
+
 					goto conf_finish;
 				}
 
@@ -890,8 +906,8 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 					       sizeof(msg.comm) - 1);
 				}
 			      conf_finish:
-				printf("Set pid %d comm %s proto %d ", msg.pid,
-				       msg.comm, msg.proto);
+				printf("Set pid %d comm %s proto %d ip %s port %d\n",
+				       msg.pid, msg.comm, msg.proto, msg.ipaddr, msg.port);
 			}
 
 			if (df_bpf_setsockopt(SOCKOPT_SET_DATADUMP_ADD, &msg,
@@ -922,14 +938,22 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 	case DF_BPF_CMD_FIND:
 		{
 			char *match_str = NULL;
+			char cmdbuf[CMD_BUF_SZ];
 			fprintf(stdout, "conf->argc == %d conf->match_str %s\n",
 				conf->argc, conf->match_str);
-			if (conf->match_str != NULL) {
+			if (conf->argc == 0 && conf->match_str != NULL) {
 				match_str = conf->match_str;
-
+				goto process_find;
 			}
 
-			char cmdbuf[CMD_BUF_SZ];
+			if (conf->argc != 1) {
+				fprintf(stdout, "Invalid params.\n");
+				return ETR_NOTSUPP;
+			}
+
+			match_str = conf->argv[0];
+
+		      process_find:
 			if ((conf->file_name != NULL
 			     && strlen(conf->file_name) > 0
 			     && (strstr(conf->file_name, "datadump-")
@@ -1151,13 +1175,15 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		{"all-files", no_argument, NULL, 'A'},
 		{"timeout", required_argument, NULL, 't'},
 		{"match-str", required_argument, NULL, 'm'},
-		{"pid", required_argument, NULL, 'p'},
+		{"pid", required_argument, NULL, 'P'},
 		{"fd", required_argument, NULL, 'f'},
 		{"comm", required_argument, NULL, 'c'},
 		{"l7-proto", required_argument, NULL, 'l'},
 		{"file-name", required_argument, NULL, 'n'},
 		{"start-line", required_argument, NULL, 's'},
 		{"end-line", required_argument, NULL, 'e'},
+		{"ipaddr", required_argument, NULL, 'i'},
+		{"port", required_argument, NULL, 'p'},
 		{NULL, 0, NULL, 0},
 	};
 
@@ -1177,7 +1203,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 	}
 
 	while ((opt =
-		getopt_long(argc, argv, "vhVCOAt:m:p:f:c:l:n:f:e:", opts,
+		getopt_long(argc, argv, "vhVCOAt:m:P:f:c:l:n:f:e:i:p:", opts,
 			    NULL)) != -1) {
 		switch (opt) {
 		case 'v':
@@ -1205,7 +1231,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 				return -1;
 			}
 			break;
-		case 'p':
+		case 'P':
 			conf->pid = atoi(optarg);
 			if (conf->pid < 0) {
 				fprintf(stderr,
@@ -1284,6 +1310,24 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 				conf->file_name[len] = '\0';
 			}
 			break;
+		case 'i':
+			{
+				if (optarg == NULL) {
+					fprintf(stderr,
+						"Invalid option: --ipaddr\n");
+					return -1;
+				}
+
+				int len = strlen(optarg) + 1;
+				conf->ip = malloc(len);
+				if (conf->ip == NULL) {
+					fprintf(stderr, "malloc failed\n");
+					return -1;
+				}
+				memcpy((void *)conf->ip, (void *)optarg, len);
+				conf->ip[len] = '\0';
+			}
+			break;
 		case 's':
 			if (parse_uint_arg(optarg, &conf->start_line) < 0) {
 				fprintf(stderr,
@@ -1295,6 +1339,12 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		case 'e':
 			if (parse_uint_arg(optarg, &conf->end_line) < 0) {
 				fprintf(stderr, "Invalid option: --end-line\n");
+				return -1;
+			}
+			break;
+		case 'p':
+			if (parse_uint_arg(optarg, &conf->port) < 0) {
+				fprintf(stderr, "Invalid option: --port\n");
 				return -1;
 			}
 			break;

@@ -106,6 +106,8 @@ static uint64_t datadump_seq;
 static uint32_t datadump_timeout;
 static char datadump_comm[16];	// If null, process or thread name filtering is not performed.
 static uint8_t datadump_proto;
+static uint16_t datadump_port;
+static char datadump_ipaddr[ADDRSTRLEN];
 static char datadump_file_path[DATADUMP_FILE_PATH_SIZE];
 static FILE *datadump_file;
 static pthread_mutex_t datadump_mutex;
@@ -734,6 +736,7 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 	params->datadump_enable = datadump_enable;
 	params->datadump_pid = datadump_pid;
 	params->datadump_proto = datadump_proto;
+	params->datadump_port = datadump_port;
 
 	params->proc_exec_event_count = get_proc_exec_event_count();
 	params->proc_exit_event_count = get_proc_exit_event_count();
@@ -742,6 +745,7 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 		      sizeof(params->datadump_file_path),
 		      (void *)datadump_file_path, sizeof(datadump_file_path));
 	memcpy(params->datadump_comm, datadump_comm, sizeof(datadump_comm));
+	memcpy(params->datadump_ipaddr, datadump_ipaddr, sizeof(datadump_ipaddr));
 	pthread_mutex_unlock(&datadump_mutex);
 
 	struct trace_stats stats_total;
@@ -776,10 +780,14 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 	if (msg->is_params) {
 		datadump_pid = msg->pid;
 		datadump_proto = msg->proto;
+		datadump_port = msg->port;
 		safe_buf_copy(datadump_comm, sizeof(datadump_comm),
 			      (void *)msg->comm, sizeof(msg->comm));
-		ebpf_info("Set datadump pid %d comm %s proto %d\n",
-			  datadump_pid, datadump_comm, datadump_proto);
+		safe_buf_copy(datadump_ipaddr, sizeof(datadump_ipaddr),
+			      (void *)msg->ipaddr, sizeof(msg->ipaddr));
+		ebpf_info("Set datadump pid %d comm %s proto %d ip %s port %d\n",
+			  datadump_pid, datadump_comm, datadump_proto,
+			  datadump_ipaddr, datadump_port);
 	} else {
 		if (!datadump_enable && msg->enable) {
 			// create a new output file
@@ -815,7 +823,9 @@ static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 			datadump_seq = 0;
 			datadump_timeout = 0;
 			datadump_pid = 0;
+			datadump_port = 0;
 			datadump_comm[0] = '\0';
+			datadump_ipaddr[0] = '\0';
 			datadump_proto = 0;
 			fprintf(datadump_file,
 				"\n\nDump data is finished, use time: %us.\n\n",
@@ -856,6 +866,10 @@ static int datadump_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
  * @proto
  *   Specifying the L7 protocol number. If set to '0', it indicates all
  *   L7 protocols.
+ * @ipaddr
+ *    Specifying ip address.
+ * @port
+ *    Specifying port.
  * @timeout
  *   Specifying the timeout duration. If the elapsed time exceeds this
  *   duration, datadump will stop. The unit is in seconds.
@@ -864,8 +878,8 @@ static int datadump_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
  *
  * @return 0 on success, and a negative value on failure.
  */
-int datadump_set_config(int pid, const char *comm, int proto, int timeout,
-			debug_callback_t cb)
+int datadump_set_config(int pid, const char *comm, int proto, const char *ipaddr,
+			int port, int timeout, debug_callback_t cb)
 {
 	if (pid < 0 || proto < 0 || proto >= PROTO_NUM || comm == NULL
 	    || timeout <= 0) {
@@ -883,16 +897,22 @@ int datadump_set_config(int pid, const char *comm, int proto, int timeout,
 	datadump_use_remote = true;
 	datadump_seq = 0;
 	datadump_pid = pid;
-	datadump_proto = (uint8_t) proto;
+	datadump_port = (uint16_t)port;
+	datadump_proto = (uint8_t)proto;
 	datadump_cb = cb;
 	datadump_comm[0] = '\0';
+	datadump_ipaddr[0] = '\0';
 	datadump_start_time = get_sys_uptime();
 	datadump_timeout = timeout;
 	if (strlen(comm) > 0)
 		safe_buf_copy(datadump_comm, sizeof(datadump_comm),
 			      (void *)comm, strlen(comm));
-	ebpf_info("Set datadump pid %d comm '%s' proto %d\n",
-		  datadump_pid, datadump_comm, datadump_proto);
+	if (strlen(ipaddr) > 0)
+		safe_buf_copy(datadump_ipaddr, sizeof(datadump_ipaddr),
+			      (void *)ipaddr, strlen(ipaddr));
+	ebpf_info("Set datadump pid %d comm '%s' proto %d ip '%s' port %d\n",
+		  datadump_pid, datadump_comm, datadump_proto,
+		  datadump_ipaddr, datadump_port);
 
 finish:
 	pthread_mutex_unlock(&datadump_mutex);
@@ -1615,7 +1635,9 @@ static void check_datadump_timeout(void)
 			datadump_enable = false;
 			datadump_use_remote = false;
 			datadump_pid = 0;
+			datadump_port = 0;
 			datadump_comm[0] = '\0';
+			datadump_ipaddr[0] = '\0';
 			datadump_proto = 0;
 			fprintf(datadump_file,
 				"\n\nDump data is finished, use time: %us.\n\n",
@@ -3691,59 +3713,62 @@ static char *flow_info(struct socket_bpf_data *sd)
 
 static bool allow_datadump(struct socket_bpf_data *sd)
 {
-	bool output = false;
-	if (datadump_pid == 0 && (strlen(datadump_comm) > 0)
-	    && (datadump_proto == 0)) {
-		if (strcmp((char *)sd->process_kname, (char *)datadump_comm) ==
-		    0) {
-			output = true;
-		}
+	bool match = true;
+	bool has_filter = false;
 
-	} else if (datadump_pid == 0 && (strlen(datadump_comm) == 0)
-		   && (datadump_proto == 0)) {
-		output = true;
-
-	} else if (datadump_pid > 0 && (strlen(datadump_comm) == 0)
-		   && (datadump_proto == 0)) {
-		if (sd->process_id == datadump_pid
-		    || sd->thread_id == datadump_pid)
-			output = true;
-
-	} else if (datadump_pid > 0 && (strlen(datadump_comm) > 0)
-		   && (datadump_proto == 0)) {
-		if ((sd->process_id == datadump_pid
-		     || sd->thread_id == datadump_pid)
-		    && (strcmp((char *)sd->process_kname, (char *)datadump_comm)
-			== 0))
-			output = true;
-	} else if (datadump_pid == 0 && (strlen(datadump_comm) > 0)
-		   && (datadump_proto > 0)) {
-		if (strcmp((char *)sd->process_kname, (char *)datadump_comm) ==
-		    0 && sd->l7_protocal_hint == datadump_proto)
-			output = true;
-
-	} else if (datadump_pid == 0 && (strlen(datadump_comm) == 0)
-		   && (datadump_proto > 0)) {
-		if (sd->l7_protocal_hint == datadump_proto)
-			output = true;
-
-	} else if (datadump_pid > 0 && (strlen(datadump_comm) == 0)
-		   && (datadump_proto > 0)) {
-		if ((sd->process_id == datadump_pid
-		     || sd->thread_id == datadump_pid)
-		    && sd->l7_protocal_hint == datadump_proto)
-			output = true;
-
-	} else if (datadump_pid > 0 && (strlen(datadump_comm) > 0)
-		   && (datadump_proto > 0)) {
-		if ((sd->process_id == datadump_pid
-		     || sd->thread_id == datadump_pid)
-		    && (strcmp((char *)sd->process_kname, (char *)datadump_comm)
-			== 0) && sd->l7_protocal_hint == datadump_proto)
-			output = true;
+	/* pid filter */
+	if (datadump_pid > 0) {
+		has_filter = true;
+		match &= (sd->process_id == datadump_pid ||
+			  sd->thread_id == datadump_pid);
 	}
 
-	return output;
+	/* comm filter */
+	if (strlen(datadump_comm) > 0) {
+		has_filter = true;
+		match &= strcmp((char *)sd->process_kname,
+				(char *)datadump_comm) == 0;
+	}
+
+	/* protocol filter */
+	if (datadump_proto > 0) {
+		has_filter = true;
+		match &= sd->l7_protocal_hint == datadump_proto;
+	}
+
+	/* ip filter */
+	if (strlen(datadump_ipaddr) > 0) {
+		has_filter = true;
+
+		char sbuf[64], dbuf[64];
+
+		if (sd->tuple.addr_len == 16) {
+			inet_ntop(AF_INET6, sd->tuple.rcv_saddr,
+				  sbuf, sizeof(sbuf));
+			inet_ntop(AF_INET6, sd->tuple.daddr,
+				  dbuf, sizeof(dbuf));
+		} else {
+			struct in_addr addr;
+
+			addr.s_addr = *((in_addr_t *) sd->tuple.rcv_saddr);
+			snprintf(sbuf, sizeof(sbuf), "%s", inet_ntoa(addr));
+
+			addr.s_addr = *((in_addr_t *) sd->tuple.daddr);
+			snprintf(dbuf, sizeof(dbuf), "%s", inet_ntoa(addr));
+		}
+
+		match &= (strcmp(sbuf, (char *)datadump_ipaddr) == 0 ||
+			  strcmp(dbuf, (char *)datadump_ipaddr) == 0);
+	}
+
+	/* port filter */
+	if (datadump_port > 0) {
+		has_filter = true;
+		match &= (datadump_port == sd->tuple.dport ||
+			  datadump_port == sd->tuple.num);
+	}
+
+	return has_filter && match;
 }
 
 static int __unused get_fd_path(pid_t pid, u32 fd, char *buf, size_t bufsize)
