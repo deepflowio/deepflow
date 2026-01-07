@@ -34,7 +34,7 @@ END;
 CALL ModifyColumnIfExists('agent_group_configuration', 'yaml', 'LONGTEXT');
 
 -- Cleanup
-DROP FUNCTION IF EXISTS ColumnExists;
+DROP PROCEDURE IF EXISTS ColumnExists;
 DROP PROCEDURE IF EXISTS ModifyColumnIfExists;
 
 -- Update DB version
