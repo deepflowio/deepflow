@@ -22,7 +22,7 @@ type MySQLAgentGroupConfiguration struct {
 	ID               int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Lcuuid           string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 	AgentGroupLcuuid string    `gorm:"column:agent_group_lcuuid;type:char(64);not null" json:"AGENT_GROUP_LCUUID"`
-	Yaml             string    `gorm:"column:yaml;type:text;not null" json:"YAML"`
+	Yaml             string    `gorm:"column:yaml;type:longtext;not null" json:"YAML"`
 	CreatedAt        time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt        time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 }
