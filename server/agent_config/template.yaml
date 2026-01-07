@@ -5496,6 +5496,12 @@ processors:
           #   ch: |-
           #     开启后所有 gRPC 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
           streaming_data_enabled: false
+      # type: dict
+      # name:
+      #   en: Custom Protocol Parsing
+      #   ch: 自定义协议解析
+      # description: deprecated
+      custom_protocols: []
     # type: section
     # name:
     #   en: Filters
@@ -6232,6 +6238,12 @@ processors:
         # field_name: ""
         HTTP: []
         HTTP2: []
+      # type: dict
+      # name:
+      #   en: Custom Protocol Parsing
+      #   ch: 自定义协议解析
+      # description: deprecated
+      custom_field_policies: []
       # type: string
       # name:
       #   en: Obfuscate Protocols
