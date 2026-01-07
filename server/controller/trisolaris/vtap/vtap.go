@@ -56,11 +56,13 @@ type VTapInfo struct {
 	// key: ctrlIP
 	kvmVTapCaches *KvmVTapCacheMap
 
-	metaData                       *metadata.MetaData
-	config                         *config.Config
-	vTapPlatformData               *VTapPlatformData
-	groupData                      *GroupData
-	vTapPolicyData                 *VTapPolicyData
+	metaData            *metadata.MetaData
+	config              *config.Config
+	vTapPlatformData    *VTapPlatformData
+	groupData           *GroupData
+	vTapPolicyData      *VTapPolicyData
+	customAppConfigData *CustomAppConfigData
+
 	lcuuidToRegionID               map[string]int
 	azToDomain                     map[string]string
 	domainIdToLcuuid               map[int]string
@@ -70,6 +72,7 @@ type VTapInfo struct {
 	hypervNetworkHostIds           mapset.Set
 	vtapGroupNameOrShortIDToLcuuid map[string]string
 	vtapGroupLcuuidToShortID       map[string]string
+	vtapGroupLcuuidToID            map[string]int
 	vtapGroupLcuuidToConfiguration map[string]*VTapConfig
 	vtapGroupLcuuidToLocalConfig   map[string]string
 	noVTapTapPortsMac              mapset.Set
@@ -130,6 +133,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config, o
 		metaData:                       metaData,
 		groupData:                      newGroupData(metaData),
 		vTapPolicyData:                 newVTapPolicyData(metaData),
+		customAppConfigData:            newCustomAppConfigData(metaData),
 		lcuuidToRegionID:               make(map[string]int),
 		azToDomain:                     make(map[string]string),
 		domainIdToLcuuid:               make(map[int]string),
@@ -139,6 +143,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config, o
 		hypervNetworkHostIds:           mapset.NewSet(),
 		vtapGroupNameOrShortIDToLcuuid: make(map[string]string),
 		vtapGroupLcuuidToShortID:       make(map[string]string),
+		vtapGroupLcuuidToID:            make(map[string]int),
 		vtapGroupLcuuidToConfiguration: make(map[string]*VTapConfig),
 		vtapGroupLcuuidToLocalConfig:   make(map[string]string),
 		noVTapTapPortsMac:              mapset.NewSet(),
@@ -256,14 +261,17 @@ func (v *VTapInfo) loadVTapGroup() {
 
 	vtapGroupNameOrShortIDToLcuuid := make(map[string]string)
 	vtapGroupLcuuidToShortID := make(map[string]string)
+	vtapGroupLcuuidToID := make(map[string]int)
 	for _, vtapGroup := range vtapGroups {
 		vtapGroupNameOrShortIDToLcuuid[vtapGroup.Name] = vtapGroup.Lcuuid
 		vtapGroupNameOrShortIDToLcuuid[vtapGroup.ShortUUID] = vtapGroup.Lcuuid
 		vtapGroupLcuuidToShortID[vtapGroup.Lcuuid] = vtapGroup.ShortUUID
+		vtapGroupLcuuidToID[vtapGroup.Lcuuid] = vtapGroup.ID
 	}
 
 	v.vtapGroupNameOrShortIDToLcuuid = vtapGroupNameOrShortIDToLcuuid
 	v.vtapGroupLcuuidToShortID = vtapGroupLcuuidToShortID
+	v.vtapGroupLcuuidToID = vtapGroupLcuuidToID
 }
 
 func vtapPortToStr(port int64) string {
@@ -700,6 +708,20 @@ func (v *VTapInfo) GetAgentPolicyVersion(vtapID int, functions mapset.Set) uint6
 		return 0
 	}
 	return v.vTapPolicyData.getAgentPolicyVersion(vtapID, functions)
+}
+
+func (v *VTapInfo) GetCustomAppConfigByte(teamID, agentGroupID int) []byte {
+	if v == nil {
+		return nil
+	}
+	return v.customAppConfigData.getCustomAppConfigByte(teamID, agentGroupID)
+}
+
+func (v *VTapInfo) GetCustomAppConfigVersion() uint64 {
+	if v == nil {
+		return 0
+	}
+	return v.customAppConfigData.getCustomAppConfigVersion()
 }
 
 func (v *VTapInfo) CheckClusterOwner(k8sClusterMD5 string) bool {
