@@ -226,7 +226,7 @@ $defs:
               - payload_hessian2_value
               - dubbo_header_value
               - dubbo_payload_map_string_value
-              - sql_insertion_column
+              - sql_upsert_column
               enum@en:
               - Header Field
               - HTTP URL Field
@@ -235,7 +235,7 @@ $defs:
               - Payload Hessian2 Value
               - Dubbo Header Value
               - Dubbo Payload Map String Value
-              - SQL Insertion Column
+              - SQL Insert and Update Column
               enum@ch:
               - 头字段提取
               - HTTP URL 提取
@@ -244,7 +244,7 @@ $defs:
               - Hessian2 内容提取
               - Dubbo 头字段提取
               - Dubbo map 内容提取
-              - SQL 插入语句列提取
+              - SQL 插入和更新语句列提取
               title@en: Field Extraction Type
               title@ch: 字段的提取类型
               description@en: |-
@@ -409,12 +409,12 @@ $defs:
                 The following settings are not supported:
                 - metric
                 - rewrite_response_status
-                - remap and condition in rewrite_native_tag
+                - remap and pre_condition in rewrite_native_tag
               description@ch: |-
                 不支持的配置如下：
                 - metric
                 - rewrite_response_status
-                - rewrite_native_tag 中的 remap 和 condition 
+                - rewrite_native_tag 中的 remap 和 pre_condition
       compound_fields:
         type: array
         title@en: Compound Fields
@@ -564,6 +564,11 @@ $defs:
         - key_value_separator: Separator between key and value, default is "=".
         - keyword: Field(s) to search for.
         - ignore_case: Whether to ignore case.
+      - parse_dict_value: Parses the value as a dictionary, and outputs the value corresponding to the specified key. Supported configuration:
+        - keyword: Field to search for.
+        - type: Can only be string.
+        - ignore_case: Whether to ignore case.
+        - skip: Skip the first N matches before extracting.
     description@ch: |-
       多个后处理步骤按配置顺序依次执行，每一步的输出作为下一步的输入。
       支持的各类型配置如下：
@@ -595,6 +600,11 @@ $defs:
         - key_value_separator：键值分隔符，默认为"="。
         - keyword：要查找的字段。
         - ignore_case：是否忽略大小写。
+      - parse_dict_value：将值作为字典解析，并输出指定 key 对应的 value。支持配置为：
+        - keyword：要查找的字段。
+        - type：类型，只能为 string。
+        - ignore_case：是否忽略大小写。
+        - skip：跳过前 N 个匹配结果后再提取。
     required:
     - type
     - settings
@@ -609,6 +619,7 @@ $defs:
         - parse_json_value
         - parse_xml_value
         - parse_key_value
+        - parse_dict_value
         enum@en:
         - Remap
         - Obfuscate
@@ -617,6 +628,7 @@ $defs:
         - Parse JSON Value
         - Parse XML Value
         - Parse Key Value
+        - Parse Dict Value
         enum@ch:
         - 字典映射
         - 脱敏
@@ -625,6 +637,7 @@ $defs:
         - JSON 提取
         - XML 提取
         - 键值提取
+        - 字典提取
         title@en: Post-processing type
         title@ch: 后期处理类型
       settings:
@@ -633,6 +646,55 @@ $defs:
         title@ch: 设置
         items:
           $ref: '#/$defs/key_value'
+  value_match_condition:
+    type: string
+    title@en: Value Match Condition
+    title@ch: 值匹配条件
+    description@en: |-
+      Syntax: operator value, where operator is the operator and value is the value to match.
+      Supported operators:
+      - Equal: `=`
+      - Not Equal: `!=`
+      - Contains (supports wildcards): `:`
+      - Does not contain (supports wildcards): `!:`
+      - Matches regex: `~`
+      - Does not match regex: `!~`
+    description@ch: |-
+      语法为：operator value，其中 operator 为操作符，value 为用于匹配的值。
+      支持的操作符如下：
+      - 等于：`=`
+      - 不等于：`!=`
+      - 包含（支持通配符）：`:`
+      - 不包含（支持通配符）：`!:`
+      - 匹配正则：`~`
+      - 不匹配正则：`!~`
+    pattern: ^(=|!=|:|!:|~|!~)\s+
+  rewrite_condition:
+    type: object
+    title@en: Rewrite Condition
+    title@ch: 重写条件
+    description@en: |-
+      Match the following array content based on extraction value.
+      The matching order is as follows:
+      - If matched in blacklist, do not rewrite.
+      - If matched in whitelist, rewrite.
+      - If whitelist is empty, rewrite.
+      - Do not rewrite.
+    description@ch: |-
+      根据配置的黑白名单决定是否重写字段值。匹配顺序为：
+      - 如果匹配黑名单，则不重写。
+      - 如果匹配白名单，则重写。
+      - 如果白名单为空，则重写。
+      - 不重写。
+    properties:
+      blacklist:
+        type: array
+        items:
+          $ref: '#/$defs/value_match_condition'
+      whitelist:
+        type: array
+        items:
+          $ref: '#/$defs/value_match_condition'
   field_output:
     type: object
     properties:
@@ -770,27 +832,18 @@ $defs:
               Mapping dictionary name, when configuration is not empty, map the input using the configured dictionary.
               Not effective when configuration is empty.
             description@ch: 映射字典名称，配置不为空时将输入用所配置的字典进行映射。配置为空时不生效。
-          condition:
-            type: object
-            title@en: Condition
-            title@ch: 条件
-            properties:
-              enum_whitelist:
-                title@en: Enum Whitelist
-                title@ch: 枚举白名单
-                type: array
-                items:
-                  type: string
-                description@en: Enum whitelist, rewrite when extraction result is in whitelist. Not effective when configuration is empty.
-                description@ch: 枚举白名单，当提取结果在白名单中时，进行重写。配置为空时不生效。
-              enum_blacklist:
-                type: array
-                title@en: Enum Blacklist
-                title@ch: 枚举黑名单
-                items:
-                  type: string
-                description@en: Enum blacklist, do not rewrite when extraction result is in blacklist.
-                description@ch: 枚举黑名单，当提取结果在黑名单中时，不进行重写。
+          pre_condition:
+            $ref: '#/$defs/rewrite_condition'
+            title@en: Pre-condition
+            title@ch: 前置条件
+            description@en: Match the original value in the request log, rewrite when matched.
+            description@ch: 匹配调用日志中原始值，当匹配时进行重写。
+          post_condition:
+            $ref: '#/$defs/rewrite_condition'
+            title@en: Post-condition
+            title@ch: 后置条件
+            description@en: Match the value extracted by custom policy, rewrite when matched.
+            description@ch: 匹配自定义策略提取的值，当匹配时进行重写。
       rewrite_response_status:
         type: object
         title@en: Rewrite Response Status
