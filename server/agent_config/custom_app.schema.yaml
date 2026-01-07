@@ -107,7 +107,6 @@ $defs:
     title@ch: 自定义字段策略
     required:
     - protocol_name
-    - fields
     properties:
       policy_name:
         type: string
