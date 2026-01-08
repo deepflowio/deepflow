@@ -133,7 +133,8 @@ custom_field:
           default_status: ""
         priority: 0
     const_fields:
-    - value: "123"
+    - name: "my_const_field"
+      value: "123"
       output:
         attribute_name: "xyz"
         rewrite_native_tag:
@@ -147,7 +148,8 @@ custom_field:
             - '!: xxx'
         priority: 0
     compound_fields:
-    - format: "{field1_name}-{field2_name}"
+    - name: "my_compound_field"
+      format: "{field1_name}-{field2_name}"
       output:
         attribute_name: "xyz"
         metric_name: "xyz"
