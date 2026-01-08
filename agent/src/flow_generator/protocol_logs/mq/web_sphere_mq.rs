@@ -14,12 +14,20 @@
  * limitations under the License.
  */
 
+use std::borrow::Cow;
+
 use serde::Serialize;
 
-use enterprise_utils::l7::mq::web_sphere_mq::WebSphereMqParser;
-use public::l7_protocol::LogMessageType;
+use public::l7_protocol::{
+    Field, FieldSetter, L7Log, L7LogAttribute, L7ProtocolEnum, LogMessageType,
+};
+use public_derive::L7Log;
 
-use crate::plugin::CustomInfo;
+use enterprise_utils::l7::{
+    custom_policy::custom_field_policy::{enums::Op, PolicySlice, Store},
+    mq::web_sphere_mq::WebSphereMqParser,
+};
+
 use crate::{
     common::{
         flow::{L7PerfStats, L7Protocol},
@@ -31,6 +39,7 @@ use crate::{
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
+            auto_merge_custom_field,
             consts::*,
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
@@ -39,9 +48,16 @@ use crate::{
             PrioFields, BASE_FIELD_PRIORITY, PLUGIN_FIELD_PRIORITY,
         },
     },
+    plugin::CustomInfo,
 };
 
-#[derive(Serialize, Debug, Default, Clone)]
+#[derive(L7Log, Serialize, Debug, Default, Clone)]
+#[l7_log(version.skip = "true")]
+#[l7_log(response_result.skip = "true")]
+#[l7_log(x_request_id.skip = "true")]
+#[l7_log(http_proxy_client.skip = "true")]
+#[l7_log(request_id.skip = "true")]
+#[l7_log(trace_id.getter = "WebSphereMqInfo::get_trace_id", trace_id.setter = "WebSphereMqInfo::set_trace_id")]
 pub struct WebSphereMqInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
@@ -68,10 +84,11 @@ pub struct WebSphereMqInfo {
     pub endpoint: String,
 
     // response
+    #[l7_log(response_status)]
     #[serde(rename = "response_status", skip_serializing_if = "value_is_default")]
     pub status: L7ResponseStatus,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub response_code: i32,
+    pub response_code: String,
     #[serde(skip_serializing_if = "value_is_default")]
     pub response_exception: String,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -148,6 +165,15 @@ impl L7ProtocolInfoInterface for WebSphereMqInfo {
     }
 }
 
+impl L7LogAttribute for WebSphereMqInfo {
+    fn add_attribute(&mut self, name: Cow<'_, str>, value: Cow<'_, str>) {
+        self.attributes.push(KeyVal {
+            key: name.into_owned(),
+            val: value.into_owned(),
+        });
+    }
+}
+
 impl WebSphereMqInfo {
     pub fn merge(&mut self, other: &mut Self) {
         if self.status == L7ResponseStatus::default() {
@@ -175,7 +201,7 @@ impl WebSphereMqInfo {
     fn response_code_to_attribute(&mut self) {
         self.attributes.push(KeyVal {
             key: SYS_RESPONSE_CODE_ATTR.to_string(),
-            val: self.response_code.to_string(),
+            val: self.response_code.clone(),
         });
     }
 
@@ -210,7 +236,7 @@ impl WebSphereMqInfo {
         if let Some(code) = custom.resp.code {
             self.msg_type = LogMessageType::Response;
             self.response_code_to_attribute();
-            self.response_code = code;
+            self.response_code = code.to_string();
         }
 
         if custom.resp.status != L7ResponseStatus::default() {
@@ -265,6 +291,49 @@ impl WebSphereMqInfo {
             self.biz_scenario = biz_scenario;
         }
     }
+
+    pub fn merge_parsed_info(&mut self, mut parser: WebSphereMqParser) {
+        self.is_async = parser.is_async;
+        self.is_reversed = parser.is_reversed;
+        self.msg_type = parser.msg_type;
+        self.trace_ids
+            .merge_field(BASE_FIELD_PRIORITY, std::mem::take(&mut parser.ntfctn_id));
+        self.trace_ids.merge_field(
+            BASE_FIELD_PRIORITY,
+            std::mem::take(&mut parser.orgnl_msg_id),
+        );
+        self.trace_ids
+            .merge_field(BASE_FIELD_PRIORITY, std::mem::take(&mut parser.msg_id));
+        if self.msg_type == LogMessageType::Response {
+            self.span_id = std::mem::take(&mut parser.mesg_ref_id);
+        } else {
+            self.span_id = std::mem::take(&mut parser.mesg_id);
+        }
+        self.request_type = std::mem::take(&mut parser.mesg_type);
+        self.request_domain = std::mem::take(&mut parser.mesg_direction);
+        self.endpoint = std::mem::take(&mut parser.endpoint);
+        self.response_code = std::mem::take(&mut parser.response_code);
+        self.status = parser.status;
+        self.response_exception = std::mem::take(&mut parser.response_exception);
+        self.attributes = std::mem::take(&mut parser.attributes);
+        self.biz_type = parser.biz_type;
+        self.biz_code = std::mem::take(&mut parser.biz_code);
+        self.biz_scenario = std::mem::take(&mut parser.biz_scenario);
+    }
+
+    fn get_trace_id(&self) -> Field {
+        Field::Str(Cow::Borrowed(&self.trace_ids.highest()))
+    }
+
+    fn set_trace_id(&mut self, trace_id: FieldSetter) {
+        let (prio, trace_id) = (trace_id.prio(), trace_id.into_inner());
+        match trace_id {
+            Field::Str(s) => {
+                self.trace_ids.merge_field(prio, s.into_owned());
+            }
+            _ => return,
+        }
+    }
 }
 
 impl From<WebSphereMqInfo> for L7ProtocolSendLog {
@@ -293,6 +362,7 @@ impl From<WebSphereMqInfo> for L7ProtocolSendLog {
                 status: f.status,
                 exception: f.response_exception,
                 result: f.response_result,
+                code: f.response_code.parse::<i32>().ok(),
                 ..Default::default()
             },
             trace_info: Some(TraceInfo {
@@ -327,97 +397,93 @@ impl From<&WebSphereMqInfo> for LogCache {
 pub struct WebSphereMqLog {
     perf_stats: Option<L7PerfStats>,
     parser: WebSphereMqParser,
+
+    custom_field_store: Store,
 }
 
-const RESPONSE_CODE_OK_SUFFIX: &str = "0000";
 impl L7ProtocolParserInterface for WebSphereMqLog {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
-        let has_wasm = param.wasm_vm.borrow().is_some();
-        self.parser.check_payload(payload, has_wasm)
+    fn check_payload(&mut self, payload: &[u8], _param: &ParseParam) -> Option<LogMessageType> {
+        self.parser.check_payload(payload)
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        let has_wasm = param.wasm_vm.borrow().is_some();
-        if !self.parser.parse_payload(payload, has_wasm) {
-            return Err(Error::L7ProtocolUnknown);
-        }
+        let Some(config) = param.parse_config else {
+            return Err(Error::NoParseConfig);
+        };
+
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
-        let mut info = WebSphereMqInfo::default();
-        if let Some(request_type) = &self.parser.request_type {
-            info.request_type = request_type.to_string();
-        }
-        if let Some(exception) = &self.parser.exception {
-            info.response_exception = exception.to_string();
-        }
-        if let Some(end_to_end_id) = &self.parser.end_to_end_id {
-            info.trace_ids
-                .merge_field(BASE_FIELD_PRIORITY, end_to_end_id.to_string());
-        }
-        info.msg_type = LogMessageType::Request;
-        info.status = L7ResponseStatus::Ok;
-        if let Some(code) = &self.parser.ret_code {
-            info.msg_type = LogMessageType::Response;
-            if !code.ends_with(RESPONSE_CODE_OK_SUFFIX) {
-                info.status = L7ResponseStatus::ServerError;
-            }
-        }
+        self.custom_field_store.clear();
+        let custom_policies = config
+            .l7_log_dynamic
+            .get_custom_field_policies(L7ProtocolEnum::L7Protocol(L7Protocol::WebSphereMq), param);
 
-        info.is_async = true;
-        let wasm_results = self.wasm_hook(param, payload);
-        if has_wasm && wasm_results.is_none() {
-            return Err(Error::L7ProtocolUnknown);
-        }
-        if let Some(customs) = wasm_results {
-            if !customs.is_empty() {
-                let mut results: Vec<L7ProtocolInfo> = Vec::with_capacity(customs.len());
-                for custom in customs {
-                    let mut custom_info = WebSphereMqInfo::default();
-                    custom_info.status = L7ResponseStatus::Ok;
-                    custom_info.msg_type = LogMessageType::Request;
-                    set_captured_byte!(custom_info, param);
-                    custom_info.is_tls = param.is_tls();
-                    custom_info.merge_custom_info(custom);
-                    match custom_info.status {
-                        L7ResponseStatus::ServerError => {
-                            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                        }
-                        L7ResponseStatus::ClientError => {
-                            self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                        }
-                        _ => {}
-                    }
-                    match custom_info.msg_type {
-                        LogMessageType::Request => {
-                            self.perf_stats.as_mut().map(|p| p.inc_req());
-                        }
-                        LogMessageType::Response => {
-                            self.perf_stats.as_mut().map(|p| p.inc_resp());
-                        }
-                        _ => {}
-                    }
-                    results.push(L7ProtocolInfo::WebSphereMqInfo(custom_info));
-                }
-                if results.len() == 1 {
-                    return Ok(L7ParseResult::Single(results.into_iter().next().unwrap()));
-                } else {
-                    return Ok(L7ParseResult::Multi(results));
+        let mut pos = 0;
+        let mut loop_count = 0;
+        let mut results: Vec<L7ProtocolInfo> = Vec::with_capacity(3);
+        while pos < payload.len() {
+            loop_count += 1;
+            let parsed_size = self.parser.parse_payload(&payload[pos..], param.direction);
+            if parsed_size == 0 {
+                break;
+            }
+            let mut info = WebSphereMqInfo::default();
+            set_captured_byte!(info, param);
+            info.is_tls = param.is_tls();
+            let parser = std::mem::take(&mut self.parser);
+            info.merge_parsed_info(parser);
+
+            let wasm_results = self.wasm_hook(param, payload[pos..pos + parsed_size].as_ref());
+            if let Some(customs) = wasm_results {
+                if customs.len() == 1 {
+                    let custom = customs.into_iter().next().unwrap();
+                    info.merge_custom_info(custom);
                 }
             }
+            self.merge_custom_fields(
+                custom_policies,
+                payload[pos..pos + parsed_size].as_ref(),
+                &mut info,
+            );
+
+            match info.status {
+                L7ResponseStatus::ServerError => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
+                }
+                L7ResponseStatus::ClientError => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                }
+                _ => {}
+            }
+            match info.msg_type {
+                LogMessageType::Request => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                }
+                LogMessageType::Response => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                }
+                _ => {}
+            }
+            info.attributes.push(KeyVal {
+                key: "mq_Index".to_string(),
+                val: loop_count.to_string(),
+            });
+            results.push(L7ProtocolInfo::WebSphereMqInfo(info));
+
+            pos += parsed_size;
+        }
+
+        if results.is_empty() {
             return Err(Error::L7ProtocolUnknown);
         }
 
-        info.is_tls = param.is_tls();
-        set_captured_byte!(info, param);
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
-            if let Some(stats) = info.perf_stats(param) {
-                perf_stats.sequential_merge(&stats);
-            }
+        if results.len() == 1 {
+            return Ok(L7ParseResult::Single(results.into_iter().next().unwrap()));
+        } else {
+            return Ok(L7ParseResult::Multi(results));
         }
-
-        Ok(L7ParseResult::Single(L7ProtocolInfo::WebSphereMqInfo(info)))
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -441,5 +507,28 @@ impl WebSphereMqLog {
         };
         let proto = L7Protocol::WebSphereMq as u8;
         vm.on_parse_payload(payload, param, proto)
+    }
+
+    fn merge_custom_fields(
+        &mut self,
+        policies: Option<PolicySlice>,
+        l7_payload: &[u8],
+        info: &mut WebSphereMqInfo,
+    ) {
+        let Some(policies) = policies else {
+            return;
+        };
+
+        for op in self.custom_field_store.drain_with(policies, &*info) {
+            match &op.op {
+                Op::SavePayload(key) => {
+                    info.attributes.push(KeyVal {
+                        key: key.to_string(),
+                        val: String::from_utf8_lossy(l7_payload).to_string(),
+                    });
+                }
+                _ => auto_merge_custom_field(op, info),
+            }
+        }
     }
 }

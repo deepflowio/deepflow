@@ -344,22 +344,45 @@ pub mod l7 {
 
     pub mod mq {
         pub mod web_sphere_mq {
-            use public::l7_protocol::LogMessageType;
+            use public::{
+                enums::{L7ResponseStatus, PacketDirection},
+                l7_protocol::{KeyVal, LogMessageType},
+            };
 
             #[derive(Default)]
             pub struct WebSphereMqParser {
-                pub request_type: Option<String>,
-                pub end_to_end_id: Option<String>,
-                pub ret_code: Option<String>,
-                pub exception: Option<String>,
+                pub msg_type: LogMessageType,
+                pub is_async: bool,
+                pub is_reversed: bool,
+
+                pub ntfctn_id: String,
+                pub orgnl_msg_id: String,
+                pub msg_id: String,
+
+                pub mesg_id: String,
+                pub mesg_ref_id: String,
+                pub mesg_type: String,
+                pub mesg_priority: String,
+                pub mesg_direction: String,
+
+                pub endpoint: String,
+                pub status: L7ResponseStatus,
+                pub response_code: String,
+                pub response_exception: String,
+
+                pub attributes: Vec<KeyVal>,
+
+                pub biz_type: u8,
+                pub biz_code: String,
+                pub biz_scenario: String,
             }
 
             impl WebSphereMqParser {
-                pub fn check_payload(&mut self, _: &[u8], _: bool) -> Option<LogMessageType> {
+                pub fn check_payload(&mut self, _: &[u8]) -> Option<LogMessageType> {
                     unimplemented!()
                 }
 
-                pub fn parse_payload(&mut self, _: &[u8], _: bool) -> bool {
+                pub fn parse_payload(&mut self, _: &[u8], _: PacketDirection) -> usize {
                     unimplemented!()
                 }
             }
