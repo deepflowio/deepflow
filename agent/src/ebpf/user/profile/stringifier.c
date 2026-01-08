@@ -548,6 +548,26 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 
 	char *str = NULL;
 	int ret_val = 0;
+
+	// Lua frames require special handling via extended hook
+	// Lua uses its own stack format with encoded tag + pointer values
+	if (use_symbol_table) {
+		str = extended_format_lua_stack(t, pid, stack_id, stack_map_name, h, new_cache, info_p);
+		if (str != NULL) {
+			// Cache the result
+			kv.key = (u64) stack_id;
+			kv.value = pointer_to_uword(str);
+			if (stack_str_hash_add_del(h, &kv, 1)) {
+				clib_mem_free((void *)str);
+				return NULL;
+			}
+			int ret = VEC_OK;
+			struct stack_str_hash_ext_data *ext = h->private;
+			vec_add1(ext->stack_str_kvps, kv, ret);
+			return str;
+		}
+	}
+
 	str = build_stack_trace_string(t, stack_map_name, pid, stack_id,
 				       h, new_cache, &ret_val, info_p, ts,
 				       ignore_libs, use_symbol_table);

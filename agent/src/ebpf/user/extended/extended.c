@@ -100,3 +100,10 @@ int __attribute__ ((weak)) extended_merge_stacks(char *dst, int len, const char 
 {
 	return 0;
 }
+
+char * __attribute__ ((weak)) extended_format_lua_stack(void *tracer, int pid, int stack_id,
+                                                        const char *stack_map_name, void *h,
+                                                        bool new_cache, void *info_p)
+{
+	return NULL;
+}

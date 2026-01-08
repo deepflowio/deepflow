@@ -66,7 +66,7 @@ void extended_process_exit(int pid);
  * @brief **extended_match_pid_handle()** Perform extended processing on matching PIDs
  * @param feat Feature identifiers, such as: off-cpu/memory profiler
  * @param pid Matching process ID
- * @param act Is MATCH_PID_ADD or MATCH_PID_DEL 
+ * @param act Is MATCH_PID_ADD or MATCH_PID_DEL
  */
 void extended_match_pid_handle(int feat, int pid, enum match_pids_act act);
 
@@ -130,5 +130,20 @@ char *extended_resolve_frame(int pid, u64 addr, u8 frame_type, u64 extra_a, u64 
  * @return Bytes written
  */
 int extended_merge_stacks(char *dst, int len, const char *i_trace, const char *u_trace, int pid);
+
+/**
+ * @brief **extended_format_lua_stack()** Format Lua interpreter stack frames
+ * @param tracer BPF tracer handle
+ * @param pid Process ID
+ * @param stack_id Interpreter stack ID from BPF map
+ * @param stack_map_name Name of the stack map
+ * @param h Stack string hash table
+ * @param new_cache Whether to create new cache entry
+ * @param info_p Process info pointer
+ * @return Formatted stack string (caller must free) or NULL
+ */
+char *extended_format_lua_stack(void *tracer, int pid, int stack_id,
+                                const char *stack_map_name, void *h,
+                                bool new_cache, void *info_p);
 
 #endif /* DF_EXTENDED_H */
