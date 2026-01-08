@@ -14,61 +14,10 @@
  * limitations under the License.
  */
 
-use super::L7ResponseStatus;
-
+pub use public::l7_protocol::{
+    ExtendedInfo, KeyVal, L7Request, L7Response, MetricKeyVal, TraceInfo,
+};
 use public::proto::flow_log;
-
-#[derive(Default, Debug)]
-pub struct L7Request {
-    pub req_type: String,
-    pub domain: String,
-    pub resource: String,
-    pub endpoint: String,
-}
-
-#[derive(Default, Debug)]
-pub struct L7Response {
-    pub status: L7ResponseStatus,
-    pub code: Option<i32>,
-    pub exception: String,
-    pub result: String,
-}
-
-#[derive(Default, Debug)]
-pub struct TraceInfo {
-    pub trace_ids: Vec<String>,
-    pub span_id: Option<String>,
-    pub parent_span_id: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KeyVal {
-    pub key: String,
-    pub val: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MetricKeyVal {
-    pub key: String,
-    pub val: f32,
-}
-
-impl Eq for MetricKeyVal {}
-
-#[derive(Default, Debug)]
-pub struct ExtendedInfo {
-    pub service_name: Option<String>,
-    pub rpc_service: Option<String>,
-    pub client_ip: Option<String>,
-    pub request_id: Option<u32>,
-    pub x_request_id_0: Option<String>,
-    pub x_request_id_1: Option<String>,
-    pub user_agent: Option<String>,
-    pub referer: Option<String>,
-    pub protocol_str: Option<String>,
-    pub attributes: Option<Vec<KeyVal>>,
-    pub metrics: Option<Vec<MetricKeyVal>>,
-}
 
 /*
  * server 的协议适配结构，用于把所有协议转换成统一的结构发送到 server
