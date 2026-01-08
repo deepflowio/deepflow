@@ -172,6 +172,7 @@ enum {
  */
 typedef struct {
 	u8 profiler_type;
+	u8 flags;
 	u64 time_stamp;
 	u32 pid;
 	u32 tid;

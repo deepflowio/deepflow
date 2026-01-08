@@ -674,6 +674,10 @@ static void set_stack_trace_msg(struct profiler_context *ctx,
 	msg->stime = stime;
 	msg->netns_id = ns_id;
 	msg->profiler_type = ctx->type;
+	msg->flags = 0;
+	if (ctx->type == PROFILER_TYPE_MEMORY && (v->flags & STACK_TRACE_FLAGS_CUDA_MEMORY)) {
+		msg->flags |= STACK_TRACE_FLAGS_CUDA_MEMORY;
+	}
 	if (ctx->type == PROFILER_TYPE_MEMORY) {
 		msg->mem_addr = v->memory.addr;
 	}

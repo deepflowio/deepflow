@@ -464,8 +464,9 @@ pub struct SK_TRACE_STATS {
 #[derive(Debug, Copy, Clone)]
 pub struct stack_profile_data {
     pub profiler_type: u8, // Profiler type, such as 1(PROFILER_TYPE_ONCPU).
-    pub timestamp: u64,    // Timestamp of the stack trace data(unit: nanoseconds).
-    pub pid: u32,          // User-space process-ID.
+    pub flags: u8,
+    pub timestamp: u64, // Timestamp of the stack trace data(unit: nanoseconds).
+    pub pid: u32,       // User-space process-ID.
     /*
      * Identified within the eBPF program in kernel space.
      * If the current is a process and not a thread this field(tid) is filled

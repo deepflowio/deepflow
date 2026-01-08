@@ -38,7 +38,7 @@ import (
 )
 
 var log = logging.MustGetLogger("profile")
-var InstanceProfileEventType = []string{"inuse_objects", "inuse_space", "goroutines", "mem-inuse"}
+var InstanceProfileEventType = []string{"inuse_objects", "inuse_space", "goroutines", "mem-inuse", "hbm-inuse"}
 
 const (
 	initLocationCapacity = 1024
@@ -364,7 +364,8 @@ func NewProfileDebug(sql string, querierDebug map[string]interface{}) (profileDe
 func GetLocationType(locations []string, locationValues [][]int, profileEventType string) []string {
 	locationTypes := make([]string, len(locations))
 	for i, location := range locations {
-		if locationValues[i][0] == locationValues[i][1] && strings.HasPrefix(profileEventType, "mem-") { // leaf node && memory profile
+		if locationValues[i][0] == locationValues[i][1] &&
+			(strings.HasPrefix(profileEventType, "mem-") || strings.HasPrefix(profileEventType, "hbm-")) { // leaf node && memory profile
 			locationTypes[i] = "O" // object type
 		} else if i == 0 { // root node
 			if location != "Total" {
