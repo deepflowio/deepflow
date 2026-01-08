@@ -1048,9 +1048,7 @@ impl L7ProtocolParserInterface for HttpLog {
         #[cfg(feature = "enterprise")]
         self.custom_field_store.clear();
         #[cfg(feature = "enterprise")]
-        let custom_policies = config
-            .l7_log_dynamic
-            .get_custom_field_policies(self.proto.into(), param);
+        let custom_policies = config.get_custom_field_policies(self.proto.into(), param);
 
         match self.proto {
             L7Protocol::Http1 => {
@@ -1446,12 +1444,14 @@ impl HttpLog {
             if let Some((key, val)) = str::from_utf8(key).ok().zip(str::from_utf8(val).ok()) {
                 policies.apply(
                     &mut self.custom_field_store,
+                    info,
                     direction.into(),
                     Source::Header(key, val),
                 );
                 if key == ":path" {
                     policies.apply(
                         &mut self.custom_field_store,
+                        info,
                         direction.into(),
                         Source::Url(&info.path),
                     );
@@ -1576,6 +1576,7 @@ impl HttpLog {
             if let Some(policies) = custom_policies {
                 policies.apply(
                     &mut self.custom_field_store,
+                    info,
                     direction.into(),
                     Source::Url(&info.path),
                 );
@@ -1614,6 +1615,7 @@ impl HttpLog {
             if let Some(policies) = custom_policies {
                 policies.apply(
                     &mut self.custom_field_store,
+                    info,
                     direction.into(),
                     Source::Header(key, trim_value),
                 );
@@ -1637,6 +1639,7 @@ impl HttpLog {
         if let Some(policies) = custom_policies {
             policies.apply(
                 &mut self.custom_field_store,
+                info,
                 direction.into(),
                 Source::Payload(PayloadType::JSON | PayloadType::XML, l7_payload),
             );
@@ -1828,12 +1831,14 @@ impl HttpLog {
                         {
                             policies.apply(
                                 &mut self.custom_field_store,
+                                info,
                                 direction.into(),
                                 Source::Header(key, val),
                             );
                             if key == ":path" {
                                 policies.apply(
                                     &mut self.custom_field_store,
+                                    info,
                                     direction.into(),
                                     Source::Url(&info.path),
                                 );

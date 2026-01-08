@@ -451,6 +451,7 @@ impl MysqlInfo {
         if let Some(policies) = custom_policies {
             policies.apply(
                 &mut parser.custom_field_store,
+                self,
                 TrafficDirection::REQUEST,
                 Source::Sql(sql_string),
             );
@@ -734,15 +735,10 @@ impl L7ProtocolParserInterface for MysqlLog {
         #[cfg(feature = "enterprise")]
         let custom_policies = {
             self.custom_field_store.clear();
-            let port = match param.direction {
-                PacketDirection::ClientToServer => param.port_dst,
-                PacketDirection::ServerToClient => param.port_src,
-            };
-            param.parse_config.as_ref().and_then(|c| {
-                c.l7_log_dynamic
-                    .extra_field_policies
-                    .select(L7Protocol::MySQL.into(), port)
-            })
+            param
+                .parse_config
+                .as_ref()
+                .and_then(|c| c.get_custom_field_policies(L7Protocol::MySQL.into(), param))
         };
 
         let mut decompress_buffer = take_buffer();

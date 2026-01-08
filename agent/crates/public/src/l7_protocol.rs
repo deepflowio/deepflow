@@ -171,7 +171,7 @@ pub enum CustomProtocol {
     CustomPolicy(String),
 }
 
-#[derive(Clone, Debug, PartialEq, Hash, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Hash, Eq)]
 pub enum L7ProtocolEnum {
     L7Protocol(L7Protocol),
     Custom(CustomProtocol),
@@ -353,6 +353,7 @@ impl_from_for_field_setter!(String);
     Clone,
     Copy,
     Debug,
+    Serialize,
     Deserialize,
     strum::AsRefStr,
     strum::EnumString,

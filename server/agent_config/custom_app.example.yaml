@@ -14,7 +14,7 @@ custom_protocol_policies:
         match_type: "hex"
         match_from_beginning: false
 custom_field:
-  dictionaries: []
+  dictionaries:
   - name: dict_1
     entries:
     - key: key1
@@ -64,6 +64,7 @@ custom_field:
           value: "6, -5"
       - type: url_decode
       - type: base64_decode
+      - type: unescape
       - type: parse_json_value
         settings:
         - key: keyword

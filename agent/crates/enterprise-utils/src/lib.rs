@@ -17,17 +17,32 @@
 pub mod l7 {
     pub mod custom_policy {
         pub mod config {
-            use serde::Deserialize;
+            use serde::{Deserialize, Serialize};
 
-            #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+            #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
             pub struct CustomProtocolConfig;
 
-            #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+            #[deprecated]
+            #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
             pub struct CustomFieldPolicy;
-            impl CustomFieldPolicy {
+
+            #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+            pub struct CustomField;
+            impl CustomField {
                 pub fn get_http2_headers(&self) -> impl Iterator<Item = &str> {
                     std::iter::empty()
                 }
+            }
+            impl From<Vec<CustomFieldPolicy>> for CustomField {
+                fn from(_: Vec<CustomFieldPolicy>) -> Self {
+                    unimplemented!()
+                }
+            }
+
+            #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+            pub struct CustomApp {
+                pub custom_protocol_policies: Vec<CustomProtocolConfig>,
+                pub custom_field: CustomField,
             }
         }
 
@@ -72,7 +87,7 @@ pub mod l7 {
             #[derive(Clone, Default, Debug, PartialEq)]
             pub struct CustomFieldPolicy;
             impl CustomFieldPolicy {
-                pub fn new(_: &[super::config::CustomFieldPolicy]) -> Self {
+                pub fn new(_: &super::config::CustomField) -> Self {
                     unimplemented!()
                 }
                 pub fn select(
@@ -96,9 +111,10 @@ pub mod l7 {
             }
 
             impl<'a> PolicySlice<'a> {
-                pub fn apply(
+                pub fn apply<L: public::l7_protocol::L7Log>(
                     &self,
                     _: &mut Store,
+                    _: &L,
                     _: super::enums::TrafficDirection,
                     _: enums::Source,
                 ) {
@@ -217,19 +233,6 @@ pub mod l7 {
                 fn from(_: public::enums::PacketDirection) -> Self {
                     unimplemented!()
                 }
-            }
-
-            #[derive(Clone, Copy, Debug, Default, Deserialize, Hash, PartialEq, Eq, PartialOrd)]
-            pub enum FieldType {
-                #[default]
-                Header,
-                HttpUrl,
-                PayloadJson,
-                PayloadXml,
-                DubboHeader,
-                DubboPayloadMapString,
-                PayloadHessian2,
-                SqlInsertionColumn,
             }
         }
     }
