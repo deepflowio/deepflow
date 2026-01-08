@@ -550,6 +550,7 @@ int collect_stack_and_send_output(struct pt_regs *ctx,
 	if (key->flags & STACK_TRACE_FLAGS_DWARF && stack != NULL) {
 		if (stack->len > 0) {
 			key->userstack = get_stackid(stack_map, stack);
+			bpf_debug("[OnCPU] userstack: %d, len: %d", key->userstack, stack->len);
 		} else {
 			// DWARF unwinding failed (likely JIT code with no debug info)
 			// Clear DWARF flag to allow fallback to FP-based unwinding via bpf_get_stackid()
@@ -560,6 +561,7 @@ int collect_stack_and_send_output(struct pt_regs *ctx,
 	if (intp_stack != NULL && intp_stack->len > 0) {
 		// Reuse stack_map (custom_stack_map_a/b) for interpreter stack
 		key->intpstack = get_stackid(stack_map, intp_stack);
+		bpf_debug("[OnCPU] intpstack: %d, len: %d", key->intpstack, intp_stack->len);
 	}
 #endif
 
@@ -580,6 +582,7 @@ int collect_stack_and_send_output(struct pt_regs *ctx,
 	if (!(key->flags & STACK_TRACE_FLAGS_DWARF)) {
 		key->userstack =
 		    bpf_get_stackid(ctx, stack_map, USER_STACKID_FLAGS);
+		bpf_debug("[OnCPU] userstack: %d", key->userstack);
 	}
 
 	if (-EEXIST == key->kernstack) {
@@ -830,8 +833,8 @@ int dwarf_unwind(void *ctx, unwind_state_t * state,
 			// This can happen when IP is in special regions like [uprobes] that have no DWARF info
 			if (regs->ip < shard_info->offset + shard_info->pc_min ||
 			    regs->ip >= shard_info->offset + shard_info->pc_max) {
-				bpf_debug("[DWARF] frame#%d: ip=%lx not in shard range, stopping",
-					state->stack.len, regs->ip);
+				// bpf_debug("[DWARF] frame#%d: ip=%lx not in shard range, stopping",
+				//	state->stack.len, regs->ip);
 				goto finish;
 			}
 		}
