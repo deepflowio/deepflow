@@ -54,6 +54,8 @@ type Specification struct {
 	BizDecodePolicyFieldMax      int `default:"200" yaml:"biz_decode_policy_field_max"`
 	BizDecodeDictionaryMax       int `default:"1000" yaml:"biz_decode_dictionary_max"`
 	BizDecodeCustomProtocolMax   int `default:"200" yaml:"biz_decode_custom_protocol_max"`
+	MaxBizPolicyPcapFileSize     int `default:"50" yaml:"max-biz-policy-pcap-file-size"` // unit: MB
+	MaxPerBizPolicyPcapFileCount int `default:"5" yaml:"max-per-biz-policy-pcap-file-count"`
 }
 
 type DFWebService struct {
