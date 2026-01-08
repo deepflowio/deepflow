@@ -208,6 +208,10 @@ controller:
     biz_decode_policy_field_max: 200
     biz_decode_dictionary_max: 1000
     biz_decode_custom_protocol_max: 200
+    # max biz policy pcap file size, unit: MB
+    max-biz-policy-pcap-file-size: 50
+    # max per biz policy pcap file count
+    max-per-biz-policy-pcap-file-count: 5
 
   # monitor module config
   monitor:
