@@ -199,12 +199,7 @@ $defs:
         title@ch: 字段
         items:
           type: object
-          oneOf:
-          - required:
-            - type
-            - match
-            - output
-          - required:
+          required:
             - name
             - type
             - match
@@ -393,9 +388,14 @@ $defs:
         items:
           type: object
           required:
+          - name
           - value
           - output
           properties:
+            name:
+              type: string
+              title@en: Constant Field Name
+              title@ch: 常量字段名
             value:
               type: string
               title@en: Constant Value
@@ -423,9 +423,14 @@ $defs:
         items:
           type: object
           required:
+          - name
           - format
           - output
           properties:
+            name:
+              type: string
+              title@en: Compound Field Name
+              title@ch: 复合字段名
             format:
               type: string
               title@en: Format
@@ -606,7 +611,6 @@ $defs:
         - skip：跳过前 N 个匹配结果后再提取。
     required:
     - type
-    - settings
     properties:
       type:
         type: string
