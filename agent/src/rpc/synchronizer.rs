@@ -69,7 +69,7 @@ use crate::{
         FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT,
         NORMAL_EXIT_WITH_RESTART,
     },
-    config::UserConfig,
+    config::{config, UserConfig},
     exception::ExceptionHandler,
     platform,
     rpc::session::Session,
@@ -143,6 +143,15 @@ impl Default for StaticConfig {
     }
 }
 
+#[derive(Default)]
+struct CustomAppConfigInfo {
+    pub version: u64,
+
+    // keep some data for other configurations to use when server sends heartbeat or invalid custom_app_config
+    pub custom_protocol_port_ranges: String,
+    pub extra_headers: HashSet<String>,
+}
+
 pub struct Status {
     pub hostname: String,
 
@@ -166,6 +175,8 @@ pub struct Status {
     pub version_platform_data: u64,
     pub version_acls: u64,
     pub version_groups: u64,
+
+    custom_app: CustomAppConfigInfo,
 
     pub interfaces: Vec<Arc<VInterface>>,
     pub peers: Vec<Arc<PeerConnection>>,
@@ -197,6 +208,7 @@ impl Default for Status {
             version_platform_data: 0,
             version_acls: 0,
             version_groups: 0,
+            custom_app: Default::default(),
             interfaces: Default::default(),
             peers: Default::default(),
             cidrs: Default::default(),
@@ -664,7 +676,8 @@ impl Synchronizer {
         status.version_acls = 0;
         status.version_groups = 0;
         status.version_platform_data = 0;
-        info!("Reset version of acls, groups and platform_data.");
+        status.custom_app = Default::default();
+        info!("Reset version of acls, groups, platform_data and custom_app_config.");
     }
 
     pub fn add_flow_acl_listener(&self, module: Box<dyn FlowAclListener>) {
@@ -800,6 +813,10 @@ impl Synchronizer {
                 static_config.agent_unique_identifier,
             ) as i32),
             current_grpc_buffer_size: Some(grpc_buffer_size),
+            custom_app_config: Some(pb::CustomAppConfig {
+                version: Some(status.custom_app.version),
+                ..Default::default()
+            }),
             ..Default::default()
         }
     }
@@ -909,16 +926,14 @@ impl Synchronizer {
             }
             if !invalid_mac.is_empty() {
                 warn!(
-                    "Invalid mac {:?}, The mac address is invalid and cannot be resolved to MacAddr
-    .",
+                    "Invalid mac {:?}, The mac address is invalid and cannot be resolved to MacAddr.",
                     invalid_mac
                 );
                 has_invalid_log = true;
             }
             if !invalid_vmac.is_empty() {
                 warn!(
-                    "Invalid vmac {:?}, The vmac address is invalid and cannot be resolved to MacAddr
-    .",
+                    "Invalid vmac {:?}, The vmac address is invalid and cannot be resolved to MacAddr.",
                     invalid_vmac
                 );
                 has_invalid_log = true;
@@ -926,6 +941,153 @@ impl Synchronizer {
         }
 
         return (segments, macs, gateway_vmacs, has_invalid_log);
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    fn parse_custom_app_config(
+        status: &RwLock<Status>,
+        config: &Option<pb::CustomAppConfig>,
+        _: &mut UserConfig,
+    ) -> Result<(), config::ConfigError> {
+        // only do version updates
+        if let Some(version) = config.as_ref().and_then(|c| c.version) {
+            let mut sg = status.write();
+            if sg.custom_app.version != version {
+                info!(
+                    "Grpc custom_app_config version changed from {} to {version}",
+                    sg.custom_app.version
+                );
+                sg.custom_app.version = version;
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn parse_custom_app_config(
+        status: &RwLock<Status>,
+        config: &Option<pb::CustomAppConfig>,
+        user_config: &mut UserConfig,
+    ) -> Result<(), config::ConfigError> {
+        use enterprise_utils::l7::custom_policy::{
+            config::{CustomApp, CustomField},
+            custom_protocol_policy::ExtraCustomProtocolConfig,
+        };
+
+        let Some(config) = config.as_ref() else {
+            // no custom_app_config, use cached extra_headers
+            let sg = status.read();
+            let ca = &mut user_config.custom_app;
+            ca.custom_protocol_port_ranges = sg.custom_app.custom_protocol_port_ranges.clone();
+            ca.extra_headers = sg.custom_app.extra_headers.clone();
+
+            // TODO: remove backward compatibility code
+            {
+                let mut ca_config = CustomApp::default();
+                let request_log = &mut user_config.processors.request_log;
+
+                #[allow(deprecated)]
+                std::mem::swap(
+                    &mut ca_config.custom_protocol_policies,
+                    &mut request_log.application_protocol_inference.custom_protocols,
+                );
+                ca.custom_protocol_port_ranges = ExtraCustomProtocolConfig::port_range(
+                    ca_config.custom_protocol_policies.as_slice(),
+                )
+                .to_string();
+
+                let mut cfp = vec![];
+                #[allow(deprecated)]
+                std::mem::swap(
+                    &mut cfp,
+                    &mut request_log.tag_extraction.custom_field_policies,
+                );
+                ca_config.custom_field = CustomField::from(cfp);
+                for header in ca_config.custom_field.get_http2_headers() {
+                    ca.extra_headers.insert(header.to_string());
+                }
+
+                // calculate a fake version to trigger update
+                use std::hash::Hasher;
+                let mut hasher = ahash::AHasher::default();
+                if let Ok(json) = serde_json::to_string(&ca_config.custom_protocol_policies) {
+                    hasher.write(json.as_bytes());
+                }
+                if let Ok(json) = serde_json::to_string(&ca_config.custom_field) {
+                    hasher.write(json.as_bytes());
+                }
+                ca.version = hasher.finish();
+
+                ca.config = Some(ca_config);
+            }
+
+            return Ok(());
+        };
+
+        let Some(version) = config.version else {
+            debug!("ignored message without version in custom_app_config");
+            return Ok(());
+        };
+        let mut sg = status.write();
+        if version == sg.custom_app.version {
+            debug!("custom_app_config not updated, version: {version}");
+            return Ok(());
+        }
+
+        let custom_app_config: CustomApp = if config.compressed() {
+            match zstd::stream::read::Decoder::new(config.configs()) {
+                Ok(reader) => match serde_yaml::from_reader(reader) {
+                    Ok(cfg) => cfg,
+                    Err(e) => {
+                        return Err(config::ConfigError::YamlConfigInvalid(format!(
+                            "Parse custom_app_config failed: {e}"
+                        )))
+                    }
+                },
+                Err(e) => {
+                    return Err(config::ConfigError::YamlConfigInvalid(format!(
+                        "Failed to create zstd decoder: {e}"
+                    )));
+                }
+            }
+        } else {
+            match serde_yaml::from_slice(config.configs()) {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    return Err(config::ConfigError::YamlConfigInvalid(format!(
+                        "Parse custom_app_config failed: {e}"
+                    )))
+                }
+            }
+        };
+
+        let custom_protocol_port_ranges = ExtraCustomProtocolConfig::port_range(
+            custom_app_config.custom_protocol_policies.as_slice(),
+        )
+        .to_string();
+        let extra_headers: HashSet<String> = custom_app_config
+            .custom_field
+            .get_http2_headers()
+            .map(|h| h.to_string())
+            .collect();
+        user_config.custom_app = config::CustomApp {
+            version,
+            custom_protocol_port_ranges: custom_protocol_port_ranges.clone(),
+            extra_headers: extra_headers.clone(),
+            config: Some(custom_app_config),
+        };
+
+        info!(
+            "Grpc custom_app_config version changed from {} to {version}",
+            sg.custom_app.version
+        );
+        sg.custom_app = CustomAppConfigInfo {
+            version,
+            custom_protocol_port_ranges,
+            extra_headers,
+        };
+
+        Ok(())
     }
 
     // Note that both 'status' and 'flow_acl_listener' will be locked here, and other places where 'status'
@@ -983,6 +1145,13 @@ impl Synchronizer {
             }
         }
         user_config.adjust();
+        if let Err(e) =
+            Self::parse_custom_app_config(status, &resp.custom_app_config, &mut user_config)
+        {
+            warn!("parse custom_app_config failed: {e}");
+            exception_handler.set(Exception::InvalidConfiguration);
+            return;
+        }
 
         if resp.only_partial_fields() {
             info!(

@@ -54,7 +54,7 @@ use public::{
 };
 
 #[cfg(feature = "enterprise")]
-use enterprise_utils::l7::custom_policy::config::{CustomFieldPolicy, CustomProtocolConfig};
+use enterprise_utils::l7::custom_policy::config::CustomProtocolConfig;
 
 pub const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
@@ -1782,6 +1782,7 @@ pub struct ApplicationProtocolInference {
     pub inference_whitelist: Vec<InferenceWhitelist>,
     pub enabled_protocols: Vec<String>,
     pub protocol_special_config: ProtocolSpecialConfig,
+    #[deprecated]
     #[cfg(feature = "enterprise")]
     pub custom_protocols: Vec<CustomProtocolConfig>,
 }
@@ -2043,8 +2044,9 @@ pub struct RequestLogTagExtraction {
     pub http_endpoint: HttpEndpoint,
     pub obfuscate_protocols: Vec<String>,
     pub custom_fields: HashMap<String, Vec<CustomFields>>,
+    #[deprecated]
     #[cfg(feature = "enterprise")]
-    pub custom_field_policies: Vec<CustomFieldPolicy>,
+    pub custom_field_policies: Vec<enterprise_utils::l7::custom_policy::config::CustomFieldPolicy>,
     pub raw: RequestLogTagExtractionRaw,
 }
 
@@ -2899,6 +2901,20 @@ pub struct UserConfig {
     pub processors: Processors,
     pub plugins: Plugins,
     pub dev: Dev,
+    #[serde(skip)]
+    #[cfg(feature = "enterprise")]
+    pub custom_app: CustomApp,
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+pub struct CustomApp {
+    pub version: u64,
+    // used in UserConfig::get_protocol_port()
+    pub custom_protocol_port_ranges: String,
+    // used in L7LogDynamicConfig
+    pub extra_headers: std::collections::HashSet<String>,
+    pub config: Option<enterprise_utils::l7::custom_policy::config::CustomApp>,
 }
 
 const MB: u64 = 1048576;
@@ -3005,33 +3021,17 @@ impl UserConfig {
 
         #[cfg(feature = "enterprise")]
         {
-            use std::collections::hash_map;
-
-            use enterprise_utils::l7::custom_policy::custom_protocol_policy::ExtraCustomProtocolConfig;
-
-            let custom_ports = ExtraCustomProtocolConfig::port_range(
-                self.processors
-                    .request_log
-                    .application_protocol_inference
-                    .custom_protocols
-                    .as_slice(),
-            );
+            let custom_ports = &self.custom_app.custom_protocol_port_ranges;
             if !custom_ports.is_empty() {
                 let custom_str = L7ProtocolParser::Custom(Default::default()).as_str();
-                match new.entry(custom_str.to_string()) {
-                    hash_map::Entry::Occupied(mut entry) => {
-                        if entry.get().is_empty() {
-                            // unlikely to happen
-                            entry.insert(custom_ports);
-                        } else {
-                            let old_ports = entry.get_mut();
-                            old_ports.push(',');
-                            old_ports.push_str(&custom_ports);
-                        }
-                    }
-                    hash_map::Entry::Vacant(entry) => {
-                        entry.insert(custom_ports);
-                    }
+                let ranges = new
+                    .entry(custom_str.to_string())
+                    .or_insert_with(|| custom_ports.clone());
+                if ranges.is_empty() {
+                    *ranges = custom_ports.clone();
+                } else {
+                    ranges.push(',');
+                    ranges.push_str(custom_ports);
                 }
             }
         }
