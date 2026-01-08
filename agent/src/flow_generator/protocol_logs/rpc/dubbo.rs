@@ -562,9 +562,7 @@ impl L7ProtocolParserInterface for DubboLog {
         #[cfg(feature = "enterprise")]
         self.custom_field_store.clear();
         #[cfg(feature = "enterprise")]
-        let custom_policies = config
-            .l7_log_dynamic
-            .get_custom_field_policies(L7Protocol::Dubbo.into(), param);
+        let custom_policies = config.get_custom_field_policies(L7Protocol::Dubbo.into(), param);
 
         let mut info = DubboInfo {
             copy_apm_trace_id: config.l7_log_dynamic.copy_apm_trace_id,

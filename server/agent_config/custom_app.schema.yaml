@@ -418,8 +418,12 @@ $defs:
         type: array
         title@en: Compound Fields
         title@ch: 复合字段
-        description@en: Compound fields, can use configured field or native_tag as input fields for formatted output.
-        description@ch: 复合字段，可以使用配置的 field 或 native_tag 作为输入字段，进行格式化输出。
+        description@en: |-
+          Compound fields, can use configured field or native_tag as input fields for formatted output.
+          Note that all configured fields (including field and native_tag) need to be parsed in the same request or response to output compound fields normally.
+        description@ch: |-
+          复合字段，可以使用配置的 field 或 native_tag 作为输入字段，进行格式化输出。
+          注意配置的所有字段（包括 field 和 native_tag）都需要在同一个请求或响应中解析到才能正常输出复合字段。
         items:
           type: object
           required:
@@ -553,6 +557,8 @@ $defs:
           - e.g. "6, -5" means characters from the seventh to the fifth from last are replaced.
       - url_decode: Decodes the value as a URL.
       - base64_decode: Decodes the value as Base64. The result must be valid UTF-8 or GBK.
+      - unescape: Unescapes the value. The result must be valid UTF-8 or GBK.
+        For example, when encountering a string with unicode encoding "DeepFlow \u91C7\u96C6\u5668", you can use this configuration to unescape it as "DeepFlow 采集器".
       - parse_json_value: Parses the value as JSON and extracts by key or path. Configuration supported:
         - keyword: Field(s) to search for.
         - type: Type, can be "string" or "path".
@@ -588,7 +594,9 @@ $defs:
           - 如“1, -1”表示从第二个字符到倒数第一个字符替换。
           - 如“6, -5”表示第七个字符到倒数第五个字符替换。
       - url_decode：对值进行URL解码。
-      - base64_decode：对值进行Base64解码，结果须为合法UTF-8 或 GBK。
+      - base64_decode：对值进行Base64解码，结果须为合法 UTF-8 或 GBK。
+      - unescape：对值进行反转义，结果须为合法 UTF-8 或 GBK。
+        例如遇到以 unicode 编码的字符串“DeepFlow \u91C7\u96C6\u5668”时，可以配置 unescape 将其反转义为“DeepFlow 采集器”。
       - parse_json_value：将值作为JSON解析，并根据key或路径提取。支持配置为：
           - keyword：要查找的字段。
           - type：类型，可为 string 或 path。
@@ -619,6 +627,7 @@ $defs:
         - obfuscate
         - url_decode
         - base64_decode
+        - unescape
         - parse_json_value
         - parse_xml_value
         - parse_key_value
@@ -628,6 +637,7 @@ $defs:
         - Obfuscate
         - URL Decode
         - Base64 Decode
+        - Unescape
         - Parse JSON Value
         - Parse XML Value
         - Parse Key Value
@@ -637,6 +647,7 @@ $defs:
         - 脱敏
         - URL 解码
         - Base64 解码
+        - 反转义
         - JSON 提取
         - XML 提取
         - 键值提取

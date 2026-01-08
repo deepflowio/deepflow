@@ -51,11 +51,14 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
         if param.l4_protocol != IpProtocol::TCP {
             return None;
         }
-        let Some(config) = param.parse_config else {
+        let Some(config) = param
+            .parse_config
+            .and_then(|c| c.custom_app.custom_protocol_config.as_ref())
+        else {
             return None;
         };
 
-        if config.custom_protocol_config.protocol_characters.is_empty() {
+        if config.protocol_characters.is_empty() {
             return None;
         }
 
@@ -64,10 +67,7 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             PacketDirection::ServerToClient => (param.port_src, TrafficDirection::RESPONSE),
         };
 
-        match self
-            .parser
-            .check_payload(payload, &config.custom_protocol_config, direction, port)
-        {
+        match self.parser.check_payload(payload, &config, direction, port) {
             Some(custom_protocol_name) => {
                 self.proto_str = custom_protocol_name;
                 return Some(LogMessageType::Request);
@@ -80,6 +80,10 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let Some(config) = param.parse_config else {
+            return Err(Error::NoParseConfig);
+        };
+
+        let Some(custom_protocol) = config.custom_app.custom_protocol_config.as_ref() else {
             return Err(Error::NoParseConfig);
         };
 
@@ -96,16 +100,13 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
 
         if self
             .parser
-            .check_payload(payload, &config.custom_protocol_config, direction, port)
+            .check_payload(payload, custom_protocol, direction, port)
             .is_none()
         {
             return Ok(L7ParseResult::None);
         };
 
-        let Some(policies) = config
-            .l7_log_dynamic
-            .get_custom_field_policies(protocol.into(), param)
-        else {
+        let Some(policies) = config.get_custom_field_policies(protocol.into(), param) else {
             return Err(Error::NoParseConfig);
         };
 

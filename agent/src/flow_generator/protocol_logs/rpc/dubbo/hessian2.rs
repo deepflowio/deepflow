@@ -170,7 +170,7 @@ pub fn get_req_body_info(
     }
 
     #[cfg(feature = "enterprise")]
-    apply_custom_field_policies(payload, cf_ctx);
+    apply_custom_field_policies(payload, info, cf_ctx);
 }
 
 #[allow(unused_variables)]
@@ -181,14 +181,19 @@ pub fn get_resp_body_info(
     #[cfg(feature = "enterprise")] cf_ctx: CustomFieldContext<'_>,
 ) {
     #[cfg(feature = "enterprise")]
-    apply_custom_field_policies(payload, cf_ctx);
+    apply_custom_field_policies(payload, info, cf_ctx);
 }
 
 #[cfg(feature = "enterprise")]
-fn apply_custom_field_policies(payload: &[u8], mut cf_ctx: CustomFieldContext<'_>) {
+fn apply_custom_field_policies(
+    payload: &[u8],
+    info: &DubboInfo,
+    mut cf_ctx: CustomFieldContext<'_>,
+) {
     if let Some(policies) = cf_ctx.policies {
         policies.apply(
             &mut cf_ctx.store,
+            info,
             cf_ctx.direction.into(),
             Source::Payload(PayloadType::HESSIAN2, payload),
         );
