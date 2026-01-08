@@ -19,6 +19,8 @@ pub mod elf_utils;
 pub mod lua;
 pub mod php;
 pub mod python;
+pub mod tpbase;
+pub mod tsd;
 pub mod v8;
 
 use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};

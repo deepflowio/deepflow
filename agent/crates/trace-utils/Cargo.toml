@@ -20,6 +20,7 @@ regex.workspace = true
 rustc-demangle = "0.1"
 semver = "1.0"
 thiserror = "1.0"
+iced-x86 = { version = "1.21", default-features = false, features = ["std", "decoder"] }
 
 [build-dependencies]
 cc = "1.0"

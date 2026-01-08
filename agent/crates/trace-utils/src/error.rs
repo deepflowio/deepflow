@@ -37,6 +37,8 @@ pub enum Error {
     InvalidPointer(u64),
     #[error("Invalid or corrupted data")]
     InvalidData,
+    #[error("{0}")]
+    Msg(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
