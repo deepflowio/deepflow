@@ -50,6 +50,8 @@ type Specification struct {
 	DataSourceRetentionTimeMax   int `default:"24000" yaml:"data_source_retention_time_max"`
 	DataSourceExtMetricsInterval int `default:"10" yaml:"data_source_ext_metrics_interval"`
 	DataSourcePrometheusInterval int `default:"10" yaml:"data_source_prometheus_interval"`
+	MaxBizPolicyPcapFileSize     int `default:"50" yaml:"max-biz-policy-pcap-file-size"` // unit: MB
+	MaxPerBizPolicyPcapFileCount int `default:"50" yaml:"max-per-biz-policy-pcap-file-count"`
 }
 
 type DFWebService struct {

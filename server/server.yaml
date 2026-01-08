@@ -204,6 +204,10 @@ controller:
     data_source_ext_metrics_interval: 10
     # unit: s
     data_source_prometheus_interval: 10
+    # max biz policy pcap file size, unit: MB
+    max-biz-policy-pcap-file-size: 50
+    # max per biz policy pcap file count
+    max-per-biz-policy-pcap-file-count: 5
 
   # monitor module config
   monitor:
