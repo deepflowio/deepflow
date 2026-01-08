@@ -578,15 +578,6 @@ type ResourceVersion struct {
 	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT"`
 }
 
-type BizDecodeDictionary struct {
-	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	TeamID    int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
-	Name      string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	Yaml      string    `gorm:"column:yaml;type:mediumtext" json:"YAML"`
-	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime;not null;" json:"CREATED_AT"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT"`
-}
-
 type BizDecodePolicy struct {
 	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	TeamID    int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
@@ -606,19 +597,28 @@ type BizDecodePolicyField struct {
 	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT"`
 }
 
-type BizDecodeDictionaryPolicyFieldConnection struct {
-	ID                  int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	DictionaryID        int       `gorm:"column:dictionary_id;type:int;not null" json:"DICTIONARY_ID"`
-	PolicyFieldID       int       `gorm:"column:policy_field_id;type:int;not null" json:"POLICY_FIELD_ID"`
-	PolicyFieldNodePath string    `gorm:"column:policy_field_node_path;type:varchar(512);not null" json:"POLICY_FIELD_NODE_PATH"`
-	CreatedAt           time.Time `gorm:"autoCreateTime;column:created_at;type:datetime;not null" json:"CREATED_AT"`
-	UpdatedAt           time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT"`
-}
-
 type BizDecodePolicyAgentGroupConnection struct {
 	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	PolicyID     int       `gorm:"column:policy_id;type:int;not null" json:"POLICY_ID"`
 	AgentGroupID int       `gorm:"column:agent_group_id;type:int;not null" json:"AGENT_GROUP_ID"`
 	CreatedAt    time.Time `gorm:"autoCreateTime;column:created_at;type:datetime;not null" json:"CREATED_AT"`
 	UpdatedAt    time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT"`
+}
+
+type BizDecodeDictionary struct {
+	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	TeamID    int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
+	Name      string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	Yaml      string    `gorm:"column:yaml;type:mediumtext" json:"YAML"`
+	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime;not null;" json:"CREATED_AT"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT"`
+}
+
+type BizDecodeCustomProtocol struct {
+	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	TeamID    int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
+	Name      string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	Yaml      string    `gorm:"column:yaml;type:mediumtext" json:"YAML"`
+	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime;not null" json:"CREATED_AT"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT"`
 }
