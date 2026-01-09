@@ -418,8 +418,12 @@ $defs:
         type: array
         title@en: Compound Fields
         title@ch: 复合字段
-        description@en: Compound fields, can use configured field or native_tag as input fields for formatted output.
-        description@ch: 复合字段，可以使用配置的 field 或 native_tag 作为输入字段，进行格式化输出。
+        description@en: |-
+          Compound fields, can use configured field or native_tag as input fields for formatted output.
+          Note that all configured fields (including field and native_tag) need to be parsed in the same request or response to output compound fields normally.
+        description@ch: |-
+          复合字段，可以使用配置的 field 或 native_tag 作为输入字段，进行格式化输出。
+          注意配置的所有字段（包括 field 和 native_tag）都需要在同一个请求或响应中解析到才能正常输出复合字段。
         items:
           type: object
           required:
