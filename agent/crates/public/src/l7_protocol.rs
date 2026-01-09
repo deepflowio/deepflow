@@ -143,6 +143,7 @@ impl From<String> for L7Protocol {
             "dns" => Self::DNS,
             "oracle" => Self::Oracle,
             "iso8583" | "iso-8583" => Self::Iso8583,
+            "triple" => Self::Triple,
             "tls" => Self::TLS,
             "ping" => Self::Ping,
             "some/ip" | "someip" => Self::SomeIp,
