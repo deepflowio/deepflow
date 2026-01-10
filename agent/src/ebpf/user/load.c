@@ -1334,6 +1334,9 @@ int ebpf_obj_load(struct ebpf_object *obj)
 		if (!python_profiler_enabled()) {
 			enabled_feats &= ~FEATURE_FLAG_PROFILE_PYTHON;
 		}
+		if (!lua_profiler_enabled()) {
+			enabled_feats &= ~FEATURE_FLAG_PROFILE_LUA;
+		}
 		enabled_feats &= ~extended_feature_flags(map);
 		if (enabled_feats == 0 &&
 		    map->def.type != BPF_MAP_TYPE_PROG_ARRAY &&
@@ -1355,7 +1358,8 @@ int ebpf_obj_load(struct ebpf_object *obj)
 		}
 		// Log language profiler map creation with max_entries for verification
 		if (strstr(map->name, "php_") || strstr(map->name, "v8_") ||
-		    strstr(map->name, "python_")) {
+		    strstr(map->name, "python_") || strstr(map->name, "lua_") ||
+		    strstr(map->name, "luajit_")) {
 			ebpf_info
 			    ("Language profiler map created: name=%s, max_entries=%d (1 means disabled)\n",
 			     map->name, map->def.max_entries);
