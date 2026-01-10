@@ -14,6 +14,7 @@
 60      , MySQL           ,
 61      , PostgreSQL      ,
 62      , Oracle          ,
+63      , SqlServer       ,
 80      , Redis           ,
 81      , MongoDB         ,
 82      , Memcached       ,
