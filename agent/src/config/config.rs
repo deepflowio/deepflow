@@ -1842,6 +1842,7 @@ impl Default for Filters {
                 ("MySQL".to_string(), "1-65535".to_string()),
                 ("PostgreSQL".to_string(), "1-65535".to_string()),
                 ("Oracle".to_string(), "1521".to_string()),
+                ("SqlServer".to_string(), "1433".to_string()),
                 ("Redis".to_string(), "1-65535".to_string()),
                 ("MongoDB".to_string(), "1-65535".to_string()),
                 ("Memcached".to_string(), "11211".to_string()),

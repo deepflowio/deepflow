@@ -163,6 +163,7 @@ const (
 	L7_PROTOCOL_MYSQL       L7Protocol = 60
 	L7_PROTOCOL_POSTGRE     L7Protocol = 61
 	L7_PROTOCOL_ORACLE      L7Protocol = 62
+	L7_PROTOCOL_SQL_SERVER  L7Protocol = 63
 	L7_PROTOCOL_REDIS       L7Protocol = 80
 	L7_PROTOCOL_MONGODB     L7Protocol = 81
 	L7_PROTOCOL_MEMCACHED   L7Protocol = 82
@@ -692,6 +693,12 @@ func (p L7Protocol) String(isTLS bool) string {
 		} else {
 			return "Oracle"
 		}
+	case L7_PROTOCOL_SQL_SERVER:
+		if isTLS {
+			return "SqlServer_TLS"
+		} else {
+			return "SqlServer"
+		}
 	case L7_PROTOCOL_ISO8583:
 		if isTLS {
 			return "ISO-8583_TLS"
@@ -808,6 +815,7 @@ var L7ProtocolStringMap = map[string]L7Protocol{
 	strings.ToLower(L7_PROTOCOL_MYSQL.String(false)):       L7_PROTOCOL_MYSQL,
 	strings.ToLower(L7_PROTOCOL_POSTGRE.String(false)):     L7_PROTOCOL_POSTGRE,
 	strings.ToLower(L7_PROTOCOL_ORACLE.String(false)):      L7_PROTOCOL_ORACLE,
+	strings.ToLower(L7_PROTOCOL_SQL_SERVER.String(false)):  L7_PROTOCOL_SQL_SERVER,
 	strings.ToLower(L7_PROTOCOL_ISO8583.String(false)):     L7_PROTOCOL_ISO8583,
 	strings.ToLower(L7_PROTOCOL_TRIPLE.String(false)):      L7_PROTOCOL_TRIPLE,
 	strings.ToLower(L7_PROTOCOL_REDIS.String(false)):       L7_PROTOCOL_REDIS,
