@@ -206,7 +206,7 @@ struct bpf_socktrace_params {
 	 * Socket Information
 	 * For detailed field descriptions, see the comments
 	 * in 'struct socket_info_s'.
-	 */ 
+	 */
 	uint64_t socket_id;
 	uint64_t seq;
 	uint16_t l7_proto;
@@ -226,7 +226,7 @@ struct bpf_socktrace_params {
 	/*
 	 * Additional (monitoring) information for the socket
 	 * trace function module.
-	 */ 
+	 */
 	uint8_t tracer_state;
 	uint32_t kern_socket_map_max;
 	uint32_t kern_socket_map_used;
@@ -294,6 +294,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "PgSQL";
 	case PROTO_ORACLE:
 		return "Oracle";
+	case PROTO_SQL_SERVER:
+		return "SqlServer";
 	case PROTO_FASTCGI:
 		return "FastCGI";
 	case PROTO_BRPC:
@@ -450,15 +452,15 @@ void uprobe_match_pid_handle(int feat, int pid, enum match_pids_act act);
 /**
  * @brief Disables the KPROBE feature while retaining UPROBE and I/O event handling.
  *
- * This function will disable the KPROBE functionality, but UPROBE and I/O event processing 
- * will continue to work as usual. 
+ * This function will disable the KPROBE functionality, but UPROBE and I/O event processing
+ * will continue to work as usual.
  */
 void disable_kprobe_feature(void);
 
 /**
  * @brief Enables the KPROBE feature.
  *
- * This function enables the KPROBE functionality, allowing kernel probes to be used 
+ * This function enables the KPROBE functionality, allowing kernel probes to be used
  * for monitoring and tracing specific points in the kernel.
  */
 void enable_kprobe_feature(void);

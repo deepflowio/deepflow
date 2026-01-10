@@ -42,7 +42,7 @@ pub use rpc::{
 };
 pub use sql::{
     MemcachedInfo, MemcachedLog, MongoDBInfo, MongoDBLog, MysqlInfo, MysqlLog, PostgreInfo,
-    PostgresqlLog, RedisInfo, RedisLog,
+    PostgresqlLog, RedisInfo, RedisLog, SqlServerInfo, SqlServerLog,
 };
 
 cfg_if::cfg_if! {
