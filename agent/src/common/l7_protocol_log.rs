@@ -44,7 +44,7 @@ use crate::flow_generator::protocol_logs::{
     sql::ObfuscateCache,
     AmqpLog, BrpcLog, DnsLog, DubboLog, HttpLog, KafkaLog, L7ResponseStatus, MemcachedLog,
     MongoDBLog, MqttLog, MysqlLog, NatsLog, OpenWireLog, PingLog, PostgresqlLog, PulsarLog,
-    RedisLog, RocketmqLog, SofaRpcLog, TarsLog, ZmtpLog,
+    RedisLog, RocketmqLog, SofaRpcLog, TarsLog, ZmtpLog, SqlServerLog,
 };
 
 use crate::flow_generator::Result;
@@ -180,6 +180,7 @@ cfg_if::cfg_if! {
                 RocketMQ(RocketmqLog),
                 OpenWire(OpenWireLog),
                 Ping(PingLog),
+                SqlServer(SqlServerLog),
                 // add protocol below
             }
         }
@@ -213,6 +214,7 @@ cfg_if::cfg_if! {
                 TLS(crate::flow_generator::protocol_logs::TlsLog),
                 SomeIp(crate::flow_generator::protocol_logs::SomeIpLog),
                 Ping(PingLog),
+                SqlServer(SqlServerLog),
                 // add protocol below
             }
         }
