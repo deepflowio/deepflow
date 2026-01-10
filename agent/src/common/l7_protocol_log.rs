@@ -38,6 +38,8 @@ use crate::config::config::Iso8583ParseConfig;
 use crate::config::handler::LogParserConfig;
 use crate::config::OracleConfig;
 use crate::flow_generator::flow_map::FlowMapCounter;
+#[cfg(feature = "enterprise")]
+use crate::flow_generator::protocol_logs::SqlServerLog;
 use crate::flow_generator::protocol_logs::{
     fastcgi::FastCGILog,
     plugin::{custom_wrap::CustomWrapLog, get_custom_log_parser},
@@ -189,30 +191,31 @@ cfg_if::cfg_if! {
             pub enum L7ProtocolParser {
                 // http have two version but one parser, can not place in macro param.
                 // custom must in first so can not place in macro
-        DNS(DnsLog),
-        SofaRPC(SofaRpcLog),
-        MySQL(MysqlLog),
-        Kafka(KafkaLog),
-        Redis(RedisLog),
-        MongoDB(MongoDBLog),
-        Memcached(MemcachedLog),
-        PostgreSQL(PostgresqlLog),
-        Dubbo(DubboLog),
-        FastCGI(FastCGILog),
-        Brpc(BrpcLog),
-        Tars(TarsLog),
-        Oracle(OracleLog),
-        MQTT(MqttLog),
-        AMQP(AmqpLog),
-        NATS(NatsLog),
-        Pulsar(PulsarLog),
-        ZMTP(ZmtpLog),
-        WebSphereMq(crate::flow_generator::protocol_logs::WebSphereMqLog),
-        OpenWire(OpenWireLog),
-        TLS(TlsLog),
-        SomeIp(SomeIpLog),
-        Ping(PingLog),
+                DNS(DnsLog),
+                SofaRPC(SofaRpcLog),
+                MySQL(MysqlLog),
+                Kafka(KafkaLog),
+                Redis(RedisLog),
+                MongoDB(MongoDBLog),
+                Memcached(MemcachedLog),
+                PostgreSQL(PostgresqlLog),
+                Dubbo(DubboLog),
+                FastCGI(FastCGILog),
+                Brpc(BrpcLog),
+                Tars(TarsLog),
+                Oracle(OracleLog),
+                MQTT(MqttLog),
+                AMQP(AmqpLog),
+                NATS(NatsLog),
+                Pulsar(PulsarLog),
+                ZMTP(ZmtpLog),
+                WebSphereMq(crate::flow_generator::protocol_logs::WebSphereMqLog),
+                OpenWire(OpenWireLog),
+                TLS(TlsLog),
+                SomeIp(SomeIpLog),
+                Ping(PingLog),
                 Iso8583(crate::flow_generator::protocol_logs::Iso8583Log),
+                SqlServer(SqlServerLog),
                 // add protocol below
             }
         }

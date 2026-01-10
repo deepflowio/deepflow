@@ -7994,6 +7994,7 @@ processors:
         Redis: 1-65535
         SofaRPC: 1-65535
         SomeIP: 1-65535
+        SqlServer: 1433
         TLS: 443,6443
         Tars: 1-65535
         WebSphereMQ: 1-65535
@@ -8022,7 +8023,7 @@ HTTP2: 1-65535
 注意：
 1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe 有效，对 Uprobe 无效；
    - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
-   - <mark>Oracle 和 TLS 仅在企业版中支持。</mark>
+   - <mark>Oracle、SQL Server 和 TLS 仅在企业版中支持。</mark>
 2. 如需控制 `gRPC` 协议，请使用 `HTTP2` 配置。
 
 #### Tag 过滤器 {#processors.request_log.filters.tag_filters}
@@ -8065,6 +8066,7 @@ processors:
         Redis: []
         SOFARPC: []
         SomeIP: []
+        SqlServer: []
         TLS: []
         Tars: []
         WebSphereMQ: []
@@ -8098,6 +8100,8 @@ processors:
             value: somevalue
         HTTP2: []
         # 其他协议
+
+<mark>Oracle、SQL Server 和 TLS 仅在企业版中支持。</mark>
 ```
 
 ##### $HTTP Tag 过滤器 {#processors.request_log.filters.tag_filters.HTTP}
@@ -8146,7 +8150,7 @@ blacklist. Including business request logs might lead to breaks in the distribut
 
 Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
 
-<mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+<mark>Oracle, SQL Server and TLS is only supported in the Enterprise Edition.</mark>
 
 ###### 字段名 {#processors.request_log.filters.tag_filters.HTTP.field_name}
 
@@ -8618,7 +8622,7 @@ processors:
 
 支持从如下 Header 中提取 trace id，其格式如下:
 - traceparent: 00-TRACEID-SPANID-01
-- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
 - sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
 - sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
 - uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
@@ -8689,7 +8693,7 @@ processors:
 
 支持从如下 Header 中提取 span id，其格式如下:
 - traceparent: 00-TRACEID-SPANID-01
-- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
 - sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
 - sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
 - uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
@@ -9519,7 +9523,7 @@ deepflow-agent 有可能会错误的判断长流的方向，如果某个端口�
 服务端判定优先级从高到低为：
 - TCP Flags 中 SYN|ACK、GPID
 - L7 层解析
-- `server_ports` 配置 
+- `server_ports` 配置
 - Packet 计数（发送包数多的为服务端）
 
 ##### 云流量忽略 MAC {#processors.flow_log.conntrack.flow_generation.cloud_traffic_ignore_mac}
@@ -11014,7 +11018,7 @@ outputs:
 
 **详细描述**:
 
-监控时间间隔 
+监控时间间隔
 
 #### 触发次数 {#outputs.npb.self_load_circuit_breaker.trigger_times}
 

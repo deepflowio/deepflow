@@ -7722,7 +7722,7 @@ processors:
 
 Turning off some protocol identification can reduce deepflow-agent resource consumption.
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-<mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+<mark>Oracle, SQL Server and TLS is only supported in the Enterprise Edition.</mark>
 
 #### Protocol Special Config {#processors.request_log.application_protocol_inference.protocol_special_config}
 
@@ -8054,7 +8054,7 @@ Currently supports extraction from the following SQL statements:
 - CREATE TABLE users ( id INT PRIMARY KEY AUTO_INCREMENT, age INT,);
 - DROP TABLE users;
 - ALTER TABLE users ADD COLUMN phone VARCHAR(20);
-- MySQL Login username 
+- MySQL Login username
 
 ##### Grpc {#processors.request_log.application_protocol_inference.protocol_special_config.grpc}
 
@@ -8175,6 +8175,7 @@ processors:
         Redis: 1-65535
         SofaRPC: 1-65535
         SomeIP: 1-65535
+        SqlServer: 1433
         TLS: 443,6443
         Tars: 1-65535
         WebSphereMQ: 1-65535
@@ -8204,7 +8205,7 @@ NOTE:
 1. HTTP2 and TLS are only used for Kprobe, not applicable to Uprobe.
    All data obtained through Uprobe is not subject to port restrictions.
    - Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-   - <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+   - <mark>Oracle, SQL Server and TLS is only supported in the Enterprise Edition.</mark>
 2. Attention: use `HTTP2` for `gRPC` Protocol.
 
 #### Tag Filters {#processors.request_log.filters.tag_filters}
@@ -8247,6 +8248,7 @@ processors:
         Redis: []
         SOFARPC: []
         SomeIP: []
+        SqlServer: []
         TLS: []
         Tars: []
         WebSphereMQ: []
@@ -8287,7 +8289,7 @@ blacklist. Including business request logs might lead to breaks in the distribut
 
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
 
-<mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+<mark>Oracle, SQL Server and TLS is only supported in the Enterprise Edition.</mark>
 
 ##### $HTTP Tag Filters {#processors.request_log.filters.tag_filters.HTTP}
 
@@ -8335,7 +8337,7 @@ blacklist. Including business request logs might lead to breaks in the distribut
 
 Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
 
-<mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+<mark>Oracle, SQL Server and TLS is only supported in the Enterprise Edition.</mark>
 
 ###### Field Name {#processors.request_log.filters.tag_filters.HTTP.field_name}
 
@@ -8818,7 +8820,7 @@ Fields rewritten by plugins have the highest priority.
 
 Supports extracting the trace id from the following headers, in the following format:
 - traceparent: 00-TRACEID-SPANID-01
-- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
 - sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
 - sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
 - uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
@@ -8890,7 +8892,7 @@ Fields rewritten by plugins have the highest priority.
 
 Supports extracting the span id from the following headers, in the following format:
 - traceparent: 00-TRACEID-SPANID-01
-- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
 - sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
 - sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
 - uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
@@ -11267,7 +11269,7 @@ outputs:
 
 **Description**:
 
-Monitoring time interval 
+Monitoring time interval
 
 #### Trigger Times {#outputs.npb.self_load_circuit_breaker.trigger_times}
 
@@ -11295,7 +11297,7 @@ outputs:
 
 **Description**:
 
-When the load exceeds the trigger threshold multiple times consecutively, the deepflow-agent will stop 
+When the load exceeds the trigger threshold multiple times consecutively, the deepflow-agent will stop
 the NPB function to reduce the load, while other functions can be used normally.
 
 #### Recovery Times {#outputs.npb.self_load_circuit_breaker.recovery_times}
@@ -11355,7 +11357,7 @@ outputs:
 
 **Description**:
 
-CPU Load Monitoring Switch 
+CPU Load Monitoring Switch
 
 ##### Trigger Threshold {#outputs.npb.self_load_circuit_breaker.cpu.trigger_threshold}
 
@@ -11445,7 +11447,7 @@ outputs:
 
 **Description**:
 
-Memory Load Monitoring Switch 
+Memory Load Monitoring Switch
 
 ##### Trigger Threshold {#outputs.npb.self_load_circuit_breaker.memory.trigger_threshold}
 
@@ -11535,7 +11537,7 @@ outputs:
 
 **Description**:
 
-Queue Load Monitoring Switch 
+Queue Load Monitoring Switch
 
 ##### Trigger Threshold {#outputs.npb.self_load_circuit_breaker.queue.trigger_threshold}
 

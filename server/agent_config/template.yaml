@@ -1904,7 +1904,7 @@ inputs:
       # unit:
       # range: []
       # enum_options: []
-      # modification: agent_restart 
+      # modification: agent_restart
       # ee_feature: false
       # description:
       #   en: |-
@@ -5324,7 +5324,7 @@ processors:
       #   en: |-
       #     Turning off some protocol identification can reduce deepflow-agent resource consumption.
       #     Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-      #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+      #     <mark>Oracle, SQL Server and TLS is only supported in the Enterprise Edition.</mark>
       #   ch: |-
       #     deepflow-agent 仅对列表内的应用协议进行数据采集。通过该参数可以控制 agent 的数据采集范围以
       #     降低资源消耗。
@@ -5624,8 +5624,8 @@ processors:
           decompress_payload: true
           # type: bool
           # name:
-          #   en: Endpoint Disabled 
-          #   ch: 提取 Endpoint 开关 
+          #   en: Endpoint Disabled
+          #   ch: 提取 Endpoint 开关
           # unit:
           # range: []
           # enum_options: []
@@ -5642,7 +5642,7 @@ processors:
           #     - CREATE TABLE users ( id INT PRIMARY KEY AUTO_INCREMENT, age INT,);
           #     - DROP TABLE users;
           #     - ALTER TABLE users ADD COLUMN phone VARCHAR(20);
-          #     - MySQL Login username 
+          #     - MySQL Login username
           #   ch: |-
           #     关闭后不会提取 SQL 语句中的动作和表名放入 endpoint 中，目前支持从如下 SQL 语句中提取：
           #     - SELECT * FROM users;
@@ -5653,7 +5653,7 @@ processors:
           #     - DROP TABLE users;
           #     - ALTER TABLE users ADD COLUMN phone VARCHAR(20);
           #     - MySQL 登陆用户名
-          endpoint_disabled: false 
+          endpoint_disabled: false
         # type: section
         # name: Grpc
         # description:
@@ -5747,7 +5747,7 @@ processors:
       #     1. HTTP2 and TLS are only used for Kprobe, not applicable to Uprobe.
       #        All data obtained through Uprobe is not subject to port restrictions.
       #        - Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-      #        - <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+      #        - <mark>Oracle, SQL Server and TLS is only supported in the Enterprise Edition.</mark>
       #     2. Attention: use `HTTP2` for `gRPC` Protocol.
       #   ch: |-
       #     配置样例:
@@ -5759,7 +5759,7 @@ processors:
       #     注意：
       #     1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe 有效，对 Uprobe 无效；
       #        - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
-      #        - <mark>Oracle 和 TLS 仅在企业版中支持。</mark>
+      #        - <mark>Oracle、SQL Server 和 TLS 仅在企业版中支持。</mark>
       #     2. 如需控制 `gRPC` 协议，请使用 `HTTP2` 配置。
       # upgrade_from: static_config.l7-protocol-ports
       port_number_prefilters:
@@ -5774,6 +5774,7 @@ processors:
         MySQL: 1-65535
         PostgreSQL: 1-65535
         Oracle: 1521
+        SqlServer: 1433
         Redis: 1-65535
         MongoDB: 1-65535
         Memcached: 11211
@@ -5821,7 +5822,7 @@ processors:
       #
       #     Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
       #
-      #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+      #     <mark>Oracle, SQL Server and TLS is only supported in the Enterprise Edition.</mark>
       #   ch: |-
       #     控制不同应用协议数据采集时的 Tag。协议名不区分大小写。
       #     Tag filter 配置例子:
@@ -5836,6 +5837,8 @@ processors:
       #                 value: somevalue
       #             HTTP2: []
       #             # 其他协议
+      #
+      #     <mark>Oracle、SQL Server 和 TLS 仅在企业版中支持。</mark>
       #     ```
       # upgrade_from: static_config.l7-log-blacklist
       tag_filters:
@@ -5868,7 +5871,7 @@ processors:
         #
         #     Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
         #
-        #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+        #     <mark>Oracle, SQL Server and TLS is only supported in the Enterprise Edition.</mark>
         # upgrade_from: static_config.l7-log-blacklist.$protocol
         # ---
         # type: string
@@ -5936,6 +5939,7 @@ processors:
         MySQL: []
         PostgreSQL: []
         Oracle: []
+        SqlServer: []
         Redis: []
         MongoDB: []
         Memcached: []
@@ -6213,7 +6217,7 @@ processors:
         #
         #     Supports extracting the trace id from the following headers, in the following format:
         #     - traceparent: 00-TRACEID-SPANID-01
-        #     - sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+        #     - sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
         #     - sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
         #     - sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
         #     - uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
@@ -6226,7 +6230,7 @@ processors:
         #
         #     支持从如下 Header 中提取 trace id，其格式如下:
         #     - traceparent: 00-TRACEID-SPANID-01
-        #     - sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+        #     - sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
         #     - sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
         #     - sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
         #     - uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
@@ -6263,7 +6267,7 @@ processors:
         #
         #     Supports extracting the span id from the following headers, in the following format:
         #     - traceparent: 00-TRACEID-SPANID-01
-        #     - sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+        #     - sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
         #     - sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
         #     - sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
         #     - uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
@@ -6276,7 +6280,7 @@ processors:
         #
         #     支持从如下 Header 中提取 span id，其格式如下:
         #     - traceparent: 00-TRACEID-SPANID-01
-        #     - sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+        #     - sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING
         #     - sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
         #     - sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
         #     - uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
@@ -7192,7 +7196,7 @@ processors:
         #     服务端判定优先级从高到低为：
         #     - TCP Flags 中 SYN|ACK、GPID
         #     - L7 层解析
-        #     - `server_ports` 配置 
+        #     - `server_ports` 配置
         #     - Packet 计数（发送包数多的为服务端）
         # upgrade_from: static_config.server-ports
         server_ports: []
@@ -8125,7 +8129,7 @@ outputs:
     custom_vxlan_flags: 0b1111_1111
     # type: bool
     # name:
-    #   en: Underlay direction flags 
+    #   en: Underlay direction flags
     #   ch: Underlay 网络是否携带 direction 标志
     # unit:
     # range: []
@@ -8137,7 +8141,7 @@ outputs:
     #     After turning it on, the tunnel header will carry a direction field.
     #   ch: |-
     #     开启后会隧道头中会携带方向字段。
-    underlay_direction_flags: true 
+    underlay_direction_flags: true
     # type: bool
     # name:
     #   en: Overlay VLAN Header Trimming
@@ -8180,7 +8184,7 @@ outputs:
       # unit:
       # range: []
       # enum_options: []
-      # modification: hot_update 
+      # modification: hot_update
       # ee_feature: false
       # description:
       #   en: |-
@@ -8190,43 +8194,43 @@ outputs:
       enabled: true
       # type: duration
       # name:
-      #   en: Monitoring time interval 
-      #   ch: 监控时间间隔 
+      #   en: Monitoring time interval
+      #   ch: 监控时间间隔
       # unit:
       # range: [1s, 60s]
       # enum_options: []
-      # modification: hot_update 
+      # modification: hot_update
       # ee_feature: false
       # description:
       #   en: |-
-      #     Monitoring time interval 
+      #     Monitoring time interval
       #   ch: |-
-      #     监控时间间隔 
-      monitoring_interval: 10s 
-      # type: int 
+      #     监控时间间隔
+      monitoring_interval: 10s
+      # type: int
       # name:
-      #   en: Trigger Times  
-      #   ch: 触发次数 
+      #   en: Trigger Times
+      #   ch: 触发次数
       # unit:
       # range: [1, 60]
       # enum_options: []
-      # modification: hot_update 
+      # modification: hot_update
       # ee_feature: false
       # description:
       #   en: |-
-      #     When the load exceeds the trigger threshold multiple times consecutively, the deepflow-agent will stop 
+      #     When the load exceeds the trigger threshold multiple times consecutively, the deepflow-agent will stop
       #     the NPB function to reduce the load, while other functions can be used normally.
       #   ch: |-
       #     当连续多次检测到负载超过触发阈值，deepflow-agent 会停止 NPB 功能来降低负载，其他功能可以正常使用。
       trigger_times: 5
-      # type: int 
+      # type: int
       # name:
-      #   en: Recovery Times  
-      #   ch: 恢复次数 
+      #   en: Recovery Times
+      #   ch: 恢复次数
       # unit:
       # range: [1, 60]
       # enum_options: []
-      # modification: hot_update 
+      # modification: hot_update
       # ee_feature: false
       # description:
       #   en: |-
@@ -8236,7 +8240,7 @@ outputs:
       #     当连续多次检测到负载低于恢复阈值，deepflow-agent 会开启 NPB 功能。
       recovery_times: 5
       # type: section
-      # name: CPU 
+      # name: CPU
       # description:
       cpu:
         # type: bool
@@ -8248,14 +8252,14 @@ outputs:
         # ee_feature: false
         # description:
         #   en: |-
-        #     CPU Load Monitoring Switch 
+        #     CPU Load Monitoring Switch
         #   ch: |-
         #     CPU 负载监控开关
         enabled: true
-        # type: int 
+        # type: int
         # name:
-        #   en: Trigger Threshold 
-        #   ch: 触发阈值 
+        #   en: Trigger Threshold
+        #   ch: 触发阈值
         # unit:
         # range: [1, 100]
         # enum_options: []
@@ -8268,10 +8272,10 @@ outputs:
         #   ch: |-
         #     当连续多次检测到负载超过该阈值，deepflow-agent 会停止 NPB 功能来降低负载，其他功能可以正常使用。
         trigger_threshold: 90
-        # type: int 
+        # type: int
         # name:
-        #   en: Recovery Threshold 
-        #   ch: 恢复阈值 
+        #   en: Recovery Threshold
+        #   ch: 恢复阈值
         # unit:
         # range: [1, 100]
         # enum_options: []
@@ -8285,7 +8289,7 @@ outputs:
         #     当连续多次检测到负载低于该阈值，deepflow-agent 会开启 NPB 功能。
         recovery_threshold: 70
       # type: section
-      # name: Memory 
+      # name: Memory
       # description:
       memory:
         # type: bool
@@ -8297,14 +8301,14 @@ outputs:
         # ee_feature: false
         # description:
         #   en: |-
-        #     Memory Load Monitoring Switch 
+        #     Memory Load Monitoring Switch
         #   ch: |-
         #     内存负载监控开关
         enabled: true
-        # type: int 
+        # type: int
         # name:
-        #   en: Trigger Threshold 
-        #   ch: 触发阈值 
+        #   en: Trigger Threshold
+        #   ch: 触发阈值
         # unit:
         # range: [1, 100]
         # enum_options: []
@@ -8317,10 +8321,10 @@ outputs:
         #   ch: |-
         #     当连续多次检测到负载超过该阈值，deepflow-agent 会停止 NPB 功能来降低负载，其他功能可以正常使用。
         trigger_threshold: 90
-        # type: int 
+        # type: int
         # name:
-        #   en: Recovery Threshold 
-        #   ch: 恢复阈值 
+        #   en: Recovery Threshold
+        #   ch: 恢复阈值
         # unit:
         # range: [1, 100]
         # enum_options: []
@@ -8334,7 +8338,7 @@ outputs:
         #     当连续多次检测到负载低于该阈值，deepflow-agent 会开启 NPB 功能。
         recovery_threshold: 70
       # type: section
-      # name: Queue 
+      # name: Queue
       # description:
       queue:
         # type: bool
@@ -8346,14 +8350,14 @@ outputs:
         # ee_feature: false
         # description:
         #   en: |-
-        #     Queue Load Monitoring Switch 
+        #     Queue Load Monitoring Switch
         #   ch: |-
         #     队列负载监控开关
         enabled: true
-        # type: int 
+        # type: int
         # name:
-        #   en: Trigger Threshold 
-        #   ch: 触发阈值 
+        #   en: Trigger Threshold
+        #   ch: 触发阈值
         # unit:
         # range: [1, 100]
         # enum_options: []
@@ -8366,10 +8370,10 @@ outputs:
         #   ch: |-
         #     当连续多次检测到负载超过该阈值，deepflow-agent 会停止 NPB 功能来降低负载，其他功能可以正常使用。
         trigger_threshold: 90
-        # type: int 
+        # type: int
         # name:
-        #   en: Recovery Threshold 
-        #   ch: 恢复阈值 
+        #   en: Recovery Threshold
+        #   ch: 恢复阈值
         # unit:
         # range: [1, 100]
         # enum_options: []
