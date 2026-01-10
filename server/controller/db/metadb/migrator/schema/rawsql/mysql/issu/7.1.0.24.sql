@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS biz_decode_dictionary_policy_field_connection (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     dictionary_id          INTEGER NOT NULL,
     policy_field_id        INTEGER NOT NULL,
-    policy_field_node_path VARCHAR(512) NOT NULL,
     created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
