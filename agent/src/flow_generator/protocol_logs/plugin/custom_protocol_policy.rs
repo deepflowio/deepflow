@@ -89,9 +89,17 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
 
         let protocol = CustomProtocol::CustomPolicy(self.proto_str.clone());
 
-        let direction = match param.direction {
-            PacketDirection::ClientToServer => TrafficDirection::REQUEST,
-            PacketDirection::ServerToClient => TrafficDirection::RESPONSE,
+        let (port, direction) = match param.direction {
+            PacketDirection::ClientToServer => (param.port_dst, TrafficDirection::REQUEST),
+            PacketDirection::ServerToClient => (param.port_src, TrafficDirection::RESPONSE),
+        };
+
+        if self
+            .parser
+            .check_payload(payload, &config.custom_protocol_config, direction, port)
+            .is_none()
+        {
+            return Ok(L7ParseResult::None);
         };
 
         let Some(policies) = config
