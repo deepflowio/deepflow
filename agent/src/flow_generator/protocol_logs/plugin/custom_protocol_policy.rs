@@ -89,9 +89,9 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
 
         let protocol = CustomProtocol::CustomPolicy(self.proto_str.clone());
 
-        let direction = match param.direction {
-            PacketDirection::ClientToServer => TrafficDirection::REQUEST,
-            PacketDirection::ServerToClient => TrafficDirection::RESPONSE,
+        let (port, direction) = match param.direction {
+            PacketDirection::ClientToServer => (param.port_dst, TrafficDirection::REQUEST),
+            PacketDirection::ServerToClient => (param.port_src, TrafficDirection::RESPONSE),
         };
 
         let Some(policies) = config
@@ -99,6 +99,13 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             .get_custom_field_policies(protocol.into(), param)
         else {
             return Err(Error::NoParseConfig);
+        };
+
+        let Some(_) =
+            self.parser
+                .check_payload(payload, &config.custom_protocol_config, direction, port)
+        else {
+            return Err(Error::CustomPolicyParseFail);
         };
 
         if self.parser.parse_payload(payload, direction, policies) {
