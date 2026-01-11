@@ -101,6 +101,7 @@ message SyncRequest {
     optional uint64 version_acls = 10 [default = 0];
     optional uint64 version_groups = 11 [default = 0];
     optional string current_k8s_image = 12;
+    optional CustomAppConfig custom_app_config = 13; // agent will only populate `version`
 
     optional string ctrl_ip = 21;
     optional string host = 22;      // 表示hostname，操作系统的原始主机名，注册和信息同步使用
@@ -378,6 +379,17 @@ message DynamicConfig {
     optional string group_id = 22;
 }
 
+message CustomAppConfig {
+    optional uint64 version = 1; // config version, apply to whole message
+
+    optional bool compressed = 2; // whether configs are compressed with ZSTD
+
+    // config string that is one of:
+    // - UTF-8 encoded YAML
+    // - ZSTD compressed UTF-8 encoded YAML (if `compressed` is true)
+    optional bytes configs = 10;
+}
+
 message SyncResponse {
     optional Status status = 1;
     optional string user_config = 2;
@@ -404,6 +416,7 @@ message SyncResponse {
     repeated SkipInterface skip_interface = 15;
 
     optional DynamicConfig dynamic_config = 20;
+    optional CustomAppConfig custom_app_config = 21;
 
     // When the controller determines that the agent needs to adjust `current_grpc_buffer_size`,
     // this value is set to true. At this time, only the following fields in the message are valid:

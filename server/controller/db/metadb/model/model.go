@@ -582,7 +582,7 @@ type BizDecodeDictionary struct {
 	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	TeamID    int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 	Name      string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	Yaml      string    `gorm:"column:yaml;type:text" json:"YAML"`
+	Yaml      string    `gorm:"column:yaml;type:mediumtext" json:"YAML"`
 	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime;not null;" json:"CREATED_AT"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT"`
 }
@@ -591,7 +591,7 @@ type BizDecodePolicy struct {
 	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	TeamID    int       `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
 	Name      string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	Yaml      string    `gorm:"column:yaml;type:text" json:"YAML"`
+	Yaml      string    `gorm:"column:yaml;type:mediumtext" json:"YAML"`
 	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime;not null" json:"CREATED_AT"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT"`
 }
@@ -599,6 +599,7 @@ type BizDecodePolicy struct {
 type BizDecodePolicyField struct {
 	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	PolicyID  int       `gorm:"column:policy_id;type:int;not null" json:"POLICY_ID"`
+	Type      int       `gorm:"column:type;type:tinyint(1);not null" json:"TYPE"`
 	Name      string    `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
 	Yaml      string    `gorm:"column:yaml;type:text" json:"YAML"`
 	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at;type:datetime;not null" json:"CREATED_AT"`

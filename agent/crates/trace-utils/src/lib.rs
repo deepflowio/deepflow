@@ -43,6 +43,7 @@ pub use utils::protect_cpu_affinity;
 pub enum InterpreterType {
     Php,
     V8,
+    Lua,
 }
 
 /// Global registry mapping PID to interpreter type

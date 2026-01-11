@@ -21,6 +21,12 @@ import (
 	"regexp"
 )
 
+//go:embed custom_app.example.yaml
+var YamlCustomAppExample []byte
+
+//go:embed custom_app.schema.yaml
+var YamlCustomAppSchema []byte
+
 //go:embed example.yaml
 var YamlAgentGroupConfig []byte
 

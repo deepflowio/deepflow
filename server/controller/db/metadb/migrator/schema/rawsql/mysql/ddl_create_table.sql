@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS agent_group_configuration (
     id    INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     lcuuid CHAR(64) NOT NULL,
     agent_group_lcuuid CHAR(64) NOT NULL,
-    yaml   TEXT,
+    yaml   LONGTEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
@@ -2556,7 +2556,7 @@ CREATE TABLE IF NOT EXISTS biz_decode_dictionary (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     team_id                INTEGER DEFAULT 1,
     name                   VARCHAR(256) NOT NULL,
-    yaml                   TEXT,
+    yaml                   MEDIUMTEXT,
     created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
@@ -2566,7 +2566,7 @@ CREATE TABLE IF NOT EXISTS biz_decode_policy (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     team_id                INTEGER DEFAULT 1,
     name                   VARCHAR(256) NOT NULL,
-    yaml                   TEXT,
+    yaml                   MEDIUMTEXT,
     created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
@@ -2575,6 +2575,7 @@ TRUNCATE TABLE biz_decode_policy;
 CREATE TABLE IF NOT EXISTS biz_decode_policy_field (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     policy_id              INTEGER NOT NULL,
+    type                   TINYINT(1) NOT NULL COMMENT '1-field; 2-const field; 3-compound field',
     name                   VARCHAR(256) NOT NULL,
     yaml                   TEXT,
     created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
