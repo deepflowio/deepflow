@@ -18,6 +18,7 @@
 #include <arpa/inet.h>
 #include <sched.h>
 #include <signal.h>
+#include <sys/stat.h> // chmod()
 #include <sys/utsname.h>
 #include <sys/prctl.h>
 #include <linux/version.h>
@@ -45,6 +46,8 @@
 #include "unwind_tracer.h"
 #include "extended/extended.h"
 #include "profile/perf_profiler.h"
+
+#include "deepflow_ebpfctl_bin.c"
 
 /*
  * Sleep duration (in seconds) before retrying CPU binding if it fails.
@@ -2234,6 +2237,36 @@ int init_match_pids_hash(void)
 				    hash_memory_size);
 }
 
+static int ebpf_tools_install(void)
+{
+	// deeflow-ebpfctl generation.
+	if (access(CTLBIN_INSTALL_PATH, F_OK) == 0) {
+		if (unlink(CTLBIN_INSTALL_PATH) != 0) {
+			ebpf_warning("Delete %s failed, with %s "
+				     "(errno:%d)\n", CTLBIN_INSTALL_PATH,
+				     strerror(errno), errno);
+			return (-1);
+		}
+	}
+
+	if (gen_file_from_mem((const char *)deepflow_ebpfctl_bin,
+			      sizeof(deepflow_ebpfctl_bin),
+			      (const char *)CTLBIN_INSTALL_PATH)) {
+		ebpf_warning("deepflow-ebpfctl tool (%s) generate failed.\n",
+			     CTLBIN_INSTALL_PATH);
+		return (-1);
+	}
+
+	if (chmod(CTLBIN_INSTALL_PATH, 0755) < 0) {
+		ebpf_warning("file '%s' chmod failed. with %s (errno:%d)\n",
+			     CTLBIN_INSTALL_PATH, strerror(errno), errno);
+		return (-1);
+	}
+
+	ebpf_info("%s installed successfully.\n", CTLBIN_INSTALL_PATH);
+	return (0);
+}
+
 int bpf_tracer_init(const char *log_file, bool is_stdout)
 {
 	init_list_head(&extra_waiting_head);
@@ -2291,6 +2324,8 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 		     MAX_CPU_NR, sys_cpus_count);
 		return ETR_INVAL;
 	}
+
+	ebpf_tools_install();
 
 	uint64_t real_time, monotonic_time;
 	real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);

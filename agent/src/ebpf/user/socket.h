@@ -236,9 +236,11 @@ struct bpf_socktrace_params {
 	uint64_t proc_exit_event_count;
 	bool datadump_enable;
 	int datadump_pid;
+	uint16_t datadump_port;
 	uint8_t datadump_proto;
 	char datadump_file_path[DATADUMP_FILE_PATH_SIZE];
 	char datadump_comm[16];
+	char datadump_ipaddr[ADDRSTRLEN];
 	struct bpf_offset_param_array offset_array;
 };
 
