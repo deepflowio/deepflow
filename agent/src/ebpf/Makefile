@@ -118,6 +118,10 @@ ifeq ($(GCC_VER_GTE71),1)
 endif
 CFLAGS += $(JAVA_AGENT_MACROS)
 
+CTLSRC := user/utils.c user/ctrl_tracer.c user/ctrl.c user/log.c
+CTLBIN := deepflow-ebpfctl
+CTLBIN_C := user/deepflow_ebpfctl_bin.c
+
 # trace-utils header
 CFLAGS += -I../../crates/trace-utils/src
 
@@ -220,7 +224,7 @@ $(STATIC_OBJDIR)/%.o: %.c | $(STATIC_OBJDIR)
 	$(call msg,CC,$@)
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
-$(LIBTRACE): $(STATIC_OBJS)
+$(LIBTRACE): $(CTLBIN_C) $(STATIC_OBJS)
 	$(call msg,AR,$@)
 	$(Q)$(AR) rcs $@ $^
 
@@ -236,11 +240,17 @@ $(JAVA_AGENT_MUSL_SO): tools/bintobuffer $(JAVA_AGENT_SRC)
 	@rm -rf user/profile/java_agent_so_musl.c
 	@./tools/bintobuffer ./$@ user/profile/java_agent_so_musl.c java_agent_so_musl
 
-build: $(ELFFILES) $(JAVA_TOOL) $(LIBTRACE)
+build: $(CTLBIN_C) $(ELFFILES) $(JAVA_TOOL) $(LIBTRACE)
 
-tools: $(LIBTRACE)
+tools: $(CTLBIN)
+
+$(CTLBIN_C): $(CTLBIN) tools/bintobuffer
+	$(call msg,CTLBIN_C,$(CTLBIN_C))
+	$(Q)./tools/bintobuffer $(CTLBIN) ./$@ deepflow_ebpfctl_bin 
+
+$(CTLBIN): $(CTLSRC) 
 	$(call msg,TOOLS,deepflow-ebpfctl)
-	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -lelf -lz -lpthread
+	$(Q)$(CC) $(CFLAGS) --static -g -O2 $(CTLSRC) -o $@ -lelf -lz -lpthread
 
 $(JAVA_TOOL): $(JAVA_AGENT_SO) user/log.c user/utils.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a
 	$(call msg,TOOLS,$@)
@@ -329,7 +339,7 @@ clean:
 	$(Q)rm -rf .profiler .socket-tracer
 	$(Q)rm -rf samples/rust/socket-tracer/target
 	$(Q)rm -rf samples/rust/profiler/target
-	$(Q)rm -rf $(JAVA_AGENT_SO) $(JAVA_TOOL) tools/bintobuffer
+	$(Q)rm -rf $(JAVA_AGENT_SO) $(JAVA_TOOL) $(CTLBIN) $(CTLBIN_C) tools/bintobuffer
 
 test: $(ELFFILES) $(LIBTRACE)
 	$(Q)$(MAKE) -C test --no-print-directory
