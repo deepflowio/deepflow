@@ -190,7 +190,8 @@ enum cfg_feature_idx {
 #define CP_TRACER_NAME	                "continuous_profiler"
 
 #define DATADUMP_FILE_PATH_SIZE		1024
-#define DATADUMP_FILE_PATH_PREFIX	"/var/log"
+#define DATADUMP_SAVE_DIR		"/var/log"
+#define DATADUMP_FILE_PATH_PREFIX	DATADUMP_SAVE_DIR
 
 // trace map回收的最大比例（指当前数量超过了整个MAP的容量的回收比例才进行回收）
 // Maximum proportion of trace map reclamation (refers to the proportion of
