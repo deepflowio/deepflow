@@ -50,6 +50,10 @@ type Specification struct {
 	DataSourceRetentionTimeMax   int `default:"24000" yaml:"data_source_retention_time_max"`
 	DataSourceExtMetricsInterval int `default:"10" yaml:"data_source_ext_metrics_interval"`
 	DataSourcePrometheusInterval int `default:"10" yaml:"data_source_prometheus_interval"`
+	BizDecodePolicyMax           int `default:"100" yaml:"biz_decode_policy_max"`
+	BizDecodePolicyFieldMax      int `default:"200" yaml:"biz_decode_policy_field_max"`
+	BizDecodeDictionaryMax       int `default:"1000" yaml:"biz_decode_dictionary_max"`
+	BizDecodeCustomProtocolMax   int `default:"200" yaml:"biz_decode_custom_protocol_max"`
 }
 
 type DFWebService struct {
