@@ -701,6 +701,10 @@ extern "C" {
      * @proto
      *   Specifying the L7 protocol number. If set to '0', it indicates all
      *   L7 protocols.
+     * @ipaddr
+     *   Specifying ip address
+     * @port
+     *   Specifying port
      * @timeout
      *   Specifying the timeout duration. If the elapsed time exceeds this
      *   duration, datadump will stop. The unit is in seconds.
@@ -713,6 +717,8 @@ extern "C" {
         pid: c_int,
         comm: *const c_char,
         proto: c_int,
+        ipaddr: *const c_char,
+        port: c_int,
         timeout: c_int,
         callback: extern "C" fn(data: *mut c_char, len: c_int),
     ) -> c_int;
