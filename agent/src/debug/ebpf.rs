@@ -112,11 +112,14 @@ impl EbpfDebugger {
         };
         let now = Instant::now();
         let duration = Duration::from_secs(*timeout as u64);
+        let empty_cstr = CString::new("").unwrap();
         unsafe {
             datadump_set_config(
                 *pid as i32,
                 CString::new(name.as_bytes()).unwrap().as_c_str().as_ptr(),
                 *protocol as i32,
+                empty_cstr.as_c_str().as_ptr(),
+                0 as c_int,
                 *timeout as c_int,
                 Self::ebpf_debug,
             );

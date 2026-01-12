@@ -683,8 +683,20 @@ fn main() {
         // test data limit max
         set_data_limit_max(10000);
 
-        //let empty_string = CString::new("").expect("CString::new failed");
-        //if datadump_set_config(0, empty_string.as_ptr(), 0, 60, debug_callback) != 0 {
+        /*
+         pub fn datadump_set_config(
+             pid: c_int,
+             comm: *const c_char,
+             proto: c_int,
+             ipaddr: *const c_char,
+             port:  c_int,
+             timeout: c_int,
+             callback: extern "C" fn(data: *mut c_char, len: c_int),
+         ) -> c_int;
+        */
+        //let comm = CString::new("").expect("CString::new failed");
+        //let ipaddr = CString::new("").expect("CString::new failed");
+        //if datadump_set_config(0, comm.as_ptr(), 0, ipaddr.as_ptr(), 0, 60, debug_callback) != 0 {
         //    println!("datadump_set_config() error");
         //    ::std::process::exit(1);
         //}
