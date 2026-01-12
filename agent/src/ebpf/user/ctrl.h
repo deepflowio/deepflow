@@ -39,6 +39,10 @@ typedef uint32_t sockoptid_t;
 
 #define SOCKOPT_ERRSTR_LEN  64
 
+#ifndef ADDRSTRLEN
+#define ADDRSTRLEN 46 // Compatible with both IPv4 and IPv6
+#endif
+
 enum sockopt_type {
 	SOCKOPT_GET = 0,
 	SOCKOPT_SET,
@@ -83,6 +87,8 @@ struct datadump_msg {
 	int pid;
 	uint8_t proto;
 	char comm[16];
+	char ipaddr[ADDRSTRLEN];
+	unsigned short port;
 };
 
 struct cpdbg_msg {

@@ -18,6 +18,9 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <getopt.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <limits.h>
 #include "tracer.h"
 #include "socket.h"
 
@@ -48,14 +51,24 @@ struct df_bpf_conf {
 	int af;
 	int verbose;
 	int stats;
-	int interval;
 	int count;
+
+	// For datadump config
+	int interval;
 	int timeout;
-	char *match_str;
 	int pid;
 	int fd;
 	int l7_proto;
+	char *ip;
+	unsigned int port;
+
+	// For search datadump files
+	char *match_str;
 	bool is_all_files;
+	char *file_name;
+	unsigned int start_line;
+	unsigned int end_line;
+
 	char *comm_str;
 	bool color;
 	bool only_stdout;
@@ -175,12 +188,175 @@ static void datadump_help(void)
 	fprintf(stderr, "    %s datadump clear\n", DF_BPF_NAME);
 	fprintf(stderr, "    %s datadump find <Match string>\n", DF_BPF_NAME);
 	fprintf(stderr,
-		"    %s datadump set --pid 1234 --comm nginx --l7-proto 20\n",
+		"    %s datadump set --pid 1234 --comm nginx --l7-proto 20 --ipaddr 127.0.0.1 --port 53\n",
 		DF_BPF_NAME);
 	fprintf(stderr, "    %s datadump find --match-str nginx\n",
 		DF_BPF_NAME);
+	fprintf(stderr,
+		"    %s datadump find --match-str nginx --file-name datadump-1.log --start-line 1 --end-line 1000\n",
+		DF_BPF_NAME);
+	fprintf(stderr,
+		"    %s datadump find --file-name datadump-1.log --start-line 1 --end-line 1000\n",
+		DF_BPF_NAME);
 	fprintf(stderr, "    %s datadump find --match-str nginx --all-files\n",
 		DF_BPF_NAME);
+}
+
+static unsigned int count_lines_in_file(const char *filepath)
+{
+	FILE *fp = fopen(filepath, "r");
+	if (!fp) {
+		fprintf(stderr, "Failed to open file '%s': %s\n", filepath,
+			strerror(errno));
+		return -1;
+	}
+
+	unsigned int lines = 0;
+	char buf[64 * 1024];
+
+	while (fgets(buf, sizeof(buf), fp)) {
+		lines++;
+	}
+
+	if (ferror(fp)) {
+		fprintf(stderr, "Error reading file '%s'\n", filepath);
+		fclose(fp);
+		return -1;
+	}
+
+	fclose(fp);
+	return lines;
+}
+
+#define DATADUMP_PREFIX "datadump-"
+#define LOG_PREFIX "deepflow-agent_rCURRENT"
+static int display_files(const char *prefix, const char *path)
+{
+	DIR *dir = opendir(path);
+	if (!dir) {
+		fprintf(stderr, "Failed to open directory '%s': %s\n",
+			path, strerror(errno));
+		return -1;
+	}
+
+	struct dirent *entry;
+	char filepath[PATH_MAX];
+
+	printf("%-43s %-12s %-21s %s\n", "Filename", "Size(Bytes)",
+	       "Last Modified", "Lines");
+
+	while ((entry = readdir(dir)) != NULL) {
+		// Skip files that do not match the filename pattern
+		if ((strncmp
+		     (entry->d_name, DATADUMP_PREFIX,
+		      strlen(DATADUMP_PREFIX)) != 0) && (strncmp
+							 (entry->d_name,
+							  LOG_PREFIX,
+							  strlen(LOG_PREFIX)) !=
+							 0))
+			continue;
+
+		// Concatenate full path while preventing buffer overflow
+		if (snprintf
+		    (filepath, sizeof(filepath), "%s/%s", path,
+		     entry->d_name) >= (int)sizeof(filepath)) {
+			fprintf(stderr, "File path too long: %s/%s\n",
+				path, entry->d_name);
+			continue;
+		}
+
+		struct stat st;
+		if (stat(filepath, &st) == -1) {
+			fprintf(stderr, "Failed to stat file '%s': %s\n",
+				filepath, strerror(errno));
+			continue;
+		}
+
+		if (!S_ISREG(st.st_mode))
+			continue;
+
+		char timebuf[64];
+		struct tm tm_info;
+		if (!localtime_r(&st.st_mtime, &tm_info)) {
+			fprintf(stderr,
+				"Failed to convert time for file '%s'\n",
+				filepath);
+			continue;
+		}
+		if (strftime
+		    (timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S",
+		     &tm_info) == 0) {
+			fprintf(stderr, "Failed to format time for file '%s'\n",
+				filepath);
+			continue;
+		}
+
+		int lines = count_lines_in_file(filepath);
+		if (lines < 0) {
+			lines = 0;
+		}
+
+		snprintf(filepath, sizeof(filepath), "%s%s", prefix,
+			 entry->d_name);
+		printf("%-43s %-12ld %-21s %u\n", filepath, (long)st.st_size,
+		       timebuf, lines);
+	}
+
+	closedir(dir);
+	return 0;
+}
+
+static int delete_datadump_files(void)
+{
+	DIR *dir = opendir(DATADUMP_SAVE_DIR);
+	if (!dir) {
+		fprintf(stderr, "Failed to open directory '%s': %s\n",
+			DATADUMP_SAVE_DIR, strerror(errno));
+		return -1;
+	}
+
+	struct dirent *entry;
+	char filepath[PATH_MAX];
+	int ret = 0, count = 0;
+
+	while ((entry = readdir(dir)) != NULL) {
+		if (strncmp
+		    (entry->d_name, DATADUMP_PREFIX,
+		     strlen(DATADUMP_PREFIX)) != 0)
+			continue;
+
+		if (snprintf
+		    (filepath, sizeof(filepath), "%s/%s", DATADUMP_SAVE_DIR,
+		     entry->d_name) >= (int)sizeof(filepath)) {
+			fprintf(stderr, "File path too long: %s/%s\n",
+				DATADUMP_SAVE_DIR, entry->d_name);
+			continue;
+		}
+
+		struct stat st;
+		if (stat(filepath, &st) == -1) {
+			fprintf(stderr, "Failed to stat file '%s': %s\n",
+				filepath, strerror(errno));
+			continue;
+		}
+
+		if (!S_ISREG(st.st_mode))
+			continue;
+
+		if (unlink(filepath) == -1) {
+			fprintf(stderr, "Failed to delete file '%s': %s\n",
+				filepath, strerror(errno));
+			ret = -1;
+		} else {
+			count++;
+			printf("Deleted file: %s\n", filepath);
+		}
+	}
+
+	closedir(dir);
+	printf("Deleted datadump files completed, a total of %d files were"
+	       " deleted.\n", count);
+	return ret;
 }
 
 static int __exec_command(const char *cmd, const char *args)
@@ -277,6 +453,7 @@ static void tracer_dump(struct bpf_tracer_param *param)
 	printf("\n");
 }
 
+/* *INDENT-OFF* */
 static void offset_dump(int cpu, bpf_offset_param_t *param)
 {
 	printf("----------------------------------\n");
@@ -289,6 +466,7 @@ static void offset_dump(int cpu, bpf_offset_param_t *param)
 	printf("tcp_sock__write_seq_offset: \t0x%x\n\n",
 	       param->tcp_sock__write_seq_offset);
 }
+/* *INDENT-ON* */
 
 static inline int msg_send(int clt_fd,
 			   const struct tracer_sock_msg *hdr,
@@ -593,8 +771,12 @@ static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 		printf("  datadump_pid:\t%d\n", sk_trace_params->datadump_pid);
 		printf("  datadump_proto:\t%d\n",
 		       sk_trace_params->datadump_proto);
+		printf("  datadump_port:\t%d\n",
+		       sk_trace_params->datadump_port);
 		printf("  datadump_comm:\t%s\n",
 		       sk_trace_params->datadump_comm);
+		printf("  datadump_ipaddr:\t%s\n",
+		       sk_trace_params->datadump_ipaddr);
 		printf("  datadump_file_path:\t%s\n\n",
 		       sk_trace_params->datadump_file_path);
 
@@ -673,12 +855,17 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 					msg.is_params = true;
 					msg.pid = conf->pid;
 					msg.proto = conf->l7_proto;
-					memset(msg.comm, 0, sizeof(msg.comm));
-					memcpy(msg.comm, conf->comm_str,
-					       sizeof(msg.comm) - 1);
-					fprintf(stdout,
-						" == pid %d l7-proto %d comm %s\n",
-						msg.pid, msg.proto, msg.comm);
+					msg.port = conf->port;
+					if (conf->comm_str)
+						snprintf(msg.comm, sizeof(msg.comm), "%s", conf->comm_str);
+					else
+						msg.comm[0] = '\0';
+
+					if (conf->ip)
+						snprintf(msg.ipaddr, sizeof(msg.ipaddr), "%s", conf->ip);
+					else
+						msg.ipaddr[0] = '\0';
+
 					goto conf_finish;
 				}
 
@@ -719,8 +906,8 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 					       sizeof(msg.comm) - 1);
 				}
 			      conf_finish:
-				printf("Set pid %d comm %s proto %d ", msg.pid,
-				       msg.comm, msg.proto);
+				printf("Set pid %d comm %s proto %d ip %s port %d\n",
+				       msg.pid, msg.comm, msg.proto, msg.ipaddr, msg.port);
 			}
 
 			if (df_bpf_setsockopt(SOCKOPT_SET_DATADUMP_ADD, &msg,
@@ -733,26 +920,30 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 			break;
 		}
 	case DF_BPF_CMD_SHOW:
-		if (conf->argc != 0)
+		if (conf->argc != 0) {
 			fprintf(stdout, "Invalid params.\n");
-		else
-			__exec_command("ls -sh /var/log/datadump-*.log", "");
+		} else {
+			display_files("", DATADUMP_SAVE_DIR);
+			printf("\n");
+			display_files("deepflow-agent/",
+				      "/var/log/deepflow-agent");
+		}
 		break;
 	case DF_BPF_CMD_FLUSH:
 		if (conf->argc != 0)
 			fprintf(stdout, "Invalid params.\n");
 		else
-			__exec_command("rm -rf /var/log/datadump-*.log", "");
+			delete_datadump_files();
 		break;
 	case DF_BPF_CMD_FIND:
 		{
-			char *match_str;
+			char *match_str = NULL;
+			char cmdbuf[CMD_BUF_SZ];
 			fprintf(stdout, "conf->argc == %d conf->match_str %s\n",
 				conf->argc, conf->match_str);
 			if (conf->argc == 0 && conf->match_str != NULL) {
 				match_str = conf->match_str;
 				goto process_find;
-
 			}
 
 			if (conf->argc != 1) {
@@ -763,17 +954,41 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 			match_str = conf->argv[0];
 
 		      process_find:
-			{
-				char cmdbuf[CMD_BUF_SZ];
+			if ((conf->file_name != NULL
+			     && strlen(conf->file_name) > 0
+			     && (strstr(conf->file_name, "datadump-")
+				 || strstr(conf->file_name,
+					   "deepflow-agent_rCURRENT")))
+			    && conf->start_line > 0 && conf->end_line > 0) {
+				if (match_str == NULL) {
+					snprintf(cmdbuf, sizeof(cmdbuf),
+						 "nl -ba " DATADUMP_SAVE_DIR
+						 "/%s | sed -n \"%u,%up\"",
+						 conf->file_name,
+						 conf->start_line,
+						 conf->end_line);
+				} else {
+					snprintf(cmdbuf, sizeof(cmdbuf),
+						 "grep -n \"%s\" "
+						 DATADUMP_SAVE_DIR
+						 "/%s | sed -n \"%u,%up\"",
+						 match_str, conf->file_name,
+						 conf->start_line,
+						 conf->end_line);
+
+				}
+			} else {
 				snprintf(cmdbuf, sizeof(cmdbuf),
-					 "grep -n -A 1 \"%s\" %s",
-					 match_str,
-					 conf->is_all_files ?
-					 "/var/log/datadump-*.log" :
-					 "$(ls -t /var/log/datadump-*.log | head -n 1)");
-				printf("%s\n", cmdbuf);
-				__exec_command(cmdbuf, "");
+					 "ls " DATADUMP_SAVE_DIR
+					 "/datadump-*.log && "
+					 "grep -n -A 1 \"%s\" %s", match_str,
+					 conf->is_all_files ? DATADUMP_SAVE_DIR
+					 "/datadump-*.log" : "$(ls -t "
+					 DATADUMP_SAVE_DIR
+					 "/datadump-*.log | head -n 1)");
 			}
+			printf("%s\n", cmdbuf);
+			__exec_command(cmdbuf, "");
 		}
 		break;
 	default:
@@ -923,6 +1138,30 @@ static struct df_bpf_obj *df_bpf_obj_get(const char *name)
 	return NULL;
 }
 
+int parse_uint_arg(const char *s, unsigned int *out)
+{
+	char *end = NULL;
+	unsigned long val;
+
+	if (!s || !out || *s == '\0')
+		return -EINVAL;
+
+	errno = 0;
+	val = strtoul(s, &end, 10);
+
+	if (errno != 0)
+		return -errno;
+
+	if (*end != '\0')
+		return -EINVAL;
+
+	if (val > UINT_MAX)
+		return -ERANGE;
+
+	*out = (unsigned int)val;
+	return 0;
+}
+
 static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 {
 	int opt;
@@ -936,10 +1175,15 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		{"all-files", no_argument, NULL, 'A'},
 		{"timeout", required_argument, NULL, 't'},
 		{"match-str", required_argument, NULL, 'm'},
-		{"pid", required_argument, NULL, 'p'},
+		{"pid", required_argument, NULL, 'P'},
 		{"fd", required_argument, NULL, 'f'},
 		{"comm", required_argument, NULL, 'c'},
 		{"l7-proto", required_argument, NULL, 'l'},
+		{"file-name", required_argument, NULL, 'n'},
+		{"start-line", required_argument, NULL, 's'},
+		{"end-line", required_argument, NULL, 'e'},
+		{"ipaddr", required_argument, NULL, 'i'},
+		{"port", required_argument, NULL, 'p'},
 		{NULL, 0, NULL, 0},
 	};
 
@@ -959,7 +1203,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 	}
 
 	while ((opt =
-		getopt_long(argc, argv, "vhVCOAt:m:p:f:c:l:", opts,
+		getopt_long(argc, argv, "vhVCOAt:m:P:f:c:l:n:f:e:i:p:", opts,
 			    NULL)) != -1) {
 		switch (opt) {
 		case 'v':
@@ -987,7 +1231,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 				return -1;
 			}
 			break;
-		case 'p':
+		case 'P':
 			conf->pid = atoi(optarg);
 			if (conf->pid < 0) {
 				fprintf(stderr,
@@ -1045,6 +1289,63 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 				memcpy((void *)conf->match_str, (void *)optarg,
 				       len);
 				conf->match_str[len] = '\0';
+			}
+			break;
+		case 'n':
+			{
+				if (optarg == NULL) {
+					fprintf(stderr,
+						"Invalid option: --file-name\n");
+					return -1;
+				}
+
+				int len = strlen(optarg) + 1;
+				conf->file_name = malloc(len);
+				if (conf->file_name == NULL) {
+					fprintf(stderr, "malloc failed\n");
+					return -1;
+				}
+				memcpy((void *)conf->file_name, (void *)optarg,
+				       len);
+				conf->file_name[len] = '\0';
+			}
+			break;
+		case 'i':
+			{
+				if (optarg == NULL) {
+					fprintf(stderr,
+						"Invalid option: --ipaddr\n");
+					return -1;
+				}
+
+				int len = strlen(optarg) + 1;
+				conf->ip = malloc(len);
+				if (conf->ip == NULL) {
+					fprintf(stderr, "malloc failed\n");
+					return -1;
+				}
+				memcpy((void *)conf->ip, (void *)optarg, len);
+				conf->ip[len] = '\0';
+			}
+			break;
+		case 's':
+			if (parse_uint_arg(optarg, &conf->start_line) < 0) {
+				fprintf(stderr,
+					"Invalid option: --start-line\n");
+				return -1;
+			}
+			break;
+
+		case 'e':
+			if (parse_uint_arg(optarg, &conf->end_line) < 0) {
+				fprintf(stderr, "Invalid option: --end-line\n");
+				return -1;
+			}
+			break;
+		case 'p':
+			if (parse_uint_arg(optarg, &conf->port) < 0) {
+				fprintf(stderr, "Invalid option: --port\n");
+				return -1;
 			}
 			break;
 		case '?':
@@ -1128,7 +1429,7 @@ show_exit:
 int main(int argc, char *argv[])
 {
 	char *prog;
-	struct df_bpf_conf conf;
+	struct df_bpf_conf conf = { 0 };
 	struct df_bpf_obj *obj;
 	int err;
 
