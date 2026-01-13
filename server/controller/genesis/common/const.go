@@ -21,6 +21,11 @@ var IGNORE_VINTERFACE_NAME = []string{
 	"kube-ipvs0",
 }
 
+var VALID_SCOPE_NAME = []string{
+	"host",
+	"global",
+}
+
 const (
 	SYNC_TYPE_FORMAT = "%d-%s-%s" // orgID-type-vtapKey
 )
