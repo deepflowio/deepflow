@@ -49,7 +49,7 @@ func newCustomAppConfig(orgID int, metaData *MetaData) *CustomAppConfig {
 		agentGroupIDToPolicies:   sync.Map{},
 		metaData:                 metaData,
 	}
-	config.version.Store(uint64(time.Now().UnixNano()))
+	config.version.Store(uint64(time.Now().Unix()))
 	return &config
 }
 
