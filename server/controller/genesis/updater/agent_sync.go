@@ -316,6 +316,10 @@ func (v *GenesisSyncRpcUpdater) ParseAgentHostAsVmPlatformInfo(orgID int, vtapID
 		}
 		isExternal := false
 		for _, ipItem := range ips {
+			// ignore link scope
+			if !slices.Contains(common.VALID_SCOPE_NAME, ipItem.Scope) {
+				continue
+			}
 			pIP, err := netaddr.ParseIP(ipItem.Address)
 			if err != nil {
 				log.Error(err.Error(), logger.NewORGPrefix(orgID))
@@ -368,8 +372,8 @@ func (v *GenesisSyncRpcUpdater) ParseAgentHostAsVmPlatformInfo(orgID int, vtapID
 		}
 		ports = append(ports, port)
 		for _, p := range ips {
-			// ignore lin scope
-			if p.Scope != "global" && p.Scope != "host" {
+			// ignore link scope
+			if !slices.Contains(common.VALID_SCOPE_NAME, p.Scope) {
 				continue
 			}
 			oIP, err := netaddr.ParseIP(p.Address)
