@@ -684,28 +684,28 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(d.Log(err.Error()))
 	}
 
-	bizDecodeCustomProtocol, err := dbmgr.DBMgr[models.BizDecodeCustomProtocol](db).Gets()
+	bizDecodeCustomProtocol, err := dbmgr.DBMgr[models.BizDecodeCustomProtocol](db).OrderIDGets()
 	if err == nil {
 		d.bizDecodeCustomProtocol = bizDecodeCustomProtocol
 	} else {
 		log.Error(d.Log(err.Error()))
 	}
 
-	bizDecodeDictionaries, err := dbmgr.DBMgr[models.BizDecodeDictionary](db).Gets()
+	bizDecodeDictionaries, err := dbmgr.DBMgr[models.BizDecodeDictionary](db).OrderIDGets()
 	if err == nil {
 		d.bizDecodeDictionaries = bizDecodeDictionaries
 	} else {
 		log.Error(d.Log(err.Error()))
 	}
 
-	bizDecodePolicies, err := dbmgr.DBMgr[models.BizDecodePolicy](db).Gets()
+	bizDecodePolicies, err := dbmgr.DBMgr[models.BizDecodePolicy](db).OrderIDGets()
 	if err == nil {
 		d.bizDecodePolicies = bizDecodePolicies
 	} else {
 		log.Error(d.Log(err.Error()))
 	}
 
-	bizDecodePolicyAgentGroupConnections, err := dbmgr.DBMgr[models.BizDecodePolicyAgentGroupConnection](db).Gets()
+	bizDecodePolicyAgentGroupConnections, err := dbmgr.DBMgr[models.BizDecodePolicyAgentGroupConnection](db).OrderIDGets()
 	if err == nil {
 		d.bizDecodePolicyAgentGroupConnections = bizDecodePolicyAgentGroupConnections
 	} else {
