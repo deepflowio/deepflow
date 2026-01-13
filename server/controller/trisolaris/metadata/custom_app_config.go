@@ -35,18 +35,21 @@ import (
 type CustomAppConfig struct {
 	orgID                    int
 	version                  atomic.Uint64
-	teamIDToProtocolPolicies sync.Map
-	teamIDToDictionaries     sync.Map
-	agentGroupIDToPolicies   sync.Map
+	protocolPolicyMutex      sync.RWMutex
+	dictionaryMutex          sync.RWMutex
+	policyMutex              sync.RWMutex
+	teamIDToProtocolPolicies map[int][]string
+	teamIDToDictionaries     map[int][]string
+	agentGroupIDToPolicies   map[int][]metadbmodel.BizDecodePolicy
 	metaData                 *MetaData
 }
 
 func newCustomAppConfig(orgID int, metaData *MetaData) *CustomAppConfig {
 	config := CustomAppConfig{
 		orgID:                    orgID,
-		teamIDToProtocolPolicies: sync.Map{},
-		teamIDToDictionaries:     sync.Map{},
-		agentGroupIDToPolicies:   sync.Map{},
+		teamIDToProtocolPolicies: map[int][]string{},
+		teamIDToDictionaries:     map[int][]string{},
+		agentGroupIDToPolicies:   map[int][]metadbmodel.BizDecodePolicy{},
 		metaData:                 metaData,
 	}
 	config.version.Store(uint64(time.Now().Unix()))
@@ -54,73 +57,142 @@ func newCustomAppConfig(orgID int, metaData *MetaData) *CustomAppConfig {
 }
 
 func (c *CustomAppConfig) generateCache() {
-	var changeVersion bool
+	var changeVersion atomic.Bool
+	var wg sync.WaitGroup
+	wg.Add(3)
 
 	metaDataCache := c.metaData.GetDBDataCache()
-	// protocol policy
-	bizDecodeCustomProtocol := metaDataCache.GetBizBizDecodeCustomProtocol()
-	protocolPolicies := map[int][]string{}
-	for _, p := range bizDecodeCustomProtocol {
-		protocolPolicies[p.TeamID] = append(protocolPolicies[p.TeamID], p.Yaml)
-	}
-	for k, v := range protocolPolicies {
-		if !changeVersion {
-			value, ok := c.teamIDToProtocolPolicies.Load(k)
-			if !ok {
-				changeVersion = true
-			} else {
-				changeVersion = !slices.Equal(value.([]string), v)
-			}
-		}
-		c.teamIDToProtocolPolicies.Store(k, v)
-	}
 
-	// dictionary
-	bizDecodeDictionaries := metaDataCache.GetBizDecodeDictionaries()
-	dictionaries := map[int][]string{}
-	for _, d := range bizDecodeDictionaries {
-		dictionaries[d.TeamID] = append(dictionaries[d.TeamID], d.Yaml)
-	}
-	for k, v := range dictionaries {
-		if !changeVersion {
-			value, ok := c.teamIDToDictionaries.Load(k)
-			if !ok {
-				changeVersion = true
-			} else {
-				changeVersion = !slices.Equal(value.([]string), v)
-			}
-		}
-		c.teamIDToDictionaries.Store(k, v)
-	}
+	go func() {
+		defer wg.Done()
 
-	// policy
-	bizDecodePolicies := metaDataCache.GetBizDecodePolicies()
-	policIDToPolicy := map[int]metadbmodel.BizDecodePolicy{}
-	for _, p := range bizDecodePolicies {
-		policIDToPolicy[p.ID] = *p
-	}
-	bizDecodePolicyAgentGroupConnections := metaDataCache.GetBizDecodePolicyAgentGroupConnections()
-	policies := map[int][]metadbmodel.BizDecodePolicy{}
-	for _, conn := range bizDecodePolicyAgentGroupConnections {
-		policy, ok := policIDToPolicy[conn.PolicyID]
-		if !ok {
-			continue
+		// protocol policy
+		var change bool
+		bizDecodeCustomProtocol := metaDataCache.GetBizBizDecodeCustomProtocol()
+		protocolPolicies := map[int][]string{}
+		for _, p := range bizDecodeCustomProtocol {
+			protocolPolicies[p.TeamID] = append(protocolPolicies[p.TeamID], p.Yaml)
 		}
-		policies[conn.AgentGroupID] = append(policies[conn.AgentGroupID], policy)
-	}
-	for k, v := range policies {
-		if !changeVersion {
-			value, ok := c.agentGroupIDToPolicies.Load(k)
-			if !ok {
-				changeVersion = true
-			} else {
-				changeVersion = !slices.Equal(value.([]metadbmodel.BizDecodePolicy), v)
-			}
-		}
-		c.agentGroupIDToPolicies.Store(k, v)
-	}
+		change = len(protocolPolicies) != len(c.teamIDToProtocolPolicies)
 
-	if changeVersion {
+		if !change {
+			c.protocolPolicyMutex.RLock()
+			for k, v := range c.teamIDToProtocolPolicies {
+				value, ok := protocolPolicies[k]
+				if !ok {
+					change = true
+					break
+				} else {
+					if !slices.Equal(value, v) {
+						change = true
+						break
+					}
+				}
+			}
+			c.protocolPolicyMutex.RUnlock()
+		}
+
+		if !change {
+			return
+		}
+
+		changeVersion.Store(true)
+		c.protocolPolicyMutex.Lock()
+		c.teamIDToProtocolPolicies = protocolPolicies
+		c.protocolPolicyMutex.Unlock()
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		// dictionary
+		var change bool
+		bizDecodeDictionaries := metaDataCache.GetBizDecodeDictionaries()
+		dictionaries := map[int][]string{}
+		for _, d := range bizDecodeDictionaries {
+			dictionaries[d.TeamID] = append(dictionaries[d.TeamID], d.Yaml)
+		}
+		change = len(dictionaries) != len(c.teamIDToDictionaries)
+
+		if !change {
+			c.dictionaryMutex.RLock()
+			for k, v := range c.teamIDToDictionaries {
+				value, ok := dictionaries[k]
+				if !ok {
+					change = true
+					break
+				} else {
+					if !slices.Equal(value, v) {
+						change = true
+						break
+					}
+				}
+			}
+			c.dictionaryMutex.RUnlock()
+		}
+
+		if !change {
+			return
+		}
+
+		changeVersion.Store(true)
+		c.dictionaryMutex.Lock()
+		c.teamIDToDictionaries = dictionaries
+		c.dictionaryMutex.Unlock()
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		// policy
+		var change bool
+		bizDecodePolicies := metaDataCache.GetBizDecodePolicies()
+		policIDToPolicy := map[int]metadbmodel.BizDecodePolicy{}
+		for _, p := range bizDecodePolicies {
+			policIDToPolicy[p.ID] = *p
+		}
+
+		bizDecodePolicyAgentGroupConnections := metaDataCache.GetBizDecodePolicyAgentGroupConnections()
+		policies := map[int][]metadbmodel.BizDecodePolicy{}
+		for _, conn := range bizDecodePolicyAgentGroupConnections {
+			policy, ok := policIDToPolicy[conn.PolicyID]
+			if !ok {
+				continue
+			}
+			policies[conn.AgentGroupID] = append(policies[conn.AgentGroupID], policy)
+		}
+		change = len(policies) != len(c.agentGroupIDToPolicies)
+
+		if !change {
+			c.policyMutex.RLock()
+			for k, v := range c.agentGroupIDToPolicies {
+				value, ok := policies[k]
+				if !ok {
+					change = true
+					break
+				} else {
+					if !slices.Equal(value, v) {
+						change = true
+						break
+					}
+				}
+			}
+			c.policyMutex.RUnlock()
+		}
+
+		if !change {
+			return
+		}
+
+		changeVersion.Store(true)
+		c.policyMutex.Lock()
+		c.agentGroupIDToPolicies = policies
+		c.policyMutex.Unlock()
+	}()
+
+	wg.Wait()
+
+	if changeVersion.Load() {
 		c.version.Add(1)
 	}
 }
@@ -133,10 +205,12 @@ func (c *CustomAppConfig) GetCustomAppConfigByte(teamID, agentGroupID int) []byt
 	k := koanf.New(".")
 
 	// protocol policy
-	protocolPolicies, ok := c.teamIDToProtocolPolicies.Load(teamID)
+	c.protocolPolicyMutex.RLock()
+	protocolPolicies, ok := c.teamIDToProtocolPolicies[teamID]
+	c.protocolPolicyMutex.RUnlock()
 	if ok {
 		protocolPolicyYamls := []map[string]interface{}{}
-		for _, p := range protocolPolicies.([]string) {
+		for _, p := range protocolPolicies {
 			protocolPolicyYaml := koanf.New(".")
 			err := protocolPolicyYaml.Load(rawbytes.Provider([]byte(p)), kyaml.Parser())
 			if err != nil {
@@ -155,10 +229,12 @@ func (c *CustomAppConfig) GetCustomAppConfigByte(teamID, agentGroupID int) []byt
 	}
 
 	// dictionary
-	dictionaries, ok := c.teamIDToDictionaries.Load(teamID)
+	c.dictionaryMutex.RLock()
+	dictionaries, ok := c.teamIDToDictionaries[teamID]
+	c.dictionaryMutex.RUnlock()
 	if ok {
 		dictYamls := []map[string]interface{}{}
-		for _, d := range dictionaries.([]string) {
+		for _, d := range dictionaries {
 			dictYaml := koanf.New(".")
 			err := dictYaml.Load(rawbytes.Provider([]byte(d)), kyaml.Parser())
 			if err != nil {
@@ -177,10 +253,12 @@ func (c *CustomAppConfig) GetCustomAppConfigByte(teamID, agentGroupID int) []byt
 	}
 
 	// policy
-	policies, ok := c.agentGroupIDToPolicies.Load(agentGroupID)
+	c.policyMutex.RLock()
+	policies, ok := c.agentGroupIDToPolicies[agentGroupID]
+	c.policyMutex.RUnlock()
 	if ok {
 		policyYamls := []map[string]interface{}{}
-		for _, p := range policies.([]metadbmodel.BizDecodePolicy) {
+		for _, p := range policies {
 			policyYaml := koanf.New(".")
 			err := policyYaml.Load(rawbytes.Provider([]byte(p.Yaml)), kyaml.Parser())
 			if err != nil {
