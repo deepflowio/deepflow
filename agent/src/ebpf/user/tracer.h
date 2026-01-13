@@ -46,6 +46,8 @@
 #include <regex.h>
 #include "config.h"
 
+#define CTLBIN_INSTALL_PATH  "/usr/bin/deepflow-ebpfctl"
+
 #define PERF_PAGE_DEF_SZ 4096
 
 #define STRINGIFY(x) #x

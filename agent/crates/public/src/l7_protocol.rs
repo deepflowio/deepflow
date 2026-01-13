@@ -60,6 +60,7 @@ pub enum L7Protocol {
     Tars = 46,
     SomeIp = 47,
     Iso8583 = 48,
+    Triple = 49,
 
     // SQL
     MySQL = 60,
@@ -104,6 +105,7 @@ impl L7Protocol {
             | Self::SofaRPC
             | Self::SomeIp
             | Self::Ping
+            | Self::Triple
             | Self::Custom => true,
             _ => false,
         }
@@ -141,6 +143,7 @@ impl From<String> for L7Protocol {
             "dns" => Self::DNS,
             "oracle" => Self::Oracle,
             "iso8583" | "iso-8583" => Self::Iso8583,
+            "triple" => Self::Triple,
             "tls" => Self::TLS,
             "ping" => Self::Ping,
             "some/ip" | "someip" => Self::SomeIp,

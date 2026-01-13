@@ -14,27 +14,26 @@
  * limitations under the License.
  */
 
-mod amqp;
-mod kafka;
-pub mod mqtt;
-mod nats;
-mod openwire;
-mod pulsar;
-mod rocketmq;
-mod zmtp;
+package vtap
 
-pub use amqp::{AmqpInfo, AmqpLog};
-pub use kafka::{KafkaInfo, KafkaLog};
-pub use mqtt::{MqttInfo, MqttLog};
-pub use nats::{NatsInfo, NatsLog};
-pub use openwire::{OpenWireInfo, OpenWireLog};
-pub use pulsar::{PulsarInfo, PulsarLog};
-pub use rocketmq::{RocketmqInfo, RocketmqLog};
-pub use zmtp::{ZmtpInfo, ZmtpLog};
+import (
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
+)
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "enterprise")] {
-        mod web_sphere_mq;
-        pub use web_sphere_mq::{WebSphereMqInfo, WebSphereMqLog};
-    }
+type CustomAppConfigData struct {
+	metaData *metadata.MetaData
+}
+
+func newCustomAppConfigData(metaData *metadata.MetaData) *CustomAppConfigData {
+	return &CustomAppConfigData{
+		metaData: metaData,
+	}
+}
+
+func (c *CustomAppConfigData) getCustomAppConfigByte(teamID, agentGroupID int) []byte {
+	return c.metaData.GetCustomAppConfigByte(teamID, agentGroupID)
+}
+
+func (c *CustomAppConfigData) getCustomAppConfigVersion() uint64 {
+	return c.metaData.GetCustomAppConfigVersion()
 }

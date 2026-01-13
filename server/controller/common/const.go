@@ -709,14 +709,15 @@ var VTapToChangeTapModes = map[int][]int{
 type DataChanged string
 
 const (
-	DATA_CHANGED_VTAP          DataChanged = "vtap"
-	DATA_CHANGED_ANALYZER      DataChanged = "analyzer"
-	DATA_CHANGED_PLATFORM_DATA DataChanged = "platform_data"
-	DATA_CHANGED_FLOW_ACL      DataChanged = "flow_acl"
-	DATA_CHANGED_GROUP         DataChanged = "group"
-	DATA_CHANGED_TAP_TYPE      DataChanged = "tap_type"
-	DATA_CHANGED_SERVICE       DataChanged = "service"
-	DATA_CHANGED_IMAGE         DataChanged = "image"
+	DATA_CHANGED_VTAP              DataChanged = "vtap"
+	DATA_CHANGED_ANALYZER          DataChanged = "analyzer"
+	DATA_CHANGED_PLATFORM_DATA     DataChanged = "platform_data"
+	DATA_CHANGED_FLOW_ACL          DataChanged = "flow_acl"
+	DATA_CHANGED_GROUP             DataChanged = "group"
+	DATA_CHANGED_TAP_TYPE          DataChanged = "tap_type"
+	DATA_CHANGED_SERVICE           DataChanged = "service"
+	DATA_CHANGED_IMAGE             DataChanged = "image"
+	DATA_CHANGED_CUSTOM_APP_CONFIG DataChanged = "custom_app_config"
 )
 
 const (

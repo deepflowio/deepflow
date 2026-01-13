@@ -1,4 +1,4 @@
--- ColumnExists function
+-- ColumnExists procedure
 DROP PROCEDURE IF EXISTS ColumnExists;
 
 CREATE PROCEDURE ColumnExists(
@@ -14,6 +14,26 @@ BEGIN
       AND TABLE_NAME   = p_table_name
       AND COLUMN_NAME  = p_col_name;
 END;
+
+-- ModifyColumnIfExists procedure
+DROP PROCEDURE IF EXISTS ModifyColumnIfExists;
+
+CREATE PROCEDURE ModifyColumnIfExists(
+    IN tableName VARCHAR(255),
+    IN colName VARCHAR(255),
+    IN colType VARCHAR(255)
+)
+BEGIN
+    CALL ColumnExists(tableName, colName, @exists);
+    IF @exists THEN
+        SET @sql = CONCAT('ALTER TABLE ', tableName, ' MODIFY COLUMN ', colName, ' ', colType);
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END;
+CALL ModifyColumnIfExists('biz_decode_policy', 'yaml', 'MEDIUMTEXT');
+CALL ModifyColumnIfExists('biz_decode_dictionary', 'yaml', 'MEDIUMTEXT');
 
 -- AddColumnIfNotExists procedure
 DROP PROCEDURE IF EXISTS AddColumnIfNotExists;
@@ -33,17 +53,12 @@ BEGIN
         DEALLOCATE PREPARE stmt;
     END IF;
 END;
-CALL AddColumnIfNotExists('host_device', 'uid', 'CHAR(64) DEFAULT ""', 'extra_info');
-CALL AddColumnIfNotExists('pod', 'uid', 'CHAR(64) DEFAULT ""', 'domain');
-CALL AddColumnIfNotExists('custom_service', 'service_group_name', 'VARCHAR(128) DEFAULT ""', 'team_id');
+CALL AddColumnIfNotExists('biz_decode_policy_field', 'type', 'TINYINT(1) NOT NULL COMMENT "1-field; 2-const field; 3-compound field"', 'policy_id');
 
 -- Cleanup
 DROP PROCEDURE IF EXISTS ColumnExists;
+DROP PROCEDURE IF EXISTS ModifyColumnIfExists;
 DROP PROCEDURE IF EXISTS AddColumnIfNotExists;
 
--- Populate uid columns
-UPDATE host_device SET uid = CONCAT('host-', UUID_SHORT()) WHERE uid IS NULL OR uid = '';
-UPDATE pod SET uid = CONCAT('pod-', UUID_SHORT()) WHERE uid IS NULL OR uid = '';
-
 -- Update DB version
-UPDATE db_version SET version='7.1.0.20';
+UPDATE db_version SET version='7.1.0.26';

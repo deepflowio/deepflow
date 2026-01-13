@@ -185,6 +185,24 @@ func GetTrisolaris(orgID int) *Trisolaris {
 	return trisolarisManager.orgToTrisolaris[orgID]
 }
 
+func PutCustomAppConfig(orgID int) {
+	if trisolarisManager == nil {
+		return
+	}
+	if orgID == 0 {
+		for _, trisolaris := range trisolarisManager.orgToTrisolaris {
+			if trisolaris != nil {
+				trisolaris.metaData.PutChCustomAppConfig()
+			}
+		}
+	} else {
+		trisolaris := GetTrisolaris(orgID)
+		if trisolaris != nil {
+			trisolaris.metaData.PutChCustomAppConfig()
+		}
+	}
+}
+
 func PutPlatformData(orgID int) {
 	if trisolarisManager == nil {
 		return

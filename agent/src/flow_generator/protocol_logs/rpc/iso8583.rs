@@ -288,7 +288,6 @@ impl L7ProtocolParserInterface for Iso8583Log {
                         info.response_status = L7ResponseStatus::ClientError;
                         info.response_exception =
                             field.translated.clone().unwrap_or(field.value.clone());
-                        self.perf_stats.as_mut().map(|p| p.inc_req_err());
                     }
                 };
                 set_captured_byte!(info, param);
@@ -331,13 +330,23 @@ impl L7ProtocolParserInterface for Iso8583Log {
             }
             info.is_async = true;
 
-            if let Some(perf_stats) = self.perf_stats.as_mut() {
-                if let Some(stats) = info.perf_stats(param) {
-                    perf_stats.sequential_merge(&stats);
-                    perf_stats.rrt_max = 0;
-                    perf_stats.rrt_sum = 0;
-                    perf_stats.rrt_count = 0;
+            match info.response_status {
+                L7ResponseStatus::ServerError => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
                 }
+                L7ResponseStatus::ClientError => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
+                }
+                _ => {}
+            }
+            match info.msg_type {
+                LogMessageType::Request => {
+                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                }
+                LogMessageType::Response => {
+                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                }
+                _ => {}
             }
 
             if is_00x000(&info.f3) {
