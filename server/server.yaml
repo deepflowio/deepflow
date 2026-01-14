@@ -204,6 +204,10 @@ controller:
     data_source_ext_metrics_interval: 10
     # unit: s
     data_source_prometheus_interval: 10
+    biz_decode_policy_max: 100
+    biz_decode_policy_field_max: 200
+    biz_decode_dictionary_max: 1000
+    biz_decode_custom_protocol_max: 200
 
   # monitor module config
   monitor:
