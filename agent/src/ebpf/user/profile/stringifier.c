@@ -745,15 +745,28 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 		return NULL;
 	}
 
-	__u64 raw_frames[PERF_MAX_STACK_DEPTH] = { 0 };
+	// Define stack_t locally to ensure correct size (approx 3KB) matching kernel definition.
+	// The map value is sizeof(stack_t), but we were reading into an array of u64 (1KB), causing buffer overflow.
+	typedef struct {
+		uint8_t len;
+		uint64_t addrs[PERF_MAX_STACK_DEPTH];
+		uint8_t frame_types[PERF_MAX_STACK_DEPTH];
+		uint64_t extra_data_a[PERF_MAX_STACK_DEPTH];
+		uint64_t extra_data_b[PERF_MAX_STACK_DEPTH];
+	} stack_t;
+
+	// Read full stack_t from BPF map
+	stack_t stack_buf;
+	memset(&stack_buf, 0, sizeof(stack_buf));
+
 	__u32 key = stack_id;
-	if (bpf_lookup_elem(fd, &key, &raw_frames) != 0) {
+	if (bpf_lookup_elem(fd, &key, &stack_buf) != 0) {
 		return NULL;
 	}
 
 	u32 frame_count = 0;
 	for (; frame_count < PERF_MAX_STACK_DEPTH; frame_count++) {
-		if (raw_frames[frame_count] == 0) {
+		if (stack_buf.addrs[frame_count] == 0) {
 			break;
 		}
 	}
@@ -762,7 +775,7 @@ static char *folded_lua_stack_trace_string(struct bpf_tracer *t,
 	}
 
 	char *result =
-	    lua_format_folded_stack_trace(t, pid, raw_frames, frame_count,
+	    lua_format_folded_stack_trace(t, pid, stack_buf.addrs, frame_count,
 					  new_cache, info_p, i_err_tag);
 	if (!result) {
 		return NULL;
