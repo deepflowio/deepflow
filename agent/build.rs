@@ -95,6 +95,11 @@ fn set_build_info() -> Result<()> {
 // - Header files
 // - `src/ebpf/mod.rs` (to exlude rust sources in `samples` folder)
 // - Makefiles
+//
+// generated C files can be found by:
+//
+//     find src/ebpf -name '*.c' -type f -printf '%T+ %p\n' | sort -r
+//
 fn set_libtrace_rerun_files() -> Result<()> {
     fn watched(path: &Path) -> bool {
         if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
@@ -107,8 +112,9 @@ fn set_libtrace_rerun_files() -> Result<()> {
                         if name.starts_with("java_agent_so_") {
                             return false;
                         }
-                        if name == "deepflow_jattach_bin.c" {
-                            return false;
+                        match name {
+                            "deepflow_jattach_bin.c" | "deepflow_ebpfctl_bin.c" => return false,
+                            _ => (),
                         }
                         return true;
                     }
