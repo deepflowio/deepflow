@@ -460,10 +460,15 @@ $defs:
           注意配置的所有字段（包括 `字段` (`field`) 和 `原生标签` (`native_tag`)）都需要在同一个请求或响应中解析到才能正常输出复合字段。
         items:
           type: object
-          required:
-          - name
-          - format
-          - output
+          oneOf:
+          - required:
+            - name
+            - format
+            - output
+          - required:
+            - name
+            - join
+            - output
           properties:
             name:
               type: string
@@ -473,10 +478,104 @@ $defs:
               type: string
               title@en: Format
               title@ch: 格式
-              description@en: >-
-                Output format, where `field1_name` and `field2_name` are configured field names, `Native Tag` (`native_tag`) can
-                also be configured as input field.
-              description@ch: 输出格式，其中 `field1_name` 和 `field2_name` 为已配置的字段名，也可以配置 `原生标签` (`native_tag`) 作为输入字段。
+              description@en: |-
+                Output format, such as `{field1_name}-{field2_name:1:4}`.
+                Here, `field1_name` and `field2_name` are names of configured fields. You can also use a configured `Native Tag` (`native_tag`) as an input field.
+                When configuring fields, you can specify index slicing. For example, `{field2_name:1:4}` means starting from index 1 of the field and taking 4 characters.
+              description@ch: |-
+                输出格式，如 `{field1_name}-{field2_name:1:4}` 的形式。
+                其中 `field1_name` 和 `field2_name` 为已配置的字段名，也可以配置 `原生标签` (`native_tag`) 作为输入字段。
+                配置字段时可以指定按下标切割。如 `{field2_name:1:4}` 表示从字段下标 1 开始，取 4 个字符。
+            join:
+              type: object
+              title@en: Join
+              title@ch: 拼接
+              description@en: |-
+                Use a specific `separator` (`separator`) to join multiple `fields` (`fields`) in the order configured.
+                This configuration has lower priority than the `format` (`format`) configuration.
+                For example, the configuration is:
+                ```
+                join:
+                  fields:
+                  - value: endpoint
+                  - name: dir
+                    value: 'direction:1:4'
+                    omit_empty: false
+                  - value: sequence
+                  omit_empty: true
+                  separator: " "
+                ```
+                If each field has a value, the output result is the same as the `format` (`format`) configuration is `{endpoint} dir={direction:1:4} {sequence}`.
+              description@ch: |-
+                使用特定的 `分隔符`（`separator`）将多个 `字段`（`fields`）按配置的顺序拼接在一起。
+                该配置优先级低于 `格式`（`format`）的配置。
+                例如配置为：
+                ```
+                join:
+                  fields:
+                  - value: endpoint
+                  - name: dir
+                    value: 'direction:1:4'
+                    omit_empty: false
+                  - value: sequence
+                  omit_empty: true
+                  separator: " "
+                ```
+                如果每个字段都有值，则输出结果与 `格式`（`format`）配置为 `{endpoint} dir={direction:1:4} {sequence}` 相同。
+              properties:
+                fields:
+                  type: array
+                  title@en: Fields
+                  title@ch: 字段
+                  description@en: Fields to join, the order of the fields is the order of the output.
+                  description@ch: 要拼接的字段，字段的顺序就是输出的顺序。
+                  items:
+                    type: object
+                    required:
+                    - value
+                    properties:
+                      name:
+                        type: string
+                        title@en: Name
+                        title@ch: 名称
+                        default: ""
+                        description@en: |-
+                          If not empty, an additional string of "name=" is concatenated before the field.
+                          For example, if configured as "dir" and the corresponding value is "forward", the result is "dir=forward".
+                        description@ch: |-
+                          不为空时，在字段前额外拼接一个“name=” 的字符串。
+                          例如配置为“dir”，且对应的值为“forward”，则结果为“dir=forward”。
+                      value:
+                        type: string
+                        title@en: Value
+                        title@ch: 值
+                        description@en: |-
+                          Value to join, can be a configured field or a native tag.
+                          Can also be sliced by configuring the index. For example, `field2_name:1:4` means starting from index 1 of the field and taking 4 characters.
+                        description@ch: |-
+                          要拼接的值，可以是一个已配置的字段或一个原生标签。
+                          也可以通过配置下标，例如 `field2_name:1:4`，来对值进行切割。
+                      omit_empty:
+                        type: boolean
+                        title@en: Omit Empty
+                        title@ch: 忽略空值
+                        default: false
+                        description@en: Whether to omit empty values. This value will override the configuration of the outer layer.
+                        description@ch: 是否忽略空值。该值会覆盖外层的配置。
+                omit_empty:
+                  type: boolean
+                  title@en: Omit Empty
+                  title@ch: 忽略空值
+                  default: false
+                  description@en: Whether to omit empty values.
+                  description@ch: 是否忽略空值。
+                separator:
+                  type: string
+                  title@en: Separator
+                  title@ch: 分隔符
+                  default: " "
+                  description@en: Separator between fields, default is " ".
+                  description@ch: 字段之间的分隔符，默认为 " "。
             output:
               title@en: Output
               title@ch: 输出
