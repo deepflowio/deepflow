@@ -133,7 +133,7 @@ $defs:
     title@en: Business Decoding Policy
     title@ch: 业务解码策略
     required:
-    - protocol_name
+    - l7_protocol
     properties:
       policy_name:
         type: string
