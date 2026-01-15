@@ -339,7 +339,7 @@ $defs:
                   title@en: Ignore Case
                   title@ch: 忽略大小写
                   default: false
-                  description@en: 'Whether to ignore case, default value: false, only effective when `Type` (`type`) is `String` (`string`).
+                  description@en: 'Whether to ignore case, default value: false, only effective when `Type` (`type`) is `String` (`string`).'
                   description@ch: 是否忽略大小写，默认值：false，仅当 `匹配类型`（`type`）为 `字符串`（`string`）时有效。
                 all_leaves:
                   type: boolean
