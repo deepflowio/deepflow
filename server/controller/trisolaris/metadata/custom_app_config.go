@@ -220,7 +220,7 @@ func (c *CustomAppConfig) GetCustomAppConfigByte(teamID, agentGroupID int) []byt
 			}
 			protocolPolicyYamls = append(protocolPolicyYamls, protocolPolicyYaml.Raw())
 		}
-		err := k.Set(common.CONFIG_KEY_CUSTOM_PROTOCOL_POLICIES, protocolPolicyYamls)
+		err := k.Set(common.CONFIG_KEY_BIZ_PROTOCOL_POLICIES, protocolPolicyYamls)
 		if err != nil {
 			errMessage := fmt.Sprintf("set protocol policy yamls failed: %s", err.Error())
 			log.Error(errMessage, logger.NewORGPrefix(c.orgID))
@@ -244,7 +244,7 @@ func (c *CustomAppConfig) GetCustomAppConfigByte(teamID, agentGroupID int) []byt
 			}
 			dictYamls = append(dictYamls, dictYaml.Raw())
 		}
-		err := k.Set(common.CONFIG_KEY_CUSTOM_FIELD_DICTIONARIES, dictYamls)
+		err := k.Set(common.CONFIG_KEY_BIZ_FIELD_DICTIONARIES, dictYamls)
 		if err != nil {
 			errMessage := fmt.Sprintf("set dictionary yamls failed: %s", err.Error())
 			log.Error(errMessage, logger.NewORGPrefix(c.orgID))
@@ -268,7 +268,7 @@ func (c *CustomAppConfig) GetCustomAppConfigByte(teamID, agentGroupID int) []byt
 			}
 			policyYamls = append(policyYamls, policyYaml.Raw())
 		}
-		err := k.Set(common.CONFIG_KEY_CUSTOM_FIELD_POLICIES, policyYamls)
+		err := k.Set(common.CONFIG_KEY_BIZ_FIELD_POLICIES, policyYamls)
 		if err != nil {
 			errMessage := fmt.Sprintf("set policy yamls failed: %s", err.Error())
 			log.Error(errMessage, logger.NewORGPrefix(c.orgID))
