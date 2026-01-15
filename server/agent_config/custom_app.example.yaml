@@ -151,7 +151,7 @@ biz_field:
         priority: 0
     compound_fields:
     - name: "my_compound_field"
-      format: "{field1_name}-{field2_name}"
+      format: "{field1_name}-{field2_name:1:4}"
       output:
         attribute_name: "xyz"
         metric_name: "xyz"
@@ -176,3 +176,15 @@ biz_field:
           server_error_values: []
           default_status: ""
         priority: 0
+    - name: "join_field"
+      join:
+        fields: # 有序，输出顺序
+        - value: endpoint
+        - name: dir
+          value: 'direction:1:4'
+          omit_empty: false # 覆盖外层的配置
+        - value: sequence
+        omit_empty: true # 无值时忽略
+        separator: " "
+      output:
+        attribute_name: "xyz"
