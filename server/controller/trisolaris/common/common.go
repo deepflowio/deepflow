@@ -129,9 +129,9 @@ const (
 )
 
 const (
-	CONFIG_KEY_CUSTOM_PROTOCOL_POLICIES  = "custom_protocol_policies"
-	CONFIG_KEY_CUSTOM_FIELD_DICTIONARIES = "custom_field.dictionaries"
-	CONFIG_KEY_CUSTOM_FIELD_POLICIES     = "custom_field.policies"
+	CONFIG_KEY_BIZ_PROTOCOL_POLICIES  = "biz_protocol_policies"
+	CONFIG_KEY_BIZ_FIELD_DICTIONARIES = "biz_field.dictionaries"
+	CONFIG_KEY_BIZ_FIELD_POLICIES     = "biz_field.policies"
 )
 
 const (
