@@ -56,6 +56,7 @@
 #include "bihash_8_8.h"
 #include "profile/stringifier.h"
 #include "profile/profile_common.h"
+#include "unwind_tracer.h"
 
 static u64 add_symcache_count;
 static u64 free_symcache_count;
@@ -416,8 +417,18 @@ void exec_proc_info_cache_update(void)
 			ev_info = rx_burst[i];
 			if (ev_info->type == PROC_EXEC) {
 				add_proc_info_to_cache(&ev_info->kv);
+				/*
+				 * Trigger interpreter profiling initialization
+				 * in real-time when process starts.
+				 */
+				unwind_process_exec((int)ev_info->kv.k.pid);
 			} else {
 				del_proc_info_from_cache(&ev_info->kv);
+				/*
+				 * Clean up interpreter profiling resources
+				 * when process exits.
+				 */
+				unwind_process_exit((int)ev_info->kv.k.pid);
 			}
 			clib_mem_free(ev_info);
 		}
@@ -1087,8 +1098,23 @@ void process_event_free(struct process_create_event *event)
 void add_event_to_proc_list(proc_event_list_t * list, struct bpf_tracer *tracer,
 			    int pid, char *path)
 {
-	static const uint32_t PROC_EVENT_HANDLE_DELAY = 120;
+	static const uint32_t PROC_EVENT_HANDLE_DELAY = 0;
 	struct process_create_event *event = NULL;
+
+	/*
+	 * Check if the PID already exists in the queue to avoid
+	 * duplicate processing. This can happen when both eBPF
+	 * process events and policy updates trigger the same PID.
+	 */
+	pthread_mutex_lock(&list->m);
+	struct process_create_event *existing;
+	list_for_each_entry(existing, &list->head, list) {
+		if (existing->pid == pid) {
+			pthread_mutex_unlock(&list->m);
+			return; /* PID already in queue, skip adding */
+		}
+	}
+	pthread_mutex_unlock(&list->m);
 
 	event = calloc(1, sizeof(struct process_create_event));
 	if (!event) {
