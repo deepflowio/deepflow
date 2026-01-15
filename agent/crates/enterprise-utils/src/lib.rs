@@ -41,8 +41,10 @@ pub mod l7 {
 
             #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
             pub struct CustomApp {
-                pub custom_protocol_policies: Vec<CustomProtocolConfig>,
-                pub custom_field: CustomField,
+                #[serde(alias = "custom_protocol_policies")]
+                pub biz_protocol_policies: Vec<CustomProtocolConfig>,
+                #[serde(alias = "custom_field")]
+                pub biz_field: CustomField,
             }
         }
 
@@ -66,6 +68,8 @@ pub mod l7 {
                     Header(&'a str, &'a str),
                     Payload(PayloadType, &'a [u8]),
                     Sql(&'a str),
+                    // used as a 'policy trigger' when the protocol only supports save payload
+                    Dummy,
                 }
 
                 #[derive(Clone, Debug, PartialEq)]

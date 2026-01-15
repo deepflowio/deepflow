@@ -2257,13 +2257,13 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     version: conf.custom_app.version,
                     custom_protocol_config: if let Some(config) = conf.custom_app.config.as_ref() {
                         Some(ExtraCustomProtocolConfig::new(
-                            config.custom_protocol_policies.as_slice(),
+                            config.biz_protocol_policies.as_slice(),
                         ))
                     } else {
                         None
                     },
                     custom_field_policies: if let Some(config) = conf.custom_app.config.as_ref() {
-                        Some(CustomFieldPolicy::new(&config.custom_field))
+                        Some(CustomFieldPolicy::new(&config.biz_field))
                     } else {
                         None
                     },
