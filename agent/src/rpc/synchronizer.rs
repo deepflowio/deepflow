@@ -988,11 +988,11 @@ impl Synchronizer {
 
                 #[allow(deprecated)]
                 std::mem::swap(
-                    &mut ca_config.custom_protocol_policies,
+                    &mut ca_config.biz_protocol_policies,
                     &mut request_log.application_protocol_inference.custom_protocols,
                 );
                 ca.custom_protocol_port_ranges = ExtraCustomProtocolConfig::port_range(
-                    ca_config.custom_protocol_policies.as_slice(),
+                    ca_config.biz_protocol_policies.as_slice(),
                 )
                 .to_string();
 
@@ -1002,18 +1002,18 @@ impl Synchronizer {
                     &mut cfp,
                     &mut request_log.tag_extraction.custom_field_policies,
                 );
-                ca_config.custom_field = CustomField::from(cfp);
-                for header in ca_config.custom_field.get_http2_headers() {
+                ca_config.biz_field = CustomField::from(cfp);
+                for header in ca_config.biz_field.get_http2_headers() {
                     ca.extra_headers.insert(header.to_string());
                 }
 
                 // calculate a fake version to trigger update
                 use std::hash::Hasher;
                 let mut hasher = ahash::AHasher::default();
-                if let Ok(json) = serde_json::to_string(&ca_config.custom_protocol_policies) {
+                if let Ok(json) = serde_json::to_string(&ca_config.biz_protocol_policies) {
                     hasher.write(json.as_bytes());
                 }
-                if let Ok(json) = serde_json::to_string(&ca_config.custom_field) {
+                if let Ok(json) = serde_json::to_string(&ca_config.biz_field) {
                     hasher.write(json.as_bytes());
                 }
                 ca.version = hasher.finish();
@@ -1062,11 +1062,11 @@ impl Synchronizer {
         };
 
         let custom_protocol_port_ranges = ExtraCustomProtocolConfig::port_range(
-            custom_app_config.custom_protocol_policies.as_slice(),
+            custom_app_config.biz_protocol_policies.as_slice(),
         )
         .to_string();
         let extra_headers: HashSet<String> = custom_app_config
-            .custom_field
+            .biz_field
             .get_http2_headers()
             .map(|h| h.to_string())
             .collect();
