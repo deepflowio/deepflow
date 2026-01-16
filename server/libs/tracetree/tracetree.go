@@ -32,7 +32,8 @@ const TRACE_TREE_VERSION_0x14 = 0x14 // before 20251027
 const TRACE_TREE_VERSION_0x15 = 0x15 // before 20251206
 const TRACE_TREE_VERSION_0x16 = 0x16 // before 20251231
 const TRACE_TREE_VERSION_0x17 = 0x17 // before 20260115
-const TRACE_TREE_VERSION = 0x18
+const TRACE_TREE_VERSION_0x18 = 0x18 // before 20260116
+const TRACE_TREE_VERSION = 0x19
 
 func HashSearchIndex(key string) uint64 {
 	return utils.DJBHash(17, key)
@@ -52,6 +53,7 @@ type TraceTree struct {
 }
 
 type SpanInfo struct {
+	SignalSource     uint8
 	AutoServiceType0 uint8
 	AutoServiceType1 uint8
 	AutoServiceID0   uint32
@@ -159,6 +161,7 @@ func (t *TraceTree) Encode() {
 		// encode uniq parent span infos
 		encoder.WriteU16(uint16(len(node.UniqParentSpanInfos)))
 		for _, s := range node.UniqParentSpanInfos {
+			encoder.WriteU8(s.SignalSource)
 			encoder.WriteU8(s.AutoServiceType0)
 			encoder.WriteU8(s.AutoServiceType1)
 			encoder.WriteVarintU32(s.AutoServiceID0)
@@ -243,6 +246,7 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		n.UniqParentSpanInfos = make([]SpanInfo, parentSpanCount)
 		for j := 0; j < parentSpanCount; j++ {
 			s := &n.UniqParentSpanInfos[j]
+			s.SignalSource = decoder.ReadU8()
 			s.AutoServiceType0 = decoder.ReadU8()
 			s.AutoServiceType1 = decoder.ReadU8()
 			s.AutoServiceID0 = decoder.ReadVarintU32()
