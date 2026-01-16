@@ -459,13 +459,10 @@ func CreateDomain(domainCreate model.DomainCreate, userInfo *httpcommon.UserInfo
 	configStr, _ := json.Marshal(domainCreate.Config)
 	domain.Config = string(configStr)
 
-	if domainCreate.Type == common.KUBERNETES {
-		// support specify cluster_id
-		if domainCreate.KubernetesClusterID != "" {
-			domain.ClusterID = domainCreate.KubernetesClusterID
-		} else {
-			domain.ClusterID = "d-" + common.GenerateShortUUID()
-		}
+	if domainCreate.KubernetesClusterID != "" {
+		domain.ClusterID = domainCreate.KubernetesClusterID
+	} else {
+		domain.ClusterID = "d-" + common.GenerateShortUUID() // biz service requirement
 	}
 
 	err := svc.NewResourceAccess(cfg.FPermit, userInfo).CanAddResource(domainCreate.TeamID, common.SET_RESOURCE_TYPE_DOMAIN, lcuuid)
