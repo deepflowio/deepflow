@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-use public::l7_protocol::{Field, L7Log};
 use public_derive::L7Log;
+use public_derive_internals::l7_protocol::{Field, L7Log, L7LogAttribute};
 
 #[derive(L7Log)]
 #[l7_log(version.skip = "true")]
@@ -38,6 +38,8 @@ struct SoloField {
     x_request_id: String,
 }
 
+impl L7LogAttribute for SoloField {}
+
 #[derive(L7Log)]
 #[l7_log(version.skip = "true")]
 #[l7_log(request_type.skip = "true")]
@@ -59,6 +61,8 @@ struct DuetField {
     x_request_id_0: String,
     x_request_id_1: String,
 }
+
+impl L7LogAttribute for DuetField {}
 
 fn solo_field() {
     let mut f = SoloField {

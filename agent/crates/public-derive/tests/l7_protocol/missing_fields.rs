@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-use public::l7_protocol::Field;
 use public_derive::L7Log;
+use public_derive_internals::l7_protocol::Field;
 
 #[derive(L7Log)]
 #[l7_log(version.skip = "true")]

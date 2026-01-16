@@ -2806,23 +2806,24 @@ dependencies = [
 
 [[package]]
 name = "num_enum"
-version = "0.5.11"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f646caf906c20226733ed5b1374287eb97e3c2a5c227ce668c1f2ce20ae57c9"
+checksum = "b1207a7e20ad57b847bbddc6776b968420d38292bbfe2089accff5e19e82454c"
 dependencies = [
  "num_enum_derive",
+ "rustversion",
 ]
 
 [[package]]
 name = "num_enum_derive"
-version = "0.5.11"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcbff9bc912032c62bf65ef1d5aea88983b420f4f839db1e9b0c281a25c9c799"
+checksum = "ff32365de1b6743cb203b710788263c44a03de03802daf96092f2da4fe6ba4d7"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -3458,14 +3459,14 @@ dependencies = [
  "pcap 0.10.1",
  "pnet",
  "prost",
+ "public-derive",
+ "public-derive-internals",
  "rand",
  "regex",
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
  "socket2 0.4.9",
- "strum",
- "strum_macros",
  "thiserror 1.0.47",
  "tonic",
  "tonic-build",
@@ -3479,9 +3480,20 @@ dependencies = [
  "cfg-if",
  "proc-macro2",
  "public",
+ "public-derive-internals",
  "quote",
  "syn 2.0.100",
  "trybuild",
+]
+
+[[package]]
+name = "public-derive-internals"
+version = "0.1.0"
+dependencies = [
+ "num_enum",
+ "serde",
+ "strum",
+ "strum_macros",
 ]
 
 [[package]]

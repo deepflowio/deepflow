@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-use public::l7_protocol::{Field, FieldSetter, L7Log};
 use public_derive::L7Log;
+use public_derive_internals::{
+    l7_protocol::{Field, FieldSetter, L7Log, L7LogAttribute},
+};
 
 #[derive(L7Log)]
 #[l7_log(endpoint.getter = "get_endpoint", endpoint.setter = "set_endpoint")]
@@ -40,6 +42,8 @@ struct CustomFields {
     field0: String,
     field1: String,
 }
+
+impl L7LogAttribute for CustomFields {}
 
 fn get_endpoint(fields: &CustomFields) -> Field<'_> {
     if fields.switch == 0 {
