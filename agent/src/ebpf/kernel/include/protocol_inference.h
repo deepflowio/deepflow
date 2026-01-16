@@ -791,10 +791,10 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		/*
 		 * Ensure the authentication response packet is captured
-		 * and distinguish it based on the 5th byte (Payload start):  
+		 * and distinguish it based on the 5th byte (Payload start):
 		 *
-		 * - **Authentication Success (OK Packet):** `0x00`  
-		 * - **Authentication Failure (ERR Packet):** `0xFF`  
+		 * - **Authentication Success (OK Packet):** `0x00`
+		 * - **Authentication Failure (ERR Packet):** `0xFF`
 		 * - **Authentication Switch Request (Auth Switch Request):** `0xFE`
 		 */
 		if (seq <= 1 || (seq == 2 && (com == 0x0 || com == 0xFF || com == 0xFE)))
@@ -835,14 +835,14 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 
 	/*
 	 * After establishing a connection, the MySQL server sends a handshake packet.
-	 * The process is as follows:  
-	 * - **Server > Client (Handshake Packet)**  
+	 * The process is as follows:
+	 * - **Server > Client (Handshake Packet)**
 	 *   The server sends this handshake packet, which includes the MySQL version,
-	 *   thread ID, authentication method, and other information.  
-	 * - **Client > Server (Login Request Packet)**  
+	 *   thread ID, authentication method, and other information.
+	 * - **Client > Server (Login Request Packet)**
 	 *   The client computes the encrypted password based on `auth-plugin-data` and
-	 *   sends it back to the server for verification.  
-	 * - **Server > Client (Login Success or Failure)**  
+	 *   sends it back to the server for verification.
+	 * - **Server > Client (Login Success or Failure)**
 	 *   The server verifies the client's identity and returns either an **OK Packet** or an **ERR Packet**.
 	 *
 	 * The handshake packet sent by the server is used for identification.
@@ -1087,6 +1087,47 @@ static __inline enum message_type infer_oracle_tns_message(const char *buf,
 		   || (data_id == REQ_DATA_ID_USER_OCI_FUNC
 		       && call_id == REQ_CALL_ID_USER_BUNDLED_EXEC_CALL)
 	    ) {
+		return MSG_REQUEST;
+	} else {
+		return MSG_UNKNOWN;
+	}
+}
+
+static __inline enum message_type infer_sql_server_message(const char *buf,
+							   size_t count,
+							   struct conn_info_s
+							   *conn_info)
+{
+#define HEADER_SIZE 8
+
+#define MESSAGE_TYPE_OFFSET  0
+#define LENGTH_OFFSET  1
+#define WINDOWS_OFFSET  7
+
+#define MESSAGE_TYPE_SQL_BATCH 1
+#define MESSAGE_TYPE_RESPONSE  4
+
+	if (!protocol_port_check_2(PROTO_SQL_SERVER, conn_info))
+		return MSG_UNKNOWN;
+	if (conn_info->tuple.l4_protocol != IPPROTO_TCP || count < HEADER_SIZE) {
+		return MSG_UNKNOWN;
+	}
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_SQL_SERVER)
+			return MSG_UNKNOWN;
+	}
+
+	char pkt_type = buf[MESSAGE_TYPE_OFFSET];
+    __u16 pkt_length = __bpf_ntohs(*(__u16 *) & buf[LENGTH_OFFSET]);
+    char windows = buf[WINDOWS_OFFSET];
+	if (pkt_length < HEADER_SIZE || windows != 0) {
+		return MSG_UNKNOWN;
+	}
+
+	if (pkt_type == MESSAGE_TYPE_RESPONSE) {
+		return MSG_RESPONSE;
+	} else if (pkt_type == MESSAGE_TYPE_SQL_BATCH) {
 		return MSG_REQUEST;
 	} else {
 		return MSG_UNKNOWN;
@@ -1446,11 +1487,11 @@ static __inline enum message_type infer_dns_message(const char *buf,
 
 	bool update_tcp_dns_prev_count = false;
 	struct dns_header *dns = (struct dns_header *)buf;
-	
+
 	/*
 	 * Note that TCP DNS adds two length bytes at the beginning of the protocol,
 	 * whereas UDP DNS does not. We need to handle this properly to ensure that
-	 * these two length bytes are not sent to the upper layer.  
+	 * these two length bytes are not sent to the upper layer.
 	 *
 	 * When receiving data, the client does not first receive two bytes but instead
 	 * receives everything at once; whereas the server receives two bytes (length) first
@@ -4001,6 +4042,15 @@ infer_protocol_2(const char *infer_buf, size_t count,
 					     conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_ORACLE;
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_SQL_SERVER && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_sql_server_message(infer_buf,
+					     count,
+					     conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_SQL_SERVER;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_ISO8583 && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -4151,7 +4201,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		 * encrypted data can be discarded to prevent it from being involved
 		 * in subsequent protocol inference, thereby avoiding performance
 		 * degradation.
-		 */ 
+		 */
 		if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 			if (conn_info->socket_info_ptr->is_tls &&
 			    !skip_http2_kprobe())
@@ -4346,6 +4396,15 @@ infer_protocol_1(struct ctx_info_s *ctx,
 						      conn_info)) !=
 			    MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_ORACLE;
+				return inferred_message;
+			}
+			break;
+		case PROTO_SQL_SERVER:
+			if ((inferred_message.type =
+			     infer_sql_server_message(infer_buf, count,
+						      conn_info)) !=
+			    MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_SQL_SERVER;
 				return inferred_message;
 			}
 			break;

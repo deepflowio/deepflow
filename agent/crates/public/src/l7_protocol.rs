@@ -66,6 +66,7 @@ pub enum L7Protocol {
     MySQL = 60,
     PostgreSQL = 61,
     Oracle = 62,
+    SqlServer = 63,
 
     // NoSQL
     Redis = 80,
@@ -142,6 +143,7 @@ impl From<String> for L7Protocol {
             "webspheremq" => Self::WebSphereMq,
             "dns" => Self::DNS,
             "oracle" => Self::Oracle,
+            "sqlserver" => Self::SqlServer,
             "iso8583" | "iso-8583" => Self::Iso8583,
             "triple" => Self::Triple,
             "tls" => Self::TLS,
