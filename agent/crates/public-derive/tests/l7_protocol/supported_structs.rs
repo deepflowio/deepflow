@@ -16,8 +16,12 @@
 
 use std::borrow::Cow;
 
-use public::{enums::L7ResponseStatus, l7_protocol::{Field, FieldSetter, L7Log}, types::PrioField};
 use public_derive::L7Log;
+use public_derive_internals::{
+    enums::L7ResponseStatus,
+    l7_protocol::{Field, FieldSetter, L7Log, L7LogAttribute},
+    types::PrioField,
+};
 
 #[derive(L7Log)]
 #[l7_log(version.skip = "true")]
@@ -40,6 +44,8 @@ struct StringField {
     endpoint: String,
     endpoint2: usize,
 }
+
+impl L7LogAttribute for StringField {}
 
 fn string_field() {
     let mut f = StringField {
@@ -77,6 +83,8 @@ struct OptionStringField {
     path: Option<String>,
     endpoint: usize,
 }
+
+impl L7LogAttribute for OptionStringField {}
 
 fn option_string_field() {
     let mut f = OptionStringField {
@@ -117,6 +125,8 @@ struct IntField {
     endpoint2: usize,
 }
 
+impl L7LogAttribute for IntField {}
+
 fn int_field() {
     let mut f = IntField {
         endpoint: "test".to_string(),
@@ -156,6 +166,8 @@ struct OptionIntField {
     id: Option<usize>,
 }
 
+impl L7LogAttribute for OptionIntField {}
+
 fn option_int_field() {
     let mut f = OptionIntField {
         id: Some(10),
@@ -194,6 +206,8 @@ struct SkipField {
     biz_scenario: String,
 }
 
+impl L7LogAttribute for SkipField {}
+
 fn skip_field() {
     let mut f = SkipField {
         endpoint: "test".to_string(),
@@ -230,6 +244,8 @@ struct WithPrioField {
     biz_code: String,
     biz_scenario: String,
 }
+
+impl L7LogAttribute for WithPrioField {}
 
 fn with_prio_field() {
     let mut f = WithPrioField::default();
@@ -270,6 +286,8 @@ struct OptionPrioField {
     biz_code: String,
     biz_scenario: String,
 }
+
+impl L7LogAttribute for OptionPrioField {}
 
 fn option_prio_field() {
     let mut f = OptionPrioField::default();
