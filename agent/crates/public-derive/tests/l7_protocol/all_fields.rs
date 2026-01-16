@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
-use public::l7_protocol::L7Log;
 use public_derive::L7Log;
+use public_derive_internals::{
+    enums::L7ResponseStatus,
+    l7_protocol::{L7Log, L7LogAttribute},
+};
 
 #[derive(L7Log)]
 struct TestInfo {
@@ -26,7 +29,7 @@ struct TestInfo {
     request_id: usize,
     endpoint: String,
     response_code: usize,
-    response_status: public::enums::L7ResponseStatus,
+    response_status: L7ResponseStatus,
     response_exception: String,
     response_result: String,
     trace_id: String,
@@ -38,6 +41,7 @@ struct TestInfo {
     biz_scenario: String,
 }
 
-fn main() {
+impl L7LogAttribute for TestInfo {}
 
+fn main() {
 }

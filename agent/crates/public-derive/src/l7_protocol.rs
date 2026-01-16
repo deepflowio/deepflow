@@ -14,82 +14,43 @@
  * limitations under the License.
  */
 
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse::ParseStream, parse2, DeriveInput};
 
+use public_derive_internals::l7_protocol::NativeTag;
+
 const ATTRIBUTE_NAME: &str = "l7_log";
 
-const NATIVE_TAG_RESPONSE_STATUS: &str = "response_status";
-const NATIVE_TAG_X_REQUEST_ID: &str = "x_request_id";
-const NATIVE_TAG_X_REQUEST_ID_0: &str = "x_request_id_0";
-const NATIVE_TAG_X_REQUEST_ID_1: &str = "x_request_id_1";
-
-cfg_if::cfg_if! {
-    if #[cfg(not(target_os = "windows"))] {
-        use public::l7_protocol::NativeTag;
-
-        fn expected_fields() -> HashMap<&'static str, FieldOptions> {
-            let fields = vec![
-                NativeTag::Version,
-                NativeTag::RequestType,
-                NativeTag::RequestDomain,
-                NativeTag::RequestResource,
-                NativeTag::RequestId,
-                NativeTag::Endpoint,
-                NativeTag::ResponseCode,
-                NativeTag::ResponseStatus,
-                NativeTag::ResponseException,
-                NativeTag::ResponseResult,
-                NativeTag::TraceId,
-                NativeTag::SpanId,
-                NativeTag::XRequestId,
-                NativeTag::XRequestId0,
-                NativeTag::XRequestId1,
-                NativeTag::HttpProxyClient,
-                NativeTag::BizType,
-                NativeTag::BizCode,
-                NativeTag::BizScenario,
-            ];
-            HashMap::from_iter(
-                fields
-                    .into_iter()
-                    .map(|field| (field.into(), FieldOptions::default())),
-            )
-        }
-    } else {
-        // Using anything in public crate will cause linking error under windows thus should be avoided.
-        fn expected_fields() -> HashMap<&'static str, FieldOptions> {
-            let fields = vec![
-                "version",
-                "request_type",
-                "request_domain",
-                "request_resource",
-                "request_id",
-                "endpoint",
-                "response_code",
-                NATIVE_TAG_RESPONSE_STATUS,
-                "response_exception",
-                "response_result",
-                "trace_id",
-                "span_id",
-                NATIVE_TAG_X_REQUEST_ID,
-                NATIVE_TAG_X_REQUEST_ID_0,
-                NATIVE_TAG_X_REQUEST_ID_1,
-                "http_proxy_client",
-                "biz_type",
-                "biz_code",
-                "biz_scenario",
-            ];
-            HashMap::from_iter(
-                fields
-                    .into_iter()
-                    .map(|field| (field, FieldOptions::default())),
-            )
-        }
-    }
+fn expected_fields() -> HashMap<NativeTag, FieldOptions> {
+    let fields = vec![
+        NativeTag::Version,
+        NativeTag::RequestType,
+        NativeTag::RequestDomain,
+        NativeTag::RequestResource,
+        NativeTag::RequestId,
+        NativeTag::Endpoint,
+        NativeTag::ResponseCode,
+        NativeTag::ResponseStatus,
+        NativeTag::ResponseException,
+        NativeTag::ResponseResult,
+        NativeTag::TraceId,
+        NativeTag::SpanId,
+        NativeTag::XRequestId,
+        NativeTag::XRequestId0,
+        NativeTag::XRequestId1,
+        NativeTag::HttpProxyClient,
+        NativeTag::BizType,
+        NativeTag::BizCode,
+        NativeTag::BizScenario,
+    ];
+    HashMap::from_iter(
+        fields
+            .into_iter()
+            .map(|field| (field, FieldOptions::default())),
+    )
 }
 
 pub fn expand_derive(input: &DeriveInput) -> syn::Result<TokenStream> {
@@ -97,19 +58,19 @@ pub fn expand_derive(input: &DeriveInput) -> syn::Result<TokenStream> {
     parse_field_options(input, &mut fields)?;
     parse_fields(input, &mut fields)?;
 
-    let xid_0_opts = fields.get(NATIVE_TAG_X_REQUEST_ID_0).unwrap();
-    let xid_1_opts = fields.get(NATIVE_TAG_X_REQUEST_ID_1).unwrap();
+    let xid_0_opts = fields.get(&NativeTag::XRequestId0).unwrap();
+    let xid_1_opts = fields.get(&NativeTag::XRequestId1).unwrap();
     if (xid_0_opts.configured() || xid_0_opts.valid())
         && (xid_1_opts.configured() || xid_1_opts.valid())
     {
-        let xid_opts = fields.get_mut(NATIVE_TAG_X_REQUEST_ID).unwrap();
+        let xid_opts = fields.get_mut(&NativeTag::XRequestId).unwrap();
         // remove invalid x_request_id if it's not configured
         if !xid_opts.configured() && !xid_opts.valid() {
             xid_opts.skip = true;
         }
     } else {
         // remove not configured or inferred x_request_id_0/1
-        for id in [NATIVE_TAG_X_REQUEST_ID_0, NATIVE_TAG_X_REQUEST_ID_1] {
+        for id in [&NativeTag::XRequestId0, &NativeTag::XRequestId1] {
             let xid_opts = fields.get(id).unwrap();
             if !xid_opts.configured() && !xid_opts.valid() {
                 fields.remove(id);
@@ -177,7 +138,7 @@ impl FieldOptions {
 
 fn parse_field_options(
     input: &DeriveInput,
-    expected_fields: &mut HashMap<&'static str, FieldOptions>,
+    expected_fields: &mut HashMap<NativeTag, FieldOptions>,
 ) -> syn::Result<()> {
     for attr in input.attrs.iter() {
         if !attr.path().is_ident(ATTRIBUTE_NAME) {
@@ -189,8 +150,13 @@ fn parse_field_options(
         meta.parse_args_with(|input: ParseStream| {
             loop {
                 let name: syn::Ident = input.parse()?;
-                let name_str = name.to_string();
-                let Some(opts) = expected_fields.get_mut(name_str.as_str()) else {
+                let Ok(tag) = NativeTag::from_str(&name.to_string()) else {
+                    return Err(syn::Error::new_spanned(
+                        &name,
+                        format!("Unknown field: {name}"),
+                    ));
+                };
+                let Some(opts) = expected_fields.get_mut(&tag) else {
                     return Err(syn::Error::new_spanned(
                         &name,
                         format!("Unknown field: {name}"),
@@ -249,7 +215,7 @@ fn parse_field_options(
 
 fn parse_fields(
     input: &DeriveInput,
-    expected_fields: &mut HashMap<&'static str, FieldOptions>,
+    expected_fields: &mut HashMap<NativeTag, FieldOptions>,
 ) -> syn::Result<()> {
     let data = match &input.data {
         syn::Data::Enum(data) => {
@@ -291,8 +257,10 @@ fn parse_fields(
             }
             let meta = attr.meta.require_list()?;
             let ident = meta.parse_args::<syn::Ident>()?;
-            let ident_str = ident.to_string();
-            let Some(opts) = expected_fields.get_mut(ident_str.as_str()) else {
+            let Ok(tag) = NativeTag::from_str(&ident.to_string()) else {
+                return Err(syn::Error::new_spanned(ident, "Unknown field"));
+            };
+            let Some(opts) = expected_fields.get_mut(&tag) else {
                 return Err(syn::Error::new_spanned(ident, "Unknown field"));
             };
             if opts.attributed || (opts.getter.is_some() && opts.setter.is_some()) {
@@ -301,7 +269,10 @@ fn parse_fields(
             opts.attributed = true;
             opts.source = Some(field.clone());
         }
-        if let Some(opts) = expected_fields.get_mut(field_ident.to_string().as_str()) {
+        let Ok(tag) = NativeTag::from_str(&field_ident.to_string()) else {
+            continue;
+        };
+        if let Some(opts) = expected_fields.get_mut(&tag) {
             if opts.attributed || (opts.getter.is_some() && opts.setter.is_some()) {
                 continue;
             }
@@ -434,11 +405,11 @@ fn generate_setter(field: &syn::Ident, wrappers: &[Wrapper], ty: &str) -> TokenS
     }
 }
 
-fn generate_impls(key: &str, options: FieldOptions) -> syn::Result<TokenStream> {
-    let getter_ident = format_ident!("get_{}", key);
-    let setter_ident = format_ident!("set_{}", key);
+fn generate_impls(key: NativeTag, options: FieldOptions) -> syn::Result<TokenStream> {
+    let getter_ident = format_ident!("get_{}", key.as_ref());
+    let setter_ident = format_ident!("set_{}", key.as_ref());
 
-    let (value_type, value_setter_type) = if key == NATIVE_TAG_RESPONSE_STATUS {
+    let (value_type, value_setter_type) = if key == NativeTag::ResponseStatus {
         (
             quote!(::public::enums::L7ResponseStatus),
             quote!(::public::enums::L7ResponseStatus),
@@ -501,7 +472,7 @@ fn generate_impls(key: &str, options: FieldOptions) -> syn::Result<TokenStream> 
             _ => (),
         }
     }
-    if key == NATIVE_TAG_RESPONSE_STATUS {
+    if key == NativeTag::ResponseStatus {
         // expecting only Option wrapper
         if !wrappers.is_empty() {
             if wrappers.len() != 1 || wrappers[0] != Wrapper::Option {
@@ -524,7 +495,7 @@ fn generate_impls(key: &str, options: FieldOptions) -> syn::Result<TokenStream> 
     match inner_type.as_str() {
         "String" => (),
         "i8" | "i16" | "i32" | "i64" | "isize" | "u8" | "u16" | "u32" | "u64" | "usize" => (),
-        "L7ResponseStatus" if key == NATIVE_TAG_RESPONSE_STATUS => (),
+        "L7ResponseStatus" if key == NativeTag::ResponseStatus => (),
         _ => return Err(syn::Error::new_spanned(path, "Unsupported field type")),
     }
     let field = ident.as_ref().unwrap();
