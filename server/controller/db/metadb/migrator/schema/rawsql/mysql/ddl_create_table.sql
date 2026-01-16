@@ -1276,7 +1276,7 @@ TRUNCATE TABLE process;
 CREATE TABLE IF NOT EXISTS custom_service (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(128) NOT NULL,
-    type                INTEGER DEFAULT 0 COMMENT '0: unknown 1: IP 2: PORT 3: chost 4: pod_service 5: pod_group 6: host',
+    type                INTEGER DEFAULT 0 COMMENT '0: unknown 1: IP 2: PORT 3: chost 4: pod_service 5: pod_group 6:pod 7: host',
     match_type          INTEGER DEFAULT 1 COMMENT '0: unkonwn 1: name match 2: uid match',
     epc_ids             TEXT COMMENT 'separated by ,',
     pod_cluster_ids     TEXT COMMENT 'separated by ,',
