@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+use std::sync::Arc;
+
 use num_enum::{FromPrimitive, IntoPrimitive, TryFromPrimitive};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use super::enums::PacketDirection;
 
@@ -163,7 +165,15 @@ impl From<&String> for L7Protocol {
 pub enum CustomProtocol {
     Wasm(u8, String),
     So(u8, String),
-    CustomPolicy(String),
+    #[serde(serialize_with = "serialize_arc_string")]
+    CustomPolicy(Arc<String>),
+}
+
+fn serialize_arc_string<S>(arc: &Arc<String>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(arc)
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Hash, Eq)]

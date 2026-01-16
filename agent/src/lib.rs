@@ -33,7 +33,7 @@ mod integration_collector;
 mod metric;
 mod monitor;
 mod platform;
-mod plugin;
+pub mod plugin;
 mod policy;
 pub mod rpc;
 mod sender;
