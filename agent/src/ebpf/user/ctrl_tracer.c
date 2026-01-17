@@ -977,14 +977,23 @@ static int datadump_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 
 				}
 			} else {
-				snprintf(cmdbuf, sizeof(cmdbuf),
-					 "ls " DATADUMP_SAVE_DIR
-					 "/datadump-*.log && "
-					 "grep -n -A 1 \"%s\" %s", match_str,
-					 conf->is_all_files ? DATADUMP_SAVE_DIR
-					 "/datadump-*.log" : "$(ls -t "
-					 DATADUMP_SAVE_DIR
-					 "/datadump-*.log | head -n 1)");
+				printf("To avoid querying too much data and causing the"
+				       " browser page to freeze, please copy the following"
+				       " file path into the 'file-name' and fill in the "
+				       "'start-line' and 'end-line' numbers:\n");
+				display_files("", DATADUMP_SAVE_DIR);
+				printf("\n");
+				display_files("deepflow-agent/",
+					      "/var/log/deepflow-agent");
+				return ETR_OK;
+				//snprintf(cmdbuf, sizeof(cmdbuf),
+				//	 "ls " DATADUMP_SAVE_DIR
+				//	 "/datadump-*.log && "
+				//	 "grep -n -A 1 \"%s\" %s", match_str,
+				//	 conf->is_all_files ? DATADUMP_SAVE_DIR
+				//	 "/datadump-*.log" : "$(ls -t "
+				//	 DATADUMP_SAVE_DIR
+				//	 "/datadump-*.log | head -n 1)");
 			}
 			printf("%s\n", cmdbuf);
 			__exec_command(cmdbuf, "");
