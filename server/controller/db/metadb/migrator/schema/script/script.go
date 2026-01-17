@@ -34,12 +34,12 @@ func (s scripts) exec(db *gorm.DB, version string) error {
 	}
 
 	// Replace '.' with '_' in version string
-	methodName := "version" + strings.ReplaceAll(version, ".", "_")
+	methodName := "Version" + strings.ReplaceAll(version, ".", "_")
 
 	// Use reflection to get the method
 	method := reflect.ValueOf(s).MethodByName(methodName)
 	if !method.IsValid() {
-		log.Debugf("No script method found for version %s", version)
+		log.Errorf("No script method found for version %s", version)
 		return nil
 	}
 
