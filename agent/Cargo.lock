@@ -1066,6 +1066,7 @@ dependencies = [
  "prost",
  "public",
  "public-derive",
+ "public-derive-internals",
  "rand",
  "regex",
  "reorder",
@@ -3479,7 +3480,6 @@ version = "0.1.0"
 dependencies = [
  "cfg-if",
  "proc-macro2",
- "public",
  "public-derive-internals",
  "quote",
  "syn 2.0.100",

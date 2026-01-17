@@ -97,6 +97,7 @@ pnet = "^0.29"
 prost.workspace = true
 public.workspace = true
 public-derive.workspace = true
+public-derive-internals.workspace = true
 rand = "0.8.5"
 regex.workspace = true
 ring = "0.17"
