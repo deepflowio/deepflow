@@ -14,14 +14,30 @@
  * limitations under the License.
  */
 
+use std::{borrow::Cow, sync::Arc};
+
+use log::trace;
+
+use enterprise_utils::l7::custom_policy::{
+    custom_field_policy::{
+        enums::{Op, PayloadType, Source},
+        Store,
+    },
+    custom_protocol_policy::ExtraProtocolCharacters,
+    enums::TrafficDirection,
+};
+use public::l7_protocol::{CustomProtocol, L7Log, L7LogAttribute, L7Protocol, LogMessageType};
+use public_derive::L7Log;
+
 use crate::{
     common::{
         flow::{L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{L7ParseResult, L7ProtocolParser, L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         protocol_logs::{
+            auto_merge_custom_field,
             pb_adapter::{KeyVal, MetricKeyVal},
             set_captured_byte, IpProtocol, L7ResponseStatus,
         },
@@ -30,17 +46,15 @@ use crate::{
     plugin::{CustomInfo, CustomInfoRequest, CustomInfoResp, CustomInfoTrace},
 };
 
-use enterprise_utils::l7::custom_policy::{
-    custom_protocol_policy::{CustomPolicyInfo, CustomPolicyParser},
-    enums::TrafficDirection,
-};
-use public::l7_protocol::{CustomProtocol, L7Protocol, LogMessageType};
-
 #[derive(Default)]
 pub struct CustomPolicyLog {
     perf_stats: Option<L7PerfStats>,
-    parser: CustomPolicyParser,
-    proto_str: String,
+
+    policy: Option<ExtraProtocolCharacters>,
+    l7_parser: Option<Box<L7ProtocolParser>>,
+    biz_protocol: Option<Arc<String>>,
+
+    store: Store,
 }
 
 impl L7ProtocolParserInterface for CustomPolicyLog {
@@ -51,31 +65,47 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
         if param.l4_protocol != IpProtocol::TCP {
             return None;
         }
-        let Some(config) = param
-            .parse_config
-            .and_then(|c| c.custom_app.custom_protocol_config.as_ref())
-        else {
-            return None;
-        };
-
-        if config.protocol_characters.is_empty() {
-            return None;
-        }
 
         let (port, direction) = match param.direction {
             PacketDirection::ClientToServer => (param.port_dst, TrafficDirection::REQUEST),
             PacketDirection::ServerToClient => (param.port_src, TrafficDirection::RESPONSE),
         };
 
-        match self.parser.check_payload(payload, &config, direction, port) {
-            Some(custom_protocol_name) => {
-                self.proto_str = custom_protocol_name;
-                return Some(LogMessageType::Request);
+        let Some(policies) = param
+            .parse_config
+            .and_then(|c| c.custom_app.custom_protocol_config.as_ref())
+            .and_then(|config| config.select(port))
+        else {
+            return None;
+        };
+
+        for policy in policies {
+            let mut parser = if policy.l7_protocol() != L7Protocol::Custom {
+                crate::common::l7_protocol_log::get_parser(policy.l7_protocol().into())
+            } else {
+                None
+            };
+            if let Some(p) = parser.as_mut() {
+                // can only check l7 request now
+                if direction == TrafficDirection::RESPONSE
+                    || p.check_payload(payload, param).is_none()
+                {
+                    continue;
+                }
             }
-            None => {
-                return None;
+            match policy.check_payload(payload, direction) {
+                None => continue,
+                Some(msg_type) => {
+                    trace!("found biz protocol in policy {}", policy.biz_protocol());
+                    self.policy = Some(policy.clone());
+                    self.l7_parser = parser.map(|p| Box::new(p));
+                    self.biz_protocol = Some(Arc::new(policy.biz_protocol().to_string()));
+                    return Some(msg_type);
+                }
             }
         }
+
+        return None;
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -83,7 +113,25 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             return Err(Error::NoParseConfig);
         };
 
-        let Some(custom_protocol) = config.custom_app.custom_protocol_config.as_ref() else {
+        let Some(biz_protocol) = self.biz_protocol.as_ref() else {
+            return Ok(L7ParseResult::None);
+        };
+
+        // check l7 payload on requests
+        if param.direction == PacketDirection::ClientToServer {
+            if let Some(p) = self.l7_parser.as_mut() {
+                if p.check_payload(payload, param).is_none() {
+                    return Ok(L7ParseResult::None);
+                }
+            }
+        }
+        match self.policy.as_ref() {
+            Some(p) if p.check_payload(payload, param.direction.into()).is_some() => (),
+            _ => return Ok(L7ParseResult::None),
+        }
+
+        let protocol = CustomProtocol::CustomPolicy(biz_protocol.clone());
+        let Some(policies) = config.get_custom_field_policies(protocol.into(), param) else {
             return Err(Error::NoParseConfig);
         };
 
@@ -91,61 +139,69 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
-        let protocol = CustomProtocol::CustomPolicy(self.proto_str.clone());
+        trace!("apply biz decode policies to {biz_protocol}");
+        let mut info = CustomPolicyInfo::default();
 
-        let (port, direction) = match param.direction {
-            PacketDirection::ClientToServer => (param.port_dst, TrafficDirection::REQUEST),
-            PacketDirection::ServerToClient => (param.port_src, TrafficDirection::RESPONSE),
-        };
+        self.store.clear();
+        policies.apply(
+            &mut self.store,
+            &info,
+            param.direction.into(),
+            Source::Payload(PayloadType::JSON | PayloadType::XML, payload),
+        );
 
-        if self
-            .parser
-            .check_payload(payload, custom_protocol, direction, port)
-            .is_none()
-        {
+        // at least one tag should be parsed
+        if self.store.is_empty() {
             return Ok(L7ParseResult::None);
-        };
+        }
 
-        let Some(policies) = config.get_custom_field_policies(protocol.into(), param) else {
-            return Err(Error::NoParseConfig);
-        };
-
-        if self.parser.parse_payload(payload, direction, policies) {
-            let mut info = CustomInfo::from((&self.parser.info, param.direction));
-            info.msg_type = param.direction.into();
-            info.proto_str = self.proto_str.clone();
-
-            match info.msg_type {
-                LogMessageType::Request => {
-                    info.req_len = Some(payload.len() as u32);
+        let mut n_ops = 0;
+        for op in self.store.drain_with(policies, &info) {
+            n_ops += 1;
+            match op.op {
+                Op::AddMetric(key, value) => {
+                    info.metrics.push(MetricKeyVal {
+                        key: key.to_string(),
+                        val: value,
+                    });
                 }
-                LogMessageType::Response => {
-                    info.resp_len = Some(payload.len() as u32);
-                }
-                _ => {}
+                _ => auto_merge_custom_field(op, &mut info),
             }
+        }
+        trace!("apply biz decode policies to {biz_protocol} success with {n_ops} ops");
 
-            info.set_is_on_blacklist(config);
-            if let Some(perf_stats) = self.perf_stats.as_mut() {
-                if info.msg_type == LogMessageType::Response {
-                    if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
-                        info.req.endpoint = endpoint.to_string();
-                    }
-                }
-                if let Some(stats) = info.perf_stats(param) {
-                    info.rrt = stats.rrt_sum;
-                    perf_stats.sequential_merge(&stats);
+        let mut info = CustomInfo::from((info, param.direction));
+        info.msg_type = param.direction.into();
+        info.proto_str = biz_protocol.to_string();
+
+        match info.msg_type {
+            LogMessageType::Request => {
+                info.req_len = Some(payload.len() as u32);
+            }
+            LogMessageType::Response => {
+                info.resp_len = Some(payload.len() as u32);
+            }
+            _ => {}
+        }
+
+        info.set_is_on_blacklist(config);
+        if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if info.msg_type == LogMessageType::Response && info.req.endpoint.is_empty() {
+                if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
+                    info.req.endpoint = endpoint.to_string();
                 }
             }
-
-            set_captured_byte!(info, param);
-            if param.parse_log {
-                Ok(L7ParseResult::Single(L7ProtocolInfo::CustomInfo(info)))
-            } else {
-                Ok(L7ParseResult::None)
+            if let Some(stats) = info.perf_stats(param) {
+                info.rrt = stats.rrt_sum;
+                perf_stats.sequential_merge(&stats);
             }
+        }
+
+        set_captured_byte!(info, param);
+        if param.parse_log {
+            Ok(L7ParseResult::Single(L7ProtocolInfo::CustomInfo(info)))
         } else {
-            Err(Error::CustomPolicyParseFail)
+            Ok(L7ParseResult::None)
         }
     }
 
@@ -158,73 +214,92 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
     }
 
     fn custom_protocol(&self) -> Option<CustomProtocol> {
-        Some(CustomProtocol::CustomPolicy(self.proto_str.clone()))
-    }
-}
-
-pub fn get_policy_parser(s: String) -> CustomPolicyLog {
-    CustomPolicyLog {
-        proto_str: s.clone(),
-        perf_stats: None,
-        parser: CustomPolicyParser::default(),
-    }
-}
-
-impl From<(&CustomPolicyInfo, PacketDirection)> for CustomInfo {
-    fn from(p: (&CustomPolicyInfo, PacketDirection)) -> CustomInfo {
-        let (info, direction) = p;
-        let mut trace_ids: Vec<String> = Vec::new();
-        if let Some(trace_id) = &info.trace_id {
-            trace_ids.push(trace_id.to_string());
+        match self.biz_protocol.as_ref() {
+            Some(p) => Some(CustomProtocol::CustomPolicy(p.clone())),
+            None => None,
         }
+    }
+}
+
+impl CustomPolicyLog {
+    pub fn get(name: Arc<String>) -> CustomPolicyLog {
+        CustomPolicyLog {
+            biz_protocol: Some(name),
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(L7Log, Default, Debug)]
+#[l7_log(biz_type.skip = "true")]
+#[l7_log(biz_code.skip = "true")]
+#[l7_log(biz_scenario.skip = "true")]
+pub struct CustomPolicyInfo {
+    pub is_request: bool,
+    pub version: String,
+    pub request_type: String,
+    pub request_domain: String,
+    pub request_resource: String,
+    pub endpoint: String,
+    pub request_id: Option<u32>,
+    pub response_code: Option<i32>,
+    pub response_status: L7ResponseStatus,
+    pub response_exception: String,
+    pub response_result: String,
+    pub trace_id: Option<String>,
+    pub span_id: Option<String>,
+    pub http_proxy_client: Option<String>,
+    pub x_request_id: Option<String>,
+    pub attributes: Vec<KeyVal>,
+    pub metrics: Vec<MetricKeyVal>,
+}
+
+impl L7LogAttribute for CustomPolicyInfo {
+    fn add_attribute(&mut self, name: Cow<'_, str>, value: Cow<'_, str>) {
+        self.attributes.push(KeyVal {
+            key: name.to_string(),
+            val: value.to_string(),
+        });
+    }
+}
+
+impl From<(CustomPolicyInfo, PacketDirection)> for CustomInfo {
+    fn from((info, direction): (CustomPolicyInfo, PacketDirection)) -> CustomInfo {
         CustomInfo {
+            request_id: info.request_id,
             req: CustomInfoRequest {
-                version: info.version.clone(),
-                req_type: info.request_type.clone(),
-                domain: info.request_domain.clone(),
-                resource: info.request_resource.clone(),
-                endpoint: info.endpoint.clone(),
+                version: info.version,
+                req_type: info.request_type,
+                domain: info.request_domain,
+                resource: info.request_resource,
+                endpoint: info.endpoint,
             },
             resp: CustomInfoResp {
                 status: L7ResponseStatus::from(info.response_status.as_str()),
-                code: info.response_code.clone(),
-                exception: info.response_exception.clone(),
-                result: info.response_result.clone(),
-                endpoint: info.endpoint.clone(),
-                req_type: info.request_type.clone(),
-            },
-            trace: CustomInfoTrace {
-                trace_ids,
-                span_id: info.span_id.clone(),
-                http_proxy_client: info.http_proxy_client.clone(),
-                x_request_id_0: if direction == PacketDirection::ClientToServer {
-                    info.x_request_id.clone()
-                } else {
-                    None
-                },
-                x_request_id_1: if direction == PacketDirection::ServerToClient {
-                    info.x_request_id.clone()
-                } else {
-                    None
-                },
+                code: info.response_code,
+                exception: info.response_exception,
+                result: info.response_result,
                 ..Default::default()
             },
-            attributes: info
-                .attributes
-                .iter()
-                .map(|(k, v)| KeyVal {
-                    key: k.clone(),
-                    val: v.clone(),
-                })
-                .collect(),
-            metrics: info
-                .metrics
-                .iter()
-                .map(|(k, v)| MetricKeyVal {
-                    key: k.clone(),
-                    val: v.clone(),
-                })
-                .collect(),
+            trace: {
+                let mut trace = CustomInfoTrace {
+                    trace_ids: match info.trace_id {
+                        Some(trace_id) => vec![trace_id],
+                        None => Vec::new(),
+                    },
+                    span_id: info.span_id,
+                    http_proxy_client: info.http_proxy_client,
+                    ..Default::default()
+                };
+                if direction == PacketDirection::ClientToServer {
+                    trace.x_request_id_0 = info.x_request_id;
+                } else {
+                    trace.x_request_id_1 = info.x_request_id;
+                }
+                trace
+            },
+            attributes: info.attributes,
+            metrics: info.metrics,
             ..Default::default()
         }
     }

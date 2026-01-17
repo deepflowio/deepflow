@@ -22,7 +22,7 @@ pub(crate) mod mq;
 mod parser;
 pub mod pb_adapter;
 pub(crate) mod ping;
-pub(crate) mod plugin;
+pub mod plugin;
 pub(crate) mod rpc;
 pub(crate) mod sql;
 
