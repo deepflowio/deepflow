@@ -177,6 +177,14 @@ void set_bpf_rt_kern(struct bpf_tracer *t, struct profiler_context *ctx)
 	ebpf_info("%s%s() success, rt_flag:%d\n", ctx->tag, __func__, rt_flag);
 }
 
+/*
+ * Best-effort detection of masked kallsyms addresses.
+ *
+ * Under normal circumstances, /proc/kallsyms begins with core
+ * kernel text symbols and is ordered by address. Having the first
+ * 100 entries all show address 0 is therefore extremely unlikely
+ * and indicates that kallsyms addresses are unavailable.
+ */
 static bool check_kallsyms_addr_is_zero(void)
 {
 	const int check_num = 100;
@@ -190,20 +198,29 @@ static bool check_kallsyms_addr_is_zero(void)
 	}
 
 	char line[max_line_len];
-	int count = 0;
+	int count = 0, zero_count = 0;
+	// Output three lines of kallsyms content
+	static const int print_num = 3;
 
 	while (fgets(line, sizeof(line), file) != NULL && count < check_num) {
 		char address[17];	// 16 characters + null terminator
 		sscanf(line, "%16s", address);
+		if (count < print_num) {
+			ebpf_info("%s [address:%s]\n", line, address);
+		}
 
 		if (strcmp(address, check_str) == 0) {
-			count++;
+			zero_count++;
 		}
+		count++;
 	}
 
 	fclose(file);
 
-	return (count == check_num);
+	ebpf_info("Check kallsyms: count %d check_num %d zero_count %d\n",
+		  count, check_num, zero_count);
+
+	return (zero_count == check_num);
 }
 
 bool run_conditions_check(void)
