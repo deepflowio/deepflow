@@ -2463,7 +2463,10 @@ mod tests {
             l7_protocol_log::{EbpfParam, L7PerfCache},
             MetaPacket,
         },
-        config::{config::Iso8583ParseConfig, OracleConfig},
+        config::{
+            config::{Iso8583ParseConfig, WebSphereMqParseConfig},
+            OracleConfig,
+        },
     };
 
     use std::cell::RefCell;
@@ -2772,6 +2775,7 @@ mod tests {
             captured_byte: 1000,
             oracle_parse_conf: OracleConfig::default(),
             iso8583_parse_conf: Iso8583ParseConfig::default(),
+            web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
             icmp_data: None,
         };
 

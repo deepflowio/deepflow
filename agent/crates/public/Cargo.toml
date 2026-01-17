@@ -51,3 +51,4 @@ windows = { version = "0.30", features = [
 
 [build-dependencies]
 tonic-build.workspace = true
+public-derive.workspace = true

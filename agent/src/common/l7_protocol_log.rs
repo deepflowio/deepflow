@@ -34,7 +34,7 @@ use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
 use crate::common::meta_packet::{IcmpData, ProtocolData};
-use crate::config::config::Iso8583ParseConfig;
+use crate::config::config::{Iso8583ParseConfig, WebSphereMqParseConfig};
 use crate::config::handler::LogParserConfig;
 use crate::config::OracleConfig;
 use crate::flow_generator::flow_map::FlowMapCounter;
@@ -682,6 +682,7 @@ pub struct ParseParam<'a> {
 
     pub oracle_parse_conf: OracleConfig,
     pub iso8583_parse_conf: Iso8583ParseConfig,
+    pub web_sphere_mq_parse_conf: WebSphereMqParseConfig,
 }
 
 impl<'a> fmt::Debug for ParseParam<'a> {
@@ -711,6 +712,7 @@ impl<'a> fmt::Debug for ParseParam<'a> {
             .field("captured_byte", &self.captured_byte)
             .field("oracle_parse_conf", &self.oracle_parse_conf)
             .field("iso8583_parse_conf", &self.iso8583_parse_conf)
+            .field("web_sphere_mq_parse_conf", &self.web_sphere_mq_parse_conf)
             .finish()
     }
 }
@@ -769,6 +771,7 @@ impl<'a> ParseParam<'a> {
 
             oracle_parse_conf: OracleConfig::default(),
             iso8583_parse_conf: Iso8583ParseConfig::default(),
+            web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
         };
         if packet.ebpf_type != EbpfType::None {
             param.ebpf_param = Some(EbpfParam {
@@ -820,6 +823,10 @@ impl<'a> ParseParam<'a> {
 
     pub fn set_iso8583_conf(&mut self, conf: &Iso8583ParseConfig) {
         self.iso8583_parse_conf = conf.clone();
+    }
+
+    pub fn set_web_sphere_mq_conf(&mut self, conf: &WebSphereMqParseConfig) {
+        self.web_sphere_mq_parse_conf = conf.clone();
     }
 }
 

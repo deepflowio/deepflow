@@ -3733,7 +3733,7 @@ static __inline enum message_type infer_rocketmq_message(const char *buf,
 }
 
 // ref: https://www.ibm.com/docs/en/ibm-mq/
-static __inline enum message_type infer_webspheremq_message(const char *buf,
+static __inline enum message_type infer_web_sphere_mq_message(const char *buf,
 							 size_t count,
 							 struct conn_info_s *conn_info)
 {
@@ -3875,7 +3875,7 @@ infer_protocol_3(const char *infer_buf, size_t count,
 #else
 	} else if ((inferred_message.type =
 #endif
-		    infer_webspheremq_message(infer_buf, count,
+		    infer_web_sphere_mq_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_WEBSPHEREMQ;
 }
@@ -4405,7 +4405,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 			break;
 		case PROTO_WEBSPHEREMQ:
 			if ((inferred_message.type =
-			     infer_webspheremq_message(infer_buf, count,
+			     infer_web_sphere_mq_message(infer_buf, count,
 						 conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_WEBSPHEREMQ;
 				return inferred_message;
