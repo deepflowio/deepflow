@@ -35,7 +35,7 @@ func (s scripts) exec(db *gorm.DB, version string) error {
 
 	// Replace '.' with '_' in version string
 	methodName := "version" + strings.ReplaceAll(version, ".", "_")
-
+	log.Infof("TODO methodName %s", methodName)
 	// Use reflection to get the method
 	method := reflect.ValueOf(s).MethodByName(methodName)
 	if !method.IsValid() {
@@ -45,7 +45,7 @@ func (s scripts) exec(db *gorm.DB, version string) error {
 
 	// Call the method with db as argument
 	results := method.Call([]reflect.Value{reflect.ValueOf(db)})
-
+	log.Infof("TODO result %v", results)
 	// Check if the method returned an error
 	if len(results) > 0 && !results[0].IsNil() {
 		return results[0].Interface().(error)
@@ -55,5 +55,6 @@ func (s scripts) exec(db *gorm.DB, version string) error {
 }
 
 func ExecuteScript(db *gorm.DB, version string) error {
+	log.Infof("TODO executing script %s", version)
 	return scripts{}.exec(db, version)
 }
