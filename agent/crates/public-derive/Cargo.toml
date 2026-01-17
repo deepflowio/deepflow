@@ -14,5 +14,4 @@ quote = "1.0"
 syn = "2.0"
 
 [dev-dependencies]
-public.workspace = true
 trybuild = "1.0"
