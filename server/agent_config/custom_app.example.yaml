@@ -1,7 +1,8 @@
-custom_protocol_policies:
-- protocol_name: "your_protocol_name"
+biz_protocol_policies:
+- biz_protocol: "your_protocol_name"
   pre_filter:
     port_list: 1-65535
+    l7_protocol: Custom
   request_characters:
     - character:
       - match_keyword: abc
@@ -13,7 +14,7 @@ custom_protocol_policies:
       - match_keyword: 0123af
         match_type: "hex"
         match_from_beginning: false
-custom_field:
+biz_field:
   dictionaries:
   - name: dict_1
     entries:
@@ -24,8 +25,8 @@ custom_field:
     default: value3
   policies:
   - policy_name: "my_policy"
-    protocol_name: HTTP
-    custom_protocol_name: "my_protocol"
+    l7_protocol: HTTP
+    biz_protocol: "my_protocol"
     filters:
       traffic_direction: both
       port_list: 1-65535
@@ -150,7 +151,7 @@ custom_field:
         priority: 0
     compound_fields:
     - name: "my_compound_field"
-      format: "{field1_name}-{field2_name}"
+      format: "{field1_name}-{field2_name:1:4}"
       output:
         attribute_name: "xyz"
         metric_name: "xyz"
@@ -175,3 +176,15 @@ custom_field:
           server_error_values: []
           default_status: ""
         priority: 0
+    - name: "join_field"
+      join:
+        fields: # 有序，输出顺序
+        - value: endpoint
+        - name: dir
+          value: 'direction:1:4'
+          omit_empty: false # 覆盖外层的配置
+        - value: sequence
+        omit_empty: true # 无值时忽略
+        separator: " "
+      output:
+        attribute_name: "xyz"

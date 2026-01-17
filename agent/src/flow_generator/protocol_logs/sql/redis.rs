@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
-use std::{cell::OnceCell, collections::HashMap, fmt, str};
+use std::{borrow::Cow, cell::OnceCell, collections::HashMap, fmt, str};
 
 use serde::{Serialize, Serializer};
 use strum_macros::Display;
 
-use super::{
-    super::{value_is_default, AppProtoHead, L7ResponseStatus},
-    ObfuscateCache,
+#[cfg(feature = "enterprise")]
+use enterprise_utils::l7::custom_policy::custom_field_policy::{
+    enums::{Op, Source},
+    Store,
 };
-use public::l7_protocol::LogMessageType;
+use public::l7_protocol::{Field, FieldSetter, L7Log, L7LogAttribute, LogMessageType};
+use public_derive::L7Log;
 
 use crate::{
     common::{
@@ -37,10 +39,15 @@ use crate::{
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
-            pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
+            pb_adapter::{ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response},
             set_captured_byte,
         },
     },
+};
+
+use super::{
+    super::{value_is_default, AppProtoHead, L7ResponseStatus},
+    ObfuscateCache,
 };
 
 const SEPARATOR_SIZE: usize = 2;
@@ -111,7 +118,16 @@ impl From<u8> for ResponseType {
     }
 }
 
-#[derive(Serialize, Debug, Default, Clone)]
+#[derive(L7Log, Serialize, Debug, Default, Clone)]
+#[l7_log(version.skip = "true", request_domain.skip = "true", endpoint.skip = "true")]
+#[l7_log(response_code.skip = "true")]
+#[l7_log(request_id.skip = "true", http_proxy_client.skip = "true")]
+#[l7_log(trace_id.skip = "true", span_id.skip = "true", x_request_id.skip = "true")]
+#[l7_log(biz_code.skip = "true", biz_type.skip = "true", biz_scenario.skip = "true")]
+#[l7_log(request_resource.getter = "RedisInfo::get_request_resource", request_resource.setter = "RedisInfo::set_request_resource")]
+#[l7_log(request_type.getter = "RedisInfo::get_request_type", request_type.setter = "RedisInfo::set_request_type")]
+#[l7_log(response_result.getter = "RedisInfo::get_response_result", response_result.setter = "RedisInfo::set_response_result")]
+#[l7_log(response_exception.getter = "RedisInfo::get_response_exception", response_exception.setter = "RedisInfo::set_response_exception")]
 pub struct RedisInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
@@ -141,6 +157,7 @@ pub struct RedisInfo {
         serialize_with = "vec_u8_to_string"
     )]
     pub error: Vec<u8>, // '-'
+    #[l7_log(response_status)]
     #[serde(rename = "response_status")]
     pub resp_status: L7ResponseStatus,
     response_result: ResponseType,
@@ -151,7 +168,19 @@ pub struct RedisInfo {
     rrt: u64,
 
     #[serde(skip)]
+    attributes: Vec<KeyVal>,
+
+    #[serde(skip)]
     is_on_blacklist: bool,
+}
+
+impl L7LogAttribute for RedisInfo {
+    fn add_attribute(&mut self, name: Cow<'_, str>, value: Cow<'_, str>) {
+        self.attributes.push(KeyVal {
+            key: name.into_owned(),
+            val: value.into_owned(),
+        });
+    }
 }
 
 impl L7ProtocolInfoInterface for RedisInfo {
@@ -195,6 +224,49 @@ where
 }
 
 impl RedisInfo {
+    fn get_field_from_bytes(bytes: &Vec<u8>) -> Field<'_> {
+        match str::from_utf8(bytes) {
+            Ok(s) => Field::from(s),
+            Err(_) => Field::None,
+        }
+    }
+
+    fn set_field_to_bytes(field: FieldSetter<'_>, bytes: &mut Vec<u8>) {
+        *bytes = field.into_inner().to_string().into_bytes();
+    }
+
+    pub fn get_request_resource(&self) -> Field<'_> {
+        Self::get_field_from_bytes(&self.request)
+    }
+
+    pub fn set_request_resource(&mut self, setter: FieldSetter<'_>) {
+        Self::set_field_to_bytes(setter, &mut self.request);
+    }
+
+    pub fn get_request_type(&self) -> Field<'_> {
+        Self::get_field_from_bytes(&self.request_type)
+    }
+
+    pub fn set_request_type(&mut self, setter: FieldSetter<'_>) {
+        Self::set_field_to_bytes(setter, &mut self.request_type);
+    }
+
+    pub fn get_response_result(&self) -> Field<'_> {
+        Self::get_field_from_bytes(&self.status)
+    }
+
+    pub fn set_response_result(&mut self, setter: FieldSetter<'_>) {
+        Self::set_field_to_bytes(setter, &mut self.status);
+    }
+
+    pub fn get_response_exception(&self) -> Field<'_> {
+        Self::get_field_from_bytes(&self.error)
+    }
+
+    pub fn set_response_exception(&mut self, setter: FieldSetter<'_>) {
+        Self::set_field_to_bytes(setter, &mut self.error);
+    }
+
     pub fn merge(&mut self, other: &mut Self) -> Result<()> {
         std::mem::swap(&mut self.status, &mut other.status);
         std::mem::swap(&mut self.error, &mut other.error);
@@ -204,6 +276,7 @@ impl RedisInfo {
         if other.is_on_blacklist {
             self.is_on_blacklist = other.is_on_blacklist;
         }
+        self.attributes.append(&mut other.attributes);
         Ok(())
     }
 
@@ -265,6 +338,16 @@ impl From<RedisInfo> for L7ProtocolSendLog {
                 result: f.response_result.to_string(),
                 ..Default::default()
             },
+            ext_info: Some(ExtendedInfo {
+                attributes: {
+                    if f.attributes.is_empty() {
+                        None
+                    } else {
+                        Some(f.attributes)
+                    }
+                },
+                ..Default::default()
+            }),
             flags,
             ..Default::default()
         };
@@ -288,6 +371,8 @@ pub struct RedisLog {
     has_request: bool,
     perf_stats: Option<L7PerfStats>,
     obfuscate: bool,
+    #[cfg(feature = "enterprise")]
+    custom_field_store: Store,
 }
 
 impl L7ProtocolParserInterface for RedisLog {
@@ -310,9 +395,41 @@ impl L7ProtocolParserInterface for RedisLog {
         if self.perf_stats.is_none() && param.parse_perf {
             self.perf_stats = Some(L7PerfStats::default())
         };
-        let mut info = RedisInfo::default();
-        info.is_tls = param.is_tls();
+
+        #[cfg(feature = "enterprise")]
+        self.custom_field_store.clear();
+        #[cfg(feature = "enterprise")]
+        let custom_policies = param
+            .parse_config
+            .and_then(|config| config.get_custom_field_policies(L7Protocol::Redis.into(), param));
+
+        let mut info = RedisInfo {
+            is_tls: param.is_tls(),
+            ..Default::default()
+        };
         self.parse(payload, param.l4_protocol, param.direction, &mut info)?;
+
+        #[cfg(feature = "enterprise")]
+        if let Some(cp) = custom_policies {
+            cp.apply(
+                &mut self.custom_field_store,
+                &info,
+                param.direction.into(),
+                Source::Dummy,
+            );
+            for op in self.custom_field_store.drain_with(cp, &info) {
+                match &op.op {
+                    Op::SavePayload(key) => {
+                        info.attributes.push(KeyVal {
+                            key: key.to_string(),
+                            val: String::from_utf8_lossy(payload).to_string(),
+                        });
+                    }
+                    _ => (),
+                }
+            }
+        }
+
         set_captured_byte!(info, param);
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);

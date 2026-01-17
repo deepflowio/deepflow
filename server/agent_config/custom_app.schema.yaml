@@ -1,57 +1,55 @@
 $schema: https://json-schema.org/draft/2020-12/schema
 type: object
 properties:
-  custom_protocol_policies:
+  biz_protocol_policies:
     type: array
-    title@en: Custom Protocol Parsing
-    title@ch: 自定义协议解析
+    title@en: Business Protocol Parsing
+    title@ch: 业务协议解析
     items:
       $ref: '#/$defs/protocol_policy'
-  custom_field:
+  biz_field:
     type: object
-    title@en: Custom Fields Policies
-    title@ch: 自定义字段提取策略
+    title@en: Business Decoding Policies
+    title@ch: 业务解码策略
     description@en: |-
-      Custom field extraction policy, used to extract possible custom fields from L7 protocols via simple rules.
-      When both plugin extraction and custom extraction policies match, the priority is as follows:
+      Business decoding policy, used to extract possible business fields from L7 protocols via simple rules.
+      When both plugin extraction and business decoding policies match, the priority is as follows:
       1. Plugin extraction.
-      2. Custom field policies extraction.
+      2. Business decoding policies extraction.
       3. Agent default extraction.
     description@ch: |-
-      自定义字段提取策略，用于通过简单的规则提取 L7 协议中可能存在的自定义字段。
-      同时匹配插件和自定义提取策略时，优先级为：
+      业务解码策略，用于通过简单的规则提取 `应用协议`（`l7_protocol`）中可能存在的业务字段。
+      同时匹配插件和业务解码策略时，优先级为：
       1. 插件提取。
-      2. 自定义字段提取。
+      2. 业务解码策略提取。
       3. 采集器默认提取。
     properties:
       dictionaries:
         type: array
-        title@en: Custom Field Dictionary
-        title@ch: 自定义字段字典
-        description@en: Custom field dictionary, used to remap custom field values in post processing.
-        description@ch: 自定义字段字典，用于 post processing 中 remap 的配置。
+        title@en: Business Field Dictionary
+        title@ch: 业务字段字典
+        description@en: Business field dictionary, used for `Remap` (`remap`) in `Post-processing` (`post`).
+        description@ch: 业务字段字典，用于 `后处理`（`post`）中 `字典映射`（`remap`）的配置。
         items:
           $ref: '#/$defs/dictionary'
       policies:
         type: array
-        title@en: Custom Field Policy
-        title@ch: 自定义字段策略
+        title@en: Business Decoding Policy
+        title@ch: 业务解码策略
         items:
           $ref: '#/$defs/field_policy'
 $defs:
   protocol_policy:
     type: object
-    title@en: Custom Protocol Parsing
-    title@ch: 自定义协议解析
+    title@en: Business Protocol Parsing
+    title@ch: 业务协议解析
     required:
-    - protocol_name
+    - biz_protocol
     properties:
-      protocol_name:
+      biz_protocol:
         type: string
         title@en: Protocol Name
         title@ch: 协议名称
-        description@en: Protocol name, corresponding to l7_flow_log.l7_protocol_str.
-        description@ch: 协议名称，对应 l7_flow_log.l7_protocol_str。
       pre_filter:
         type: object
         title@en: Pre-filter
@@ -61,28 +59,57 @@ $defs:
             $ref: '#/$defs/port_list'
             title@en: Port List
             title@ch: 端口列表
-            description@en: Pre-filter port, which can improve parsing performance.
-            description@ch: 预过滤端口，可以提高解析性能。
+            description@en: |-
+              Pre-filter port, which can improve parsing performance.
+              For example, if configured as `80,8080-8090`, only traffic on ports 80 and 8080-8090 will be parsed.
+            description@ch: |-
+              预过滤端口，可以提高解析性能。
+              例如配置为 `80,8080-8090`，则只解析 80 和 8080 至 8090 端口的流量。
+          l7_protocol:
+            type: string
+            enum:
+            - http
+            - http2
+            - dubbo
+            - mysql
+            - redis
+            - custom
+            enum@en:
+            - HTTP
+            - HTTP2
+            - Dubbo
+            - MySQL
+            - Redis
+            - Custom
+            enum@ch:
+            - HTTP
+            - HTTP2
+            - Dubbo
+            - MySQL
+            - Redis
+            - 自定义协议
+            title@en: Filter Protocol Name
+            title@ch: 过滤协议名称
       request_characters:
         type: array
         title@en: Request Characters
         title@ch: 请求特征
-        description@en: Multiple features are ORed.
-        description@ch: 多个特征进行 OR 运算。
+        description@en: Multiple `Feature String` (`match_keyword`) are ORed.
+        description@ch: 多个 `特征字符串` (`match_keyword`) 进行 OR 运算。
         items:
           $ref: '#/$defs/character_group'
       response_characters:
         type: array
         title@en: Response Characters
         title@ch: 响应特征
-        description@en: Multiple features are ORed.
-        description@ch: 多个特征进行 OR 运算。
+        description@en: Multiple `Feature String` (`match_keyword`) are ORed.
+        description@ch: 多个 `特征字符串` (`match_keyword`) 进行 OR 运算。
         items:
           $ref: '#/$defs/character_group'
   dictionary:
     type: object
-    title@en: Custom Field Dictionary
-    title@ch: 自定义字段字典
+    title@en: Business Field Dictionary
+    title@ch: 业务字段字典
     required:
     - name
     - entries
@@ -103,47 +130,52 @@ $defs:
         title@ch: 字典的默认值
   field_policy:
     type: object
-    title@en: Custom Field Policy
-    title@ch: 自定义字段策略
+    title@en: Business Decoding Policy
+    title@ch: 业务解码策略
     required:
-    - protocol_name
+    - l7_protocol
     properties:
       policy_name:
         type: string
         title@en: Policy Name
         title@ch: 策略名称
-      protocol_name:
+      l7_protocol:
         type: string
         enum:
         - http
         - http2
         - dubbo
         - mysql
+        - redis
         - custom
         enum@en:
         - HTTP
         - HTTP2
         - Dubbo
         - MySQL
+        - Redis
         - Custom
         enum@ch:
         - HTTP
         - HTTP2
         - Dubbo
         - MySQL
+        - Redis
         - 自定义协议
         title@en: Protocol Name
         title@ch: 协议名称
-        description@en: 'To parse Grpc please configure as HTTP2'
-        description@ch: 如要解析 Grpc 请配置为 HTTP2。
-      custom_protocol_name:
+        description@en: 'To parse gRpc please configure as HTTP2'
+        description@ch: 如要解析 gRpc 请配置为 HTTP2。
+      biz_protocol:
         type: string
-        title@en: Custom Protocol Name
-        title@ch: 自定义协议名称
-        description@en: >-
-          Takes effect when Protocol Name is Custom. Note: A `custom_protocol_policies` configuration must
-          exist, and the custom protocol name must match, otherwise parsing will fail.
-        description@ch: 当协议名称为“自定义协议”时生效，注意：此时必须存在一个 `custom_protocol_policies` 配置，且自定义名称协议名称相等，否则无法解析。
+        title@en: Business Protocol Name
+        title@ch: 业务协议名称
+        description@en: |-
+          Takes effect when Protocol Name is Custom.
+          Note: A `Business Protocol Parsing` (`biz_protocol_policies`) configuration with matching `Protocol Name` (`biz_protocol`) must exist, otherwise parsing will fail.
+        description@ch: |-
+          当协议名称为 `自定义协议`（`custom`）时生效。
+          注意：此时必须存在一个 `业务协议解析`（`biz_protocol_policies`）配置，且 `协议名称`（`biz_protocol`）与该配置相同，否则无法解析。
       filters:
         type: object
         title@en: Filters
@@ -166,20 +198,24 @@ $defs:
             - 响应
             - 请求和响应
             default: both
-            description@en: Search in request, response, or both, default value is both.
-            description@ch: 在请求、响应或二者中搜索，默认值为 both。
+            description@en: Search in `Request` (`request`), `Response` (`response`), or `Both` (`both`), default value is `Both` (`both`).
+            description@ch: 在 `请求`（`request`）、`响应`（`response`）或 `请求和响应`（`both`）中搜索，默认值为 `请求和响应`（`both`）。
           port_list:
             $ref: '#/$defs/port_list'
             title@en: Port List
             title@ch: 端口列表
-            description@en: Can be used to filter ports.
-            description@ch: 可以用于过滤端口。
+            description@en: |-
+              Pre-filter port, which can improve parsing performance.
+              For example, if configured as `80,8080-8090`, only traffic on ports 80 and 8080-8090 will be parsed.
+            description@ch: |-
+              预过滤端口，可以提高解析性能。
+              例如配置为 `80,8080-8090`，则只解析 80 和 8080 至 8090 端口的流量。
           feature_string:
             type: string
             title@en: Feature String
             title@ch: 特征字符串
-            description@en: Can be used to match Payload before extraction, invalid for header_field type.
-            description@ch: 可以用于提取前匹配 Payload，对 header_field 类型无效。
+            description@en: Can be used to match Payload before extraction, invalid for `Header Field` (`header_field`) type.
+            description@ch: 可以用于提取前匹配 Payload，对 `头字段提取`（`header_field`）类型无效。
       raw:
         type: object
         title@en: Raw
@@ -208,8 +244,8 @@ $defs:
               type: string
               title@en: Field Name
               title@ch: 字段名
-              description@en: Used in compound_fields, can be omitted.
-              description@ch: 用于 compound_fields 中，可以省略。
+              description@en: Used in `Compound Fields` (`compound_fields`), can be omitted.
+              description@ch: 用于 `复合字段`（`compound_fields`）中，可以省略。
             type:
               type: string
               enum:
@@ -243,21 +279,21 @@ $defs:
               title@ch: 字段的提取类型
               description@en: |-
                 Extract field from data. Optional values and their meanings:
-                - `http_url_field`: Extract field from HTTP URL parameters, such as `?key=value&key2=value2` at the end of a URL.
-                - `header_field`: Extract field from the header of HTTP/Dubbo/SofaRPC/etc. protocols, for example, HTTP header like `key: value`.
-                - `payload_json_value`: Extract field from JSON payload, such as `"key": 1`, `"key": "value"`, or `"key": null`, etc.
-                - `payload_xml_value`: Extract field from XML payload, for example, `<key attr="xxx">value</key>`.
-                - `payload_hessian2_value`: Extract field from the payload encoded with Hessian2.
-                - `sql_insertion_column`: Extract field from SQL insertion columns, e.g., `INSERT INTO table (column1, column2) VALUES (value1, value2)`.
+                - `Header Field` (`header_field`): Extract field from the header of HTTP/Dubbo/SofaRPC/etc. protocols, for example, HTTP header like `key: value`.
+                - `HTTP URL Field` (`http_url_field`): Extract field from HTTP URL parameters, such as `?key=value&key2=value2` at the end of a URL.
+                - `Payload JSON Value` (`payload_json_value`): Extract field from JSON payload, such as `"key": 1`, `"key": "value"`, or `"key": null`, etc.
+                - `Payload XML Value` (`payload_xml_value`): Extract field from XML payload, for example, `<key attr="xxx">value</key>`.
+                - `Payload Hessian2 Value` (`payload_hessian2_value`): Extract field from the payload encoded with Hessian2.
+                - `SQL Insert and Update Column` (`sql_upsert_column`): Extract field from SQL insertion columns, e.g., `INSERT INTO table (column1, column2) VALUES (value1, value2)`.
                   Only MySQL is supported and only the first column can be extracted.
               description@ch: |-
                 字段的提取类型，可选值及含义为：
-                - `http_url_field`：从 HTTP URL 末尾的参数中提取字段，URL 末尾形如：`?key=value&key2=value2`。
-                - `header_field`：从 HTTP/Dubbo/SofaRPC 等协议的 Header 部分提取字段，例如 HTTP 的 Header 形如：`key: value`。
-                - `payload_json_value`：从 Json Payload 中提取字段，形如：`"key": 1`，或者 `"key": "value"`，或者 `"key": None`，等等。
-                - `payload_xml_value`：从 XML Payload 中提取字段，形如：`<key attr="xxx">value</key>`。
-                - `payload_hessian2_value`：Payload 使用 Hessian2 编码，从中提取字段。
-                - `sql_insertion_column`：从 SQL 插入列中提取字段，例如：`INSERT INTO table (column1, column2) VALUES (value1, value2)`。
+                - `头字段提取` (`header_field`)：从 HTTP/Dubbo/SofaRPC 等协议的 Header 部分提取字段，例如 HTTP 的 Header 形如：`key: value`。
+                - `HTTP URL 提取` (`http_url_field`)：从 HTTP URL 末尾的参数中提取字段，URL 末尾形如：`?key=value&key2=value2`。
+                - `JSON 内容提取` (`payload_json_value`)：从 Json Payload 中提取字段，形如：`"key": 1`，或者 `"key": "value"`，或者 `"key": None`，等等。
+                - `XML 内容提取` (`payload_xml_value`)：从 XML Payload 中提取字段，形如：`<key attr="xxx">value</key>`。
+                - `Hessian2 内容提取` (`payload_hessian2_value`)：Payload 使用 Hessian2 编码，从中提取字段。
+                - `SQL 插入和更新语句列提取` (`sql_upsert_column`)：从 SQL 插入列中提取字段，例如：`INSERT INTO table (column1, column2) VALUES (value1, value2)`。
                   目前只支持 MySQL 协议，且只能提取插入的第一列内容。
             match:
               type: object
@@ -281,19 +317,19 @@ $defs:
                   title@en: Match Type
                   title@ch: 匹配类型
                   description@en: |-
-                    Match type. Options: string and path.
-                    When set to 'string':
-                    - For http_url_field and header_field, matches the key.
-                    - For sql_insertion_column, matches the SQL insert column name.
-                    - For payload_json_value and payload_xml_value, matches content in JSON or XML format, returning the first element found after a match.
-                    When set to 'path': Only valid for parse_json_value and parse_xml_value types; use syntax like 'aaa.bbb.ccc' for hierarchical extraction.
+                    Match type.
+                    When set to `String` (`string`):
+                    - For `HTTP URL Field` (`http_url_field`) and `Header Field` (`header_field`), matches the key.
+                    - For `SQL Insert and Update Column` (`sql_upsert_column`), matches the SQL insert column name.
+                    - For `Payload JSON Value` (`payload_json_value`) and `Payload XML Value` (`payload_xml_value`), matches content in JSON or XML format, returning the first element found after a match.
+                    When set to `Path` (`path`): Only valid for `Payload JSON Value` (`payload_json_value`) and `Payload XML Value` (`payload_xml_value`) types; use syntax like 'aaa.bbb.ccc' for hierarchical extraction.
                   description@ch: |-
-                    匹配类型，可选值：string 和 path。
-                    配置为 "string" 时：
-                    - 对于 http_url_field 和 header_field 匹配 key。
-                    - 对于 sql_insertion_column 匹配 SQL 插入列名。
-                    - 对于 payload_json_value 和 payload_xml_value 匹配 JSON 和 XML 格式的内容，并取第一个匹配后的位置的元素作为结果。
-                    "path" 类型只对 parse_json_value 和 parse_xml_value 类型的字段有效，可以用 "aaa.bbb.ccc" 这样的语法按层级提取 XML 和 JSON 格式的内容。
+                    匹配类型。
+                    配置为 `字符串` (`string`) 时：
+                    - 对于 `HTTP URL Field` (`http_url_field`) 和 `Header Field` (`header_field`) 匹配 key。
+                    - 对于 `SQL Insert and Update Column` (`sql_upsert_column`) 匹配 SQL 插入列名。
+                    - 对于 `Payload JSON Value` (`payload_json_value`) 和 `Payload XML Value` (`payload_xml_value`) 匹配 JSON 和 XML 格式的内容，并取第一个匹配后的位置的元素作为结果。
+                    `路径`（`path`）类型只对 `Payload JSON Value` (`payload_json_value`) 和 `Payload XML Value` (`payload_xml_value`) 类型的字段有效，可以用 "aaa.bbb.ccc" 这样的语法按层级提取 XML 和 JSON 格式的内容。
                 keyword:
                   type: string
                   title@en: Match Keyword
@@ -303,8 +339,8 @@ $defs:
                   title@en: Ignore Case
                   title@ch: 忽略大小写
                   default: false
-                  description@en: 'Whether to ignore case, default value: false, only effective when type is string.'
-                  description@ch: 是否忽略大小写，默认值：false，仅当 type 为 string 时有效。
+                  description@en: 'Whether to ignore case, default value: false, only effective when `Type` (`type`) is `String` (`string`).'
+                  description@ch: 是否忽略大小写，默认值：false，仅当 `匹配类型`（`type`）为 `字符串`（`string`）时有效。
                 all_leaves:
                   type: boolean
                   title@en: All Leaves
@@ -312,18 +348,18 @@ $defs:
                   default: false
                   description@en: |-
                     Whether to apply field rule to all leaf nodes. Default: false.
-                    Only valid for parse_json_value and parse_xml_value types.
+                    Only valid for `Payload JSON Value` (`payload_json_value`) and `Payload XML Value` (`payload_xml_value`) types.
                     When true:
                     - Applies rule to all leaf nodes matched under the keyword in JSON or XML.
-                    - Only attribute_name in output is valid, used as a prefix; the output name will use attribute_name as prefix and append the leaf node path separated by ''.''.
-                    - Such fields cannot be used in compound_fields.
+                    - Only `Attribute Name` (`attribute_name`) in `Output` (`output`) is valid, used as a prefix; the output name will use `Attribute Name` (`attribute_name`) as prefix and append the leaf node path separated by ''.''.
+                    - Such fields cannot be used in `Compound Fields` (`compound_fields`).
                   description@ch: |-
                     是否对所有叶子节点应用字段规则，默认值：false。
-                    该配置只对 parse_json_value 和 parse_xml_value 类型的字段有效。
+                    该配置只对 `Payload JSON Value` (`payload_json_value`) 和 `Payload XML Value` (`payload_xml_value`) 类型的字段有效。
                     设置为 true 时，字段规则将有以下行为改变：
-                    - 对 keyword 匹配 JSON 或 XML 的内容下所有叶子节点应用规则。
-                    - output 中配置只有 attribute_name 生效，表示输出结果的前缀。输出的名字将使用 attribute_name 作为前缀，后接叶子节点的路径作为后缀，中间以 "." 分隔。
-                    - field 将无法用于 compound_fields 中。
+                    - 对所匹配 JSON 或 XML 的内容下所有叶子节点应用规则。
+                    - `输出` (`output`) 配置中只有 `属性名称` (`attribute_name`) 生效，表示输出结果的前缀。输出的名字将使用 `属性名称` (`attribute_name`) 作为前缀，后接叶子节点的路径作为后缀，中间以 "." 分隔。
+                    - 该字段无法用于 `复合字段`（`compound_fields`）中。
             post:
               type: array
               title@en: Post-processing
@@ -366,8 +402,6 @@ $defs:
                     - 数字
                     - 字母
                     - 汉字
-                  description@en: 'Extraction result validation character set, optional values: digits/alphabets/hanzi.'
-                  description@ch: 提取结果校验字符集，可选值：digits/alphabets/hanzi。
                 special_characters:
                   type: string
                   title@en: Special Characters
@@ -406,30 +440,35 @@ $defs:
               $ref: '#/$defs/field_output'
               description@en: |-
                 The following settings are not supported:
-                - metric
-                - rewrite_response_status
-                - remap and pre_condition in rewrite_native_tag
+                - `Metric Name` (`metric_name`)
+                - `Rewrite Response Status` (`rewrite_response_status`)
+                - `Remap` (`remap`) and `Pre Condition` (`pre_condition`) in `Rewrite Native Tag` (`rewrite_native_tag`)
               description@ch: |-
                 不支持的配置如下：
-                - metric
-                - rewrite_response_status
-                - rewrite_native_tag 中的 remap 和 pre_condition
+                - `指标名称` (`metric_name`)
+                - `重写响应状态` (`rewrite_response_status`)
+                - `重写原生标签` (`rewrite_native_tag`) 中的 `字典映射` (`remap`) 和 `前置条件` (`pre_condition`)
       compound_fields:
         type: array
         title@en: Compound Fields
         title@ch: 复合字段
         description@en: |-
-          Compound fields, can use configured field or native_tag as input fields for formatted output.
-          Note that all configured fields (including field and native_tag) need to be parsed in the same request or response to output compound fields normally.
+          Compound fields, can use configured `Field` (`field`) or `Native Tag` (`native_tag`) as input fields for formatted output.
+          Note that all configured fields (including `Field` (`field`) and `Native Tag` (`native_tag`)) need to be parsed in the same request or response to output compound fields normally.
         description@ch: |-
-          复合字段，可以使用配置的 field 或 native_tag 作为输入字段，进行格式化输出。
-          注意配置的所有字段（包括 field 和 native_tag）都需要在同一个请求或响应中解析到才能正常输出复合字段。
+          复合字段，可以使用配置的 `字段` (`field`) 或 `原生标签` (`native_tag`) 作为输入字段，进行格式化输出。
+          注意配置的所有字段（包括 `字段` (`field`) 和 `原生标签` (`native_tag`)）都需要在同一个请求或响应中解析到才能正常输出复合字段。
         items:
           type: object
-          required:
-          - name
-          - format
-          - output
+          oneOf:
+          - required:
+            - name
+            - format
+            - output
+          - required:
+            - name
+            - join
+            - output
           properties:
             name:
               type: string
@@ -439,10 +478,104 @@ $defs:
               type: string
               title@en: Format
               title@ch: 格式
-              description@en: >-
-                Output format, where field1_name and field2_name are configured field names, native_tag can
-                also be configured as input field.
-              description@ch: 输出格式，其中 field1_name 和 field2_name 为已配置的字段名，也可以配置 native_tag 作为输入字段。
+              description@en: |-
+                Output format, such as `{field1_name}-{field2_name:1:4}`.
+                Here, `field1_name` and `field2_name` are names of configured fields. You can also use a configured `Native Tag` (`native_tag`) as an input field.
+                When configuring fields, you can specify index slicing. For example, `{field2_name:1:4}` means starting from index 1 of the field and taking 4 characters.
+              description@ch: |-
+                输出格式，如 `{field1_name}-{field2_name:1:4}` 的形式。
+                其中 `field1_name` 和 `field2_name` 为已配置的字段名，也可以配置 `原生标签` (`native_tag`) 作为输入字段。
+                配置字段时可以指定按下标切割。如 `{field2_name:1:4}` 表示从字段下标 1 开始，取 4 个字符。
+            join:
+              type: object
+              title@en: Join
+              title@ch: 拼接
+              description@en: |-
+                Use a specific `separator` (`separator`) to join multiple `fields` (`fields`) in the order configured.
+                This configuration has lower priority than the `format` (`format`) configuration.
+                For example, the configuration is:
+                ```
+                join:
+                  fields:
+                  - value: endpoint
+                  - name: dir
+                    value: 'direction:1:4'
+                    omit_empty: false
+                  - value: sequence
+                  omit_empty: true
+                  separator: " "
+                ```
+                If each field has a value, the output result is the same as the `format` (`format`) configuration is `{endpoint} dir={direction:1:4} {sequence}`.
+              description@ch: |-
+                使用特定的 `分隔符`（`separator`）将多个 `字段`（`fields`）按配置的顺序拼接在一起。
+                该配置优先级低于 `格式`（`format`）的配置。
+                例如配置为：
+                ```
+                join:
+                  fields:
+                  - value: endpoint
+                  - name: dir
+                    value: 'direction:1:4'
+                    omit_empty: false
+                  - value: sequence
+                  omit_empty: true
+                  separator: " "
+                ```
+                如果每个字段都有值，则输出结果与 `格式`（`format`）配置为 `{endpoint} dir={direction:1:4} {sequence}` 相同。
+              properties:
+                fields:
+                  type: array
+                  title@en: Fields
+                  title@ch: 字段
+                  description@en: Fields to join, the order of the fields is the order of the output.
+                  description@ch: 要拼接的字段，字段的顺序就是输出的顺序。
+                  items:
+                    type: object
+                    required:
+                    - value
+                    properties:
+                      name:
+                        type: string
+                        title@en: Name
+                        title@ch: 名称
+                        default: ""
+                        description@en: |-
+                          If not empty, an additional string of "name=" is concatenated before the field.
+                          For example, if configured as "dir" and the corresponding value is "forward", the result is "dir=forward".
+                        description@ch: |-
+                          不为空时，在字段前额外拼接一个“name=” 的字符串。
+                          例如配置为“dir”，且对应的值为“forward”，则结果为“dir=forward”。
+                      value:
+                        type: string
+                        title@en: Value
+                        title@ch: 值
+                        description@en: |-
+                          Value to join, can be a configured field or a native tag.
+                          Can also be sliced by configuring the index. For example, `field2_name:1:4` means starting from index 1 of the field and taking 4 characters.
+                        description@ch: |-
+                          要拼接的值，可以是一个已配置的字段或一个原生标签。
+                          也可以通过配置下标，例如 `field2_name:1:4`，来对值进行切割。
+                      omit_empty:
+                        type: boolean
+                        title@en: Omit Empty
+                        title@ch: 忽略空值
+                        default: false
+                        description@en: Whether to omit empty values. This value will override the configuration of the outer layer.
+                        description@ch: 是否忽略空值。该值会覆盖外层的配置。
+                omit_empty:
+                  type: boolean
+                  title@en: Omit Empty
+                  title@ch: 忽略空值
+                  default: false
+                  description@en: Whether to omit empty values.
+                  description@ch: 是否忽略空值。
+                separator:
+                  type: string
+                  title@en: Separator
+                  title@ch: 分隔符
+                  default: " "
+                  description@en: Separator between fields, default is " ".
+                  description@ch: 字段之间的分隔符，默认为 " "。
             output:
               title@en: Output
               title@ch: 输出
@@ -477,8 +610,8 @@ $defs:
         title@en: Match Ignore Case
         title@ch: 匹配时忽略大小写
         default: false
-        description@en: Whether ignore case when match keywords, when match_type == string effected.
-        description@ch: 匹配关键词时是否忽略大小写，当 match_type == string 时生效。
+        description@en: Whether ignore case when match keywords, effective when `Match Type` (`match_type`) is `String` (`string`).
+        description@ch: 匹配关键词时是否忽略大小写，当 `匹配类型`（`match_type`）为 `字符串`（`string`）时生效。
       match_from_beginning:
         type: boolean
         title@en: Match from Beginning
@@ -495,8 +628,8 @@ $defs:
         type: array
         title@en: Character
         title@ch: 特征
-        description@en: Multiple match_keywords are ANDed.
-        description@ch: 多个 match_keyword 进行 AND 运算。
+        description@en: Multiple `Feature String` (`match_keyword`) are ANDed.
+        description@ch: 多个 `特征字符串` (`match_keyword`) 进行 AND 运算。
         items:
           $ref: '#/$defs/match_keyword'
   raw_save_config:
@@ -544,9 +677,9 @@ $defs:
     description@en: |-
       Multiple post-processing steps are executed sequentially in the order configured, with the output of each step serving as the input for the next.
       Supported configuration types are as follows:
-      - remap: Uses the specified dictionary to map/translate extracted results. Configuration supported:
+      - `Remap` (`remap`): Uses the specified dictionary to map/translate extracted results. Configuration supported:
         - dictionary_name: Name of the dictionary.
-      - obfuscate: Performs desensitization of extracted content. Configuration supported:
+      - `Obfuscate` (`obfuscate`): Performs desensitization of extracted content. Configuration supported:
         - mask: Mask character, defaults to "*", supports only ASCII characters.
         - preset: Preset desensitization type, options:
           - id-card-name: Obfuscates names in ID cards (only displays the first character of the name).
@@ -555,26 +688,26 @@ $defs:
         - range: Indicates which characters are replaced by *, i.e., only the first and last characters are retained.
           - e.g. "1, -1" means characters from the second to the penultimate are replaced.
           - e.g. "6, -5" means characters from the seventh to the fifth from last are replaced.
-      - url_decode: Decodes the value as a URL.
-      - base64_decode: Decodes the value as Base64. The result must be valid UTF-8 or GBK.
-      - unescape: Unescapes the value. The result must be valid UTF-8 or GBK.
+      - `URL Decode` (`url_decode`): Decodes the value as a URL.
+      - `Base64 Decode` (`base64_decode`): Decodes the value as Base64. The result must be valid UTF-8 or GBK.
+      - `Unescape` (`unescape`): Unescapes the value. The result must be valid UTF-8 or GBK.
         For example, when encountering a string with unicode encoding "DeepFlow \u91C7\u96C6\u5668", you can use this configuration to unescape it as "DeepFlow 采集器".
-      - parse_json_value: Parses the value as JSON and extracts by key or path. Configuration supported:
+      - `Parse JSON Value` (`parse_json_value`): Parses the value as JSON and extracts by key or path. Configuration supported:
         - keyword: Field(s) to search for.
         - type: Type, can be "string" or "path".
         - ignore_case: Whether to ignore case.
         - skip: Skip the first N matches before extracting.
-      - parse_xml_value: Parses the value as XML and extracts fields. Configuration supported:
+      - `Parse XML Value` (`parse_xml_value`): Parses the value as XML and extracts fields. Configuration supported:
         - keyword: Field(s) to search for.
         - type: Type, can be "string" or "path".
         - ignore_case: Whether to ignore case.
         - skip: Skip the first N matches before extracting.
-      - parse_key_value: Parses the value as key-value format with custom separators, and outputs the value for a specified key. Configuration supported:
+      - `Parse Key Value` (`parse_key_value`): Parses the value as key-value format with custom separators, and outputs the value for a specified key. Configuration supported:
         - key_value_pair_separator: Separator between key-value pairs, default is ",".
         - key_value_separator: Separator between key and value, default is "=".
         - keyword: Field(s) to search for.
         - ignore_case: Whether to ignore case.
-      - parse_dict_value: Parses the value as a dictionary, and outputs the value corresponding to the specified key. Supported configuration:
+      - `Parse Dict Value` (`parse_dict_value`): Parses the value as a dictionary, and outputs the value corresponding to the specified key. Supported configuration:
         - keyword: Field to search for.
         - type: Can only be string.
         - ignore_case: Whether to ignore case.
@@ -582,9 +715,9 @@ $defs:
     description@ch: |-
       多个后处理步骤按配置顺序依次执行，每一步的输出作为下一步的输入。
       支持的各类型配置如下：
-      - remap：使用配置的字典映射/翻译提取结果。支持配置为：
+      - `字典映射` (`remap`)：使用配置的字典映射/翻译提取结果。支持配置为：
         - dictionary_name: 字典名称
-      - obfuscate：对提取结果内容进行脱敏。支持配置为：
+      - `脱敏` (`obfuscate`)：对提取结果内容进行脱敏。支持配置为：
         - mask：掩码字符，默认为"*"，只支持 ASCII 字符。
         - preset：脱敏预设类型，可选：
           - id-card-name：身份证姓名脱敏（只显示名字中第一个字符）。
@@ -593,26 +726,26 @@ $defs:
         - range：表示从第几个字符到第几个字符替换为 *，即只保留第一个和最后一个字符。
           - 如“1, -1”表示从第二个字符到倒数第一个字符替换。
           - 如“6, -5”表示第七个字符到倒数第五个字符替换。
-      - url_decode：对值进行URL解码。
-      - base64_decode：对值进行Base64解码，结果须为合法 UTF-8 或 GBK。
-      - unescape：对值进行反转义，结果须为合法 UTF-8 或 GBK。
+      - `URL 解码` (`url_decode`)：对值进行URL解码。
+      - `Base64 解码` (`base64_decode`)：对值进行Base64解码，结果须为合法 UTF-8 或 GBK。
+      - `反转义` (`unescape`)：对值进行反转义，结果须为合法 UTF-8 或 GBK。
         例如遇到以 unicode 编码的字符串“DeepFlow \u91C7\u96C6\u5668”时，可以配置 unescape 将其反转义为“DeepFlow 采集器”。
-      - parse_json_value：将值作为JSON解析，并根据key或路径提取。支持配置为：
+      - `JSON 提取` (`parse_json_value`)：将值作为JSON解析，并根据key或路径提取。支持配置为：
           - keyword：要查找的字段。
           - type：类型，可为 string 或 path。
           - ignore_case：是否忽略大小写。
           - skip：跳过前 N 个匹配结果后再提取。
-      - parse_xml_value：将值作为 xml 解析并提取。支持配置为：
+      - `XML 提取` (`parse_xml_value`)：将值作为 xml 解析并提取。支持配置为：
         - keyword：要查找的字段。
         - type：类型，可为 string 或 path。
         - ignore_case：是否忽略大小写。
         - skip：跳过前 N 个匹配结果后再提取。
-      - parse_key_value：将值按分隔符解析为 key-value 格式，并输出指定 key 对应的 value。支持配置为：
+      - `键值提取` (`parse_key_value`)：将值按分隔符解析为 key-value 格式，并输出指定 key 对应的 value。支持配置为：
         - key_value_pair_separator：键值对分隔符，默认为“,”。
         - key_value_separator：键值分隔符，默认为"="。
         - keyword：要查找的字段。
         - ignore_case：是否忽略大小写。
-      - parse_dict_value：将值作为字典解析，并输出指定 key 对应的 value。支持配置为：
+      - `字典提取` (`parse_dict_value`)：将值作为字典解析，并输出指定 key 对应的 value。支持配置为：
         - keyword：要查找的字段。
         - type：类型，只能为 string。
         - ignore_case：是否忽略大小写。
@@ -665,7 +798,7 @@ $defs:
     title@en: Value Match Condition
     title@ch: 值匹配条件
     description@en: |-
-      Syntax: operator value, where operator is the operator and value is the value to match.
+      Syntax: `operator value`, where `operator` is the operator and `value` is the value to match.
       Supported operators:
       - Equal: `=`
       - Not Equal: `!=`
@@ -674,7 +807,7 @@ $defs:
       - Matches regex: `~`
       - Does not match regex: `!~`
     description@ch: |-
-      语法为：operator value，其中 operator 为操作符，value 为用于匹配的值。
+      语法为：`operator value`，其中 `operator` 为操作符，`value` 为用于匹配的值。
       支持的操作符如下：
       - 等于：`=`
       - 不等于：`!=`
@@ -797,7 +930,7 @@ $defs:
             description@en: |-
               Can fill in one of the following fields to overwrite the corresponding field value.
               Note: This requires support in the corresponding protocol, otherwise the configuration will not take effect.
-              When overwriting response_code, the original non-empty value will be saved into the attribute as `sys_response_code`.
+              When overwriting `Response Code` (`response_code`), the original non-empty value will be saved into the attribute as `sys_response_code`.
               - version
               - request_type
               - request_domain
@@ -819,7 +952,7 @@ $defs:
             description@ch: |-
               可以填写以下几种字段之一，用于覆写对应字段的值。
               注意对应的协议需要支持，否则配置无效。
-              当重写 response_code 时，自动将原来的非空值以 `sys_response_code` 为名写入 attribute 中。
+              当重写 `响应代码` (`response_code`) 时，自动将原来的非空值以 `sys_response_code` 为名写入 attribute 中。
               - version
               - request_type
               - request_domain
@@ -841,7 +974,7 @@ $defs:
           remap:
             type: string
             title@en: Remap
-            title@ch: 映射
+            title@ch: 字典映射
             description@en: >-
               Mapping dictionary name, when configuration is not empty, map the input using the configured dictionary.
               Not effective when configuration is empty.
@@ -902,10 +1035,8 @@ $defs:
             - 正常
             - 客户端异常
             - 服务端异常
-            description@en: >-
-              Optional values: ok/client_error/server_error, when set to empty, no rewrite if no match.
-              Default value is empty.
-            description@ch: 可选为 ok/client_error/server_error，设置为空时如果没有匹配则不进行重写。默认值为空。
+            description@en: When set to empty, do not rewrite if the value doesn't match any lists.  Default value is empty.
+            description@ch: 设置为空时如果没有匹配则不进行重写。默认值为空。
       priority:
         type: integer
         title@en: Priority

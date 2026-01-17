@@ -16,18 +16,18 @@ futures = "~0.3"
 ipnet = "2"
 libc = "0.2.149"
 log = "0.4"
-num_enum = "0.5.6"
+num_enum.workspace = true
 parking_lot = "0.11"
 pnet = "^0.29"
 prost.workspace = true
+public-derive.workspace = true
+public-derive-internals.workspace = true
 rand = "0.8.5"
 regex.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.72"
 serde_yaml = "0.8"
 socket2.workspace = true
-strum = { version = "0.27", features = ["derive"] }
-strum_macros = "0.27"
 thiserror = "1.0"
 tonic.workspace = true
 
