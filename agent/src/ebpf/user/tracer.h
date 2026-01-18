@@ -629,6 +629,7 @@ bool is_feature_regex_set(int feature);
 bool php_profiler_enabled(void);
 bool v8_profiler_enabled(void);
 bool python_profiler_enabled(void);
+bool lua_profiler_enabled(void);
 int bpf_tracer_init(const char *log_file, bool is_stdout);
 int tracer_bpf_load(struct bpf_tracer *tracer);
 int tracer_probes_init(struct bpf_tracer *tracer);
