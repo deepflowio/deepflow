@@ -58,6 +58,20 @@ type Specification struct {
 	MaxPerBizPolicyPcapFileCount int `default:"5" yaml:"max-per-biz-policy-pcap-file-count"`
 }
 
+type ACLController struct {
+	Enabled bool   `default:"false" yaml:"enabled"`
+	Host    string `default:"acl-controller" yaml:"host"`
+	Port    int    `default:"20408" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
+}
+
+type FUser struct {
+	Enabled bool   `default:"false" yaml:"enabled"`
+	Host    string `default:"fuser" yaml:"host"`
+	Port    int    `default:"20824" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
+}
+
 type DFWebService struct {
 	Enabled bool   `default:"false" yaml:"enabled"`
 	Host    string `default:"df-web" yaml:"host"`
@@ -95,10 +109,11 @@ type ControllerConfig struct {
 	NoIPOverlapping                bool   `default:"false" yaml:"no-ip-overlapping"`
 	AgentCommandTimeout            int    `default:"30" yaml:"agent-cmd-timeout"`
 
+	ACLController    ACLController    `yaml:"acl-controller"`
+	FUser            FUser            `yaml:"fuser"`
 	DFWebService     DFWebService     `yaml:"df-web-service"`
 	QuerierJSService QuerierJSService `yaml:"querier-js-service"`
 	FPermit          common.FPermit   `yaml:"fpermit"`
-	Pcap             configs.Pcap     `yaml:"pcap"`
 
 	MetadbCfg     metadb.Config
 	PostgreSQLCfg metadb.PostgreSQLConfig     `yaml:"postgresql"`
@@ -110,6 +125,7 @@ type ControllerConfig struct {
 	IngesterApi common.IngesterApi `yaml:"ingester-api"`
 	Spec        Specification      `yaml:"spec"`
 
+	Pcap           configs.Pcap                  `yaml:"pcap"`
 	MonitorCfg     monitor.MonitorConfig         `yaml:"monitor"`
 	ManagerCfg     manager.ManagerConfig         `yaml:"manager"`
 	GenesisCfg     genesis.GenesisConfig         `yaml:"genesis"`

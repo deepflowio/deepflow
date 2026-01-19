@@ -107,6 +107,20 @@ controller:
     port: 20823
     timeout: 30
 
+  # deepflow fuser service config
+  fuser:
+    enabled: false
+    host: fuser
+    port: 20824
+    timeout: 30
+
+  # deepflow acl-controller service config
+  acl-controller:
+    enabled: false
+    host: acl-controller
+    port: 20408
+    timeout: 30
+
   # mysql相关配置
   mysql:
     enabled: true
