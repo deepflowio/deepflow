@@ -310,7 +310,8 @@ pub unsafe extern "C" fn lua_format_folded_stack_trace(
     let raw = slice::from_raw_parts(frames, frame_count as usize);
     let mut buf_vec = Vec::with_capacity(frame_count as usize * 32);
 
-    for &encoded in raw {
+    // We want the root->leaf order here (folded stacks are "root;...;leaf").
+    for &encoded in raw.iter().rev() {
         if encoded == 0 {
             continue;
         }
@@ -723,9 +724,9 @@ const LUA_51_OFFSETS: Option<LuaOfs> = Some(LuaOfs {
     off_proto_lineinfo: 0,
     off_proto_abslineinfo: 0,
     off_tstring_len: 0,
-    sizeof_tstring: 16,
+    sizeof_tstring: 24,
     sizeof_callinfo: 40,
-    sizeof_tvalue: 24,
+    sizeof_tvalue: 16,
 });
 
 #[cfg(not(target_arch = "aarch64"))]
@@ -1343,7 +1344,7 @@ fn detect_runtime_uncached(pid: u32) -> Option<LuaRuntimeInfo> {
     if best_prio == 0 {
         return None;
     }
-
+    
     let (kind, ver, label) = if best_path.contains("libluajit-5.1") || best_path.contains("luajit")
     {
         (2u32, "2.1", "LuaJIT 2.1")
