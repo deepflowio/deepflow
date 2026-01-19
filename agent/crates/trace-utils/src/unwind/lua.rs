@@ -1344,7 +1344,7 @@ fn detect_runtime_uncached(pid: u32) -> Option<LuaRuntimeInfo> {
     if best_prio == 0 {
         return None;
     }
-    
+
     let (kind, ver, label) = if best_path.contains("libluajit-5.1") || best_path.contains("luajit")
     {
         (2u32, "2.1", "LuaJIT 2.1")
