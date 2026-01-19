@@ -6213,6 +6213,8 @@ processors:
       #         # - `payload_json_value`: Extract field from JSON payload, e.g. `"key": 1`, `"key": "value"`, `"key": None`, etc.
       #         # - `payload_xml_value`: Extract field from XML payload, e.g. `<key attr="xxx">value</key>`
       #         # - `payload_hessian2_value`: Extract field from payload using Hessian2 encoding.
+      #         # - `dubbo_header_value`: Extra field from the Attachments which payload was encoded with Dubbo protocol.
+      #         # - `dubbo_payload_map_string_value`: Extra field from key-value format which payload was encoded with Dubbo protocol.
       #         # - `sql_insertion_column`: Extract column from SQL insert statement, e.g. `INSERT INTO table (column1, column2) VALUES (value1, value2)`. Currently only MySQL is supported and only the first column's value can be extracted.
       #         type: "http_url_field"
       #         # Matching rule
@@ -6447,6 +6449,8 @@ processors:
       #         # - `payload_json_value`：从 Json Payload 中提取字段，形如：`"key": 1`,  或者 `"key": "value"`,  或者 `"key": None`, 等等 ...
       #         # - `payload_xml_value`：从 XML Payload 中提取字段，形如：`<key attr="xxx">value</key>`
       #         # - `payload_hessian2_value`：Payload 使用 Hessian2 编码，从中提取字段
+      #         # - `dubbo_header_value`：Payload 使用 Dubbo 协议，从 Dubbo Attachments 中提取字段。
+      #         # - `dubbo_payload_map_string_value`：Payload 使用 Dubbo 协议，且业务报文以 key-value 形式编码，从中提取指定的字段。
       #         # - `sql_insertion_column`：从 SQL 插入列中提取字段，例如：`INSERT INTO table (column1, column2) VALUES (value1, value2)`。目前只支持 MySQL 协议，且只能提取插入的第一列内容。
       #         type: "http_url_field"
       #         # 匹配规则
