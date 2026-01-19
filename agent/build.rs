@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-use std::{
-    env,
-    path::{Path, PathBuf},
-    process::Command,
-    str,
-};
+#[cfg(feature = "libtrace")]
+use std::path::{Path, PathBuf};
+use std::{env, process::Command, str};
 
 use anyhow::Result;
 use chrono::prelude::*;
+#[cfg(feature = "libtrace")]
 use walkdir::WalkDir;
 
 fn get_branch() -> Result<String> {
@@ -100,6 +98,7 @@ fn set_build_info() -> Result<()> {
 //
 //     find src/ebpf -name '*.c' -type f -printf '%T+ %p\n' | sort -r
 //
+#[cfg(feature = "libtrace")]
 fn set_libtrace_rerun_files() -> Result<()> {
     fn watched(path: &Path) -> bool {
         if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
@@ -145,6 +144,7 @@ fn set_libtrace_rerun_files() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "libtrace")]
 fn set_build_libtrace() -> Result<()> {
     set_libtrace_rerun_files()?;
     let output = match env::var("CARGO_CFG_TARGET_ENV")?.as_str() {
@@ -171,6 +171,7 @@ fn set_build_libtrace() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "libtrace")]
 fn set_linkage() -> Result<()> {
     let target_env = env::var("CARGO_CFG_TARGET_ENV")?;
     if target_env.as_str() == "musl" {
@@ -294,10 +295,13 @@ fn main() -> Result<()> {
      */
     make_pulsar_proto()?;
     make_brpc_proto()?;
-    let target_os = env::var("CARGO_CFG_TARGET_OS")?;
-    if target_os.as_str() == "linux" {
-        set_build_libtrace()?;
-        set_linkage()?;
+    #[cfg(feature = "libtrace")]
+    {
+        let target_os = env::var("CARGO_CFG_TARGET_OS")?;
+        if target_os.as_str() == "linux" {
+            set_build_libtrace()?;
+            set_linkage()?;
+        }
     }
     Ok(())
 }

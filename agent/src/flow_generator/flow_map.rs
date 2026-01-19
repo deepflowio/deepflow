@@ -1433,6 +1433,7 @@ impl FlowMap {
         */
         let (l7_proto_enum, port, is_skip, l7_failed_count, last) = match meta_packet.signal_source
         {
+            #[cfg(feature = "libtrace")]
             SignalSource::EBPF => {
                 let (local_epc, remote_epc) = if meta_packet.lookup_key.l2_end_0 {
                     (local_epc_id, 0)

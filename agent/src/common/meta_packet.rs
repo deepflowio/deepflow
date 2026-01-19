@@ -20,7 +20,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(unix, feature = "libtrace"))]
 use std::{error::Error, net::Ipv6Addr, ptr};
 
 use bitflags::bitflags;
@@ -30,12 +30,10 @@ use pnet::packet::{
     tcp::{TcpOptionNumber, TcpOptionNumbers},
 };
 
-use super::ebpf::EbpfType;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use super::enums::CaptureNetworkType;
 use super::{
     consts::*,
     decapsulate::TunnelInfo,
+    ebpf::EbpfType,
     endpoint::EndpointDataPov,
     enums::{EthernetType, HeaderType, IpProtocol, TcpFlags},
     flow::{L7Protocol, PacketDirection, SignalSource},
@@ -44,7 +42,7 @@ use super::{
 };
 
 use crate::error;
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(unix, feature = "libtrace"))]
 use crate::{
     common::ebpf::{GO_HTTP2_UPROBE, GO_HTTP2_UPROBE_DATA},
     ebpf::{
@@ -149,22 +147,16 @@ bitflags! {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-#[derive(PartialEq, Clone, Debug)]
+#[cfg(all(unix, feature = "libtrace"))]
+#[derive(PartialEq, Clone, Debug, Default)]
 pub enum SegmentFlags {
+    #[default]
     None,
     Start,
     Seg,
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-impl Default for SegmentFlags {
-    fn default() -> Self {
-        SegmentFlags::None
-    }
-}
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(unix, feature = "libtrace"))]
 impl From<u8> for SegmentFlags {
     fn from(value: u8) -> Self {
         match value {
@@ -249,7 +241,7 @@ pub struct MetaPacket<'a> {
     pub is_request_end: bool,
     pub is_response_end: bool,
     pub ebpf_flags: ApplicationFlags,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     pub segment_flags: SegmentFlags,
 
     pub process_id: u32,
@@ -258,7 +250,7 @@ pub struct MetaPacket<'a> {
     pub thread_id: u32,
     pub coroutine_id: u64,
     pub syscall_trace_id: u64,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
     // for PcapAssembler
     pub flow_id: u64, // PCAP and L7 Log
@@ -1084,7 +1076,7 @@ impl<'a> MetaPacket<'a> {
         self.cap_end_seq = packet.cap_start_seq;
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     #[inline]
     pub unsafe fn from_ebpf(data: &mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
         let (local_ip, remote_ip) = if data.tuple.addr_len == 4 {
@@ -1128,7 +1120,7 @@ impl<'a> MetaPacket<'a> {
             l2_end_0: data.direction == SOCK_DIR_SND,
             l2_end_1: data.direction == SOCK_DIR_RCV,
             proto: IpProtocol::try_from(data.tuple.protocol)?,
-            tap_type: CaptureNetworkType::Cloud,
+            tap_type: super::enums::CaptureNetworkType::Cloud,
             ..Default::default()
         };
 
@@ -1193,7 +1185,7 @@ impl<'a> MetaPacket<'a> {
         return Ok(packet);
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     #[inline]
     fn parse_direction(msg_type: u8) -> PacketDirection {
         match msg_type {
@@ -1241,7 +1233,7 @@ impl<'a> MetaPacket<'a> {
             (self.lookup_key.dst_ip, self.lookup_key.dst_port),
         );
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         if self.signal_source == SignalSource::EBPF
             && (self.process_kname[..12]).eq(b"redis-server")
         {
@@ -1414,8 +1406,14 @@ impl CacheItem for MetaPacket<'static> {
         self.l7_protocol_from_ebpf
     }
 
+    #[cfg(feature = "libtrace")]
     fn is_segment_start(&self) -> bool {
         self.segment_flags == SegmentFlags::Start
+    }
+
+    #[cfg(not(feature = "libtrace"))]
+    fn is_segment_start(&self) -> bool {
+        false
     }
 }
 
