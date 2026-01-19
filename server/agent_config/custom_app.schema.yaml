@@ -326,10 +326,10 @@ $defs:
                   description@ch: |-
                     匹配类型。
                     配置为 `字符串` (`string`) 时：
-                    - 对于 `HTTP URL Field` (`http_url_field`) 和 `Header Field` (`header_field`) 匹配 key。
-                    - 对于 `SQL Insert and Update Column` (`sql_upsert_column`) 匹配 SQL 插入列名。
-                    - 对于 `Payload JSON Value` (`payload_json_value`) 和 `Payload XML Value` (`payload_xml_value`) 匹配 JSON 和 XML 格式的内容，并取第一个匹配后的位置的元素作为结果。
-                    `路径`（`path`）类型只对 `Payload JSON Value` (`payload_json_value`) 和 `Payload XML Value` (`payload_xml_value`) 类型的字段有效，可以用 "aaa.bbb.ccc" 这样的语法按层级提取 XML 和 JSON 格式的内容。
+                    - 对于 `HTTP URL 提取` (`http_url_field`) 和 `头字段提取` (`header_field`) 匹配 key。
+                    - 对于 `SQL 插入和更新语句列提取` (`sql_upsert_column`) 匹配 SQL 插入列名。
+                    - 对于 `JSON 内容提取` (`payload_json_value`) 和 `XML 内容提取` (`payload_xml_value`) 匹配 JSON 和 XML 格式的内容，并取第一个匹配后的位置的元素作为结果。
+                    `路径`（`path`）类型只对 `JSON 内容提取` (`payload_json_value`) 和 `XML 内容提取` (`payload_xml_value`) 类型的字段有效，可以用 "aaa.bbb.ccc" 这样的语法按层级提取 XML 和 JSON 格式的内容。
                 keyword:
                   type: string
                   title@en: Match Keyword
