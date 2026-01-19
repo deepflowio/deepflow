@@ -355,7 +355,7 @@ $defs:
                     - Such fields cannot be used in `Compound Fields` (`compound_fields`).
                   description@ch: |-
                     是否对所有叶子节点应用字段规则，默认值：false。
-                    该配置只对 `Payload JSON Value` (`payload_json_value`) 和 `Payload XML Value` (`payload_xml_value`) 类型的字段有效。
+                    该配置只对 `JSON 内容提取` (`payload_json_value`) 和 `XML 内容提取` (`payload_xml_value`) 类型的字段有效。
                     设置为 true 时，字段规则将有以下行为改变：
                     - 对所匹配 JSON 或 XML 的内容下所有叶子节点应用规则。
                     - `输出` (`output`) 配置中只有 `属性名称` (`attribute_name`) 生效，表示输出结果的前缀。输出的名字将使用 `属性名称` (`attribute_name`) 作为前缀，后接叶子节点的路径作为后缀，中间以 "." 分隔。
