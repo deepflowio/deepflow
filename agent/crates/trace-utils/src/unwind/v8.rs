@@ -1715,10 +1715,7 @@ fn replace_builtin_frames_with_js(native_trace: &str, js_trace: &str) -> String 
             || native_frame.starts_with("[unknown]")
             || native_frame.contains("Builtins_JSEntry")
             || native_frame.contains("V8::")
-            || native_frame.contains("V8::EntryFrame")
-            || (native_frame.starts_with("[")
-                && native_frame.contains("node")
-                && native_frame.ends_with("]"));
+            || native_frame.contains("V8::EntryFrame");
 
         if should_replace && js_frame_idx < js_frames.len() {
             // Replace with JS frame

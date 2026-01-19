@@ -1796,13 +1796,12 @@ int unwind_one_v8_frame(unwind_state_t *state, v8_proc_info_t *vi,
 
 	// Check for Stub/Entry/Internal frames (SMI marker)
 	// Note: V8 frame markers use special encoding (shift=1, not full SMI shift=32)
-	if ((fp_marker & V8_SMI_TAG_MASK) == V8_SMI_TAG) {
+	if (fp_marker != 0 && (fp_marker & V8_SMI_TAG_MASK) == V8_SMI_TAG) {
 		// Stub frame: type 0x0
 		// Frame marker uses V8_SmiTagShift=1 (not V8_SmiValueShift=32)
 		pointer_and_type = V8_MAKE_PTR(V8_TYPE_MARKER, fp);
 		delta_or_marker = fp_marker >> V8_SMI_TAG_SHIFT;
-		// Note: when fp_function is zero, the delta_or_marker is not valid
-		if (delta_or_marker > 0 && delta_or_marker < 32 && fp_function != 0) {
+		if (delta_or_marker > 0 && delta_or_marker < 32) {
 			add_frame_ex(&state->intp_stack, FRAME_TYPE_V8, pointer_and_type, delta_or_marker, 0);
 			// bpf_debug("[V8 eBPF] Added stub marker 0x%lx", delta_or_marker);
 			goto unwind_frame;
@@ -1967,8 +1966,14 @@ unwind_frame:
 	// See: https://chromium.googlesource.com/v8/v8/+/main/src/execution/arm64/frame-constants-arm64.h
 	if (pointer_and_type == V8_MAKE_PTR(V8_TYPE_MARKER, fp) && delta_or_marker == 1) {
 		state->regs.sp += V8_ENTRYFRAME_CALLEE_SAVED_REGS_BEFORE_FP_LR_PAIR * sizeof(__u64);
-		// bpf_debug("[V8 eBPF] ARM64 Entry Frame: adjusted SP by %d bytes",
+		// bpf_debug("[V8 eBPF] Entry Frame: adjusted SP by %d bytes",
 		//           V8_ENTRYFRAME_CALLEE_SAVED_REGS_BEFORE_FP_LR_PAIR * sizeof(__u64));
+		// EntryFrame marks the boundary between V8 JavaScript and native C++ code.
+		// Stop V8 unwinding here - any further frames are native and should be
+		// handled by DWARF/FP-based unwinding, not V8 interpreter unwinding.
+		// bpf_debug("[V8 eBPF] Unwound to fp=0x%lx ret=0x%lx (stopping at EntryFrame)", new_fp, ret_addr);
+		__sync_fetch_and_add(&vi->unwinding_success, 1);
+		return -1;  // Signal to stop V8 unwinding
 	}
 
 	// bpf_debug("[V8 eBPF] Unwound to fp=0x%lx ret=0x%lx", new_fp, ret_addr);
