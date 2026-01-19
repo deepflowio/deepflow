@@ -27,7 +27,6 @@ type Warrant struct {
 	Timeout int    `default:"30" yaml:"timeout"`
 }
 
-// TODO use this
 type FPermit struct {
 	Enabled bool   `default:"false" yaml:"enabled"`
 	Host    string `default:"fpermit" yaml:"host"`
@@ -41,11 +40,11 @@ type IngesterApi struct {
 	Timeout  int `default:"60" yaml:"timeout"`
 }
 
+type Querier struct {
+	ListenPort int `default:"20416" yaml:"listen_port"`
+}
+
 type Pcap struct {
 	PageSize int     `default:"100000" yaml:"page_size"`
 	Querier  Querier `yaml:"querier"`
-}
-
-type Querier struct {
-	ListenPort int `default:"20416" yaml:"listen_port"`
 }
