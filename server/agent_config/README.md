@@ -8815,6 +8815,8 @@ Example:
     # - `payload_json_value`: Extract field from JSON payload, e.g. `"key": 1`, `"key": "value"`, `"key": None`, etc.
     # - `payload_xml_value`: Extract field from XML payload, e.g. `<key attr="xxx">value</key>`
     # - `payload_hessian2_value`: Extract field from payload using Hessian2 encoding.
+    # - `dubbo_header_value`: Extra field from the Attachments which payload was encoded with Dubbo protocol.
+    # - `dubbo_payload_map_string_value`: Extra field from key-value format which payload was encoded with Dubbo protocol.
     # - `sql_insertion_column`: Extract column from SQL insert statement, e.g. `INSERT INTO table (column1, column2) VALUES (value1, value2)`. Currently only MySQL is supported and only the first column's value can be extracted.
     type: "http_url_field"
     # Matching rule
