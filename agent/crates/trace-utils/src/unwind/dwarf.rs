@@ -35,12 +35,24 @@ const EH_FRAME_NAME: &'static str = ".eh_frame";
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum CfaType {
-    RbpOffset,
-    RspOffset,
+    RbpOffset, // CFA = FP + offset (RBP on x86_64, X29 on ARM64)
+    RspOffset, // CFA = SP + offset (RSP on x86_64, X31 on ARM64)
     Expression,
     Unsupported,
     #[default]
     NoEntry,
+}
+
+/// Return Address recovery type for ARM64
+/// On x86_64, RA is always at CFA-8 (implicitly handled in BPF code)
+/// On ARM64, RA may be in LR register or saved on stack
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum RaType {
+    #[default]
+    CfaOffset, // RA at CFA + offset (saved on stack) - x86_64 default
+    LrRegister, // ARM64: RA is in Link Register (X30), not on stack - ARM64 default
+    Unsupported,
 }
 
 #[repr(u8)]
@@ -58,26 +70,33 @@ pub enum RegType {
 pub struct UnwindEntry {
     pub pc: u64,
     pub cfa_type: CfaType,
-    pub rbp_type: RegType,
-    pub cfa_offset: i16, // by factor of 8
-    pub rbp_offset: i16, // by factor of 8
+    pub rbp_type: RegType, // FP recovery: how to restore frame pointer
+    pub ra_type: RaType,   // RA recovery: how to get return address (ARM64)
+    pub cfa_offset: i16,   // by factor of 8
+    pub rbp_offset: i16,   // by factor of 8 (FP offset from CFA)
+    pub ra_offset: i16,    // by factor of 8 (RA offset from CFA, used when ra_type is CfaOffset)
 }
 
 impl fmt::Display for UnwindEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "(pc={:016x} ", self.pc)?;
         match self.cfa_type {
-            CfaType::RbpOffset => write!(f, "cfa=rbp{:+} ", (self.cfa_offset as i64) << 3)?,
-            CfaType::RspOffset => write!(f, "cfa=rsp{:+} ", (self.cfa_offset as i64) << 3)?,
+            CfaType::RbpOffset => write!(f, "cfa=fp{:+} ", (self.cfa_offset as i64) << 3)?,
+            CfaType::RspOffset => write!(f, "cfa=sp{:+} ", (self.cfa_offset as i64) << 3)?,
             CfaType::Expression => write!(f, "cfa=expression ")?,
             CfaType::Unsupported => write!(f, "cfa=unsupported ")?,
             CfaType::NoEntry => write!(f, "cfa=no-entry ")?,
         }
         match self.rbp_type {
-            RegType::Undefined => write!(f, "rbp=undefined)"),
-            RegType::SameValue => write!(f, "rbp=rbp)"),
-            RegType::Offset => write!(f, "rbp=cfa{:+})", (self.rbp_offset as i64) << 3),
-            RegType::Unsupported => write!(f, "rbp=unsupported)"),
+            RegType::Undefined => write!(f, "fp=undefined ")?,
+            RegType::SameValue => write!(f, "fp=same ")?,
+            RegType::Offset => write!(f, "fp=cfa{:+} ", (self.rbp_offset as i64) << 3)?,
+            RegType::Unsupported => write!(f, "fp=unsupported ")?,
+        }
+        match self.ra_type {
+            RaType::CfaOffset => write!(f, "ra=cfa{:+})", (self.ra_offset as i64) << 3),
+            RaType::LrRegister => write!(f, "ra=lr)"),
+            RaType::Unsupported => write!(f, "ra=unsupported)"),
         }
     }
 }
@@ -102,20 +121,54 @@ impl PartialOrd for UnwindEntry {
     }
 }
 
-const REG_ID_RBP: u16 = 6;
-const REG_ID_RSP: u16 = 7;
+// Architecture-specific DWARF register IDs
+// For x86_64: RBP=6, RSP=7 (System V AMD64 ABI)
+// For ARM64: FP/X29=29, SP=31, LR/X30=30 (DWARF for ARM Architecture)
+
+#[cfg(target_arch = "x86_64")]
+mod arch_regs {
+    pub const FP: u16 = 6; // RBP - Frame Pointer
+    pub const SP: u16 = 7; // RSP - Stack Pointer
+}
+
+#[cfg(target_arch = "aarch64")]
+mod arch_regs {
+    pub const FP: u16 = 29; // X29/FP - Frame Pointer
+    pub const SP: u16 = 31; // SP - Stack Pointer
+    pub const LR: u16 = 30; // X30/LR - Link Register (holds return address)
+}
+
+// Fallback for other architectures (compilation will fail with meaningful error)
+#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+mod arch_regs {
+    pub const FP: u16 = 0;
+    pub const SP: u16 = 0;
+    compile_error!("Unsupported architecture for DWARF unwinding");
+}
+
+#[cfg(target_arch = "aarch64")]
+use arch_regs::LR as REG_ID_LR;
+use arch_regs::{FP as REG_ID_FP, SP as REG_ID_SP};
+
+// Legacy aliases for backward compatibility in existing code
+const REG_ID_RBP: u16 = REG_ID_FP;
+const REG_ID_RSP: u16 = REG_ID_SP;
 
 impl UnwindEntry {
     fn new<S, R>(
         section: &S,
         bases: &BaseAddresses,
         cie: &CommonInformationEntry<R>,
+        default_ra_type: RaType,
     ) -> Result<Self>
     where
         R: Reader,
         S: UnwindSection<R>,
     {
-        let mut sm = Self::default();
+        let mut sm = Self {
+            ra_type: default_ra_type,
+            ..Default::default()
+        };
         let mut ins_iter = cie.instructions(section, bases);
         while let Some(ins) = ins_iter.next()? {
             sm.update(cie, &ins);
@@ -172,7 +225,7 @@ impl UnwindEntry {
                 self.cfa_type = CfaType::Expression;
                 self.cfa_offset = 0;
             }
-            // register instructions: only care about RBP
+            // FP register instructions (RBP on x86_64, X29 on ARM64)
             CallFrameInstruction::Undefined { register } if register.0 == REG_ID_RBP => {
                 self.rbp_type = RegType::Undefined;
                 self.rbp_offset = 0;
@@ -197,7 +250,7 @@ impl UnwindEntry {
                 self.rbp_offset =
                     ((*factored_offset as i64 * cie.data_alignment_factor()) >> 3) as i16;
             }
-            // unsupported register instructions
+            // unsupported FP register instructions
             CallFrameInstruction::ValOffset { register, .. } if register.0 == REG_ID_RBP => {
                 self.rbp_type = RegType::Unsupported;
                 self.rbp_offset = 0;
@@ -216,16 +269,52 @@ impl UnwindEntry {
                 self.rbp_type = RegType::Unsupported;
                 self.rbp_offset = 0;
             }
+            // ARM64 LR (Link Register / X30) tracking for return address
+            // When LR has SameValue rule, return address is in LR register
+            // When LR has Offset rule, RA is saved on stack at CFA + offset
+            #[cfg(target_arch = "aarch64")]
+            CallFrameInstruction::SameValue { register } if register.0 == REG_ID_LR => {
+                self.ra_type = RaType::LrRegister;
+                self.ra_offset = 0;
+            }
+            #[cfg(target_arch = "aarch64")]
+            CallFrameInstruction::Offset {
+                register,
+                factored_offset,
+            } if register.0 == REG_ID_LR => {
+                self.ra_type = RaType::CfaOffset;
+                self.ra_offset =
+                    ((*factored_offset as i64 * cie.data_alignment_factor()) >> 3) as i16;
+            }
+            #[cfg(target_arch = "aarch64")]
+            CallFrameInstruction::OffsetExtendedSf {
+                register,
+                factored_offset,
+            } if register.0 == REG_ID_LR => {
+                self.ra_type = RaType::CfaOffset;
+                self.ra_offset =
+                    ((*factored_offset as i64 * cie.data_alignment_factor()) >> 3) as i16;
+            }
+            #[cfg(target_arch = "aarch64")]
+            CallFrameInstruction::Undefined { register } if register.0 == REG_ID_LR => {
+                // LR undefined usually means this is a stop frame (entry point)
+                self.ra_type = RaType::Unsupported;
+                self.ra_offset = 0;
+            }
             _ => (),
         }
     }
 }
 
 type RegState = (RegType, i16);
+#[cfg(target_arch = "aarch64")]
+type RaState = (RaType, i16);
 
 struct StateMachine {
     entry: UnwindEntry,
     initial_rbp: RegState,
+    #[cfg(target_arch = "aarch64")]
+    initial_ra: RaState,
     reg_stack: Vec<UnwindEntry>,
 }
 
@@ -234,6 +323,8 @@ impl StateMachine {
         Self {
             entry,
             initial_rbp: (entry.rbp_type, entry.rbp_offset),
+            #[cfg(target_arch = "aarch64")]
+            initial_ra: (entry.ra_type, entry.ra_offset),
             reg_stack: Default::default(),
         }
     }
@@ -251,6 +342,11 @@ impl StateMachine {
             CallFrameInstruction::Restore { register } => {
                 if register.0 == REG_ID_RBP {
                     (self.entry.rbp_type, self.entry.rbp_offset) = self.initial_rbp;
+                }
+                // ARM64: Also handle LR restore
+                #[cfg(target_arch = "aarch64")]
+                if register.0 == REG_ID_LR {
+                    (self.entry.ra_type, self.entry.ra_offset) = self.initial_ra;
                 }
             }
             CallFrameInstruction::RememberState => {
@@ -277,6 +373,21 @@ pub fn read_unwind_entries(data: &[u8]) -> Result<Vec<UnwindEntry>> {
     let eh_frame = EhFrame::new(eh_section.data()?, NativeEndian);
     let ba = BaseAddresses::default().set_eh_frame(eh_section.address());
 
+    // Set default return address type based on target architecture.
+    // On ARM64, return address is in LR by default (until explicitly saved to stack).
+    // On x86_64, return address is always at CFA-8.
+    #[cfg(target_arch = "aarch64")]
+    let default_ra_type = RaType::LrRegister;
+    #[cfg(not(target_arch = "aarch64"))]
+    let default_ra_type = RaType::CfaOffset;
+
+    // Create a default UnwindEntry with architecture-specific ra_type
+    let make_default_entry = |pc: u64| UnwindEntry {
+        pc,
+        ra_type: default_ra_type,
+        ..Default::default()
+    };
+
     // Find the maximum address of executable sections (.text, .plt, etc.)
     // to determine the actual code range, not just DWARF coverage
     let mut max_executable_addr = 0u64;
@@ -289,10 +400,7 @@ pub fn read_unwind_entries(data: &[u8]) -> Result<Vec<UnwindEntry>> {
 
     let mut unwind_entries = vec![];
     // represent pc ranges without dwarf entries
-    let mut holes = vec![UnwindEntry {
-        pc: 0,
-        ..Default::default()
-    }];
+    let mut holes = vec![make_default_entry(0)];
 
     let mut cies = HashMap::new();
     let mut cie_states = HashMap::new();
@@ -321,23 +429,14 @@ pub fn read_unwind_entries(data: &[u8]) -> Result<Vec<UnwindEntry>> {
                         unreachable!();
                     }
                 }
-                Err(index) if index >= holes.len() => holes.push(UnwindEntry {
-                    pc: fde_end,
-                    ..Default::default()
-                }),
+                Err(index) if index >= holes.len() => holes.push(make_default_entry(fde_end)),
                 Err(index) => {
                     // we have holes[index - 1].pc < fde_start and holes[index].pc > fde_start here
                     let next_hole = &holes[index];
                     if next_hole.pc == fde_end {
                         // do nothing
                     } else if next_hole.pc > fde_end {
-                        holes.insert(
-                            index,
-                            UnwindEntry {
-                                pc: fde_end,
-                                ..Default::default()
-                            },
-                        );
+                        holes.insert(index, make_default_entry(fde_end));
                     } else {
                         match (&holes[index..]).binary_search_by_key(&fde_end, |entry| entry.pc) {
                             Ok(offset) => {
@@ -356,7 +455,12 @@ pub fn read_unwind_entries(data: &[u8]) -> Result<Vec<UnwindEntry>> {
             // copy here because CIE state is for all FDEs
             let entry: UnwindEntry = match cie_states.entry(pfde.cie_offset()) {
                 Entry::Occupied(o) => *o.get(),
-                Entry::Vacant(v) => *v.insert(UnwindEntry::new(&eh_frame, &ba, fde.cie())?),
+                Entry::Vacant(v) => *v.insert(UnwindEntry::new(
+                    &eh_frame,
+                    &ba,
+                    fde.cie(),
+                    default_ra_type,
+                )?),
             };
             let mut sm = StateMachine::new(entry);
             sm.set_pc(fde.initial_address());
