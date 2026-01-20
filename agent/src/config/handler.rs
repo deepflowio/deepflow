@@ -3523,6 +3523,18 @@ impl ConfigHandler {
                 new_preprocess.out_of_order_reassembly_protocols.clone();
             restart_agent = !first_run;
         }
+        if preprocess.out_of_order_reassembly_timeout
+            != new_preprocess.out_of_order_reassembly_timeout
+        {
+            info!(
+                "Update inputs.ebpf.socket.preprocess.out_of_order_reassembly_timeout from {:?} to {:?}.",
+                preprocess.out_of_order_reassembly_timeout,
+                new_preprocess.out_of_order_reassembly_timeout
+            );
+            preprocess.out_of_order_reassembly_timeout =
+                new_preprocess.out_of_order_reassembly_timeout.clone();
+            restart_agent = !first_run;
+        }
         if preprocess.segmentation_reassembly_protocols
             != new_preprocess.segmentation_reassembly_protocols
         {

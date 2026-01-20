@@ -4296,6 +4296,44 @@ Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overvie
 
 Attention: use `HTTP2` for `gRPC` Protocol.
 
+##### OOOR Timeout {#inputs.ebpf.socket.preprocess.out_of_order_reassembly_timeout}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.preprocess.out_of_order_reassembly_timeout`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      preprocess:
+        out_of_order_reassembly_timeout: 100ms
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| _DYNAMIC_OPTIONS_ | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['100ms', '1s'] |
+
+**Description**:
+
+When the OOOR cache data times out, it will be output directly. This parameter can be adjusted according to metric
+`deepflow_agent_ebpf_collect.metrics.time_backtrack_max`.
+
+Note: Increasing this value will consume more memory
+
 ##### SR Protocols {#inputs.ebpf.socket.preprocess.segmentation_reassembly_protocols}
 
 **Tags**:

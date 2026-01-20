@@ -1161,6 +1161,7 @@ impl Default for EbpfTunning {
 pub struct EbpfSocketPreprocess {
     pub out_of_order_reassembly_cache_size: usize,
     pub out_of_order_reassembly_protocols: Vec<String>,
+    pub out_of_order_reassembly_timeout: Duration,
     pub segmentation_reassembly_protocols: Vec<String>,
 }
 
@@ -1169,6 +1170,7 @@ impl Default for EbpfSocketPreprocess {
         Self {
             out_of_order_reassembly_cache_size: 16,
             out_of_order_reassembly_protocols: vec![],
+            out_of_order_reassembly_timeout: Duration::from_millis(100),
             segmentation_reassembly_protocols: vec![],
         }
     }
