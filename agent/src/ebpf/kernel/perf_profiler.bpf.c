@@ -204,6 +204,9 @@ typedef struct {
 	__u64 ip;
 	__u64 sp;
 	__u64 bp;
+#if defined(__aarch64__)
+	__u64 lr;  // Link Register (X30) for ARM64 - holds return address
+#endif
 } regs_t;
 
 // Note: stack_t is defined earlier (line 91-96) for use in custom_stack_map
@@ -674,6 +677,10 @@ int get_usermode_regs(struct pt_regs *regs, regs_t * dst)
 		dst->ip = PT_REGS_IP(regs);
 		dst->sp = PT_REGS_SP(regs);
 		dst->bp = PT_REGS_FP(regs);
+#if defined(__aarch64__)
+		// On ARM64, also capture the Link Register (X30) which holds return address
+		dst->lr = regs->regs[30];
+#endif
 		return 0;
 	}
 
@@ -708,6 +715,10 @@ int get_usermode_regs(struct pt_regs *regs, regs_t * dst)
 	dst->ip = PT_REGS_IP(&user_regs);
 	dst->sp = PT_REGS_SP(&user_regs);
 	dst->bp = PT_REGS_FP(&user_regs);
+#if defined(__aarch64__)
+	// On ARM64, capture LR from the saved user registers
+	dst->lr = user_regs.regs[30];
+#endif
 	return 0;
 }
 
@@ -1082,8 +1093,8 @@ int dwarf_unwind(void *ctx, unwind_state_t * state,
 			// This can happen when IP is in special regions like [uprobes] that have no DWARF info
 			if (regs->ip < shard_info->offset + shard_info->pc_min ||
 			    regs->ip >= shard_info->offset + shard_info->pc_max) {
-				bpf_debug("[DWARF] frame#%d: ip=%lx not in shard range, stopping",
-					state->stack.len, regs->ip);
+			// 	bpf_debug("[DWARF] frame#%d: ip=%lx not in shard range, stopping",
+			// 		state->stack.len, regs->ip);
 				goto finish;
 			}
 		}
@@ -1134,11 +1145,52 @@ int dwarf_unwind(void *ctx, unwind_state_t * state,
 			__sync_fetch_and_add(error_count_ptr, 1);
 			goto finish;
 		}
+		// Recover Return Address (IP for next frame)
+		// On x86_64: RA is always at CFA-8 (fixed convention)
+		// On ARM64: RA may be in LR register or saved on stack at variable offset
+#if defined(__aarch64__)
+		// ARM64: Use ra_type to determine how to recover return address
+		switch (ue->ra_type) {
+		case RA_TYPE_LR_REGISTER:
+			// RA is in the Link Register (leaf function or not yet saved)
+			// Safety check: LR should only be valid for the first (leaf) frame.
+			// If LR is 0, it means it was already used or is invalid.
+			if (regs->lr == 0) {
+				// LR was already consumed or is invalid, cannot continue
+				goto finish;
+			}
+			regs->ip = regs->lr;
+			break;
+		case RA_TYPE_CFA_OFFSET:
+			// RA is saved on stack at CFA + ra_offset
+			{
+				__u64 ra_addr = cfa;
+				if (ue->ra_offset < 0) {
+					ra_addr -= ((-ue->ra_offset) << 3);
+				} else {
+					ra_addr += (ue->ra_offset << 3);
+				}
+				if (bpf_probe_read_user(&regs->ip, sizeof(__u64), (void *)ra_addr) != 0) {
+					__sync_fetch_and_add(error_count_ptr, 1);
+					goto finish;
+				}
+			}
+			break;
+		default:
+			// RA_TYPE_UNSUPPORTED - cannot unwind
+			__sync_fetch_and_add(error_count_ptr, 1);
+			goto finish;
+		}
+#else
+		// x86_64: RA is always at CFA-8
 		if (bpf_probe_read_user
 		    (&regs->ip, sizeof(__u64), (void *)(cfa - 8)) != 0) {
 			__sync_fetch_and_add(error_count_ptr, 1);
 			goto finish;
 		}
+#endif
+
+		// Recover Frame Pointer (BP/FP for next frame)
 		__u64 rbp_addr = cfa;
 		switch (ue->rbp_type) {
 		case REG_TYPE_UNDEFINED:
@@ -1161,6 +1213,19 @@ int dwarf_unwind(void *ctx, unwind_state_t * state,
 			__sync_fetch_and_add(error_count_ptr, 1);
 			goto finish;
 		}
+#if defined(__aarch64__)
+		// ARM64: After using LR for RA recovery, ALWAYS invalidate it.
+		// Reason: LR register can only be valid for the FIRST (leaf) frame.
+		// After that, each caller's return address is in ITS OWN saved LR on stack,
+		// which will be read via CFA_OFFSET in the next iteration.
+		// If we don't invalidate LR, and the next frame's DWARF info incorrectly
+		// says LR_REGISTER, we would reuse the same LR value causing duplicate frames.
+		if (ue->ra_type == RA_TYPE_LR_REGISTER) {
+			// We just used LR for this frame. Invalidate it for next frame.
+			regs->lr = 0;
+		}
+		// If ra_type was CFA_OFFSET, we already read RA from stack, LR was already 0 or unused.
+#endif
 		regs->sp = cfa;
 	}
 

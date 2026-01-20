@@ -33,8 +33,8 @@
 #define UNWIND_SHARDS_PER_PROCESS 1024
 
 enum CfaType {
-    CFA_TYPE_RBP_OFFSET,
-    CFA_TYPE_RSP_OFFSET,
+    CFA_TYPE_RBP_OFFSET,  /* CFA = FP + offset (RBP on x86_64, X29 on ARM64) */
+    CFA_TYPE_RSP_OFFSET,  /* CFA = SP + offset (RSP on x86_64, X31 on ARM64) */
     CFA_TYPE_EXPRESSION,
     CFA_TYPE_UNSUPPORTED,
     CFA_TYPE_NO_ENTRY,
@@ -48,6 +48,17 @@ enum RegType {
     REG_TYPE_UNSUPPORTED,
 };
 typedef uint8_t RegType;
+
+/* Return Address recovery type for ARM64
+ * On x86_64, RA is always at CFA-8 (implicitly handled)
+ * On ARM64, RA may be in LR register or saved on stack
+ */
+enum RaType {
+    RA_TYPE_CFA_OFFSET,   /* RA at CFA + offset */
+    RA_TYPE_LR_REGISTER,  /* ARM64: RA is in Link Register (X30) */
+    RA_TYPE_UNSUPPORTED,
+};
+typedef uint8_t RaType;
 
 typedef struct lua_unwind_table_t lua_unwind_table_t;
 
@@ -79,9 +90,11 @@ typedef struct {
 typedef struct {
     uint64_t pc;
     CfaType cfa_type;
-    RegType rbp_type;
-    int16_t cfa_offset;
-    int16_t rbp_offset;
+    RegType rbp_type;   /* FP recovery: how to restore frame pointer */
+    RaType ra_type;     /* RA recovery: how to get return address (ARM64) */
+    int16_t cfa_offset;     /* by factor of 8 */
+    int16_t rbp_offset;     /* by factor of 8 (FP offset from CFA) */
+    int16_t ra_offset;      /* by factor of 8 (RA offset from CFA, for ARM64) */
 } unwind_entry_t;
 
 typedef struct {
