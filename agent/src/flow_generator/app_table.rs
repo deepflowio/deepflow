@@ -207,7 +207,7 @@ impl AppTable {
         }
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     fn is_whitelist(&self, packet: &MetaPacket) -> bool {
         for list in &self.inference_whitelist {
             if list.is_matched(
@@ -224,13 +224,14 @@ impl AppTable {
 
     // EBPF数据MetaPacket中direction未赋值
     // return (proto, port, fail_count, last_time)
+    #[cfg(feature = "libtrace")]
     pub fn get_protocol_from_ebpf(
         &mut self,
         packet: &MetaPacket,
         local_epc: i32,
         remote_epc: i32,
     ) -> Option<(L7ProtocolEnum, u16, u32, u64)> {
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(unix)]
         if self.is_whitelist(packet) {
             return None;
         }

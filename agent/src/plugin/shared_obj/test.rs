@@ -31,7 +31,7 @@ use crate::{
         flow::PacketDirection,
         l7_protocol_info::L7ProtocolInfo,
         l7_protocol_log::L7ProtocolParserInterface,
-        l7_protocol_log::{EbpfParam, L7PerfCache, ParseParam},
+        l7_protocol_log::{L7PerfCache, ParseParam},
     },
     config::{config::Iso8583ParseConfig, OracleConfig},
     flow_generator::protocol_logs::{
@@ -65,7 +65,8 @@ fn get_req_param<'a>(
         flow_id: 1234567,
         direction: PacketDirection::ClientToServer,
         ebpf_type: EbpfType::TracePoint,
-        ebpf_param: Some(EbpfParam {
+        #[cfg(feature = "libtrace")]
+        ebpf_param: Some(crate::common::l7_protocol_log::EbpfParam {
             is_tls: false,
             is_req_end: false,
             is_resp_end: false,
@@ -103,8 +104,8 @@ fn get_resp_param<'a>(
         flow_id: 1234567,
         direction: PacketDirection::ServerToClient,
         ebpf_type: EbpfType::TracePoint,
-
-        ebpf_param: Some(EbpfParam {
+        #[cfg(feature = "libtrace")]
+        ebpf_param: Some(crate::common::l7_protocol_log::EbpfParam {
             is_tls: false,
             is_req_end: false,
             is_resp_end: false,

@@ -47,8 +47,6 @@ use crate::{
     rpc::get_timestamp,
     utils::stats::{Counter, CounterType, CounterValue, RefCountable},
 };
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use public::utils::string::get_string_from_chars;
 use public::{
     chrono_map::ChronoMap,
     l7_protocol::LogMessageType,
@@ -140,10 +138,11 @@ impl MetaAppProto {
             biz_type: l7_info.get_biz_type(),
         };
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         if meta_packet.signal_source == SignalSource::EBPF {
             let is_src = meta_packet.lookup_key.l2_end_0;
-            let process_name = get_string_from_chars(&meta_packet.process_kname);
+            let process_name =
+                public::utils::string::get_string_from_chars(&meta_packet.process_kname);
             match (is_src, meta_packet.lookup_key.direction) {
                 (true, PacketDirection::ClientToServer)
                 | (false, PacketDirection::ServerToClient) => {
