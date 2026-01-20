@@ -51,6 +51,13 @@ func (obj *_DBMgr[M]) Gets() (results []*M, err error) {
 	return
 }
 
+// OrderIDGets 按照 id 升序获取批量结果
+func (obj *_DBMgr[M]) OrderIDGets() (results []*M, err error) {
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Order("id asc").Find(&results).Error
+
+	return
+}
+
 func (obj *_DBMgr[M]) GetFields(fields []string) (results []*M, err error) {
 	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Select(fields).Find(&results).Error
 	return

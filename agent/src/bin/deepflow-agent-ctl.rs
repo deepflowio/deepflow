@@ -28,12 +28,14 @@ use clap::{ArgEnum, Parser, Subcommand};
 #[cfg(target_os = "linux")]
 use flate2::write::ZlibDecoder;
 
+#[cfg(all(target_os = "linux", feature = "libtrace"))]
+use deepflow_agent::debug::EbpfMessage;
+#[cfg(target_os = "linux")]
+use deepflow_agent::debug::PlatformMessage;
 use deepflow_agent::debug::{
     Beacon, Client, Message, Module, PolicyMessage, RpcMessage, DEBUG_QUEUE_IDLE_TIMEOUT,
     DEEPFLOW_AGENT_BEACON,
 };
-#[cfg(target_os = "linux")]
-use deepflow_agent::debug::{EbpfMessage, PlatformMessage};
 use public::{consts::DEFAULT_CONTROLLER_PORT, debug::QueueMessage};
 
 const ERR_PORT_MSG: &str = "error: The following required arguments were not provided:
@@ -65,7 +67,7 @@ enum ControllerCmd {
     Queue(QueueCmd),
     /// get information about the policy
     Policy(PolicyCmd),
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "libtrace"))]
     /// get information about the ebpf
     Ebpf(EbpfCmd),
     /// get information about the deepflow-agent
@@ -297,7 +299,7 @@ impl Controller {
             ControllerCmd::List => self.list(),
             ControllerCmd::Queue(c) => self.queue(c),
             ControllerCmd::Policy(c) => self.policy(c),
-            #[cfg(target_os = "linux")]
+            #[cfg(all(target_os = "linux", feature = "libtrace"))]
             ControllerCmd::Ebpf(c) => self.ebpf(c),
         }
     }
@@ -743,7 +745,7 @@ impl Controller {
         }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "libtrace"))]
     fn ebpf(&self, c: EbpfCmd) -> Result<()> {
         if self.port.is_none() {
             return Err(anyhow!(ERR_PORT_MSG));

@@ -51,14 +51,16 @@ use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
         HttpEndpointMatchRule, Iso8583ParseConfig, OracleConfig, PcapStream, PortConfig,
-        ProcessorsFlowLogTunning, RequestLog, RequestLogTunning, SessionTimeout, TagFilterOperator,
-        Timeouts, UserConfig, GRPC_BUFFER_SIZE_MIN,
+        ProcessorsFlowLogTunning, RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts,
+        UserConfig, GRPC_BUFFER_SIZE_MIN,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
 use crate::config::InferenceWhitelist;
 use crate::flow_generator::protocol_logs::decode_new_rpc_trace_context_with_type;
 use crate::rpc::Session;
+#[cfg(all(unix, feature = "libtrace"))]
+use crate::utils::environment::{get_ctrl_ip_and_mac, is_tt_workload};
 use crate::{
     common::{
         decapsulate::TunnelTypeBitmap, enums::CaptureNetworkType,
@@ -77,11 +79,7 @@ use crate::{
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
-    ebpf::CAP_LEN_MAX,
-    utils::environment::{
-        get_container_resource_limits, get_ctrl_ip_and_mac, is_tt_workload,
-        set_container_resource_limit,
-    },
+    utils::environment::{get_container_resource_limits, set_container_resource_limit},
 };
 #[cfg(target_os = "linux")]
 use crate::{
@@ -103,7 +101,6 @@ if #[cfg(feature = "enterprise")] {
         };
 
         use enterprise_utils::l7::custom_policy::{
-            config::CustomFieldPolicy as CustomFieldPolicyConfig,
             custom_field_policy::{CustomFieldPolicy, PolicySlice},
             custom_protocol_policy::ExtraCustomProtocolConfig,
         };
@@ -1061,6 +1058,23 @@ impl From<&Vec<String>> for DnsNxdomainTrie {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct CustomAppConfig {
+    pub version: u64,
+    #[cfg(feature = "enterprise")]
+    pub custom_protocol_config: Option<ExtraCustomProtocolConfig>,
+    #[cfg(feature = "enterprise")]
+    pub custom_field_policies: Option<CustomFieldPolicy>,
+}
+
+impl PartialEq for CustomAppConfig {
+    // does not include custom_protocol_config and custom_field_policies
+    // because we need None value to represent "not updated"
+    fn eq(&self, other: &Self) -> bool {
+        self.version == other.version
+    }
+}
+
 #[derive(Clone, PartialEq)]
 pub struct LogParserConfig {
     pub l7_log_collect_nps_threshold: u64,
@@ -1077,8 +1091,7 @@ pub struct LogParserConfig {
     pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
     pub unconcerned_dns_nxdomain_trie: DnsNxdomainTrie,
     pub mysql_decompress_payload: bool,
-    #[cfg(feature = "enterprise")]
-    pub custom_protocol_config: ExtraCustomProtocolConfig,
+    pub custom_app: CustomAppConfig,
 }
 
 impl Default for LogParserConfig {
@@ -1099,16 +1112,14 @@ impl Default for LogParserConfig {
             unconcerned_dns_nxdomain_response_suffixes: vec![],
             unconcerned_dns_nxdomain_trie: DnsNxdomainTrie::default(),
             mysql_decompress_payload: true,
-            #[cfg(feature = "enterprise")]
-            custom_protocol_config: ExtraCustomProtocolConfig::default(),
+            custom_app: CustomAppConfig::default(),
         }
     }
 }
 
 impl fmt::Debug for LogParserConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut ds = f.debug_struct("LogParserConfig");
-        let r = ds
+        f.debug_struct("LogParserConfig")
             .field(
                 "l7_log_collect_nps_threshold",
                 &self.l7_log_collect_nps_threshold,
@@ -1146,12 +1157,9 @@ impl fmt::Debug for LogParserConfig {
                 "unconcerned_dns_nxdomain_trie",
                 &self.unconcerned_dns_nxdomain_response_suffixes,
             )
-            .field("mysql_decompress_payload", &self.mysql_decompress_payload);
-
-        #[cfg(feature = "enterprise")]
-        r.field("custom_protocol_config", &self.custom_protocol_config);
-
-        r.finish()
+            .field("mysql_decompress_payload", &self.mysql_decompress_payload)
+            .field("custom_app", &self.custom_app)
+            .finish()
     }
 }
 
@@ -1162,6 +1170,24 @@ impl LogParserConfig {
             None => Timeouts::l7_default_timeout(l7_protocol),
         }
         .into()
+    }
+
+    #[cfg(feature = "enterprise")]
+    pub fn get_custom_field_policies(
+        &self,
+        protocol: L7ProtocolEnum,
+        param: &ParseParam,
+    ) -> Option<PolicySlice> {
+        self.custom_app
+            .custom_field_policies
+            .as_ref()
+            .and_then(|cfp| {
+                let server_port = match param.direction {
+                    PacketDirection::ClientToServer => param.port_dst,
+                    PacketDirection::ServerToClient => param.port_src,
+                };
+                cfp.select(protocol, server_port)
+            })
     }
 }
 
@@ -1515,9 +1541,6 @@ pub struct L7LogDynamicConfig {
 
     pub grpc_streaming_data_enabled: bool,
 
-    #[cfg(feature = "enterprise")]
-    pub extra_field_policies: CustomFieldPolicy,
-
     pub error_request_header: usize,
     pub error_response_header: usize,
     pub error_request_payload: usize,
@@ -1532,8 +1555,7 @@ impl Default for L7LogDynamicConfig {
 
 impl fmt::Debug for L7LogDynamicConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut ds = f.debug_struct("L7LogDynamicConfig");
-        let r = ds
+        f.debug_struct("L7LogDynamicConfig")
             .field("proxy_client", &self.proxy_client)
             .field("x_request_id", &self.x_request_id)
             .field("trace_types", &self.trace_types)
@@ -1557,12 +1579,8 @@ impl fmt::Debug for L7LogDynamicConfig {
             .field(
                 "grpc_streaming_data_enabled",
                 &self.grpc_streaming_data_enabled,
-            );
-
-        #[cfg(feature = "enterprise")]
-        let r = r.field("extra_field_policies", &self.extra_field_policies);
-
-        r.field("error_request_header", &self.error_request_header)
+            )
+            .field("error_request_header", &self.error_request_header)
             .field("error_response_header", &self.error_response_header)
             .field("error_request_payload", &self.error_request_payload)
             .field("error_response_payload", &self.error_response_payload)
@@ -1572,8 +1590,7 @@ impl fmt::Debug for L7LogDynamicConfig {
 
 impl PartialEq for L7LogDynamicConfig {
     fn eq(&self, other: &Self) -> bool {
-        #[allow(unused_mut)]
-        let mut eq = self.proxy_client == other.proxy_client
+        self.proxy_client == other.proxy_client
             && self.x_request_id == other.x_request_id
             && self.multiple_trace_id_collection == other.multiple_trace_id_collection
             && self.copy_apm_trace_id == other.copy_apm_trace_id
@@ -1584,12 +1601,7 @@ impl PartialEq for L7LogDynamicConfig {
             && self.error_response_header == other.error_response_header
             && self.error_request_payload == other.error_request_payload
             && self.error_response_payload == other.error_response_payload
-            && self.grpc_streaming_data_enabled == other.grpc_streaming_data_enabled;
-        #[cfg(feature = "enterprise")]
-        {
-            eq &= self.extra_field_policies == other.extra_field_policies;
-        }
-        eq
+            && self.grpc_streaming_data_enabled == other.grpc_streaming_data_enabled
     }
 }
 
@@ -1603,7 +1615,7 @@ pub struct L7LogDynamicConfigBuilder {
     pub extra_log_fields: ExtraLogFields,
     pub grpc_streaming_data_enabled: bool,
     #[cfg(feature = "enterprise")]
-    pub extra_field_policies: Vec<CustomFieldPolicyConfig>,
+    pub extra_headers: HashSet<String>,
     pub error_request_header: usize,
     pub error_request_payload: usize,
     pub error_response_header: usize,
@@ -1612,12 +1624,13 @@ pub struct L7LogDynamicConfigBuilder {
 
 impl Default for L7LogDynamicConfigBuilder {
     fn default() -> Self {
-        (&RequestLog::default()).into()
+        (&UserConfig::default()).into()
     }
 }
 
-impl From<&RequestLog> for L7LogDynamicConfigBuilder {
-    fn from(c: &RequestLog) -> Self {
+impl From<&UserConfig> for L7LogDynamicConfigBuilder {
+    fn from(config: &UserConfig) -> Self {
+        let c = &config.processors.request_log;
         Self {
             proxy_client: c
                 .tag_extraction
@@ -1669,7 +1682,7 @@ impl From<&RequestLog> for L7LogDynamicConfigBuilder {
                 .grpc
                 .streaming_data_enabled,
             #[cfg(feature = "enterprise")]
-            extra_field_policies: c.tag_extraction.custom_field_policies.clone(),
+            extra_headers: config.custom_app.extra_headers.clone(),
             error_request_header: c.tag_extraction.raw.error_request_header,
             error_request_payload: c.tag_extraction.raw.error_request_payload,
             error_response_header: c.tag_extraction.raw.error_response_header,
@@ -1690,7 +1703,7 @@ impl From<L7LogDynamicConfigBuilder> for L7LogDynamicConfig {
             mut extra_log_fields,
             grpc_streaming_data_enabled,
             #[cfg(feature = "enterprise")]
-            extra_field_policies,
+            extra_headers,
             error_request_header,
             error_request_payload,
             error_response_header,
@@ -1744,14 +1757,12 @@ impl From<L7LogDynamicConfigBuilder> for L7LogDynamicConfig {
         }
 
         #[cfg(feature = "enterprise")]
-        for policy in extra_field_policies.iter() {
-            for header in policy.get_http2_headers() {
-                if dup_checker.contains(header) {
-                    continue;
-                }
-                dup_checker.insert(header.to_owned());
-                expected_headers_set.insert(header.as_bytes().to_vec());
+        for header in extra_headers.into_iter() {
+            if dup_checker.contains(&header) {
+                continue;
             }
+            dup_checker.insert(header.clone());
+            expected_headers_set.insert(header.into_bytes());
         }
 
         Self {
@@ -1766,8 +1777,6 @@ impl From<L7LogDynamicConfigBuilder> for L7LogDynamicConfig {
             expected_headers_set: Arc::new(expected_headers_set),
             extra_log_fields,
             grpc_streaming_data_enabled,
-            #[cfg(feature = "enterprise")]
-            extra_field_policies: CustomFieldPolicy::new(&extra_field_policies),
             error_request_header,
             error_request_payload,
             error_response_header,
@@ -1783,19 +1792,6 @@ impl L7LogDynamicConfig {
 
     pub fn is_span_id(&self, context: &str) -> bool {
         self.span_set.contains(context)
-    }
-
-    #[cfg(feature = "enterprise")]
-    pub fn get_custom_field_policies(
-        &self,
-        protocol: L7ProtocolEnum,
-        param: &ParseParam,
-    ) -> Option<PolicySlice> {
-        let server_port = match param.direction {
-            PacketDirection::ClientToServer => param.port_dst,
-            PacketDirection::ServerToClient => param.port_src,
-        };
-        self.extra_field_policies.select(protocol, server_port)
     }
 }
 
@@ -1830,7 +1826,7 @@ pub struct ModuleConfig {
     pub handler: HandlerConfig,
     pub log: LogConfig,
     pub synchronizer: SynchronizerConfig,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     pub ebpf: EbpfConfig,
     pub agent_type: AgentType,
     pub metric_server: MetricServerConfig,
@@ -2186,8 +2182,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .request_log
                     .tunning
                     .session_aggregate_max_entries,
-                l7_log_dynamic: L7LogDynamicConfigBuilder::from(&conf.processors.request_log)
-                    .into(),
+                l7_log_dynamic: L7LogDynamicConfigBuilder::from(&conf).into(),
                 l7_log_ignore_tap_sides: {
                     let mut tap_sides = [false; TapSide::MAX as usize + 1];
                     for t in conf
@@ -2253,15 +2248,24 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .protocol_special_config
                     .mysql
                     .decompress_payload,
+                #[cfg(not(feature = "enterprise"))]
+                custom_app: CustomAppConfig::default(),
                 #[cfg(feature = "enterprise")]
-                custom_protocol_config: ExtraCustomProtocolConfig::new(
-                    &conf
-                        .processors
-                        .request_log
-                        .application_protocol_inference
-                        .custom_protocols
-                        .as_slice(),
-                ),
+                custom_app: CustomAppConfig {
+                    version: conf.custom_app.version,
+                    custom_protocol_config: if let Some(config) = conf.custom_app.config.as_ref() {
+                        Some(ExtraCustomProtocolConfig::new(
+                            config.biz_protocol_policies.as_slice(),
+                        ))
+                    } else {
+                        None
+                    },
+                    custom_field_policies: if let Some(config) = conf.custom_app.config.as_ref() {
+                        Some(CustomFieldPolicy::new(&config.biz_field))
+                    } else {
+                        None
+                    },
+                },
             },
             debug: DebugConfig {
                 agent_id: conf.global.common.agent_id as u16,
@@ -2291,13 +2295,13 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 },
                 host: conf.global.self_monitoring.hostname.clone(),
             },
-            #[cfg(any(target_os = "linux", target_os = "android"))]
+            #[cfg(all(unix, feature = "libtrace"))]
             ebpf: EbpfConfig {
                 collector_enabled: conf.outputs.flow_metrics.enabled,
                 l7_metrics_enabled: conf.outputs.flow_metrics.filters.apm_metrics,
                 agent_id: conf.global.common.agent_id as u16,
                 epc_id: conf.global.common.vpc_id,
-                l7_log_packet_size: CAP_LEN_MAX
+                l7_log_packet_size: crate::ebpf::CAP_LEN_MAX
                     .min(conf.processors.request_log.tunning.payload_truncation as usize),
                 l7_log_tap_types: generate_tap_types_array(
                     &conf.outputs.flow_log.filters.l7_capture_network_types,
@@ -2509,7 +2513,7 @@ impl ConfigHandler {
         )
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     pub fn ebpf(&self) -> EbpfAccess {
         Map::new(self.current_config.clone(), |config| -> &EbpfConfig {
             &config.ebpf
@@ -2793,7 +2797,7 @@ impl ConfigHandler {
         }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "libtrace"))]
     fn set_ebpf(handler: &ConfigHandler, components: &mut AgentComponents) {
         if let Some(d) = components.ebpf_dispatcher_component.as_mut() {
             d.ebpf_collector
@@ -2913,7 +2917,7 @@ impl ConfigHandler {
         let mut dispatcher_need_reload_config = candidate_config.flow != new_config.flow;
         dispatcher_need_reload_config |= candidate_config.log_parser != new_config.log_parser;
         dispatcher_need_reload_config |= candidate_config.collector != new_config.collector;
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         {
             dispatcher_need_reload_config |= candidate_config.ebpf != new_config.ebpf;
         }
@@ -2923,7 +2927,7 @@ impl ConfigHandler {
                 for dispatcher in c.dispatcher_components.iter() {
                     dispatcher.dispatcher_listener.notify_reload_config();
                 }
-                #[cfg(any(target_os = "linux", target_os = "android"))]
+                #[cfg(all(unix, feature = "libtrace"))]
                 if let Some(d) = c.ebpf_dispatcher_component.as_ref() {
                     d.ebpf_collector.notify_reload_config();
                 }
@@ -5116,14 +5120,6 @@ impl ConfigHandler {
             app.protocol_special_config = new_app.protocol_special_config.clone();
             restart_agent = !first_run;
         }
-        #[cfg(feature = "enterprise")]
-        if app.custom_protocols != new_app.custom_protocols {
-            info!(
-                "Update processors.request_log.application_protocol_inference.custom_protocols from {:?} to {:?}.",
-                app.custom_protocols, new_app.custom_protocols
-            );
-            app.custom_protocols = new_app.custom_protocols.clone();
-        }
         let filters = &mut request_log.filters;
         let new_filters = &mut new_request_log.filters;
         if filters.port_number_prefilters != new_filters.port_number_prefilters {
@@ -5220,14 +5216,6 @@ impl ConfigHandler {
                 tag_extraction.tracing_tag, new_tag_extraction.tracing_tag
             );
             tag_extraction.tracing_tag = new_tag_extraction.tracing_tag.clone();
-        }
-        #[cfg(feature = "enterprise")]
-        if tag_extraction.custom_field_policies != new_tag_extraction.custom_field_policies {
-            info!(
-                "Update processors.request_log.tag_extraction.custom_field_policies from {:?} to {:?}.",
-                tag_extraction.custom_field_policies, new_tag_extraction.custom_field_policies
-            );
-            tag_extraction.custom_field_policies = new_tag_extraction.custom_field_policies.clone();
         }
         let raw = &mut tag_extraction.raw;
         let new_raw = &mut new_tag_extraction.raw;
@@ -5532,31 +5520,50 @@ impl ConfigHandler {
             candidate_config.handler = new_config.handler.clone();
         }
 
+        // this comparison does not include custom_protocol_config and custom_field_policies
+        // do not copy these two fields when log parser config changed
         if candidate_config.log_parser != new_config.log_parser {
             debug!(
                 "log_parser config change from {:#?} to {:#?}",
                 candidate_config.log_parser, new_config.log_parser
             );
+            let old_app = &mut candidate_config.log_parser.custom_app;
             #[cfg(feature = "enterprise")]
-            stats_collector.deregister_countables(
-                candidate_config
-                    .log_parser
-                    .l7_log_dynamic
-                    .extra_field_policies
-                    .counters()
-                    .map(|(m, _)| m),
-            );
+            {
+                let new_app = &mut new_config.log_parser.custom_app;
+                if old_app.version != new_app.version {
+                    let old = old_app.custom_protocol_config.take();
+                    if let Some(config) = new_app.custom_protocol_config.take() {
+                        debug!("custom_protocol_config change from {old:#?} to {config:#?}");
+                        old_app.custom_protocol_config.replace(config);
+                    } else if old.is_some() {
+                        debug!("custom_protocol_config removed");
+                    }
 
-            candidate_config.log_parser = new_config.log_parser.clone();
-
-            #[cfg(feature = "enterprise")]
-            stats_collector.register_countables(
-                candidate_config
-                    .log_parser
-                    .l7_log_dynamic
-                    .extra_field_policies
-                    .counters(),
-            );
+                    if let Some(old) = old_app.custom_field_policies.take() {
+                        stats_collector.deregister_countables(old.counters().map(|(m, _)| m));
+                    }
+                    if let Some(cfp) = new_app.custom_field_policies.take() {
+                        debug!("custom_field_policies change from {old:#?} to {cfp:#?}");
+                        stats_collector.register_countables(cfp.counters());
+                        old_app.custom_field_policies.replace(cfp);
+                    } else if old.is_some() {
+                        debug!("custom_field_policies removed");
+                    }
+                    old_app.version = new_app.version;
+                }
+            }
+            candidate_config.log_parser = LogParserConfig {
+                // custom_app is updated in the above code into old_app
+                custom_app: CustomAppConfig {
+                    version: old_app.version,
+                    #[cfg(feature = "enterprise")]
+                    custom_protocol_config: old_app.custom_protocol_config.take(),
+                    #[cfg(feature = "enterprise")]
+                    custom_field_policies: old_app.custom_field_policies.take(),
+                },
+                ..new_config.log_parser.clone()
+            };
         }
 
         if candidate_config.synchronizer != new_config.synchronizer {
@@ -5567,7 +5574,7 @@ impl ConfigHandler {
             candidate_config.synchronizer = new_config.synchronizer.clone();
         }
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         if candidate_config.ebpf != new_config.ebpf {
             if candidate_config.capture_mode != PacketCaptureType::Analyzer {
                 // Check if language-specific profiling configuration changed (only on dynamic config update, not on first start)

@@ -55,7 +55,6 @@ use crate::{
     common::{
         enums::CaptureNetworkType,
         flow::L7Stats,
-        proc_event::BoxedProcEvents,
         tagged_flow::{BoxedTaggedFlow, TaggedFlow},
         tap_types::CaptureNetworkTyper,
         FeatureFlags, DEFAULT_LOG_RETENTION, DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT,
@@ -105,7 +104,6 @@ use crate::{
 };
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
-    ebpf_dispatcher::EbpfCollector,
     platform::SocketSynchronizer,
     utils::{environment::core_file_check, lru::Lru, process::ProcessListener},
 };
@@ -1692,14 +1690,14 @@ impl WatcherComponents {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(unix, feature = "libtrace"))]
 pub struct EbpfDispatcherComponent {
-    pub ebpf_collector: Box<EbpfCollector>,
+    pub ebpf_collector: Box<crate::ebpf_dispatcher::EbpfCollector>,
     pub session_aggregator: SessionAggregator,
     pub l7_collector: L7CollectorThread,
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(unix, feature = "libtrace"))]
 impl EbpfDispatcherComponent {
     pub fn start(&mut self) {
         self.session_aggregator.start();
@@ -1792,7 +1790,7 @@ pub struct AgentComponents {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub socket_synchronizer: SocketSynchronizer,
     pub debugger: Debugger,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     pub ebpf_dispatcher_component: Option<EbpfDispatcherComponent>,
     pub running: AtomicBool,
     pub stats_collector: Arc<stats::Collector>,
@@ -1803,7 +1801,8 @@ pub struct AgentComponents {
     pub profile_uniform_sender: UniformSenderThread<Profile>,
     pub packet_sequence_uniform_output: DebugSender<BoxedPacketSequenceBlock>, // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_uniform_sender: UniformSenderThread<BoxedPacketSequenceBlock>, // Enterprise Edition Feature: packet-sequence
-    pub proc_event_uniform_sender: UniformSenderThread<BoxedProcEvents>,
+    #[cfg(feature = "libtrace")]
+    pub proc_event_uniform_sender: UniformSenderThread<crate::common::proc_event::BoxedProcEvents>,
     pub application_log_uniform_sender: UniformSenderThread<ApplicationLog>,
     pub skywalking_uniform_sender: UniformSenderThread<SkyWalkingExtra>,
     pub datadog_uniform_sender: UniformSenderThread<Datadog>,
@@ -2613,9 +2612,9 @@ impl AgentComponents {
             bpf_syntax_str,
         }));
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         let queue_size = config_handler.ebpf().load().queue_size;
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         let mut dpdk_ebpf_senders = vec![];
 
         let mut tap_interfaces = vec![];
@@ -2628,21 +2627,23 @@ impl AgentComponents {
             #[cfg(target_os = "linux")]
             let netns = entry.1;
 
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            let queue_name = "0-ebpf-dpdk-to-dispatcher";
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            let (dpdk_ebpf_sender, dpdk_ebpf_receiver, counter) =
-                queue::bounded_with_debug(queue_size, queue_name, &queue_debugger);
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            stats_collector.register_countable(
-                &stats::QueueStats {
-                    id: i,
-                    module: queue_name,
-                },
-                Countable::Owned(Box::new(counter)),
-            );
-            #[cfg(any(target_os = "linux", target_os = "android"))]
-            dpdk_ebpf_senders.push(dpdk_ebpf_sender);
+            #[cfg(all(unix, feature = "libtrace"))]
+            let dpdk_ebpf_receiver = {
+                let queue_name = "0-ebpf-dpdk-to-dispatcher";
+                let (dpdk_ebpf_sender, dpdk_ebpf_receiver, counter) =
+                    queue::bounded_with_debug(queue_size, queue_name, &queue_debugger);
+                stats_collector.register_countable(
+                    &stats::QueueStats {
+                        id: i,
+                        module: queue_name,
+                    },
+                    Countable::Owned(Box::new(counter)),
+                );
+                dpdk_ebpf_senders.push(dpdk_ebpf_sender);
+                Some(dpdk_ebpf_receiver)
+            };
+            #[cfg(not(all(unix, feature = "libtrace")))]
+            let dpdk_ebpf_receiver = None;
 
             let dispatcher_component = build_dispatchers(
                 i,
@@ -2674,7 +2675,7 @@ impl AgentComponents {
                 #[cfg(target_os = "linux")]
                 libvirt_xml_extractor.clone(),
                 #[cfg(target_os = "linux")]
-                Some(dpdk_ebpf_receiver),
+                dpdk_ebpf_receiver,
                 #[cfg(target_os = "linux")]
                 {
                     packet_fanout_count > 1
@@ -2683,30 +2684,33 @@ impl AgentComponents {
             dispatcher_components.push(dispatcher_component);
         }
         tap_interfaces.sort();
-        let proc_event_queue_name = "1-proc-event-to-sender";
-        #[allow(unused)]
-        let (proc_event_sender, proc_event_receiver, counter) = queue::bounded_with_debug(
-            user_config.inputs.ebpf.tunning.collector_queue_size,
-            proc_event_queue_name,
-            &queue_debugger,
-        );
-        stats_collector.register_countable(
-            &QueueStats {
-                module: proc_event_queue_name,
-                ..Default::default()
-            },
-            Countable::Owned(Box::new(counter)),
-        );
-        let proc_event_uniform_sender = UniformSenderThread::new(
-            proc_event_queue_name,
-            Arc::new(proc_event_receiver),
-            config_handler.sender(),
-            stats_collector.clone(),
-            exception_handler.clone(),
-            None,
-            SenderEncoder::Raw,
-            sender_leaky_bucket.clone(),
-        );
+        #[cfg(feature = "libtrace")]
+        let (proc_event_sender, proc_event_uniform_sender) = {
+            let proc_event_queue_name = "1-proc-event-to-sender";
+            let (proc_event_sender, proc_event_receiver, counter) = queue::bounded_with_debug(
+                user_config.inputs.ebpf.tunning.collector_queue_size,
+                proc_event_queue_name,
+                &queue_debugger,
+            );
+            stats_collector.register_countable(
+                &QueueStats {
+                    module: proc_event_queue_name,
+                    ..Default::default()
+                },
+                Countable::Owned(Box::new(counter)),
+            );
+            let proc_event_uniform_sender = UniformSenderThread::new(
+                proc_event_queue_name,
+                Arc::new(proc_event_receiver),
+                config_handler.sender(),
+                stats_collector.clone(),
+                exception_handler.clone(),
+                None,
+                SenderEncoder::Raw,
+                sender_leaky_bucket.clone(),
+            );
+            (proc_event_sender, proc_event_uniform_sender)
+        };
 
         let profile_queue_name = "1-profile-to-sender";
         let (profile_sender, profile_receiver, counter) = queue::bounded_with_debug(
@@ -2830,13 +2834,11 @@ impl AgentComponents {
         );
 
         let ebpf_dispatcher_id = dispatcher_components.len();
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         let mut ebpf_dispatcher_component = None;
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        let is_kernel_ebpf_meltdown = crate::utils::guard::is_kernel_ebpf_meltdown();
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         if !config_handler.ebpf().load().ebpf.disabled
-            && !is_kernel_ebpf_meltdown
+            && !crate::utils::guard::is_kernel_ebpf_meltdown()
             && (candidate_config.capture_mode != PacketCaptureType::Analyzer
                 || candidate_config
                     .user_config
@@ -2901,7 +2903,7 @@ impl AgentComponents {
                 &synchronizer,
                 agent_mode,
             );
-            match EbpfCollector::new(
+            match crate::ebpf_dispatcher::EbpfCollector::new(
                 ebpf_dispatcher_id,
                 synchronizer.ntp_diff(),
                 config_handler.ebpf(),
@@ -3172,7 +3174,7 @@ impl AgentComponents {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             socket_synchronizer,
             debugger,
-            #[cfg(any(target_os = "linux", target_os = "android"))]
+            #[cfg(all(unix, feature = "libtrace"))]
             ebpf_dispatcher_component,
             stats_collector,
             running: AtomicBool::new(false),
@@ -3186,6 +3188,7 @@ impl AgentComponents {
             prometheus_uniform_sender,
             telegraf_uniform_sender,
             profile_uniform_sender,
+            #[cfg(feature = "libtrace")]
             proc_event_uniform_sender,
             application_log_uniform_sender,
             skywalking_uniform_sender,
@@ -3267,7 +3270,7 @@ impl AgentComponents {
             }
         }
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         if let Some(ebpf_dispatcher_component) = self.ebpf_dispatcher_component.as_mut() {
             ebpf_dispatcher_component.start();
         }
@@ -3277,6 +3280,7 @@ impl AgentComponents {
             self.prometheus_uniform_sender.start();
             self.telegraf_uniform_sender.start();
             self.profile_uniform_sender.start();
+            #[cfg(feature = "libtrace")]
             self.proc_event_uniform_sender.start();
             self.application_log_uniform_sender.start();
             self.skywalking_uniform_sender.start();
@@ -3324,7 +3328,7 @@ impl AgentComponents {
 
         self.debugger.stop();
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         if let Some(d) = self.ebpf_dispatcher_component.as_mut() {
             d.stop();
         }
@@ -3345,6 +3349,7 @@ impl AgentComponents {
         if let Some(h) = self.profile_uniform_sender.notify_stop() {
             join_handles.push(h);
         }
+        #[cfg(feature = "libtrace")]
         if let Some(h) = self.proc_event_uniform_sender.notify_stop() {
             join_handles.push(h);
         }

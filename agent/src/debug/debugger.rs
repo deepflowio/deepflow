@@ -34,11 +34,10 @@ use log::{error, info, warn};
 use parking_lot::RwLock;
 use tokio::runtime::Runtime;
 
+#[cfg(all(target_os = "linux", feature = "libtrace"))]
+use super::ebpf::{EbpfDebugger, EbpfMessage};
 #[cfg(target_os = "linux")]
-use super::{
-    ebpf::{EbpfDebugger, EbpfMessage},
-    platform::{PlatformDebugger, PlatformMessage},
-};
+use super::platform::{PlatformDebugger, PlatformMessage};
 use super::{
     policy::{PolicyDebugger, PolicyMessage},
     rpc::{RpcDebugger, RpcMessage},
@@ -64,7 +63,7 @@ struct ModuleDebuggers {
     pub rpc: RpcDebugger,
     pub queue: Arc<QueueDebugger>,
     pub policy: PolicyDebugger,
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "libtrace"))]
     pub ebpf: EbpfDebugger,
 }
 
@@ -534,7 +533,7 @@ impl Debugger {
                     _ => unreachable!(),
                 }
             }
-            #[cfg(target_os = "linux")]
+            #[cfg(all(target_os = "linux", feature = "libtrace"))]
             Module::Ebpf => {
                 let ebpf = &debuggers.ebpf;
                 let req: Message<EbpfMessage> = decode_from_std_read(&mut payload, serialize_conf)?;
@@ -572,7 +571,7 @@ impl Debugger {
             ),
             queue: Arc::new(QueueDebugger::new()),
             policy: PolicyDebugger::new(context.policy_setter),
-            #[cfg(target_os = "linux")]
+            #[cfg(all(target_os = "linux", feature = "libtrace"))]
             ebpf: EbpfDebugger::new(),
         };
 

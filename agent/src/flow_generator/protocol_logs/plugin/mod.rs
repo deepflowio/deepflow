@@ -38,7 +38,7 @@ pub mod wasm;
 cfg_if::cfg_if! {
 if #[cfg(feature = "enterprise")] {
         pub mod custom_protocol_policy;
-        pub use custom_protocol_policy::{get_policy_parser, CustomPolicyLog};
+        pub use custom_protocol_policy::CustomPolicyLog;
     }
 }
 
@@ -60,7 +60,7 @@ pub fn get_custom_log_parser(proto: CustomProtocol) -> L7ProtocolParser {
             #[cfg(target_os = "windows")]
             CustomProtocol::So(_, _) => unimplemented!(),
             #[cfg(feature = "enterprise")]
-            CustomProtocol::CustomPolicy(s) => CustomLog::CustomPolicyLog(get_policy_parser(s)),
+            CustomProtocol::CustomPolicy(s) => CustomLog::CustomPolicyLog(CustomPolicyLog::get(s)),
             #[cfg(not(feature = "enterprise"))]
             CustomProtocol::CustomPolicy(_) => unimplemented!(),
         }),

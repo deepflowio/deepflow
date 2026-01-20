@@ -312,6 +312,7 @@ pub trait L7ProtocolParserInterface {
     fn set_obfuscate_cache(&mut self, _: Option<ObfuscateCache>) {}
 }
 
+#[cfg(feature = "libtrace")]
 #[derive(Clone, Debug)]
 pub struct EbpfParam<'a> {
     pub is_tls: bool,
@@ -654,6 +655,7 @@ pub struct ParseParam<'a> {
     // ebpf_type 不为 EBPF_TYPE_NONE 会有值
     // ===================================
     // not None when payload from ebpf
+    #[cfg(feature = "libtrace")]
     pub ebpf_param: Option<EbpfParam<'a>>,
     // calculate from cap_seq, req and correspond resp may have same packet seq, non ebpf always 0
     pub packet_start_seq: u64,
@@ -695,9 +697,10 @@ impl<'a> fmt::Debug for ParseParam<'a> {
             .field("flow_id", &self.flow_id)
             .field("icmp_data", &self.icmp_data)
             .field("direction", &self.direction)
-            .field("ebpf_type", &self.ebpf_type)
-            .field("ebpf_param", &self.ebpf_param)
-            .field("packet_start_seq", &self.packet_start_seq)
+            .field("ebpf_type", &self.ebpf_type);
+        #[cfg(feature = "libtrace")]
+        ds.field("ebpf_param", &self.ebpf_param);
+        ds.field("packet_start_seq", &self.packet_start_seq)
             .field("packet_end_seq", &self.packet_end_seq)
             .field("time", &self.time)
             .field("parse_perf", &self.parse_perf)
@@ -730,7 +733,7 @@ impl<'a> ParseParam<'a> {
         parse_perf: bool,
         parse_log: bool,
     ) -> Self {
-        let mut param = Self {
+        Self {
             l4_protocol: packet.lookup_key.proto,
             ip_src: packet.lookup_key.src_ip,
             ip_dst: packet.lookup_key.dst_ip,
@@ -747,7 +750,20 @@ impl<'a> ParseParam<'a> {
             ebpf_type: packet.ebpf_type,
             packet_start_seq: packet.cap_start_seq,
             packet_end_seq: packet.cap_end_seq,
-            ebpf_param: None,
+            #[cfg(feature = "libtrace")]
+            ebpf_param: if packet.ebpf_type != EbpfType::None {
+                Some(EbpfParam {
+                    is_tls: packet.is_tls(),
+                    is_req_end: packet.is_request_end,
+                    is_resp_end: packet.is_response_end,
+                    #[cfg(unix)]
+                    process_kname: std::str::from_utf8(&packet.process_kname[..]).unwrap_or(""),
+                    #[cfg(windows)]
+                    process_kname: "",
+                })
+            } else {
+                None
+            },
             time: packet.lookup_key.timestamp.as_micros() as u64,
             parse_perf,
             parse_log,
@@ -769,25 +785,13 @@ impl<'a> ParseParam<'a> {
 
             oracle_parse_conf: OracleConfig::default(),
             iso8583_parse_conf: Iso8583ParseConfig::default(),
-        };
-        if packet.ebpf_type != EbpfType::None {
-            param.ebpf_param = Some(EbpfParam {
-                is_tls: packet.is_tls(),
-                is_req_end: packet.is_request_end,
-                is_resp_end: packet.is_response_end,
-                #[cfg(any(target_os = "linux", target_os = "android"))]
-                process_kname: std::str::from_utf8(&packet.process_kname[..]).unwrap_or(""),
-                #[cfg(target_os = "windows")]
-                process_kname: "",
-            });
         }
-
-        param
     }
 }
 
 impl<'a> ParseParam<'a> {
     pub fn is_tls(&self) -> bool {
+        #[cfg(feature = "libtrace")]
         if let Some(ebpf_param) = self.ebpf_param.as_ref() {
             return ebpf_param.is_tls;
         }

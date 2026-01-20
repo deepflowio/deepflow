@@ -231,6 +231,11 @@ cfg_if::cfg_if! {
 pub const PROFILER_CTX_MEMORY_IDX: usize = 2;
 pub const PROFILER_CTX_NUM: usize = 3;
 
+// Stack trace flags
+#[cfg(feature = "extended_observability")]
+#[allow(dead_code)]
+pub const STACK_TRACE_FLAGS_CUDA_MEMORY: u8 = 0x4;
+
 // set this flag to notify caller not to free the data
 pub const TRACER_CALLBACK_FLAG_KEEP_DATA: u8 = 0x1;
 
@@ -464,8 +469,9 @@ pub struct SK_TRACE_STATS {
 #[derive(Debug, Copy, Clone)]
 pub struct stack_profile_data {
     pub profiler_type: u8, // Profiler type, such as 1(PROFILER_TYPE_ONCPU).
-    pub timestamp: u64,    // Timestamp of the stack trace data(unit: nanoseconds).
-    pub pid: u32,          // User-space process-ID.
+    pub flags: u8,
+    pub timestamp: u64, // Timestamp of the stack trace data(unit: nanoseconds).
+    pub pid: u32,       // User-space process-ID.
     /*
      * Identified within the eBPF program in kernel space.
      * If the current is a process and not a thread this field(tid) is filled
@@ -709,6 +715,10 @@ extern "C" {
      * @proto
      *   Specifying the L7 protocol number. If set to '0', it indicates all
      *   L7 protocols.
+     * @ipaddr
+     *   Specifying ip address
+     * @port
+     *   Specifying port
      * @timeout
      *   Specifying the timeout duration. If the elapsed time exceeds this
      *   duration, datadump will stop. The unit is in seconds.
@@ -721,6 +731,8 @@ extern "C" {
         pid: c_int,
         comm: *const c_char,
         proto: c_int,
+        ipaddr: *const c_char,
+        port: c_int,
         timeout: c_int,
         callback: extern "C" fn(data: *mut c_char, len: c_int),
     ) -> c_int;

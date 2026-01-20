@@ -38,7 +38,7 @@ CALL AddColumnIfNotExists('pod', 'uid', 'CHAR(64) DEFAULT ""', 'domain');
 CALL AddColumnIfNotExists('custom_service', 'service_group_name', 'VARCHAR(128) DEFAULT ""', 'team_id');
 
 -- Cleanup
-DROP FUNCTION IF EXISTS ColumnExists;
+DROP PROCEDURE IF EXISTS ColumnExists;
 DROP PROCEDURE IF EXISTS AddColumnIfNotExists;
 
 -- Populate uid columns

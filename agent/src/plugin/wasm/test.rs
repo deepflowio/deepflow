@@ -30,7 +30,7 @@ use public::l7_protocol::{CustomProtocol, LogMessageType};
 use crate::common::ebpf::EbpfType;
 use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_info::L7ProtocolInfo;
-use crate::common::l7_protocol_log::{EbpfParam, L7PerfCache};
+use crate::common::l7_protocol_log::L7PerfCache;
 
 use crate::config::handler::LogParserConfig;
 use crate::config::{config::Iso8583ParseConfig, OracleConfig};
@@ -56,7 +56,8 @@ fn get_req_param<'a>(
         flow_id: 1234567,
         direction: PacketDirection::ClientToServer,
         ebpf_type: EbpfType::TracePoint,
-        ebpf_param: Some(EbpfParam {
+        #[cfg(feature = "libtrace")]
+        ebpf_param: Some(crate::common::l7_protocol_log::EbpfParam {
             is_tls: false,
             is_req_end: false,
             is_resp_end: false,
@@ -95,8 +96,8 @@ fn get_resq_param<'a>(
         flow_id: 1234567,
         direction: PacketDirection::ServerToClient,
         ebpf_type: EbpfType::TracePoint,
-
-        ebpf_param: Some(EbpfParam {
+        #[cfg(feature = "libtrace")]
+        ebpf_param: Some(crate::common::l7_protocol_log::EbpfParam {
             is_tls: false,
             is_req_end: false,
             is_resp_end: false,

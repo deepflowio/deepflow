@@ -39,6 +39,8 @@ use super::{
     value_is_default, AppProtoHead, L7ResponseStatus, PrioField,
 };
 
+#[cfg(feature = "libtrace")]
+use crate::utils::bytes::read_u32_le;
 use crate::{
     common::{
         ebpf::EbpfType,
@@ -56,7 +58,7 @@ use crate::{
         set_captured_byte, L7ProtoRawDataType, BASE_FIELD_PRIORITY, PLUGIN_FIELD_PRIORITY,
     },
     plugin::CustomInfo,
-    utils::bytes::{read_u32_be, read_u32_le},
+    utils::bytes::read_u32_be,
 };
 
 cfg_if::cfg_if! {
@@ -991,6 +993,7 @@ impl L7ProtocolParserInterface for HttpLog {
                     self.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
                 }
                 match param.ebpf_type {
+                    #[cfg(feature = "libtrace")]
                     EbpfType::GoHttp2Uprobe
                     | EbpfType::GoHttp2UprobeData
                     | EbpfType::UnixSocket => {
@@ -1048,9 +1051,7 @@ impl L7ProtocolParserInterface for HttpLog {
         #[cfg(feature = "enterprise")]
         self.custom_field_store.clear();
         #[cfg(feature = "enterprise")]
-        let custom_policies = config
-            .l7_log_dynamic
-            .get_custom_field_policies(self.proto.into(), param);
+        let custom_policies = config.get_custom_field_policies(self.proto.into(), param);
 
         match self.proto {
             L7Protocol::Http1 => {
@@ -1106,6 +1107,7 @@ impl L7ProtocolParserInterface for HttpLog {
                     };
 
                     let ret = match param.ebpf_type {
+                        #[cfg(feature = "libtrace")]
                         EbpfType::GoHttp2Uprobe => self.parse_http2_go_uprobe(
                             &config.l7_log_dynamic,
                             &payload[offset..],
@@ -1407,6 +1409,7 @@ impl HttpLog {
     // +---------------------------------------------------------------+
     // |                          value (valueLength,变长)           ...|
     // +---------------------------------------------------------------+
+    #[cfg(feature = "libtrace")]
     pub fn check_http2_go_uprobe(
         &mut self,
         config: &L7LogDynamicConfig,
@@ -1446,12 +1449,14 @@ impl HttpLog {
             if let Some((key, val)) = str::from_utf8(key).ok().zip(str::from_utf8(val).ok()) {
                 policies.apply(
                     &mut self.custom_field_store,
+                    info,
                     direction.into(),
                     Source::Header(key, val),
                 );
                 if key == ":path" {
                     policies.apply(
                         &mut self.custom_field_store,
+                        info,
                         direction.into(),
                         Source::Url(&info.path),
                     );
@@ -1486,6 +1491,7 @@ impl HttpLog {
         }
     }
 
+    #[cfg(feature = "libtrace")]
     pub fn parse_http2_go_uprobe(
         &mut self,
         config: &L7LogDynamicConfig,
@@ -1576,6 +1582,7 @@ impl HttpLog {
             if let Some(policies) = custom_policies {
                 policies.apply(
                     &mut self.custom_field_store,
+                    info,
                     direction.into(),
                     Source::Url(&info.path),
                 );
@@ -1614,6 +1621,7 @@ impl HttpLog {
             if let Some(policies) = custom_policies {
                 policies.apply(
                     &mut self.custom_field_store,
+                    info,
                     direction.into(),
                     Source::Header(key, trim_value),
                 );
@@ -1637,6 +1645,7 @@ impl HttpLog {
         if let Some(policies) = custom_policies {
             policies.apply(
                 &mut self.custom_field_store,
+                info,
                 direction.into(),
                 Source::Payload(PayloadType::JSON | PayloadType::XML, l7_payload),
             );
@@ -1828,12 +1837,14 @@ impl HttpLog {
                         {
                             policies.apply(
                                 &mut self.custom_field_store,
+                                info,
                                 direction.into(),
                                 Source::Header(key, val),
                             );
                             if key == ":path" {
                                 policies.apply(
                                     &mut self.custom_field_store,
+                                    info,
                                     direction.into(),
                                     Source::Url(&info.path),
                                 );
@@ -2446,33 +2457,24 @@ pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{
-        config::TagFilterOperator,
-        handler::{BlacklistTrie, L7LogDynamicConfigBuilder, LogParserConfig, TraceType},
-        HttpEndpoint, HttpEndpointMatchRule, HttpEndpointTrie,
-    };
-    use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
-    use crate::utils::test::Capture;
-    use crate::{
-        common::{
-            l7_protocol_log::{EbpfParam, L7PerfCache},
-            MetaPacket,
-        },
-        config::{config::Iso8583ParseConfig, OracleConfig},
-    };
-
-    use std::cell::RefCell;
-    use std::collections::HashSet;
-    use std::fmt;
-    use std::fs;
-    use std::mem::size_of;
-    use std::net::{IpAddr, Ipv4Addr};
-    use std::path::Path;
-    use std::rc::Rc;
-    use std::slice::from_raw_parts;
-    use std::time::Duration;
-
     use super::*;
+
+    #[cfg(feature = "libtrace")]
+    use std::net::{IpAddr, Ipv4Addr};
+    use std::{cell::RefCell, collections::HashSet, fmt, fs, path::Path, rc::Rc, time::Duration};
+
+    #[cfg(feature = "libtrace")]
+    use crate::config::{config::Iso8583ParseConfig, OracleConfig};
+    use crate::{
+        common::{l7_protocol_log::L7PerfCache, MetaPacket},
+        config::{
+            config::TagFilterOperator,
+            handler::{BlacklistTrie, L7LogDynamicConfigBuilder, LogParserConfig, TraceType},
+            HttpEndpoint, HttpEndpointMatchRule, HttpEndpointTrie,
+        },
+        flow_generator::L7_RRT_CACHE_CAPACITY,
+        utils::test::Capture,
+    };
 
     const FILE_DIR: &str = "resources/test/flow_generator/http";
 
@@ -2717,6 +2719,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "libtrace")]
     #[test]
     fn test_go_uprobe() {
         #[derive(Debug)]
@@ -2730,7 +2733,10 @@ mod tests {
             fn to_bytes(self, key: &str, val: &str) -> Vec<u8> {
                 let hdr_p;
                 unsafe {
-                    hdr_p = from_raw_parts(&self as *const Self as *const u8, size_of::<Self>());
+                    hdr_p = std::slice::from_raw_parts(
+                        &self as *const Self as *const u8,
+                        std::mem::size_of::<Self>(),
+                    );
                 }
                 return [hdr_p, key.as_bytes(), val.as_bytes()].concat();
             }
@@ -2745,7 +2751,7 @@ mod tests {
             flow_id: 0,
             direction: PacketDirection::ClientToServer,
             ebpf_type: EbpfType::GoHttp2Uprobe,
-            ebpf_param: Some(EbpfParam {
+            ebpf_param: Some(crate::common::l7_protocol_log::EbpfParam {
                 is_tls: false,
                 is_req_end: false,
                 is_resp_end: false,

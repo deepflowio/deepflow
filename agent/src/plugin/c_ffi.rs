@@ -76,15 +76,15 @@ impl From<(&ParseParam<'_>, &[u8])> for ParseCtx {
             ebpf_type: (p.ebpf_type as u8),
             time: p.time,
             direction: (p.direction as u8),
-            process_kname: if let Some(e) = p.ebpf_param.as_ref() {
-                e.process_kname.as_ptr()
-            } else {
-                "".as_ptr()
-            },
+            process_kname: "".as_ptr(),
             buf_size: p.buf_size as i32,
             payload_size: payload.len() as i32,
             payload: payload.as_ptr(),
         };
+        #[cfg(feature = "libtrace")]
+        if let Some(e) = p.ebpf_param.as_ref() {
+            ctx.process_kname = e.process_kname.as_ptr();
+        }
 
         match (p.ip_src, p.ip_dst) {
             (IpAddr::V4(src), IpAddr::V4(dst)) => {

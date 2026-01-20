@@ -205,6 +205,7 @@ type VTapCache struct {
 	bootTime           int
 	exceptions         int64
 	vTapLcuuid         *string
+	vTapGroupID        int
 	vTapGroupLcuuid    *string
 	vTapGroupShortID   *string
 	cpuNum             int
@@ -264,9 +265,10 @@ type VTapCache struct {
 	agentRemoteSegments []*agent.Segment
 
 	// vtap version
-	pushVersionPlatformData uint64
-	pushVersionPolicy       uint64
-	pushVersionGroups       uint64
+	pushVersionPlatformData    uint64
+	pushVersionPolicy          uint64
+	pushVersionGroups          uint64
+	pushVersionCustomAppConfig uint64
 
 	// grpc buffer size
 	grpcBufferSize    uint64
@@ -313,6 +315,7 @@ func (c *VTapCache) String() ([]byte, error) {
 		"bootTime":                         c.GetBootTime(),
 		"grpcBufferSize":                   c.GetGRPCBufferSize(),
 		"exceptions":                       c.GetExceptions(),
+		"vTapGroupID":                      c.GetVTapGroupID(),
 		"vTapGroupLcuuid":                  c.GetVTapGroupLcuuid(),
 		"vTapGroupShortID":                 c.GetVTapGroupShortID(),
 		"autoGRPCBufferSizeInterval":       c.GetAutoGRPCBufferSizeInterval(),
@@ -344,6 +347,7 @@ func (c *VTapCache) String() ([]byte, error) {
 		"pushVersionPlatformData":          c.GetPushVersionPlatformData(),
 		"pushVersionPolicy":                c.GetPushVersionPolicy(),
 		"pushVersionGroups":                c.GetPushVersionGroups(),
+		"pushVersionCustomAppConfig":       c.GetPushVersionCustomAppConfig(),
 		"expectedRevision":                 c.GetExpectedRevision(),
 		"upgradePackage":                   c.GetUpgradePackage(),
 		"podClusterID":                     c.GetPodClusterID(),
@@ -380,6 +384,7 @@ func NewVTapCache(vtap *metadbmodel.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.bootTime = vtap.BootTime
 	vTapCache.exceptions = vtap.Exceptions
 	vTapCache.vTapLcuuid = proto.String(vtap.VTapLcuuid)
+	vTapCache.vTapGroupID = vTapInfo.vtapGroupLcuuidToID[vtap.VtapGroupLcuuid]
 	vTapCache.vTapGroupLcuuid = proto.String(vtap.VtapGroupLcuuid)
 	vTapCache.vTapGroupShortID = proto.String(vTapInfo.vtapGroupLcuuidToShortID[vtap.VtapGroupLcuuid])
 	vTapCache.cpuNum = vtap.CPUNum
@@ -430,6 +435,7 @@ func NewVTapCache(vtap *metadbmodel.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.pushVersionPlatformData = 0
 	vTapCache.pushVersionPolicy = 0
 	vTapCache.pushVersionGroups = 0
+	vTapCache.pushVersionCustomAppConfig = 0
 	vTapCache.controllerSyncFlag = atomicbool.NewBool(false)
 	vTapCache.tsdbSyncFlag = atomicbool.NewBool(false)
 	vTapCache.podClusterID = 0
@@ -837,6 +843,14 @@ func (c *VTapCache) GetPushVersionGroups() uint64 {
 	return c.pushVersionGroups
 }
 
+func (c *VTapCache) UpdatePushVersionCustomAppConfig(version uint64) {
+	c.pushVersionCustomAppConfig = version
+}
+
+func (c *VTapCache) GetPushVersionCustomAppConfig() uint64 {
+	return c.pushVersionCustomAppConfig
+}
+
 func (c *VTapCache) GetSimplePlatformDataVersion() uint64 {
 	platformData := c.GetVTapPlatformData()
 	if platformData == nil {
@@ -979,6 +993,10 @@ func (c *VTapCache) GetLcuuid() string {
 	return ""
 }
 
+func (c *VTapCache) GetVTapGroupID() int {
+	return c.vTapGroupID
+}
+
 func (c *VTapCache) GetVTapGroupLcuuid() string {
 	if c.vTapGroupLcuuid != nil {
 		return *c.vTapGroupLcuuid
@@ -991,6 +1009,10 @@ func (c *VTapCache) GetVTapGroupShortID() string {
 		return *c.vTapGroupShortID
 	}
 	return ""
+}
+
+func (c *VTapCache) updateVTapGroupID(id int) {
+	c.vTapGroupID = id
 }
 
 func (c *VTapCache) updateVTapGroupLcuuid(lcuuid string) {
@@ -1529,6 +1551,7 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *metadbmodel.VTap) {
 	c.modifyVTapCache()
 	// 采集器组变化 重新生成平台数据
 	if c.GetVTapGroupLcuuid() != vtap.VtapGroupLcuuid {
+		c.updateVTapGroupID(v.vtapGroupLcuuidToID[vtap.VtapGroupLcuuid])
 		c.updateVTapGroupLcuuid(vtap.VtapGroupLcuuid)
 		c.updateVTapGroupShortID(v.vtapGroupLcuuidToShortID[vtap.VtapGroupLcuuid])
 		v.setVTapChangedForPD()

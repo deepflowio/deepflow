@@ -475,34 +475,131 @@ func (c *Cleaner) cleanPodIngressDirty(domainLcuuid string) {
 
 func (c *Cleaner) cleanPodServiceDirty(domainLcuuid string) {
 	podServiceIDs := getIDs[metadbmodel.PodService](c.org.DB, domainLcuuid)
-	total := len(podServiceIDs)
-	if total != 0 {
-		for i := 0; i < total; i += c.cfg.MySQLBatchSize {
+	if len(podServiceIDs) == 0 {
+		return
+	}
+
+	podServiceIDSet := make(map[int]struct{}, len(podServiceIDs))
+	for _, id := range podServiceIDs {
+		podServiceIDSet[id] = struct{}{}
+	}
+
+	// 清理 PodServicePorts
+	var podServicePortRefs []struct {
+		ID           int `gorm:"column:id"`
+		PodServiceID int `gorm:"column:pod_service_id"`
+	}
+	if err := c.org.DB.Model(&metadbmodel.PodServicePort{}).
+		Select("id, pod_service_id").
+		Where(map[string]interface{}{"domain": domainLcuuid}).
+		Find(&podServicePortRefs).Error; err != nil {
+		log.Errorf("failed to query pod service port refs: %s, domain lcuuid: %s", err.Error(), domainLcuuid, c.org.LogPrefix)
+		return
+	}
+
+	dirtyPodServicePortIDs := make([]int, 0)
+	for _, ref := range podServicePortRefs {
+		if _, exists := podServiceIDSet[ref.PodServiceID]; !exists {
+			dirtyPodServicePortIDs = append(dirtyPodServicePortIDs, ref.ID)
+		}
+	}
+
+	if len(dirtyPodServicePortIDs) > 0 {
+		for i := 0; i < len(dirtyPodServicePortIDs); i += c.cfg.MySQLBatchSize {
 			end := i + c.cfg.MySQLBatchSize
-			if end > total {
-				end = total
+			if end > len(dirtyPodServicePortIDs) {
+				end = len(dirtyPodServicePortIDs)
 			}
-			podServiceIDsBatch := podServiceIDs[i:end]
 
 			var podServicePorts []*metadbmodel.PodServicePort
-			c.org.DB.Where(map[string]interface{}{"domain": domainLcuuid}).
-				Where("pod_service_id NOT IN ?", podServiceIDsBatch).Find(&podServicePorts)
+			if err := c.org.DB.Where("id IN ?", dirtyPodServicePortIDs[i:end]).Find(&podServicePorts).Error; err != nil {
+				log.Errorf("failed to query pod service ports: %s, pod service port ids: %v", err.Error(), dirtyPodServicePortIDs[i:end], c.org.LogPrefix)
+				continue
+			}
 			if len(podServicePorts) != 0 {
 				c.org.DB.Unscoped().Delete(&podServicePorts)
 				log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podServicePorts), c.org.LogPrefix)
 			}
+		}
+	}
+
+	// 清理 PodGroupPorts
+	var podGroupPortRefs []struct {
+		ID           int `gorm:"column:id"`
+		PodServiceID int `gorm:"column:pod_service_id"`
+	}
+	if err := c.org.DB.Model(&metadbmodel.PodGroupPort{}).
+		Select("id, pod_service_id").
+		Where(map[string]interface{}{"domain": domainLcuuid}).
+		Find(&podGroupPortRefs).Error; err != nil {
+		log.Errorf("failed to query pod group port refs: %s, domain lcuuid: %s", err.Error(), domainLcuuid, c.org.LogPrefix)
+		return
+	}
+
+	dirtyPodGroupPortIDs := make([]int, 0)
+	for _, ref := range podGroupPortRefs {
+		if _, exists := podServiceIDSet[ref.PodServiceID]; !exists {
+			dirtyPodGroupPortIDs = append(dirtyPodGroupPortIDs, ref.ID)
+		}
+	}
+
+	if len(dirtyPodGroupPortIDs) > 0 {
+		for i := 0; i < len(dirtyPodGroupPortIDs); i += c.cfg.MySQLBatchSize {
+			end := i + c.cfg.MySQLBatchSize
+			if end > len(dirtyPodGroupPortIDs) {
+				end = len(dirtyPodGroupPortIDs)
+			}
 
 			var podGroupPorts []*metadbmodel.PodGroupPort
-			c.org.DB.Where(map[string]interface{}{"domain": domainLcuuid}).
-				Where("pod_service_id NOT IN ?", podServiceIDsBatch).Find(&podGroupPorts)
+			if err := c.org.DB.Where("id IN ?", dirtyPodGroupPortIDs[i:end]).Find(&podGroupPorts).Error; err != nil {
+				log.Errorf("failed to query pod group ports: %s, pod group port ids: %v", err.Error(), dirtyPodGroupPortIDs[i:end], c.org.LogPrefix)
+				continue
+			}
 			if len(podGroupPorts) != 0 {
 				c.org.DB.Unscoped().Delete(&podGroupPorts)
 				log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, podGroupPorts), c.org.LogPrefix)
 			}
+		}
+	}
+
+	// 清理 VInterfaces
+	var vifDevices []struct {
+		ID       int `gorm:"column:id"`
+		DeviceID int `gorm:"column:deviceid"`
+	}
+	if err := c.org.DB.Model(&metadbmodel.VInterface{}).
+		Select("id, deviceid").
+		Where(map[string]interface{}{"domain": domainLcuuid, "devicetype": ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE}).
+		Find(&vifDevices).Error; err != nil {
+		log.Errorf("failed to query vif devices: %s, domain lcuuid: %s", err.Error(), domainLcuuid, c.org.LogPrefix)
+		return
+	}
+
+	dirtyVifDeviceIDSet := make(map[int]struct{})
+	for _, vd := range vifDevices {
+		if _, exists := podServiceIDSet[vd.DeviceID]; !exists {
+			dirtyVifDeviceIDSet[vd.DeviceID] = struct{}{}
+		}
+	}
+
+	dirtyVifDeviceIDs := make([]int, 0, len(dirtyVifDeviceIDSet))
+	for deviceID := range dirtyVifDeviceIDSet {
+		dirtyVifDeviceIDs = append(dirtyVifDeviceIDs, deviceID)
+	}
+
+	if len(dirtyVifDeviceIDs) > 0 {
+		for i := 0; i < len(dirtyVifDeviceIDs); i += c.cfg.MySQLBatchSize {
+			end := i + c.cfg.MySQLBatchSize
+			if end > len(dirtyVifDeviceIDs) {
+				end = len(dirtyVifDeviceIDs)
+			}
 
 			var vifs []*metadbmodel.VInterface
-			c.org.DB.Where(map[string]interface{}{"domain": domainLcuuid}).
-				Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE, podServiceIDsBatch).Find(&vifs)
+			if err := c.org.DB.Where(map[string]interface{}{"domain": domainLcuuid}).
+				Where("devicetype = ? AND deviceid IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE, dirtyVifDeviceIDs[i:end]).Find(&vifs).Error; err != nil {
+				log.Errorf("failed to query vifs: %s, domain lcuuid: %s", err.Error(), domainLcuuid, c.org.LogPrefix)
+				continue
+			}
 			if len(vifs) != 0 {
 				c.org.DB.Unscoped().Delete(&vifs)
 				log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, vifs), c.org.LogPrefix)
@@ -515,38 +612,129 @@ func (c *Cleaner) cleanPodServiceDirty(domainLcuuid string) {
 
 func (c *Cleaner) cleanPodGroupDirty(domainLcuuid string) {
 	podGroupIDs := getIDs[metadbmodel.PodGroup](c.org.DB, domainLcuuid)
-	total := len(podGroupIDs)
-	if total != 0 {
-		for i := 0; i < total; i += c.cfg.MySQLBatchSize {
+	if len(podGroupIDs) == 0 {
+		return
+	}
+
+	podGroupIDSet := make(map[int]struct{}, len(podGroupIDs))
+	for _, id := range podGroupIDs {
+		podGroupIDSet[id] = struct{}{}
+	}
+
+	// 清理 PodGroupPorts
+	var podGroupPortRefs []struct {
+		ID         int `gorm:"column:id"`
+		PodGroupID int `gorm:"column:pod_group_id"`
+	}
+	if err := c.org.DB.Model(&metadbmodel.PodGroupPort{}).
+		Select("id, pod_group_id").
+		Where(map[string]interface{}{"domain": domainLcuuid}).
+		Find(&podGroupPortRefs).Error; err != nil {
+		log.Errorf("failed to query pod group port refs: %s, domain lcuuid: %s", err.Error(), domainLcuuid, c.org.LogPrefix)
+		return
+	}
+
+	dirtyPodGroupPortIDs := make([]int, 0)
+	for _, ref := range podGroupPortRefs {
+		if _, exists := podGroupIDSet[ref.PodGroupID]; !exists {
+			dirtyPodGroupPortIDs = append(dirtyPodGroupPortIDs, ref.ID)
+		}
+	}
+
+	if len(dirtyPodGroupPortIDs) > 0 {
+		for i := 0; i < len(dirtyPodGroupPortIDs); i += c.cfg.MySQLBatchSize {
 			end := i + c.cfg.MySQLBatchSize
-			if end > total {
-				end = total
+			if end > len(dirtyPodGroupPortIDs) {
+				end = len(dirtyPodGroupPortIDs)
 			}
-			podGroupIDsBatch := podGroupIDs[i:end]
 
 			var podGroupPorts []*metadbmodel.PodGroupPort
-			c.org.DB.Where(map[string]interface{}{"domain": domainLcuuid}).
-				Where("pod_group_id NOT IN ?", podGroupIDsBatch).Find(&podGroupPorts)
+			if err := c.org.DB.Where("id IN ?", dirtyPodGroupPortIDs[i:end]).Find(&podGroupPorts).Error; err != nil {
+				log.Errorf("failed to query pod group ports: %s, pod group port ids: %v", err.Error(), dirtyPodGroupPortIDs[i:end], c.org.LogPrefix)
+				continue
+			}
 			if len(podGroupPorts) != 0 {
 				c.org.DB.Unscoped().Delete(&podGroupPorts)
 				log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, podGroupPorts), c.org.LogPrefix)
 			}
+		}
+	}
+
+	// 清理 Pods
+	var podRefs []struct {
+		ID         int `gorm:"column:id"`
+		PodGroupID int `gorm:"column:pod_group_id"`
+	}
+	if err := c.org.DB.Model(&metadbmodel.Pod{}).
+		Select("id, pod_group_id").
+		Where(map[string]interface{}{"domain": domainLcuuid}).
+		Find(&podRefs).Error; err != nil {
+		log.Errorf("failed to query pod refs: %s, domain lcuuid: %s", err.Error(), domainLcuuid, c.org.LogPrefix)
+		return
+	}
+
+	dirtyPodIDs := make([]int, 0)
+	for _, ref := range podRefs {
+		if _, exists := podGroupIDSet[ref.PodGroupID]; !exists {
+			dirtyPodIDs = append(dirtyPodIDs, ref.ID)
+		}
+	}
+
+	if len(dirtyPodIDs) > 0 {
+		for i := 0; i < len(dirtyPodIDs); i += c.cfg.MySQLBatchSize {
+			end := i + c.cfg.MySQLBatchSize
+			if end > len(dirtyPodIDs) {
+				end = len(dirtyPodIDs)
+			}
 
 			var pods []*metadbmodel.Pod
-			c.org.DB.Where(map[string]interface{}{"domain": domainLcuuid}).
-				Where("pod_group_id NOT IN ?", podGroupIDsBatch).Find(&pods)
+			if err := c.org.DB.Where("id IN ?", dirtyPodIDs[i:end]).Find(&pods).Error; err != nil {
+				log.Errorf("failed to query pods: %s, pod ids: %v", err.Error(), dirtyPodIDs[i:end], c.org.LogPrefix)
+				continue
+			}
 			if len(pods) != 0 {
 				if err := c.org.DB.Unscoped().Delete(&pods).Error; err != nil {
-					log.Errorf("failed to delete pods: %s, pod group ids: %v", err.Error(), podGroupIDsBatch, c.org.LogPrefix)
+					log.Errorf("failed to delete pods: %s, pod ids: %v", err.Error(), dirtyPodIDs[i:end], c.org.LogPrefix)
 				} else {
 					publishTagrecorder[*message.DeletedPods, message.DeletedPods, metadbmodel.Pod](c.org.DB, pods, ctrlrcommon.RESOURCE_TYPE_POD_EN, c.toolData)
 				}
 				log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, pods), c.org.LogPrefix)
 			}
+		}
+	}
+
+	// 清理 PodReplicaSets
+	var podReplicaSetRefs []struct {
+		ID         int `gorm:"column:id"`
+		PodGroupID int `gorm:"column:pod_group_id"`
+	}
+	if err := c.org.DB.Model(&metadbmodel.PodReplicaSet{}).
+		Select("id, pod_group_id").
+		Where(map[string]interface{}{"domain": domainLcuuid}).
+		Find(&podReplicaSetRefs).Error; err != nil {
+		log.Errorf("failed to query pod replica set refs: %s, domain lcuuid: %s", err.Error(), domainLcuuid, c.org.LogPrefix)
+		return
+	}
+
+	dirtyPodReplicaSetIDs := make([]int, 0)
+	for _, ref := range podReplicaSetRefs {
+		if _, exists := podGroupIDSet[ref.PodGroupID]; !exists {
+			dirtyPodReplicaSetIDs = append(dirtyPodReplicaSetIDs, ref.ID)
+		}
+	}
+
+	if len(dirtyPodReplicaSetIDs) > 0 {
+		for i := 0; i < len(dirtyPodReplicaSetIDs); i += c.cfg.MySQLBatchSize {
+			end := i + c.cfg.MySQLBatchSize
+			if end > len(dirtyPodReplicaSetIDs) {
+				end = len(dirtyPodReplicaSetIDs)
+			}
 
 			var podReplicaSets []*metadbmodel.PodReplicaSet
-			c.org.DB.Where(map[string]interface{}{"domain": domainLcuuid}).
-				Where("pod_group_id NOT IN ?", podGroupIDsBatch).Find(&podReplicaSets)
+			if err := c.org.DB.Where("id IN ?", dirtyPodReplicaSetIDs[i:end]).Find(&podReplicaSets).Error; err != nil {
+				log.Errorf("failed to query pod replica sets: %s, pod replica set ids: %v", err.Error(), dirtyPodReplicaSetIDs[i:end], c.org.LogPrefix)
+				continue
+			}
 			if len(podReplicaSets) != 0 {
 				c.org.DB.Unscoped().Delete(&podReplicaSets)
 				log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, podReplicaSets), c.org.LogPrefix)
@@ -594,26 +782,66 @@ func (c *Cleaner) cleanPodNodeDirty(domainLcuuid string) {
 
 func (c *Cleaner) cleanPodDirty(domainLcuuid string) {
 	podIDs := getIDs[metadbmodel.Pod](c.org.DB, domainLcuuid)
-	total := len(podIDs)
-	if total != 0 {
-		for i := 0; i < total; i += c.cfg.MySQLBatchSize {
-			end := i + c.cfg.MySQLBatchSize
-			if end > total {
-				end = total
-			}
+	if len(podIDs) == 0 {
+		return
+	}
 
-			var vifs []*metadbmodel.VInterface
-			c.org.DB.Where(map[string]interface{}{"domain": domainLcuuid}).
-				Where("devicetype = ? AND deviceid NOT IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD, podIDs[i:end]).Find(&vifs)
-			if len(vifs) != 0 {
-				if err := c.org.DB.Unscoped().Delete(&vifs).Error; err != nil {
-					log.Errorf("failed to delete vifs: %s, pod ids: %v", err.Error(), podIDs[i:end], c.org.LogPrefix)
-					continue
-				}
-				log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_EN, vifs), c.org.LogPrefix)
+	var vifDevices []struct {
+		ID       int `gorm:"column:id"`
+		DeviceID int `gorm:"column:deviceid"`
+	}
+	if err := c.org.DB.Model(&metadbmodel.VInterface{}).
+		Select("id, deviceid").
+		Where(map[string]interface{}{"domain": domainLcuuid, "devicetype": ctrlrcommon.VIF_DEVICE_TYPE_POD}).
+		Find(&vifDevices).Error; err != nil {
+		log.Errorf("failed to query vif devices: %s, domain: %s", err.Error(), domainLcuuid, c.org.LogPrefix)
+		return
+	}
 
-				c.fillStatsd(domainLcuuid, tagTypeDeviceIPConn, len(vifs))
+	if len(vifDevices) == 0 {
+		return
+	}
+
+	// 找出所有不存在的 deviceids（不在 podIDs 中的）
+	podIDSet := make(map[int]struct{}, len(podIDs))
+	for _, id := range podIDs {
+		podIDSet[id] = struct{}{}
+	}
+
+	dirtyDeviceIDSet := make(map[int]struct{})
+	for _, vd := range vifDevices {
+		if _, exists := podIDSet[vd.DeviceID]; !exists {
+			dirtyDeviceIDSet[vd.DeviceID] = struct{}{}
+		}
+	}
+
+	dirtyDeviceIDs := make([]int, 0, len(dirtyDeviceIDSet))
+	for deviceID := range dirtyDeviceIDSet {
+		dirtyDeviceIDs = append(dirtyDeviceIDs, deviceID)
+	}
+
+	// 使用脏数据的 deviceids 分批删除 vifs
+	total := len(dirtyDeviceIDs)
+	for i := 0; i < total; i += c.cfg.MySQLBatchSize {
+		end := i + c.cfg.MySQLBatchSize
+		if end > total {
+			end = total
+		}
+
+		var vifs []*metadbmodel.VInterface
+		if err := c.org.DB.Where(map[string]interface{}{"domain": domainLcuuid}).
+			Where("devicetype = ? AND deviceid IN ?", ctrlrcommon.VIF_DEVICE_TYPE_POD, dirtyDeviceIDs[i:end]).Find(&vifs).Error; err != nil {
+			log.Errorf("failed to query vifs: %s, dirty device ids: %v", err.Error(), dirtyDeviceIDs[i:end], c.org.LogPrefix)
+			continue
+		}
+		if len(vifs) != 0 {
+			if err := c.org.DB.Unscoped().Delete(&vifs).Error; err != nil {
+				log.Errorf("failed to delete vifs: %s, dirty device ids: %v", err.Error(), dirtyDeviceIDs[i:end], c.org.LogPrefix)
+				continue
 			}
+			log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, ctrlrcommon.RESOURCE_TYPE_POD_EN, vifs), c.org.LogPrefix)
+
+			c.fillStatsd(domainLcuuid, tagTypeDeviceIPConn, len(vifs))
 		}
 	}
 }
@@ -764,31 +992,92 @@ func (c *Cleaner) cleanPodNamespaceDirty(domainLcuuid string) {
 
 func (c *Cleaner) cleanVInterfaceDirty(domainLcuuid string) {
 	vifIDs := getIDs[metadbmodel.VInterface](c.org.DB, domainLcuuid)
-	total := len(vifIDs)
-	if total != 0 {
-		for i := 0; i < total; i += c.cfg.MySQLBatchSize {
+	if len(vifIDs) == 0 {
+		return
+	}
+
+	vifIDSet := make(map[int]struct{}, len(vifIDs))
+	for _, id := range vifIDs {
+		vifIDSet[id] = struct{}{}
+	}
+
+	// 清理 LANIPs
+	var lanIPRefs []struct {
+		ID    int `gorm:"column:id"`
+		VifID int `gorm:"column:vifid"`
+	}
+	if err := c.org.DB.Model(&metadbmodel.LANIP{}).
+		Select("id, vifid").
+		Where(map[string]interface{}{"domain": domainLcuuid}).
+		Find(&lanIPRefs).Error; err != nil {
+		log.Errorf("failed to query lan ip refs: %s, domain lcuuid: %s", err.Error(), domainLcuuid, c.org.LogPrefix)
+		return
+	}
+
+	dirtyLANIPIDs := make([]int, 0)
+	for _, ref := range lanIPRefs {
+		if _, exists := vifIDSet[ref.VifID]; !exists {
+			dirtyLANIPIDs = append(dirtyLANIPIDs, ref.ID)
+		}
+	}
+
+	if len(dirtyLANIPIDs) > 0 {
+		for i := 0; i < len(dirtyLANIPIDs); i += c.cfg.MySQLBatchSize {
 			end := i + c.cfg.MySQLBatchSize
-			if end > total {
-				end = total
+			if end > len(dirtyLANIPIDs) {
+				end = len(dirtyLANIPIDs)
 			}
 
 			var lanIPs []*metadbmodel.LANIP
-			c.org.DB.Where(map[string]interface{}{"domain": domainLcuuid}).
-				Where("vifid NOT IN ?", vifIDs[i:end]).Find(&lanIPs)
+			if err := c.org.DB.Where("id IN ?", dirtyLANIPIDs[i:end]).Find(&lanIPs).Error; err != nil {
+				log.Errorf("failed to query lan ips: %s, lan ip ids: %v", err.Error(), dirtyLANIPIDs[i:end], c.org.LogPrefix)
+				continue
+			}
 			if len(lanIPs) != 0 {
 				if err := c.org.DB.Unscoped().Delete(&lanIPs).Error; err != nil {
-					log.Errorf("failed to delete lan ips: %s, vif ids: %v", err.Error(), vifIDs[i:end], c.org.LogPrefix)
+					log.Errorf("failed to delete lan ips: %s, lan ip ids: %v", err.Error(), dirtyLANIPIDs[i:end], c.org.LogPrefix)
 					continue
 				}
 				log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, lanIPs), c.org.LogPrefix)
 			}
+		}
+	}
+
+	// 清理 WANIPs
+	var wanIPRefs []struct {
+		ID    int `gorm:"column:id"`
+		VifID int `gorm:"column:vifid"`
+	}
+	if err := c.org.DB.Model(&metadbmodel.WANIP{}).
+		Select("id, vifid").
+		Where(map[string]interface{}{"domain": domainLcuuid}).
+		Find(&wanIPRefs).Error; err != nil {
+		log.Errorf("failed to query wan ip refs: %s, domain lcuuid: %s", err.Error(), domainLcuuid, c.org.LogPrefix)
+		return
+	}
+
+	dirtyWANIPIDs := make([]int, 0)
+	for _, ref := range wanIPRefs {
+		if _, exists := vifIDSet[ref.VifID]; !exists {
+			dirtyWANIPIDs = append(dirtyWANIPIDs, ref.ID)
+		}
+	}
+
+	if len(dirtyWANIPIDs) > 0 {
+		for i := 0; i < len(dirtyWANIPIDs); i += c.cfg.MySQLBatchSize {
+			end := i + c.cfg.MySQLBatchSize
+			if end > len(dirtyWANIPIDs) {
+				end = len(dirtyWANIPIDs)
+			}
 
 			var wanIPs []*metadbmodel.WANIP
-			c.org.DB.Where(map[string]interface{}{"domain": domainLcuuid}).
-				Where("vifid NOT IN ?", vifIDs[i:end]).Find(&wanIPs)
+			if err := c.org.DB.Where("id IN ?", dirtyWANIPIDs[i:end]).Find(&wanIPs).Error; err != nil {
+				log.Errorf("failed to query wan ips: %s, wan ip ids: %v", err.Error(), dirtyWANIPIDs[i:end], c.org.LogPrefix)
+				continue
+			}
 			if len(wanIPs) != 0 {
 				if err := c.org.DB.Unscoped().Delete(&wanIPs).Error; err != nil {
-					log.Errorf("failed to delete wan ips: %s, vif ids: %v", err.Error(), vifIDs[i:end], c.org.LogPrefix)
+					log.Errorf("failed to delete wan ips: %s, wan ip ids: %v", err.Error(), dirtyWANIPIDs[i:end], c.org.LogPrefix)
 					continue
 				}
 				log.Error(formatLogDeleteABecauseBHasGone(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, wanIPs), c.org.LogPrefix)

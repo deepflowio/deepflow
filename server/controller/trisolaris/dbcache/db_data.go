@@ -82,6 +82,11 @@ type DBDataCache struct {
 	vtapGroups []*models.VTapGroup
 	chDevices  []*models.ChDevice
 
+	bizDecodeCustomProtocol              []*models.BizDecodeCustomProtocol
+	bizDecodeDictionaries                []*models.BizDecodeDictionary
+	bizDecodePolicies                    []*models.BizDecodePolicy
+	bizDecodePolicyAgentGroupConnections []*models.BizDecodePolicyAgentGroupConnection
+
 	config *config.Config
 
 	ORGID
@@ -295,6 +300,22 @@ func (d *DBDataCache) GetCustomServices() []*models.CustomService {
 	return d.customServices
 }
 
+func (d *DBDataCache) GetBizBizDecodeCustomProtocol() []*models.BizDecodeCustomProtocol {
+	return d.bizDecodeCustomProtocol
+}
+
+func (d *DBDataCache) GetBizDecodeDictionaries() []*models.BizDecodeDictionary {
+	return d.bizDecodeDictionaries
+}
+
+func (d *DBDataCache) GetBizDecodePolicies() []*models.BizDecodePolicy {
+	return d.bizDecodePolicies
+}
+
+func (d *DBDataCache) GetBizDecodePolicyAgentGroupConnections() []*models.BizDecodePolicyAgentGroupConnection {
+	return d.bizDecodePolicyAgentGroupConnections
+}
+
 // SetCustomServices sets the custom services for testing purposes
 func (d *DBDataCache) SetCustomServices(services []*models.CustomService) {
 	d.customServices = services
@@ -498,7 +519,7 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(d.Log(err.Error()))
 	}
 	podGroups, err := dbmgr.DBMgr[models.PodGroup](db).GetFields([]string{
-		"id", "name", "type", "uid", "network_mode",
+		"id", "name", "type", "uid", "network_mode", "pod_cluster_id", "pod_namespace_id",
 	})
 	if err == nil {
 		d.podGroups = podGroups
@@ -659,6 +680,34 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	err = db.Order("type asc, id asc").Find(&customServices).Error
 	if err == nil {
 		d.customServices = customServices
+	} else {
+		log.Error(d.Log(err.Error()))
+	}
+
+	bizDecodeCustomProtocol, err := dbmgr.DBMgr[models.BizDecodeCustomProtocol](db).OrderIDGets()
+	if err == nil {
+		d.bizDecodeCustomProtocol = bizDecodeCustomProtocol
+	} else {
+		log.Error(d.Log(err.Error()))
+	}
+
+	bizDecodeDictionaries, err := dbmgr.DBMgr[models.BizDecodeDictionary](db).OrderIDGets()
+	if err == nil {
+		d.bizDecodeDictionaries = bizDecodeDictionaries
+	} else {
+		log.Error(d.Log(err.Error()))
+	}
+
+	bizDecodePolicies, err := dbmgr.DBMgr[models.BizDecodePolicy](db).OrderIDGets()
+	if err == nil {
+		d.bizDecodePolicies = bizDecodePolicies
+	} else {
+		log.Error(d.Log(err.Error()))
+	}
+
+	bizDecodePolicyAgentGroupConnections, err := dbmgr.DBMgr[models.BizDecodePolicyAgentGroupConnection](db).OrderIDGets()
+	if err == nil {
+		d.bizDecodePolicyAgentGroupConnections = bizDecodePolicyAgentGroupConnections
 	} else {
 		log.Error(d.Log(err.Error()))
 	}

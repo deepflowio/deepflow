@@ -1276,7 +1276,7 @@ TRUNCATE TABLE process;
 CREATE TABLE IF NOT EXISTS custom_service (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(128) NOT NULL,
-    type                INTEGER DEFAULT 0 COMMENT '0: unknown 1: IP 2: PORT 3: chost 4: pod_service 5: pod_group 6: host',
+    type                INTEGER DEFAULT 0 COMMENT '0: unknown 1: IP 2: PORT 3: chost 4: pod_service 5: pod_group 6:pod 7: host',
     match_type          INTEGER DEFAULT 1 COMMENT '0: unkonwn 1: name match 2: uid match',
     epc_ids             TEXT COMMENT 'separated by ,',
     pod_cluster_ids     TEXT COMMENT 'separated by ,',
@@ -2552,21 +2552,11 @@ CREATE TABLE IF NOT EXISTS `resource_version` (
 TRUNCATE TABLE resource_version;
 
 -- Business
-CREATE TABLE IF NOT EXISTS biz_decode_dictionary (
-    id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    team_id                INTEGER DEFAULT 1,
-    name                   VARCHAR(256) NOT NULL,
-    yaml                   TEXT,
-    created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at             DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
-TRUNCATE TABLE biz_decode_dictionary;
-
 CREATE TABLE IF NOT EXISTS biz_decode_policy (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     team_id                INTEGER DEFAULT 1,
     name                   VARCHAR(256) NOT NULL,
-    yaml                   TEXT,
+    yaml                   MEDIUMTEXT,
     created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
@@ -2575,22 +2565,13 @@ TRUNCATE TABLE biz_decode_policy;
 CREATE TABLE IF NOT EXISTS biz_decode_policy_field (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     policy_id              INTEGER NOT NULL,
+    type                   TINYINT(1) NOT NULL COMMENT '1-field; 2-const field; 3-compound field',
     name                   VARCHAR(256) NOT NULL,
     yaml                   TEXT,
     created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE biz_decode_policy_field;
-
-CREATE TABLE IF NOT EXISTS biz_decode_dictionary_policy_field_connection (
-    id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    dictionary_id          INTEGER NOT NULL,
-    policy_field_id        INTEGER NOT NULL,
-    policy_field_node_path VARCHAR(512) NOT NULL,
-    created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at             DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
-TRUNCATE TABLE biz_decode_dictionary_policy_field_connection;
 
 CREATE TABLE IF NOT EXISTS biz_decode_policy_agent_group_connection (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -2600,3 +2581,23 @@ CREATE TABLE IF NOT EXISTS biz_decode_policy_agent_group_connection (
     updated_at             DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE biz_decode_policy_agent_group_connection;
+
+CREATE TABLE IF NOT EXISTS biz_decode_dictionary (
+    id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                INTEGER DEFAULT 1,
+    name                   VARCHAR(256) NOT NULL,
+    yaml                   MEDIUMTEXT,
+    created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at             DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+TRUNCATE TABLE biz_decode_dictionary;
+
+CREATE TABLE IF NOT EXISTS biz_decode_custom_protocol (
+    id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                INTEGER DEFAULT 1,
+    name                   VARCHAR(256) NOT NULL,
+    yaml                   MEDIUMTEXT,
+    created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at             DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+TRUNCATE TABLE biz_decode_custom_protocol;
