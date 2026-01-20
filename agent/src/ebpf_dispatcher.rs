@@ -110,6 +110,7 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct EbpfCounter {
     rx: AtomicU64,
+    time_backtrack_max: AtomicU64,
     get_token_failed: AtomicU64,
 }
 
@@ -121,6 +122,7 @@ impl OwnedCountable for SyncEbpfCounter {
     fn get_counters(&self) -> Vec<Counter> {
         let rx = self.counter.rx.swap(0, Ordering::Relaxed);
         let get_token_failed = self.counter.get_token_failed.swap(0, Ordering::Relaxed);
+        let time_backtrack_max = self.counter.time_backtrack_max.swap(0, Ordering::Relaxed);
         let ebpf_counter = unsafe { ebpf::socket_tracer_stats() };
 
         vec![
@@ -133,6 +135,11 @@ impl OwnedCountable for SyncEbpfCounter {
                 "get_token_failed",
                 CounterType::Counted,
                 CounterValue::Unsigned(get_token_failed),
+            ),
+            (
+                "time_backtrack_max",
+                CounterType::Counted,
+                CounterValue::Unsigned(time_backtrack_max),
             ),
             (
                 "perf_pages_count",
@@ -411,6 +418,11 @@ impl EbpfDispatcher {
                 .socket
                 .preprocess
                 .out_of_order_reassembly_cache_size,
+            ebpf_config
+                .ebpf
+                .socket
+                .preprocess
+                .out_of_order_reassembly_timeout,
         );
         let mut flow_map = FlowMap::new(
             self.dispatcher_id as u32,
@@ -432,6 +444,7 @@ impl EbpfDispatcher {
         let mut log_parser_config = self.log_parser_config.load().clone();
         let mut collector_config = self.collector_config.load().clone();
         let mut ebpf_config = self.config.load().clone();
+        let mut last_packet_timestamp = 0;
 
         while unsafe { SWITCH } {
             if need_reload_config.swap(false, Ordering::Relaxed) {
@@ -467,6 +480,14 @@ impl EbpfDispatcher {
             }
 
             for mut packet in batch.drain(..) {
+                if packet.lookup_key.timestamp.as_nanos() < last_packet_timestamp {
+                    counter.time_backtrack_max.fetch_max(
+                        last_packet_timestamp - packet.lookup_key.timestamp.as_nanos(),
+                        Ordering::Relaxed,
+                    );
+                }
+                last_packet_timestamp = packet.lookup_key.timestamp.as_nanos();
+
                 if !leaky_bucket.acquire(1) {
                     counter.get_token_failed.fetch_add(1, Ordering::Relaxed);
                     exception_handler.set(Exception::RxPpsThresholdExceeded);
@@ -1351,6 +1372,7 @@ impl EbpfCollector {
             config_handle,
             counter: Arc::new(EbpfCounter {
                 rx: AtomicU64::new(0),
+                time_backtrack_max: AtomicU64::new(0),
                 get_token_failed: AtomicU64::new(0),
             }),
             need_reload_config: Default::default(),
