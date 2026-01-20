@@ -177,7 +177,7 @@ walkdir = "2"
 
 [features]
 default = ["libtrace"]
-enterprise = ["extended_observability", "enterprise-utils"]
+enterprise = ["dep:enterprise-utils"]
 extended_observability = ["libtrace"]
 dylib_pcap = []
 libtrace = []
