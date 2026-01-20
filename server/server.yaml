@@ -212,12 +212,16 @@ controller:
     vtap_group_max: 1000
     vtap_max_per_group: 10000
     az_max_per_server: 10
+
+    # data_source related
     data_source_max: 25
     data_source_retention_time_max: 24000
     # unit: s
     data_source_ext_metrics_interval: 10
     # unit: s
     data_source_prometheus_interval: 10
+
+    # biz_decode related
     biz_decode_policy_max: 100
     biz_decode_policy_field_max: 200
     biz_decode_dictionary_max: 1000
@@ -226,6 +230,10 @@ controller:
     max-biz-policy-pcap-file-size: 50
     # max per biz policy pcap file count
     max-per-biz-policy-pcap-file-count: 5
+
+    # policy related
+    pcap_policy_max: 1000
+    pcap_policy_complexity_threshold: 1000
 
   # monitor module config
   monitor:
