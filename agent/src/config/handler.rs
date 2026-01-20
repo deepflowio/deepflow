@@ -59,6 +59,8 @@ use super::{
 use crate::config::InferenceWhitelist;
 use crate::flow_generator::protocol_logs::decode_new_rpc_trace_context_with_type;
 use crate::rpc::Session;
+#[cfg(all(unix, feature = "libtrace"))]
+use crate::utils::environment::{get_ctrl_ip_and_mac, is_tt_workload};
 use crate::{
     common::{
         decapsulate::TunnelTypeBitmap, enums::CaptureNetworkType,
@@ -77,11 +79,7 @@ use crate::{
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
-    ebpf::CAP_LEN_MAX,
-    utils::environment::{
-        get_container_resource_limits, get_ctrl_ip_and_mac, is_tt_workload,
-        set_container_resource_limit,
-    },
+    utils::environment::{get_container_resource_limits, set_container_resource_limit},
 };
 #[cfg(target_os = "linux")]
 use crate::{
@@ -1828,7 +1826,7 @@ pub struct ModuleConfig {
     pub handler: HandlerConfig,
     pub log: LogConfig,
     pub synchronizer: SynchronizerConfig,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     pub ebpf: EbpfConfig,
     pub agent_type: AgentType,
     pub metric_server: MetricServerConfig,
@@ -2297,13 +2295,13 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 },
                 host: conf.global.self_monitoring.hostname.clone(),
             },
-            #[cfg(any(target_os = "linux", target_os = "android"))]
+            #[cfg(all(unix, feature = "libtrace"))]
             ebpf: EbpfConfig {
                 collector_enabled: conf.outputs.flow_metrics.enabled,
                 l7_metrics_enabled: conf.outputs.flow_metrics.filters.apm_metrics,
                 agent_id: conf.global.common.agent_id as u16,
                 epc_id: conf.global.common.vpc_id,
-                l7_log_packet_size: CAP_LEN_MAX
+                l7_log_packet_size: crate::ebpf::CAP_LEN_MAX
                     .min(conf.processors.request_log.tunning.payload_truncation as usize),
                 l7_log_tap_types: generate_tap_types_array(
                     &conf.outputs.flow_log.filters.l7_capture_network_types,
@@ -2515,7 +2513,7 @@ impl ConfigHandler {
         )
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     pub fn ebpf(&self) -> EbpfAccess {
         Map::new(self.current_config.clone(), |config| -> &EbpfConfig {
             &config.ebpf
@@ -2799,7 +2797,7 @@ impl ConfigHandler {
         }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "libtrace"))]
     fn set_ebpf(handler: &ConfigHandler, components: &mut AgentComponents) {
         if let Some(d) = components.ebpf_dispatcher_component.as_mut() {
             d.ebpf_collector
@@ -2919,7 +2917,7 @@ impl ConfigHandler {
         let mut dispatcher_need_reload_config = candidate_config.flow != new_config.flow;
         dispatcher_need_reload_config |= candidate_config.log_parser != new_config.log_parser;
         dispatcher_need_reload_config |= candidate_config.collector != new_config.collector;
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         {
             dispatcher_need_reload_config |= candidate_config.ebpf != new_config.ebpf;
         }
@@ -2929,7 +2927,7 @@ impl ConfigHandler {
                 for dispatcher in c.dispatcher_components.iter() {
                     dispatcher.dispatcher_listener.notify_reload_config();
                 }
-                #[cfg(any(target_os = "linux", target_os = "android"))]
+                #[cfg(all(unix, feature = "libtrace"))]
                 if let Some(d) = c.ebpf_dispatcher_component.as_ref() {
                     d.ebpf_collector.notify_reload_config();
                 }
@@ -5555,7 +5553,7 @@ impl ConfigHandler {
             candidate_config.synchronizer = new_config.synchronizer.clone();
         }
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         if candidate_config.ebpf != new_config.ebpf {
             if candidate_config.capture_mode != PacketCaptureType::Analyzer {
                 // Check if language-specific profiling configuration changed (only on dynamic config update, not on first start)

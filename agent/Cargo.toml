@@ -176,9 +176,11 @@ tonic-build.workspace = true
 walkdir = "2"
 
 [features]
+default = ["libtrace"]
 enterprise = ["extended_observability", "enterprise-utils"]
-extended_observability = []
+extended_observability = ["libtrace"]
 dylib_pcap = []
+libtrace = []
 
 [[bench]]
 name = "common"

@@ -21,9 +21,9 @@ pub mod common;
 pub mod config;
 pub mod debug;
 pub mod dispatcher;
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(unix, feature = "libtrace"))]
 pub mod ebpf;
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(unix, feature = "libtrace"))]
 mod ebpf_dispatcher;
 mod error;
 pub mod exception;
