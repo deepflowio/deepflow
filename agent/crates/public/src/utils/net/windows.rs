@@ -127,6 +127,7 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
 pub fn get_interface_by_index(if_index: u32) -> Result<Link> {
     let adapters = get_pcap_interfaces()?;
     debug!("adapters: {:?}, if_index: {}", adapters.clone(), if_index);
+    println!("adapters: {:?}, if_index: {}", adapters.clone(), if_index);
     adapters
         .into_iter()
         .find(|link| link.if_index == if_index)
@@ -257,6 +258,7 @@ pub fn route_get(dest_addr: IpAddr) -> Result<Route> {
                 "failed to run GetBestInterfaceEx function with destination address={} because of win32 error code({}),\n{}",
                 dest_addr, ret_code, WIN_ERROR_CODE_STR
             );
+            println!("route get {:?}", err_msg);
             return Err(Error::Windows(err_msg));
         }
 
@@ -282,8 +284,13 @@ pub fn route_get(dest_addr: IpAddr) -> Result<Route> {
                 "failed to run GetBestRoute2 function with destination address={} error: {}",
                 dest_addr, err
             );
+            println!("route get {:?}", err_msg);
             return Err(Error::Windows(err_msg));
         }
+        println!(
+            "ooooooooooooooo {:?} {:?} {:?}",
+            best_if_index, route_row.InterfaceIndex, route_row.InterfaceLuid
+        );
 
         // 解析 best_src_addr, gateway
         let (src_addr, gateway) = match dest_addr {
@@ -326,6 +333,8 @@ fn get_pcap_interfaces() -> Result<Vec<Link>> {
     let devices = pcap::Device::list()
         .map_err(|e| Error::Windows(format!("list pcap interfaces failed: {}", e)))?;
     let adapters = get_adapters_addresses().map(|(adapters, _)| adapters)?;
+    println!("devices: {:?}", devices);
+    println!("adapters {:?}", adapters);
     let mut pcap_interfaces = vec![];
     for device in devices {
         if let Some(link) = adapters
@@ -398,6 +407,14 @@ pub fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
         while !adapter_ptr.is_null() {
             let adapter = adapter_ptr.as_ref().unwrap();
 
+            println!(
+                "xxxxxxxxxxxxxxxxxxxxxx {:?} {:?} {:?} {:?} {:?}",
+                adapter.OperStatus,
+                adapter.AdapterName,
+                adapter.FriendlyName,
+                adapter.PhysicalAddress,
+                adapter.IfType
+            );
             // 跳过status=down, adapter_name == null, friendly_name == null的interface
             if adapter.OperStatus != IfOperStatusUp
                 || adapter.AdapterName.is_null()
@@ -468,10 +485,14 @@ pub fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
                     friendly_name, adapter_id, e
                 ))
             })? {
-                IfType::Ethernet | IfType::TokenRing | IfType::Ieee80211 | IfType::Ieee1394 => {
-                    flags |= LinkFlags::BROADCAST | LinkFlags::MULTICAST
-                }
-                IfType::Ppp | IfType::Tunnel => {
+                IfType::Ethernet
+                | IfType::TokenRing
+                | IfType::Ieee80211
+                | IfType::Ieee1394
+                | IfType::Ieee802154
+                | IfType::Wman
+                | IfType::Man => flags |= LinkFlags::BROADCAST | LinkFlags::MULTICAST,
+                IfType::Ppp | IfType::Tunnel | IfType::Tunnel2 => {
                     flags |= LinkFlags::POINT_TO_POINT | LinkFlags::MULTICAST
                 }
                 IfType::Loopback => flags |= LinkFlags::LOOPBACK | LinkFlags::MULTICAST,
