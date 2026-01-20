@@ -330,22 +330,20 @@ pub mod l7 {
 
     pub mod mq {
         pub mod web_sphere_mq {
-            use public::l7_protocol::LogMessageType;
+            use public::enums::PacketDirection;
+            use public::l7_protocol::{L7LogBase, LogMessageType};
 
             #[derive(Default)]
             pub struct WebSphereMqParser {
-                pub request_type: Option<String>,
-                pub end_to_end_id: Option<String>,
-                pub ret_code: Option<String>,
-                pub exception: Option<String>,
+                pub base: L7LogBase,
             }
 
             impl WebSphereMqParser {
-                pub fn check_payload(&mut self, _: &[u8], _: bool) -> Option<LogMessageType> {
+                pub fn check_payload(&mut self, _: &[u8]) -> Option<LogMessageType> {
                     unimplemented!()
                 }
 
-                pub fn parse_payload(&mut self, _: &[u8], _: bool) -> bool {
+                pub fn parse_payload(&mut self, _: &[u8], _: PacketDirection, _: bool) -> usize {
                     unimplemented!()
                 }
             }

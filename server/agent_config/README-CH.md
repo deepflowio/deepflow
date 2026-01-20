@@ -7652,6 +7652,38 @@ processors:
 | 126 | 附加信息 |
 | 128 | 报文鉴别码 |
 
+##### WebSphereMQ {#processors.request_log.application_protocol_inference.protocol_special_config.webspheremq}
+
+###### 解析 XML {#processors.request_log.application_protocol_inference.protocol_special_config.webspheremq.parse_xml_enabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.webspheremq.parse_xml_enabled`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        webspheremq:
+          parse_xml_enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否解析 XML 数据内容。
+
 ##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
 
 ###### 解压 MySQL 数据包 {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}

@@ -7819,6 +7819,38 @@ Field Reference:
 | 126 | Additional Data |
 | 128 | Message Authentication Code (MAC) |
 
+##### WebSphereMQ {#processors.request_log.application_protocol_inference.protocol_special_config.webspheremq}
+
+###### Parse XML {#processors.request_log.application_protocol_inference.protocol_special_config.webspheremq.parse_xml_enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.webspheremq.parse_xml_enabled`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        webspheremq:
+          parse_xml_enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to parse XML.
+
 ##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
 
 ###### Decompress MySQL Payload {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}

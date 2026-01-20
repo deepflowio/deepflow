@@ -272,6 +272,7 @@ impl FlowLog {
             parse_param.set_captured_byte(packet.get_captured_byte());
             parse_param.set_oracle_conf(flow_config.oracle_parse_conf);
             parse_param.set_iso8583_conf(&flow_config.iso8583_parse_conf);
+            parse_param.set_web_sphere_mq_conf(&flow_config.web_sphere_mq_parse_conf);
 
             let parser = self.l7_protocol_log_parser.as_mut().unwrap();
 
