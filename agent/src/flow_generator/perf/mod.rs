@@ -129,6 +129,23 @@ pub struct L7ProtocolChecker {
     other: Vec<L7ProtocolTuple>,
 }
 
+impl From<&FlowConfig> for L7ProtocolChecker {
+    fn from(config: &FlowConfig) -> Self {
+        Self::new(
+            &config.l7_protocol_enabled_bitmap,
+            &config
+                .l7_protocol_parse_port_bitmap
+                .iter()
+                .filter_map(|(name, bitmap)| {
+                    L7ProtocolParser::try_from(name.as_ref())
+                        .ok()
+                        .map(|p| (p.protocol(), bitmap.clone()))
+                })
+                .collect(),
+        )
+    }
+}
+
 impl L7ProtocolChecker {
     pub fn new(
         protocol_bitmap: &L7ProtocolBitmap,
@@ -257,7 +274,7 @@ impl FlowLog {
         if let Some(payload) = packet.get_l7() {
             let mut parse_param = ParseParam::new(
                 &*packet,
-                self.perf_cache.clone(),
+                Some(self.perf_cache.clone()),
                 Rc::clone(&self.wasm_vm),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Rc::clone(&self.so_plugin),
@@ -354,7 +371,7 @@ impl FlowLog {
 
             let mut param = ParseParam::new(
                 &*packet,
-                self.perf_cache.clone(),
+                Some(self.perf_cache.clone()),
                 Rc::clone(&self.wasm_vm),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Rc::clone(&self.so_plugin),

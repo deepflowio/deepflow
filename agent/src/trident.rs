@@ -796,6 +796,8 @@ impl Trident {
                 session.clone(),
                 runtime.clone(),
                 exception_handler.clone(),
+                config_handler.flow(),
+                config_handler.log_parser(),
             );
             #[cfg(any(target_os = "linux", target_os = "android"))]
             remote_executor.start();

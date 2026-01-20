@@ -579,7 +579,7 @@ mod tests {
             let mut dns = DnsLog::default();
             let param = &mut ParseParam::new(
                 packet as &MetaPacket,
-                log_cache.clone(),
+                Some(log_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
@@ -690,7 +690,7 @@ mod tests {
                 payload,
                 &ParseParam::new(
                     &*packet,
-                    rrt_cache.clone(),
+                    Some(rrt_cache.clone()),
                     Default::default(),
                     #[cfg(any(target_os = "linux", target_os = "android"))]
                     Default::default(),
@@ -707,7 +707,7 @@ mod tests {
         let packet = MetaPacket::empty();
         let mut pp = ParseParam::new(
             &packet,
-            Rc::new(RefCell::new(L7PerfCache::new(100))),
+            Some(Rc::new(RefCell::new(L7PerfCache::new(100)))),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),

@@ -209,6 +209,57 @@ pub struct AppProtoLogsBaseInfo {
     pub pod_id_1: u32,
 }
 
+impl Default for AppProtoLogsBaseInfo {
+    fn default() -> Self {
+        Self {
+            start_time: Default::default(),
+            end_time: Default::default(),
+            flow_id: Default::default(),
+            tap_port: Default::default(),
+            signal_source: Default::default(),
+            agent_id: Default::default(),
+            tap_type: Default::default(),
+            tap_side: Default::default(),
+            biz_type: Default::default(),
+            head: Default::default(),
+
+            mac_src: Default::default(),
+            mac_dst: Default::default(),
+            ip_src: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            ip_dst: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            l3_epc_id_src: Default::default(),
+            l3_epc_id_dst: Default::default(),
+            port_src: Default::default(),
+            port_dst: Default::default(),
+            req_tcp_seq: Default::default(),
+            resp_tcp_seq: Default::default(),
+
+            gpid_0: Default::default(),
+            gpid_1: Default::default(),
+
+            ebpf_type: Default::default(),
+            process_id_0: Default::default(),
+            process_id_1: Default::default(),
+            process_kname_0: Default::default(),
+            process_kname_1: Default::default(),
+            syscall_trace_id_request: Default::default(),
+            syscall_trace_id_response: Default::default(),
+            syscall_trace_id_thread_0: Default::default(),
+            syscall_trace_id_thread_1: Default::default(),
+            syscall_coroutine_0: Default::default(),
+            syscall_coroutine_1: Default::default(),
+            syscall_cap_seq_0: Default::default(),
+            syscall_cap_seq_1: Default::default(),
+
+            protocol: Default::default(),
+            is_vip_interface_src: Default::default(),
+            is_vip_interface_dst: Default::default(),
+            pod_id_0: Default::default(),
+            pod_id_1: Default::default(),
+        }
+    }
+}
+
 pub fn timestamp_to_micros<S>(d: &Timestamp, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,

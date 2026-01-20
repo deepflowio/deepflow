@@ -80,6 +80,7 @@ use crate::{
             get_executable_path, is_tt_pod, running_in_container, running_in_k8s,
             running_in_only_watch_k8s_mode, KubeWatchPolicy,
         },
+        hasher::md5_to_string,
         stats,
     },
 };
@@ -1739,10 +1740,7 @@ impl Synchronizer {
             ));
         }
 
-        let checksum = checksum
-            .finalize()
-            .into_iter()
-            .fold(String::new(), |s, c| s + &format!("{:02x}", c));
+        let checksum = md5_to_string(&mut checksum);
         if checksum != md5_sum {
             return Err(format!(
                 "Binary checksum mismatch, expected: {}, received: {}",
