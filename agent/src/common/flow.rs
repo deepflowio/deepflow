@@ -77,7 +77,8 @@ pub enum CloseType {
     ClientEstablishReset = 18,  // 18: 建连-客户端其他重置
     ServerEstablishReset = 19,  // 19: 建连-服务端其他重置
     TcpFinClientRst = 20,       // 20: 正常结束-客户端重置
-    Max = 21,
+    IcmpTimeout = 21,           // 21: TODO
+    Max = 22,
 }
 
 impl CloseType {
@@ -97,6 +98,7 @@ impl CloseType {
             || self == CloseType::ServerReset
             || self == CloseType::ServerQueueLack
             || self == CloseType::ServerEstablishReset
+            || self == CloseType::IcmpTimeout
     }
 }
 
@@ -1070,7 +1072,21 @@ impl Flow {
             FlowState::Exception => CloseType::Unknown,
             FlowState::Opening1 => CloseType::ClientSynRepeat,
             FlowState::Opening2 => CloseType::ServerSynAckRepeat,
-            FlowState::Established => CloseType::Timeout,
+            FlowState::Established => {
+                if self.flow_key.proto == IpProtocol::ICMPV4
+                    || self.flow_key.proto == IpProtocol::ICMPV6
+                {
+                    if self.flow_metrics_peers[0].total_packet_count
+                        != self.flow_metrics_peers[1].total_packet_count
+                    {
+                        CloseType::IcmpTimeout
+                    } else {
+                        CloseType::Timeout
+                    }
+                } else {
+                    CloseType::Timeout
+                }
+            }
             FlowState::ClosingTx1 => CloseType::ServerHalfClose,
             FlowState::ClosingRx1 => CloseType::ClientHalfClose,
             FlowState::ClosingTx2 | FlowState::ClosingRx2 | FlowState::Closed => CloseType::TcpFin,

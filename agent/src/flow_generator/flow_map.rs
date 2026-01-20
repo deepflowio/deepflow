@@ -915,7 +915,11 @@ impl FlowMap {
     ) -> bool {
         self.update_flow(config, node, meta_packet);
         let peers = &node.tagged_flow.flow.flow_metrics_peers;
-        if peers[FLOW_METRICS_PEER_SRC].packet_count > 0
+        if node.tagged_flow.flow.flow_key.proto == IpProtocol::ICMPV4
+            || node.tagged_flow.flow.flow_key.proto == IpProtocol::ICMPV6
+        {
+            node.timeout = config.flow.flow_timeout.icmp_timeout;
+        } else if peers[FLOW_METRICS_PEER_SRC].packet_count > 0
             && peers[FLOW_METRICS_PEER_DST].packet_count > 0
         {
             node.timeout = config.flow.flow_timeout.established_rst;
