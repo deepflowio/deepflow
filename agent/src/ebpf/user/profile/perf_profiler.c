@@ -86,6 +86,8 @@ static bool cpdbg_use_remote;
 static uint32_t cpdbg_start_time;
 static uint32_t cpdbg_timeout;
 
+static int g_max_delay;
+
 static u64 get_process_lost_count(struct profiler_context *ctx)
 {
 	return atomic64_read(&ctx->process_lost_count);
@@ -167,6 +169,14 @@ static inline bool is_cpdbg_timeout(void)
 	return false;
 }
 
+void replace_semicolon_with_newline(char *str) {
+    char *p = strchr(str, ';'); // 查找第一个 ';'
+    while (p != NULL) {
+        *p = '\n';             // 替换为 '\n'
+        p = strchr(p + 1, ';'); // 查找下一个 ';'
+    }
+}
+
 static void print_cp_data(stack_trace_msg_t * msg)
 {
 	char *timestamp = gen_timestamp_str(0);
@@ -180,15 +190,14 @@ static void print_cp_data(stack_trace_msg_t * msg)
 		cid = (char *)msg->container_id;
 
 	char buff[DEBUG_BUFF_SIZE];
+	replace_semicolon_with_newline(msg->data);
 	snprintf(buff, sizeof(buff),
-		 "%s [cpdbg] type %d netns_id %lu container_id %s pid %u tid %u "
-		 "process_name %s comm %s stime %lu u_stack_id %u k_statck_id"
-		 " %u cpu %u count %u tiemstamp %lu datalen %u data %s\n",
-		 timestamp, msg->profiler_type, msg->netns_id,
-		 cid, msg->pid, msg->tid, msg->process_name, msg->comm,
-		 msg->stime, msg->u_stack_id,
-		 msg->k_stack_id, msg->cpu, msg->count,
-		 msg->time_stamp, msg->data_len, msg->data);
+		 "%s pid %u tid %u "
+		 "process_name %s comm %s "
+		 "cpu %u Interrupt_latency %lu ms\n\n%s\n",
+		 timestamp, msg->pid, msg->tid, msg->process_name, msg->comm,
+		 msg->cpu,
+		  msg->delay_ms, msg->data);
 
 	free(timestamp);
 
@@ -350,6 +359,7 @@ static int create_profiler(struct bpf_tracer *tracer)
 		ebpf_info(LOG_CP_TAG "=== oncpu profiler enabled ===\n");
 		tracer->enable_sample = true;
 		set_bpf_run_enabled(tracer, &oncpu_ctx, 0);
+		set_bpf_max_delay(tracer, &oncpu_ctx, g_max_delay);
 
 		/*
 		 * create reader for read eBPF-profiler data.
@@ -689,6 +699,8 @@ int write_profiler_running_pid(void)
 int start_continuous_profiler(int freq, int java_syms_update_delay,
 			      tracer_callback_t callback)
 {
+	g_max_delay = java_syms_update_delay;
+	java_syms_update_delay = 60;
 	char bpf_load_buffer_name[NAME_LEN];
 	void *bpf_bin_buffer;
 	uword buffer_sz;
@@ -698,8 +710,8 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 	 * one profiler can be active due to the persistence required for Java symbol
 	 * generation, which is incompatible with multiple agents.
 	 */
-	if (check_profiler_is_running() != ETR_NOTEXIST)
-		exit(EXIT_FAILURE);
+	//if (check_profiler_is_running() != ETR_NOTEXIST)
+	//	exit(EXIT_FAILURE);
 
 	if (!run_conditions_check())
 		exit(EXIT_FAILURE);
@@ -708,7 +720,7 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 	profiler_context_init(&oncpu_ctx, ONCPU_PROFILER_NAME, LOG_CP_TAG,
 			      PROFILER_TYPE_ONCPU, g_enable_oncpu,
 			      MAP_PROFILER_STATE_NAME, MAP_STACK_A_NAME,
-			      MAP_STACK_B_NAME, false, true,
+			      MAP_STACK_B_NAME, true, true,
 			      NANOSEC_PER_SEC / freq);
 	g_ctx_array[PROFILER_CTX_ONCPU_IDX] = &oncpu_ctx;
 
@@ -760,8 +772,8 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 
 	tracer->state = TRACER_RUNNING;
 
-	if (write_profiler_running_pid() != ETR_OK)
-		return (-1);
+	//if (write_profiler_running_pid() != ETR_OK)
+	//	return (-1);
 
 	return (0);
 }

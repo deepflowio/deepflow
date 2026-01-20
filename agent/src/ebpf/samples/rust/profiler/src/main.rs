@@ -158,15 +158,29 @@ fn main() {
     env_logger::builder()
       .format_timestamp(Some(env_logger::TimestampPrecision::Millis))
       .init();
+    let max_num = match std::env::args()
+        .nth(1)
+        .and_then(|arg| arg.parse::<i32>().ok())
+    {
+        Some(num) => num, // 保存 num 到变量 input_num
+        None => {
+            eprintln!("\nUsage: irqoff-latency <threshold-value>\n\nExplanation:\n\n  threshold-value: The threshold value for disabling interrupts, in milliseconds (ms).\n\ne.g.:\n\n  irqoff-latency 100  # Output process information for interrupts disabled for more than 100ms.\n");
+            return; // 结束程序
+        }
+    };
+
+    // 在 main 中使用 input_num
+    println!("Capture data where interrupt masking time is greater than or equal to a threshold of {}", max_num);
+
 
     // cat ./.profiler.folded |./flamegraph.pl --color=io --countname=ms > profiler-test.svg
-    let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
-    let log_file_c = log_file.as_c_str();
+    //let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
+    //let log_file_c = log_file.as_c_str();
     unsafe {
         // The first parameter passed by a null pointer can be
         // filled with std::ptr::null()
-        if bpf_tracer_init(log_file_c.as_ptr(), true) != 0 {
-            println!("bpf_tracer_init() file:{:?} error", log_file);
+        if bpf_tracer_init(std::ptr::null(), true) != 0 {
+            println!("bpf_tracer_init() file error");
             ::std::process::exit(1);
         }
 
@@ -186,27 +200,27 @@ fn main() {
 
         // Used to test our DeepFlow products, written as 97 frequency, so that
         // it will not affect the sampling test of deepflow agent (using 99Hz).
-        if start_continuous_profiler(97, 60, continuous_profiler_callback) != 0 {
+        if start_continuous_profiler(19997, max_num, continuous_profiler_callback) != 0 {
             println!("start_continuous_profiler() error.");
             ::std::process::exit(1);
         }
 
         set_profiler_regex(
-            CString::new("^(socket_tracer|java|deepflow-.*)$".as_bytes())
+            CString::new("^(.*)$".as_bytes())
                 .unwrap()
                 .as_c_str()
                 .as_ptr(),
         );
 
         // CPUID will not be included in the aggregation of stack trace data.
-        set_profiler_cpu_aggregation(0);
+        set_profiler_cpu_aggregation(1);
 
         bpf_tracer_finish();
 
-        //if cpdbg_set_config(60, debug_callback) != 0 {
-        //    println!("cpdbg_set_config() error");
-        //    ::std::process::exit(1);
-        //}
+       if cpdbg_set_config(600000, debug_callback) != 0 {
+           println!("cpdbg_set_config() error");
+           ::std::process::exit(1);
+       }
 
         let stats = socket_tracer_stats();
         print!("{:#?}\n", stats);
