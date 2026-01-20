@@ -221,13 +221,37 @@ $defs:
         title@en: Raw
         title@ch: 原始数据
         properties:
-          save_request:
-            title@en: Save Request
-            title@ch: 保存请求
+          save_request_header:
+            title@en: Save Request Header
+            title@ch: 保存请求标头
+            description@en: Save HTTP request header as attribute. Default attribute name is `request_header`.
+            description@ch: 将 HTTP 请求的标头保存为属性。默认属性名为 `request_header`。
             $ref: '#/$defs/raw_save_config'
-          save_response:
-            title@en: Save Response
-            title@ch: 保存响应
+          save_request_payload:
+            title@en: Save Request Payload
+            title@ch: 保存请求负载
+            description@en: |-
+              Save HTTP request payload as attribute. Default attribute name is `request_payload`.
+              For HTTP protocol, only save the payload part (excluding the header).
+            description@ch: |-
+              将请求的负载保存为属性。默认属性名为 `request_payload`。
+              对于 HTTP 协议来说，只保存 HTTP 负载的部分（即不包含标头）。
+            $ref: '#/$defs/raw_save_config'
+          save_response_header:
+            title@en: Save Response Header
+            title@ch: 保存响应标头
+            description@en: Save HTTP response header as attribute. Default attribute name is `response_header`.
+            description@ch: 将 HTTP 响应的标头保存为属性。默认属性名为 `response_header`。
+            $ref: '#/$defs/raw_save_config'
+          save_response_payload:
+            title@en: Save Response Payload
+            title@ch: 保存响应负载
+            description@en: |-
+              Save HTTP response payload as attribute. Default attribute name is `response_payload`.
+              For HTTP protocol, only save the payload part (excluding the header).
+            description@ch: |-
+              将响应的负载保存为属性。默认属性名为 `response_payload`。
+              对于 HTTP 协议来说，只保存 HTTP 负载的部分（即不包含标头）。
             $ref: '#/$defs/raw_save_config'
       fields:
         type: array
