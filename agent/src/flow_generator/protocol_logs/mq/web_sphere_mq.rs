@@ -429,6 +429,7 @@ impl WebSphereMqLog {
 
         for op in self.custom_field_store.drain_with(policies, &*info) {
             match &op.op {
+                Op::SaveHeader(_) => (),
                 Op::SavePayload(key) => {
                     info.attributes.push(KeyVal {
                         key: key.to_string(),

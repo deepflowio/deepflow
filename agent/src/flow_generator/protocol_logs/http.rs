@@ -1318,7 +1318,7 @@ impl HttpLog {
         }
 
         #[cfg(feature = "enterprise")]
-        self.merge_custom_fields(custom_policies, l7_payload, info);
+        self.merge_custom_fields(custom_policies, payload, l7_payload, info);
 
         // In uprobe mode, headers are reported in a way different from other modes:
         // one payload contains one header.
@@ -1628,10 +1628,7 @@ impl HttpLog {
             }
         }
 
-        #[cfg(target_os = "linux")]
-        let l7_payload = headers.remaining_buf().trim_ascii_start();
-        #[cfg(target_os = "windows")]
-        let l7_payload = Self::trim_ascii_start(headers.remaining_buf());
+        let l7_payload = V1Structure::new(payload).body;
 
         set_captured_byte!(info, param);
         // 当解析完所有Header仍未找到Content-Length，则认为该字段值为0
@@ -2137,12 +2134,15 @@ impl HttpLog {
     fn merge_custom_fields(
         &mut self,
         policies: Option<PolicySlice>,
+        payload: &[u8],
         l7_payload: Option<&[u8]>,
         info: &mut HttpInfo,
     ) {
         let Some(policies) = policies else {
             return;
         };
+
+        let mut headers: Option<&[u8]> = None;
 
         for op in self.custom_field_store.drain_with(policies, &*info) {
             match &op.op {
@@ -2177,6 +2177,15 @@ impl HttpLog {
                         key: key.to_string(),
                         val: *value,
                     });
+                }
+                Op::SaveHeader(key) => {
+                    let header = headers.get_or_insert_with(|| V1Structure::new(payload).headers);
+                    if !header.is_empty() {
+                        info.attributes.push(KeyVal {
+                            key: key.to_string(),
+                            val: String::from_utf8_lossy(header).to_string(),
+                        });
+                    }
                 }
                 Op::SavePayload(key) => {
                     if let Some(l7_payload) = l7_payload {
@@ -2389,12 +2398,6 @@ pub fn get_http_resp_info(line_info: &str) -> Result<(Version, u16)> {
 
 pub struct V1HeaderIterator<'a>(&'a [u8]);
 
-impl<'a> V1HeaderIterator<'a> {
-    pub fn remaining_buf(&self) -> &'a [u8] {
-        self.0
-    }
-}
-
 impl<'a> Iterator for V1HeaderIterator<'a> {
     type Item = &'a str;
 
@@ -2423,6 +2426,38 @@ impl<'a> Iterator for V1HeaderIterator<'a> {
 
 pub fn parse_v1_headers(payload: &[u8]) -> V1HeaderIterator<'_> {
     V1HeaderIterator(payload)
+}
+
+struct V1Structure<'a> {
+    first_line: &'a [u8],
+    headers: &'a [u8],
+    body: &'a [u8],
+}
+
+impl<'a> V1Structure<'a> {
+    pub fn new(payload: &'a [u8]) -> Self {
+        let Some(end) = payload.windows(2).position(|w| w == b"\r\n") else {
+            return Self {
+                first_line: payload,
+                headers: &[],
+                body: &[],
+            };
+        };
+        let first_line = &payload[..end];
+        let payload = &payload[end + 2..];
+        match payload.windows(4).position(|w| w == b"\r\n\r\n") {
+            None => Self {
+                first_line,
+                headers: payload,
+                body: &[],
+            },
+            Some(end) => Self {
+                first_line,
+                headers: &payload[..end + 2], // include one "\r\n"
+                body: &payload[end + 4..],
+            },
+        }
+    }
 }
 
 pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {

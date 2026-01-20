@@ -1413,7 +1413,7 @@ impl MysqlLog {
         };
         for op in self.custom_field_store.drain_with(policies, &*info) {
             match &op.op {
-                Op::AddMetric(_, _) | Op::SavePayload(_) => (),
+                Op::AddMetric(_, _) | Op::SaveHeader(_) | Op::SavePayload(_) => (),
                 _ => auto_merge_custom_field(op, info),
             }
         }
@@ -1925,10 +1925,6 @@ mod tests {
 
     #[test]
     fn comment_extractor() {
-        flexi_logger::Logger::try_with_env()
-            .unwrap()
-            .start()
-            .unwrap();
         let testcases = vec![
             (
                 "/* traceparent: 00-trace_id-span_id-01 */ SELECT * FROM table",

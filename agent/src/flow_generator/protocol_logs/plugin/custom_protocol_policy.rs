@@ -150,25 +150,28 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             Source::Payload(PayloadType::JSON | PayloadType::XML, payload),
         );
 
-        // at least one tag should be parsed
-        if self.store.is_empty() {
-            return Ok(L7ParseResult::None);
-        }
-
         let mut n_ops = 0;
         for op in self.store.drain_with(policies, &info) {
-            n_ops += 1;
             match op.op {
                 Op::AddMetric(key, value) => {
+                    n_ops += 1;
                     info.metrics.push(MetricKeyVal {
                         key: key.to_string(),
                         val: value,
                     });
                 }
-                _ => auto_merge_custom_field(op, &mut info),
+                Op::SaveHeader(_) | Op::SavePayload(_) => (),
+                _ => {
+                    n_ops += 1;
+                    auto_merge_custom_field(op, &mut info);
+                }
             }
         }
         trace!("apply biz decode policies to {biz_protocol} success with {n_ops} ops");
+        // at least one tag should be parsed
+        if n_ops == 0 {
+            return Ok(L7ParseResult::None);
+        }
 
         let mut info = CustomInfo::from((info, param.direction));
         info.msg_type = param.direction.into();

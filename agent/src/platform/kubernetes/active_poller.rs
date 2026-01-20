@@ -384,11 +384,6 @@ mod tests {
 
     #[test]
     fn interface_info_store() {
-        flexi_logger::Logger::try_with_env()
-            .unwrap()
-            .start()
-            .unwrap();
-
         let mut input = HashMap::from([
             (
                 NsFile::Root,

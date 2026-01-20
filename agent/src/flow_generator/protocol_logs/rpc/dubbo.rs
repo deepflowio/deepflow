@@ -1151,7 +1151,7 @@ impl DubboLog {
                     });
                 }
                 // not supported
-                Op::SavePayload(_) => (),
+                Op::SaveHeader(_) | Op::SavePayload(_) => (),
                 _ => auto_merge_custom_field(op, info),
             }
         }

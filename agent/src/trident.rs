@@ -2642,7 +2642,7 @@ impl AgentComponents {
                 dpdk_ebpf_senders.push(dpdk_ebpf_sender);
                 Some(dpdk_ebpf_receiver)
             };
-            #[cfg(not(all(unix, feature = "libtrace")))]
+            #[cfg(all(unix, not(feature = "libtrace")))]
             let dpdk_ebpf_receiver = None;
 
             let dispatcher_component = build_dispatchers(
