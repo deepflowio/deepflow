@@ -33,7 +33,10 @@ use crate::{
         l7_protocol_log::L7ProtocolParserInterface,
         l7_protocol_log::{L7PerfCache, ParseParam},
     },
-    config::{config::Iso8583ParseConfig, OracleConfig},
+    config::{
+        config::{Iso8583ParseConfig, WebSphereMqParseConfig},
+        OracleConfig,
+    },
     flow_generator::protocol_logs::{
         pb_adapter::KeyVal,
         plugin::shared_obj::{get_so_parser, SoLog},
@@ -87,6 +90,7 @@ fn get_req_param<'a>(
         captured_byte: 0,
         oracle_parse_conf: OracleConfig::default(),
         iso8583_parse_conf: Iso8583ParseConfig::default(),
+        web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
         icmp_data: None,
     }
 }
@@ -126,6 +130,7 @@ fn get_resp_param<'a>(
         captured_byte: 0,
         oracle_parse_conf: OracleConfig::default(),
         iso8583_parse_conf: Iso8583ParseConfig::default(),
+        web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
         icmp_data: None,
     }
 }

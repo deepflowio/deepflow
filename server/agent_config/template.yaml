@@ -5474,6 +5474,25 @@ processors:
           #    | 128 | 报文鉴别码 |
           extract_fields: "2,7,11,32,33"
         # type: section
+        # name: WebSphereMQ
+        # description:
+        webspheremq:
+          # type: bool
+          # name:
+          #   en: Parse XML
+          #   ch: 解析 XML
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     Whether to parse XML.
+          #   ch: |-
+          #     是否解析 XML 数据内容。
+          parse_xml_enabled: false
+        # type: section
         # name: MySQL
         # description:
         mysql:

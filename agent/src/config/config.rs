@@ -1696,6 +1696,12 @@ impl Default for Iso8583Config {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Default, PartialEq, Eq)]
+#[serde(default)]
+pub struct WebSphereMqConfig {
+    pub parse_xml_enabled: bool,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct MysqlConfig {
@@ -1771,6 +1777,7 @@ impl Default for InferenceWhitelist {
 pub struct ProtocolSpecialConfig {
     pub oracle: OracleConfig,
     pub iso8583: Iso8583Config,
+    pub web_sphere_mq: WebSphereMqConfig,
     pub mysql: MysqlConfig,
     pub grpc: GrpcConfig,
 }
@@ -3478,6 +3485,11 @@ impl Default for Iso8583ParseConfig {
             pan_obfuscate: true,
         }
     }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct WebSphereMqParseConfig {
+    pub parse_xml_enabled: bool,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]

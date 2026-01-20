@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+use std::borrow::Cow;
 
 use std::sync::Arc;
 
@@ -20,6 +21,10 @@ use num_enum::{FromPrimitive, IntoPrimitive, TryFromPrimitive};
 use serde::{Serialize, Serializer};
 
 use super::enums::PacketDirection;
+use super::types::PrioStrings;
+
+use public_derive::L7Log;
+use public_derive_internals::enums::L7ResponseStatus;
 
 pub const DEFAULT_DNS_PORT: u16 = 53;
 pub const DEFAULT_TLS_PORT: u16 = 443;
@@ -242,3 +247,181 @@ pub trait L7ProtocolChecker {
 pub use public_derive_internals::l7_protocol::{
     Field, FieldSetter, L7Log, L7LogAttribute, NativeTag,
 };
+
+#[derive(Default, Debug)]
+pub struct L7Request {
+    pub req_type: String,
+    pub domain: String,
+    pub resource: String,
+    pub endpoint: String,
+}
+
+#[derive(Default, Debug)]
+pub struct L7Response {
+    pub status: L7ResponseStatus,
+    pub code: Option<i32>,
+    pub exception: String,
+    pub result: String,
+}
+
+#[derive(Default, Debug)]
+pub struct TraceInfo {
+    pub trace_ids: Vec<String>,
+    pub span_id: Option<String>,
+    pub parent_span_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyVal {
+    pub key: String,
+    pub val: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetricKeyVal {
+    pub key: String,
+    pub val: f32,
+}
+
+impl Eq for MetricKeyVal {}
+
+#[derive(Default, Debug)]
+pub struct ExtendedInfo {
+    pub service_name: Option<String>,
+    pub rpc_service: Option<String>,
+    pub client_ip: Option<String>,
+    pub request_id: Option<u32>,
+    pub x_request_id_0: Option<String>,
+    pub x_request_id_1: Option<String>,
+    pub user_agent: Option<String>,
+    pub referer: Option<String>,
+    pub protocol_str: Option<String>,
+    pub attributes: Option<Vec<KeyVal>>,
+    pub metrics: Option<Vec<MetricKeyVal>>,
+}
+
+#[derive(L7Log, Serialize, Debug, Default, Clone)]
+#[l7_log(trace_id.getter = "L7LogBase::get_trace_id", trace_id.setter = "L7LogBase::set_trace_id")]
+pub struct L7LogBase {
+    pub msg_type: LogMessageType,
+    pub version: String,
+
+    pub request_type: String,
+    pub request_domain: String,
+    pub request_resource: String,
+    pub endpoint: String,
+
+    pub response_status: L7ResponseStatus,
+    pub response_code: String,
+    pub response_exception: String,
+    pub response_result: String,
+
+    pub request_id: Option<u32>,
+    pub x_request_id: String,
+    pub http_proxy_client: String,
+
+    pub trace_ids: PrioStrings,
+    pub span_id: String,
+
+    #[serde(skip)]
+    pub attributes: Vec<KeyVal>,
+
+    pub is_async: bool,
+    pub is_reversed: bool,
+    pub biz_type: u8,
+    pub biz_code: String,
+    pub biz_scenario: String,
+}
+
+impl L7LogAttribute for L7LogBase {
+    fn add_attribute(&mut self, name: Cow<'_, str>, value: Cow<'_, str>) {
+        self.attributes.push(KeyVal {
+            key: name.into_owned(),
+            val: value.into_owned(),
+        });
+    }
+}
+
+impl L7LogBase {
+    pub fn merge(&mut self, other: &mut Self) {
+        if self.version.is_empty() {
+            self.version = std::mem::take(&mut other.version);
+        }
+        if self.request_type.is_empty() {
+            self.request_type = std::mem::take(&mut other.request_type);
+        }
+        if self.request_domain.is_empty() {
+            self.request_domain = std::mem::take(&mut other.request_domain);
+        }
+        if self.request_resource.is_empty() {
+            self.request_resource = std::mem::take(&mut other.request_resource);
+        }
+        if self.endpoint.is_empty() {
+            self.endpoint = std::mem::take(&mut other.endpoint);
+        }
+
+        if self.response_status == L7ResponseStatus::default() {
+            self.response_status = other.response_status;
+        }
+        if self.response_code.is_empty() {
+            self.response_code = std::mem::take(&mut other.response_code);
+        }
+        if self.response_exception.is_empty() {
+            self.response_exception = std::mem::take(&mut other.response_exception);
+        }
+        if self.response_result.is_empty() {
+            self.response_result = std::mem::take(&mut other.response_result);
+        }
+
+        if self.request_id.is_none() {
+            self.request_id = other.request_id.take();
+        }
+        if self.x_request_id.is_empty() {
+            self.x_request_id = std::mem::take(&mut other.x_request_id);
+        }
+        if self.http_proxy_client.is_empty() {
+            self.http_proxy_client = std::mem::take(&mut other.http_proxy_client);
+        }
+
+        let other_trace_ids = std::mem::take(&mut other.trace_ids);
+        self.trace_ids.merge(other_trace_ids);
+        if self.span_id.is_empty() {
+            self.span_id = std::mem::take(&mut other.span_id);
+        }
+
+        self.attributes.append(&mut other.attributes);
+        if self.biz_type == 0 {
+            self.biz_type = other.biz_type;
+        }
+        if self.biz_code.is_empty() {
+            self.biz_code = std::mem::take(&mut other.biz_code);
+        }
+        if self.biz_scenario.is_empty() {
+            self.biz_scenario = std::mem::take(&mut other.biz_scenario);
+        }
+        if other.is_async {
+            self.is_async = other.is_async;
+        }
+        if other.is_reversed {
+            self.is_reversed = other.is_reversed;
+        }
+    }
+
+    fn get_trace_id(&self) -> Field {
+        if let Some(v) = self.trace_ids.first() {
+            Field::Str(Cow::Borrowed(v.as_str()))
+        } else {
+            Field::Str(Cow::Borrowed(""))
+        }
+    }
+
+    fn set_trace_id(&mut self, trace_id: FieldSetter) {
+        let (prio, trace_id) = (trace_id.prio(), trace_id.into_inner());
+        match trace_id {
+            Field::Str(s) => {
+                self.trace_ids.push(prio, s.into_owned().into());
+            }
+            _ => return,
+        }
+    }
+}

@@ -2464,7 +2464,10 @@ mod tests {
     use std::{cell::RefCell, collections::HashSet, fmt, fs, path::Path, rc::Rc, time::Duration};
 
     #[cfg(feature = "libtrace")]
-    use crate::config::{config::Iso8583ParseConfig, OracleConfig};
+    use crate::config::{
+        config::{Iso8583ParseConfig, WebSphereMqParseConfig},
+        OracleConfig,
+    };
     use crate::{
         common::{l7_protocol_log::L7PerfCache, MetaPacket},
         config::{
@@ -2773,6 +2776,7 @@ mod tests {
             captured_byte: 1000,
             oracle_parse_conf: OracleConfig::default(),
             iso8583_parse_conf: Iso8583ParseConfig::default(),
+            web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
             icmp_data: None,
         };
 
