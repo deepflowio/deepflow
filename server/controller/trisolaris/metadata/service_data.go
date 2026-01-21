@@ -558,16 +558,24 @@ func (s *ServiceDataOP) generateService() {
 		}
 
 		for index := range groupKeys {
-			if values, ok := keyToPorts[groupKeys[index]]; ok {
-				service := podGroupToProto(
-					podGroup.ID,
-					groupKeys[index].protocol,
-					values,
-					trident.ServiceType_POD_SERVICE_POD_GROUP,
-					groupKeys[index].podServiceID,
-				)
-				services = append(services, service)
-			}
+			//if values, ok := keyToPorts[groupKeys[index]]; ok {
+			//	service := podGroupToProto(
+			//		podGroup.ID,
+			//		groupKeys[index].protocol,
+			//		values,
+			//		trident.ServiceType_POD_SERVICE_POD_GROUP,
+			//		groupKeys[index].podServiceID,
+			//	)
+			//	services = append(services, service)
+			//}
+			service := podGroupToProto(
+				podGroup.ID,
+				groupKeys[index].protocol,
+				[]uint32{0},
+				trident.ServiceType_POD_SERVICE_POD_GROUP,
+				groupKeys[index].podServiceID,
+			)
+			services = append(services, service)
 		}
 
 		// if pod_group hostNetwork == true
@@ -647,17 +655,26 @@ func (s *ServiceDataOP) generateService() {
 		if podService.PodNamespaceID != 0 {
 			ips := []string{podService.ServiceClusterIP}
 			for index := range protocols {
-				if ports, ok := protocolToPorts[protocols[index]]; ok {
-					service := serviceToProto(
-						podService.VPCID,
-						ips,
-						protocols[index],
-						ports,
-						trident.ServiceType_POD_SERVICE_IP,
-						podService.ID,
-					)
-					services = append(services, service)
-				}
+				//if ports, ok := protocolToPorts[protocols[index]]; ok {
+				//	service := serviceToProto(
+				//		podService.VPCID,
+				//		ips,
+				//		protocols[index],
+				//		ports,
+				//		trident.ServiceType_POD_SERVICE_IP,
+				//		podService.ID,
+				//	)
+				//	services = append(services, service)
+				//}
+				service := serviceToProto(
+					podService.VPCID,
+					ips,
+					protocols[index],
+					[]uint32{0},
+					trident.ServiceType_POD_SERVICE_IP,
+					podService.ID,
+				)
+				services = append(services, service)
 			}
 		}
 	}
