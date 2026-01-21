@@ -55,10 +55,10 @@ func GetAgentCMDManager(key string) *CMDManager {
 func NewAgentCMDManagerIfNotExist(key string, requestID uint64) *CMDManager {
 	manager, loaded := keyToAgentCMDManager.Load(key)
 	if loaded {
-		log.Infof("agent(key: %s) already exists, reusing existing manager", key)
+		log.Infof("[REMOTE_EXEC] agent(key: %s) cmd manager already exists, reusing existing manager", key)
 		return manager.(*CMDManager)
 	}
-	log.Infof("new agent(key: %s)", key)
+	log.Infof("[REMOTE_EXEC] new agent(key: %s) cmd manager, initial request_id: %d", key, requestID)
 	newManager := &CMDManager{
 		key:             key,
 		RequestChan:     make(chan *grpcapi.RemoteExecRequest, 1),
@@ -67,21 +67,22 @@ func NewAgentCMDManagerIfNotExist(key string, requestID uint64) *CMDManager {
 	newManager.latestRequestID.Store(requestID)
 
 	keyToAgentCMDManager.Store(key, newManager)
+	log.Infof("[REMOTE_EXEC] agent(key: %s) cmd manager created successfully, ready to receive requests", key)
 	return newManager
 }
 
 func RemoveAgentCMDManager(key string) {
-	log.Infof("preparing to remove agent(key: %s)", key)
+	log.Infof("[REMOTE_EXEC] preparing to remove agent(key: %s) cmd manager", key)
 	manager, ok := keyToAgentCMDManager.Load(key)
 	if !ok {
-		log.Warningf("agent(key: %s) was removed before", key)
+		log.Warningf("[REMOTE_EXEC] agent(key: %s) cmd manager was removed before", key)
 		return
 	}
 	m := manager.(*CMDManager)
 	m.requestIDToResp.Range(func(k, v interface{}) bool {
 		requestID := k.(uint64)
 		cmdResp := v.(*CMDRespManager)
-		errMessage := fmt.Sprintf("agent(key: %s, request id: %d) disconnected from the server", key, requestID)
+		errMessage := fmt.Sprintf("[REMOTE_EXEC] agent(key: %s, request id: %d) disconnected from the server", key, requestID)
 		cmdResp.SetErrorMessage(errMessage)
 		log.Warning(errMessage)
 		cmdResp.close()
@@ -89,7 +90,7 @@ func RemoveAgentCMDManager(key string) {
 	})
 	m.close()
 	keyToAgentCMDManager.Delete(key)
-	log.Infof("agent(key: %s) is removed", key)
+	log.Infof("[REMOTE_EXEC] agent(key: %s) cmd manager is removed", key)
 }
 
 type CMDManager struct {
@@ -104,9 +105,9 @@ func (m *CMDManager) IsValid() bool {
 	return m.key != ""
 }
 
-func (m *CMDManager) removeRespManager(requestID uint64) {
+func (m *CMDManager) RemoveRespManager(requestID uint64) {
 	m.requestIDToResp.Delete(requestID)
-	log.Infof("response(key: %s, request id: %v) is removed", m.key, requestID)
+	log.Infof("[REMOTE_EXEC] response(key: %s, request id: %v) is removed", m.key, requestID)
 }
 
 func (m *CMDManager) GetRespManager(requestID uint64) *CMDRespManager {
@@ -115,13 +116,14 @@ func (m *CMDManager) GetRespManager(requestID uint64) *CMDRespManager {
 	}
 	return &CMDRespManager{}
 }
-func (m *CMDManager) newRespManager() (uint64, *CMDRespManager) {
+func (m *CMDManager) NewRespManager() (uint64, *CMDRespManager) {
 	latestRequestID := m.latestRequestID.Add(1)
 	resp := &CMDRespManager{
 		requestID:                  latestRequestID,
 		ResponseDoneChan:           make(chan struct{}, 1),
 		GetRemoteCommandsDoneChan:  make(chan struct{}, 1),
 		GetLinuxNamespacesDoneChan: make(chan struct{}, 1),
+		IncrementalDataChan:        make(chan struct{}, 100), // 支持更高频率的增量通知
 		RemoteExecResp:             RemoteExecResp{},
 	}
 	m.requestIDToResp.Store(latestRequestID, resp)
@@ -139,9 +141,12 @@ type CMDRespManager struct {
 	ResponseDoneChan           chan struct{}
 	GetRemoteCommandsDoneChan  chan struct{}
 	GetLinuxNamespacesDoneChan chan struct{}
+	IncrementalDataChan        chan struct{} // 用于增量数据通知的通道
 
-	mutex        sync.Mutex
-	ErrorMessage string
+	mutex          sync.Mutex
+	ContentChunks  []string // 独立存储每次 Agent 响应的数据块，保持一一对应关系
+	nextChunkIndex int      // 下一个待读取的 chunk 索引
+	ErrorMessage   string
 	RemoteExecResp
 }
 
@@ -150,10 +155,28 @@ func (r *CMDRespManager) IsValid() bool {
 }
 
 // AppendContent appends data to Content in a thread-safe way.
+// 每次追加数据后会发送增量通知，支持流式处理
+// 同时将数据作为独立块存储，保持与 Agent 响应的一一对应关系
 func (r *CMDRespManager) AppendContent(data []byte) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+
+	// 保持向后兼容：继续追加到 Content 字符串
 	r.Content += string(data)
+
+	// 同时作为独立块存储，用于增量读取
+	r.ContentChunks = append(r.ContentChunks, string(data))
+
+	// 发送增量数据通知（非阻塞）
+	select {
+	case r.IncrementalDataChan <- struct{}{}:
+		log.Debugf("[REMOTE_EXEC] 发送增量数据通知 (request_id: %d, chunk_index: %d, chunk_size: %d, total_chunks: %d, total_size: %d)",
+			r.requestID, len(r.ContentChunks)-1, len(data), len(r.ContentChunks), len(r.Content))
+	default:
+		// 如果通道满了，跳过本次通知，避免阻塞
+		log.Warningf("[REMOTE_EXEC] 增量数据通道已满，跳过通知 (request_id: %d, data_size: %d)",
+			r.requestID, len(data))
+	}
 }
 
 // SetErrorMessage sets ErrorMessage in a thread-safe way.
@@ -177,15 +200,37 @@ func (r *CMDRespManager) SetLinuxNamespaces(ns []*grpcapi.LinuxNamespace) {
 	r.LinuxNamespaces = ns
 }
 
-// getContent returns Content in a thread-safe way.
-func (r *CMDRespManager) getContent() string {
+// GetContent returns Content in a thread-safe way.
+func (r *CMDRespManager) GetContent() string {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	return r.Content
 }
 
-// getErrorMessage returns ErrorMessage in a thread-safe way.
-func (r *CMDRespManager) getErrorMessage() string {
+// GetNewContent returns new content since the last call and updates the read position.
+// 用于支持增量数据读取，返回自上次读取后的新内容
+// 返回下一个未读取的数据块，保持与 Agent 响应的一一对应关系
+func (r *CMDRespManager) GetNewContent(lastReadPos *int) string {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	// 检查是否还有未读取的数据块
+	if r.nextChunkIndex >= len(r.ContentChunks) {
+		return ""
+	}
+
+	// 返回下一个数据块
+	chunk := r.ContentChunks[r.nextChunkIndex]
+	r.nextChunkIndex++
+
+	// 更新 lastReadPos 以保持向后兼容
+	*lastReadPos += len(chunk)
+
+	return chunk
+}
+
+// GetErrorMessage returns ErrorMessage in a thread-safe way.
+func (r *CMDRespManager) GetErrorMessage() string {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	return r.ErrorMessage
@@ -214,11 +259,12 @@ func (r *CMDRespManager) close() {
 		close(r.ResponseDoneChan)
 		close(r.GetRemoteCommandsDoneChan)
 		close(r.GetLinuxNamespacesDoneChan)
+		close(r.IncrementalDataChan)
 	})
 }
 
 func GetCMDAndNamespace(timeout, orgID, agentID int) (*RemoteExecResp, error) {
-	log.Infof("current node ip(%s) get cmd and namespace", ctrlcommon.NodeIP)
+	log.Infof("[REMOTE_EXEC] current node ip(%s) get cmd and namespace", ctrlcommon.NodeIP)
 	dbInfo, err := metadb.GetDB(orgID)
 	if err != nil {
 		return nil, err
@@ -227,19 +273,19 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*RemoteExecResp, error) {
 	if err := dbInfo.Where("id = ?", agentID).Find(&agent).Error; err != nil {
 		return nil, err
 	}
-	log.Infof("current node ip(%s) agent(cur controller ip: %s, controller ip: %s, id: %d, name: %s) get remote commands and linux namespaces",
+	log.Infof("[REMOTE_EXEC] current node ip(%s) agent(cur controller ip: %s, controller ip: %s, id: %d, name: %s) get remote commands and linux namespaces",
 		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name, dbInfo.LogPrefixORGID)
 
 	key := agent.CtrlIP + "-" + agent.CtrlMac
 	manager := GetAgentCMDManager(key)
-	requestID, cmdResp := manager.newRespManager()
+	requestID, cmdResp := manager.NewRespManager()
 	if !manager.IsValid() {
 		return nil, fmt.Errorf("agent(key: %s, name: %s) cmd manager not found", key, agent.Name)
 	}
 	if !cmdResp.IsValid() {
 		return nil, fmt.Errorf("agent(key: %s, name: %s) resp manager not found", key, agent.Name)
 	}
-	defer manager.removeRespManager(requestID)
+	defer manager.RemoveRespManager(requestID)
 
 	listCmdReq := &grpcapi.RemoteExecRequest{
 		RequestId: &requestID,
@@ -284,12 +330,12 @@ func GetCMDAndNamespace(timeout, orgID, agentID int) (*RemoteExecResp, error) {
 			if commandsReceived || len(cmdResp.getRemoteCommands()) != 0 {
 				return &RemoteExecResp{RemoteCommands: cmdResp.getRemoteCommands()}, nil
 			}
-			log.Errorf("get agent(key: %s) remote commands: %s, error: %s", key, cmdResp.getContent(), cmdResp.getErrorMessage(), dbInfo.LogPrefixORGID)
-			errorMsg := cmdResp.getErrorMessage()
+			log.Errorf("[REMOTE_EXEC] get agent(key: %s) remote commands: %s, error: %s", key, cmdResp.GetContent(), cmdResp.GetErrorMessage(), dbInfo.LogPrefixORGID)
+			errorMsg := cmdResp.GetErrorMessage()
 			if errorMsg == "" {
-				errorMsg = cmdResp.getContent()
+				errorMsg = cmdResp.GetContent()
 			}
-			return nil, fmt.Errorf("failed to get agent(key: %s, name: %s) remote commands and linux namespaces, error: %s", key, agent.Name, errorMsg)
+			return nil, fmt.Errorf("[REMOTE_EXEC] failed to get agent(key: %s, name: %s) remote commands and linux namespaces, error: %s", key, agent.Name, errorMsg)
 		}
 	}
 	return &RemoteExecResp{
@@ -310,19 +356,21 @@ func RunAgentCMD(timeout, orgID, agentID int, req *grpcapi.RemoteExecRequest, CM
 		return "", fmt.Errorf("%s%s", serverLog, err.Error())
 	}
 	b, _ := json.Marshal(req)
-	log.Infof("current node ip(%s) agent(cur controller ip: %s, controller ip: %s, id: %d, name: %s) run remote command, request: %s",
+	log.Infof("[REMOTE_EXEC] current node ip(%s) agent(cur controller ip: %s, controller ip: %s, id: %d, name: %s) run remote command, request: %s",
 		ctrlcommon.NodeIP, agent.CurControllerIP, agent.ControllerIP, agentID, agent.Name, string(b), dbInfo.LogPrefixORGID)
 	key := agent.CtrlIP + "-" + agent.CtrlMac
 	manager := GetAgentCMDManager(key)
-	requestID, cmdResp := manager.newRespManager()
+	requestID, cmdResp := manager.NewRespManager()
 	if !manager.IsValid() {
 		return "", fmt.Errorf("agent(key: %s, name: %s) cmd manager not found", key, agent.Name)
 	}
 	if !cmdResp.IsValid() {
 		return "", fmt.Errorf("agent(key: %s, name: %s) resp manager not found", key, agent.Name)
 	}
-	defer manager.removeRespManager(requestID)
+	log.Infof("[REMOTE_EXEC] agent(key: %s) created response manager, request_id: %d", key, requestID)
+	defer manager.RemoveRespManager(requestID)
 	req.RequestId = &requestID
+	log.Infof("[REMOTE_EXEC] agent(key: %s) sending request to RequestChan, request_id: %d", key, requestID)
 	manager.RequestChan <- req
 
 	cmdTimeout := time.After(time.Duration(timeout) * time.Second)
@@ -337,12 +385,12 @@ func RunAgentCMD(timeout, orgID, agentID int, req *grpcapi.RemoteExecRequest, CM
 			if !ok {
 				return "", fmt.Errorf("%sagent(key: %s, name: %s) command manager is lost", serverLog, key, agent.Name)
 			}
-			if msg := cmdResp.getErrorMessage(); msg != "" {
-				return cmdResp.getContent(), fmt.Errorf("The deepflow-agent is unable to execute the `%s` command."+
+			if msg := cmdResp.GetErrorMessage(); msg != "" {
+				return cmdResp.GetContent(), fmt.Errorf("The deepflow-agent is unable to execute the `%s` command."+
 					" Detailed error information is as follows:\n\n%s", CMD, msg)
 			}
-			content = cmdResp.getContent()
-			log.Infof("command run content len: %d", len(content), dbInfo.LogPrefixORGID)
+			content = cmdResp.GetContent()
+			log.Infof("[REMOTE_EXEC] command run content len: %d", len(content), dbInfo.LogPrefixORGID)
 			return content, nil
 		}
 	}
