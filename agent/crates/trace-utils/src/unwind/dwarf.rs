@@ -497,16 +497,54 @@ pub fn read_unwind_entries(data: &[u8]) -> Result<Vec<UnwindEntry>> {
             let mut sm = StateMachine::new(entry);
             sm.set_pc(fde.initial_address());
             let mut ins_iter = fde.instructions(&eh_frame, &ba);
-            while let Some(ins) = ins_iter.next()? {
-                if matches!(
-                    ins,
-                    CallFrameInstruction::AdvanceLoc { .. } | CallFrameInstruction::SetLoc { .. }
-                ) {
-                    unwind_entries.push(sm.entry);
+
+            // On ARM64, tolerate unknown CFI instructions by skipping problematic FDEs.
+            // ARM64 binaries may use newer CFI instructions (e.g., for PAC/BTI) not yet
+            // supported by gimli. On x86_64, the CFI instruction set is stable and fully
+            // supported, so we keep the original strict behavior.
+            #[cfg(target_arch = "aarch64")]
+            let (fde_ok, _last_ins) = {
+                let mut fde_ok = true;
+                loop {
+                    let ins = match ins_iter.next() {
+                        Ok(Some(ins)) => ins,
+                        Err(_e) => {
+                            // Skip this FDE if we encounter unknown instructions
+                            fde_ok = false;
+                            break;
+                        }
+                        Ok(None) => break,
+                    };
+                    if matches!(
+                        ins,
+                        CallFrameInstruction::AdvanceLoc { .. }
+                            | CallFrameInstruction::SetLoc { .. }
+                    ) {
+                        unwind_entries.push(sm.entry);
+                    }
+                    sm.update(fde.cie(), &ins);
                 }
-                sm.update(fde.cie(), &ins);
+                (fde_ok, ())
+            };
+
+            #[cfg(not(target_arch = "aarch64"))]
+            let fde_ok = {
+                while let Some(ins) = ins_iter.next()? {
+                    if matches!(
+                        ins,
+                        CallFrameInstruction::AdvanceLoc { .. }
+                            | CallFrameInstruction::SetLoc { .. }
+                    ) {
+                        unwind_entries.push(sm.entry);
+                    }
+                    sm.update(fde.cie(), &ins);
+                }
+                true
+            };
+
+            if fde_ok {
+                unwind_entries.push(sm.entry);
             }
-            unwind_entries.push(sm.entry);
         }
     }
     unwind_entries.extend(holes);
