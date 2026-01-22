@@ -361,7 +361,7 @@ impl PostgresqlLog {
                 }
                 Err(Error::L7ProtocolUnknown)
             }
-            'B' | 'F' | 'C' | 'D' | 'H' | 'S' | 'X' | 'd' | 'c' | 'f' => Ok(false),
+            'B' | 'F' | 'C' | 'D' | 'H' | 'S' | 'X' | 'd' | 'c' | 'f' | 'E' => Ok(false),
             _ => Err(Error::L7ProtocolUnknown),
         }
     }
@@ -477,7 +477,7 @@ fn strip_string_end_with_zero(data: &[u8]) -> Result<&[u8]> {
 
 #[cfg(test)]
 mod test {
-    use std::{cell::RefCell, path::Path, rc::Rc};
+    use std::{cell::RefCell, fmt::Write, fs, path::Path, rc::Rc};
 
     use public::l7_protocol::LogMessageType;
 
@@ -488,6 +488,7 @@ mod test {
             l7_protocol_log::ParseParam,
             l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface},
         },
+        config::handler::LogParserConfig,
         flow_generator::protocol_logs::PostgreInfo,
         flow_generator::{protocol_logs::PostgresqlLog, L7_RRT_CACHE_CAPACITY},
         utils::test::Capture,
@@ -629,5 +630,104 @@ mod test {
             return (info, parser.perf_stats.unwrap());
         }
         unreachable!()
+    }
+
+    fn run(name: &str, truncate: Option<usize>) -> String {
+        let pcap_file = Path::new(FILE_DIR).join(name);
+        let capture = Capture::load_pcap(pcap_file, truncate);
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
+        let mut packets = capture.as_meta_packets();
+        if packets.is_empty() {
+            return "".to_string();
+        }
+
+        let mut pgsql = PostgresqlLog::default();
+        let mut output: String = String::new();
+        let first_dst_port = packets[0].lookup_key.dst_port;
+        let log_config = LogParserConfig::default();
+        for packet in packets.iter_mut() {
+            packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
+                PacketDirection::ClientToServer
+            } else {
+                PacketDirection::ServerToClient
+            };
+            let payload = match packet.get_l4_payload() {
+                Some(p) => match truncate {
+                    Some(t) if t < p.len() => &p[..t],
+                    _ => p,
+                },
+                None => continue,
+            };
+
+            let mut param = ParseParam::new(
+                &*packet,
+                log_cache.clone(),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
+            );
+            param.parse_config = Some(&log_config);
+            param.set_captured_byte(payload.len());
+
+            let is_pgsql = pgsql.check_payload(payload, &param).is_some();
+            let info = pgsql.parse_payload(payload, &param);
+
+            if let Ok(info) = info {
+                if info.is_none() {
+                    let i = PostgreInfo::default();
+                    let _ = write!(
+                        &mut output,
+                        "{} is_pgsql: {}\n",
+                        serde_json::to_string(&i).unwrap(),
+                        is_pgsql
+                    );
+                    continue;
+                }
+                match info.unwrap_single() {
+                    L7ProtocolInfo::PostgreInfo(mut i) => {
+                        i.rrt = 0;
+                        let _ = write!(
+                            &mut output,
+                            "{} is_pgsql: {}\n",
+                            serde_json::to_string(&i).unwrap(),
+                            is_pgsql
+                        );
+                    }
+                    _ => unreachable!(),
+                }
+            } else {
+                let i = PostgreInfo::default();
+                let _ = write!(
+                    &mut output,
+                    "{} is_pgsql: {}\n",
+                    serde_json::to_string(&i).unwrap(),
+                    is_pgsql
+                );
+            }
+        }
+        output
+    }
+
+    #[test]
+    fn check() {
+        let files = vec![("pgsql-all.pcap", "pgsql-all.result")];
+
+        for item in files.iter() {
+            let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
+            let output = run(item.0, None);
+
+            if output != expected {
+                let output_path = Path::new("actual.txt");
+                fs::write(&output_path, &output).unwrap();
+                assert!(
+                    output == expected,
+                    "output different from expected {}, written to {:?}",
+                    item.1,
+                    output_path
+                );
+            }
+        }
     }
 }
