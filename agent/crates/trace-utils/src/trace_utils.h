@@ -49,6 +49,7 @@ enum RegType {
 };
 typedef uint8_t RegType;
 
+#if defined(__aarch64__)
 /* Return Address recovery type for ARM64
  * On x86_64, RA is always at CFA-8 (implicitly handled)
  * On ARM64, RA may be in LR register or saved on stack
@@ -59,6 +60,7 @@ enum RaType {
     RA_TYPE_UNSUPPORTED,
 };
 typedef uint8_t RaType;
+#endif
 
 typedef struct lua_unwind_table_t lua_unwind_table_t;
 
@@ -91,10 +93,14 @@ typedef struct {
     uint64_t pc;
     CfaType cfa_type;
     RegType rbp_type;   /* FP recovery: how to restore frame pointer */
+#if defined(__aarch64__)
     RaType ra_type;     /* RA recovery: how to get return address (ARM64) */
+#endif
     int16_t cfa_offset;     /* by factor of 8 */
     int16_t rbp_offset;     /* by factor of 8 (FP offset from CFA) */
+#if defined(__aarch64__)
     int16_t ra_offset;      /* by factor of 8 (RA offset from CFA, for ARM64) */
+#endif
 } unwind_entry_t;
 
 typedef struct {
