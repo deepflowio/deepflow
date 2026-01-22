@@ -1286,6 +1286,7 @@ CREATE TABLE IF NOT EXISTS custom_service (
     domain              CHAR(64) DEFAULT '' COMMENT 'reserved for backend',
     team_id             INTEGER DEFAULT 1,
     service_group_name  VARCHAR(128) DEFAULT '',
+    match_port_enabled  TINYINT(1) DEFAULT NULL COMMENT '0: disable 1: enable, only effective when type=pod_service',
     lcuuid              CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
