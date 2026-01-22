@@ -3209,7 +3209,7 @@ inputs:
         #   ch: 乱序重排（OOOR）超时时间
         # unit:
         # range: [100ms, 1s]
-        # enum_options: [_DYNAMIC_OPTIONS_]
+        # enum_options: []
         # modification: agent_restart
         # ee_feature: true
         # description:
