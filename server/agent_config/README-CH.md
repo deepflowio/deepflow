@@ -4214,11 +4214,6 @@ inputs:
         out_of_order_reassembly_timeout: 100ms
 ```
 
-**枚举可选值**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | |
-
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |

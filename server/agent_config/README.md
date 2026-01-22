@@ -4316,11 +4316,6 @@ inputs:
         out_of_order_reassembly_timeout: 100ms
 ```
 
-**Enum options**:
-| Value | Note                         |
-| ----- | ---------------------------- |
-| _DYNAMIC_OPTIONS_ | |
-
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
