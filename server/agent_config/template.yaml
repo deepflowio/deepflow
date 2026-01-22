@@ -3203,6 +3203,26 @@ inputs:
         #     需关注 agent 内存用量；（2）配置`HTTP2`或`gRPC`会全部开启这两个协议
         # upgrade_from: static_config.ebpf.syscall-out-of-order-reassembly
         out_of_order_reassembly_protocols: []
+        # type: duration
+        # name:
+        #   en: OOOR Timeout
+        #   ch: 乱序重排（OOOR）超时时间
+        # unit:
+        # range: [100ms, 1s]
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     When the OOOR cache data times out, it will be output directly. This parameter can be adjusted according to metric
+        #     `deepflow_agent_ebpf_collect.metrics.time_backtrack_max`.
+        #
+        #     Note: Increasing this value will consume more memory
+        #   ch: |-
+        #     OOOR 缓存的数据时间超时会直接输出, 可以根据采集器指标 `deepflow_agent_ebpf_collect.metrics.metrics.time_backtrack_max` 调整该参数。
+        #
+        #     注意：增大该值会消耗更多的内存
+        out_of_order_reassembly_timeout: 100ms
         # type: string
         # name:
         #   en: SR Protocols
