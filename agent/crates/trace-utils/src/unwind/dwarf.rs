@@ -502,45 +502,30 @@ pub fn read_unwind_entries(data: &[u8]) -> Result<Vec<UnwindEntry>> {
             // ARM64 binaries may use newer CFI instructions (e.g., for PAC/BTI) not yet
             // supported by gimli. On x86_64, the CFI instruction set is stable and fully
             // supported, so we keep the original strict behavior.
-            #[cfg(target_arch = "aarch64")]
-            let (fde_ok, _last_ins) = {
-                let mut fde_ok = true;
-                loop {
-                    let ins = match ins_iter.next() {
-                        Ok(Some(ins)) => ins,
-                        Err(_e) => {
-                            // Skip this FDE if we encounter unknown instructions
-                            fde_ok = false;
-                            break;
+            #[allow(unused_mut)]
+            let mut fde_ok = true;
+            loop {
+                match ins_iter.next() {
+                    Ok(None) => break,
+                    Ok(Some(ins)) => {
+                        if matches!(
+                            ins,
+                            CallFrameInstruction::AdvanceLoc { .. }
+                                | CallFrameInstruction::SetLoc { .. }
+                        ) {
+                            unwind_entries.push(sm.entry);
                         }
-                        Ok(None) => break,
-                    };
-                    if matches!(
-                        ins,
-                        CallFrameInstruction::AdvanceLoc { .. }
-                            | CallFrameInstruction::SetLoc { .. }
-                    ) {
-                        unwind_entries.push(sm.entry);
+                        sm.update(fde.cie(), &ins);
                     }
-                    sm.update(fde.cie(), &ins);
-                }
-                (fde_ok, ())
-            };
-
-            #[cfg(not(target_arch = "aarch64"))]
-            let fde_ok = {
-                while let Some(ins) = ins_iter.next()? {
-                    if matches!(
-                        ins,
-                        CallFrameInstruction::AdvanceLoc { .. }
-                            | CallFrameInstruction::SetLoc { .. }
-                    ) {
-                        unwind_entries.push(sm.entry);
+                    #[cfg(target_arch = "aarch64")]
+                    Err(_e) => {
+                        fde_ok = false;
+                        break;
                     }
-                    sm.update(fde.cie(), &ins);
+                    #[cfg(not(target_arch = "aarch64"))]
+                    Err(e) => return Err(e.into()),
                 }
-                true
-            };
+            }
 
             if fde_ok {
                 unwind_entries.push(sm.entry);
