@@ -1116,4 +1116,5 @@ type CustomService struct {
 	Domain           string          `gorm:"column:domain;type:char(64);not null" json:"DOMAIN" mapstructure:"DOMAIN"`
 	TeamID           int             `gorm:"column:team_id;type:int;default:0" json:"TEAM_ID" mapstructure:"TEAM_ID"`
 	ServiceGroupName string          `gorm:"column:service_group_name;type:varchar(128);default:''" json:"SERVICE_GROUP_NAME" mapstructure:"SERVICE_GROUP_NAME"`
+	MatchPortEnabled int             `gorm:"column:match_port_enabled;type:tinyint(1);default:null" json:"MATCH_PORT_ENABLED" mapstructure:"MATCH_PORT_ENABLED"`
 }
