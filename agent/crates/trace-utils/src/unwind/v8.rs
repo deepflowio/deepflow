@@ -1694,9 +1694,29 @@ pub fn merge_stacks(interpreter_trace: &str, native_trace: &str) -> String {
     replace_builtin_frames_with_js(native_trace, &enhanced_js_trace)
 }
 
+/// Check if a frame represents V8 JIT code (should be replaced with JS frames)
+fn is_v8_jit_frame(frame: &str) -> bool {
+    frame.starts_with("Builtins_")
+        || frame.starts_with("[unknown]")
+        || frame.contains("Builtins_JSEntry")
+}
+
+/// Check if a frame is a V8 entry point (boundary from native to JS)
+fn is_v8_entry_point(frame: &str) -> bool {
+    frame.contains("v8::internal::Invoke") || frame.contains("v8::internal::Execution::Call")
+}
+
+/// Check if a frame is a node binary path frame like [/path/to/node]
+fn is_node_binary_frame(frame: &str) -> bool {
+    if frame.starts_with('[') && frame.ends_with(']') {
+        let inner = &frame[1..frame.len() - 1];
+        return inner.ends_with("/node") || inner.ends_with("/nodejs") || inner.contains("/node/");
+    }
+    false
+}
+
 /// Replace Builtins_ and [unknown] frames in native stack with JS frames
 fn replace_builtin_frames_with_js(native_trace: &str, js_trace: &str) -> String {
-    // Split both stacks into frames
     let native_frames: Vec<&str> = native_trace.split(';').filter(|f| !f.is_empty()).collect();
     let js_frames: Vec<&str> = js_trace.split(';').filter(|f| !f.is_empty()).collect();
 
@@ -1704,18 +1724,51 @@ fn replace_builtin_frames_with_js(native_trace: &str, js_trace: &str) -> String 
         return native_trace.to_string();
     }
 
+    // Check if we have any [unknown] or Builtins_ markers
+    let has_jit_markers = native_frames.iter().any(|f| is_v8_jit_frame(f));
+
+    // If no JIT markers, check for Invoke + [/path/to/node] pattern
+    if !has_jit_markers {
+        // Find if there's Invoke followed by [/path/to/node] frames
+        let mut invoke_idx = None;
+        let mut last_node_binary_idx = None;
+
+        for (idx, frame) in native_frames.iter().enumerate() {
+            if is_v8_entry_point(frame) {
+                invoke_idx = Some(idx);
+            }
+            // Only track node binary frames AFTER invoke
+            if invoke_idx.is_some() && is_node_binary_frame(frame) {
+                last_node_binary_idx = Some(idx);
+            }
+        }
+
+        // If we found Invoke followed by [/path/to/node], insert JS frames after it
+        if let (Some(_invoke), Some(last_node)) = (invoke_idx, last_node_binary_idx) {
+            trace!(
+                "No JIT markers but found Invoke+[node] pattern, inserting after idx {}",
+                last_node
+            );
+            let mut result: Vec<&str> = native_frames[..=last_node].to_vec();
+            result.extend(js_frames.iter());
+            result.extend(native_frames[last_node + 1..].iter());
+            return result.join(";");
+        }
+
+        // No pattern found, just append JS frames at the end
+        let mut result = native_frames.clone();
+        result.extend(js_frames.iter());
+        return result.join(";");
+    }
+
+    // Original logic: replace JIT markers with JS frames
     let mut result_frames: Vec<&str> = Vec::new();
     let mut js_frame_idx = 0;
     let mut last_replacement_idx: Option<usize> = None;
 
-    for (_idx, native_frame) in native_frames.iter().enumerate() {
+    for native_frame in native_frames.iter() {
         // Check if this frame should be replaced
-        // FIXME: how to find the frames necessary to be replaced
-        let should_replace = native_frame.starts_with("Builtins_")
-            || native_frame.starts_with("[unknown]")
-            || native_frame.contains("Builtins_JSEntry")
-            || native_frame.contains("V8::")
-            || native_frame.contains("V8::EntryFrame");
+        let should_replace = is_v8_jit_frame(native_frame);
 
         if should_replace && js_frame_idx < js_frames.len() {
             // Replace with JS frame
@@ -1748,8 +1801,7 @@ fn replace_builtin_frames_with_js(native_trace: &str, js_trace: &str) -> String 
         }
     }
 
-    let result = result_frames.join(";");
-    result
+    result_frames.join(";")
 }
 
 /// Enhance V8 trace with better symbolization
