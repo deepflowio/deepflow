@@ -343,11 +343,13 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 	}
 
 	if len(p.extraFilters) > 0 {
-		// to support same pron like promql filters, here we need to parse and extract `where` clause
+		// to support same filters like promql filters, here we need to parse and extract `where` clause
 		// it can't be use in querier where directly
+		// for this scenarios, all tag would be use as deepflow-tag, do not support prometheus tag here
+		// notice: here, when call parseExtraFiltersToWhereClause, use prefixType=prefixNone means always query DeepFlow tag
 		extraLabelMatchers, err := parseExtraFiltersToMatchers(p.extraFilters)
 		if err == nil {
-			filters = append(filters, p.parseExtraFiltersToWhereClause(extraLabelMatchers, prefixType, db,
+			filters = append(filters, p.parseExtraFiltersToWhereClause(extraLabelMatchers, prefixNone, db,
 				func(tagName, tagAlias string, isDeepFlowTag bool) {
 					if db == "" || db == chCommon.DB_NAME_PROMETHEUS || db == chCommon.DB_NAME_EXT_METRICS {
 						if isDeepFlowTag && (len(q.Hints.Grouping) == 0 || tagAlias != "") {
@@ -597,6 +599,9 @@ func removePrometheusTagPrefix(tag string) string {
 	return strings.Replace(tag, "tag.", "", 1)
 }
 
+// prefix type means "real prefix type" for metric
+// when query prometheus metrics, prefix type is DeepFlow Tag, means we should query DeepFlow tag with 'df_x'
+// when query DeepFlow metrics, prefix type is Prometheus Tag, means we should query Prometheus tag with 'tag_x'
 func (p *prometheusReader) parsePromQLTag(prefixType prefix, db, tag string) (tagName string, tagAlias string, isDeepFlowTag bool) {
 	// set flag
 	if prefixType == prefixNone {
@@ -1122,7 +1127,7 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 	if len(p.extraFilters) > 0 {
 		extraLabelMatchers, err := parseExtraFiltersToMatchers(p.extraFilters)
 		if err == nil {
-			filters = append(filters, p.parseExtraFiltersToWhereClause(extraLabelMatchers, prefixDeepFlow, chCommon.DB_NAME_PROMETHEUS,
+			filters = append(filters, p.parseExtraFiltersToWhereClause(extraLabelMatchers, prefixNone, chCommon.DB_NAME_PROMETHEUS,
 				func(tagName, tagAlias string, isDeepFlowTag bool) {
 					if isDeepFlowTag && cap(groupBy) == 0 {
 						expectedQueryTags[tagName] = tagAlias
