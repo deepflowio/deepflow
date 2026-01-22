@@ -71,10 +71,12 @@ pub struct UnwindEntry {
     pub pc: u64,
     pub cfa_type: CfaType,
     pub rbp_type: RegType, // FP recovery: how to restore frame pointer
-    pub ra_type: RaType,   // RA recovery: how to get return address (ARM64)
+    #[cfg(target_arch = "aarch64")]
+    pub ra_type: RaType, // RA recovery: how to get return address (ARM64 only)
     pub cfa_offset: i16,   // by factor of 8
     pub rbp_offset: i16,   // by factor of 8 (FP offset from CFA)
-    pub ra_offset: i16,    // by factor of 8 (RA offset from CFA, used when ra_type is CfaOffset)
+    #[cfg(target_arch = "aarch64")]
+    pub ra_offset: i16, // by factor of 8 (RA offset from CFA, ARM64 only)
 }
 
 impl fmt::Display for UnwindEntry {
@@ -93,11 +95,15 @@ impl fmt::Display for UnwindEntry {
             RegType::Offset => write!(f, "fp=cfa{:+} ", (self.rbp_offset as i64) << 3)?,
             RegType::Unsupported => write!(f, "fp=unsupported ")?,
         }
+        #[cfg(target_arch = "aarch64")]
         match self.ra_type {
-            RaType::CfaOffset => write!(f, "ra=cfa{:+})", (self.ra_offset as i64) << 3),
-            RaType::LrRegister => write!(f, "ra=lr)"),
-            RaType::Unsupported => write!(f, "ra=unsupported)"),
+            RaType::CfaOffset => write!(f, "ra=cfa{:+})", (self.ra_offset as i64) << 3)?,
+            RaType::LrRegister => write!(f, "ra=lr)")?,
+            RaType::Unsupported => write!(f, "ra=unsupported)")?,
         }
+        #[cfg(not(target_arch = "aarch64"))]
+        write!(f, ")")?;
+        Ok(())
     }
 }
 
@@ -155,6 +161,7 @@ const REG_ID_RBP: u16 = REG_ID_FP;
 const REG_ID_RSP: u16 = REG_ID_SP;
 
 impl UnwindEntry {
+    #[cfg(target_arch = "aarch64")]
     fn new<S, R>(
         section: &S,
         bases: &BaseAddresses,
@@ -169,6 +176,25 @@ impl UnwindEntry {
             ra_type: default_ra_type,
             ..Default::default()
         };
+        let mut ins_iter = cie.instructions(section, bases);
+        while let Some(ins) = ins_iter.next()? {
+            sm.update(cie, &ins);
+        }
+        Ok(sm)
+    }
+
+    #[cfg(not(target_arch = "aarch64"))]
+    fn new<S, R>(
+        section: &S,
+        bases: &BaseAddresses,
+        cie: &CommonInformationEntry<R>,
+        _default_ra_type: RaType,
+    ) -> Result<Self>
+    where
+        R: Reader,
+        S: UnwindSection<R>,
+    {
+        let mut sm = Self::default();
         let mut ins_iter = cie.instructions(section, bases);
         while let Some(ins) = ins_iter.next()? {
             sm.update(cie, &ins);
@@ -382,9 +408,15 @@ pub fn read_unwind_entries(data: &[u8]) -> Result<Vec<UnwindEntry>> {
     let default_ra_type = RaType::CfaOffset;
 
     // Create a default UnwindEntry with architecture-specific ra_type
+    #[cfg(target_arch = "aarch64")]
     let make_default_entry = |pc: u64| UnwindEntry {
         pc,
         ra_type: default_ra_type,
+        ..Default::default()
+    };
+    #[cfg(not(target_arch = "aarch64"))]
+    let make_default_entry = |pc: u64| UnwindEntry {
+        pc,
         ..Default::default()
     };
 
