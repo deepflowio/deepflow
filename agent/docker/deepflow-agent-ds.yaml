@@ -24,6 +24,22 @@ spec:
           imagePullPolicy: Never
           securityContext:
             privileged: true
+          readinessProbe:
+            httpGet:
+              path: /v1/ready/
+              port: 38086
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /v1/health/
+              port: 38086
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
           volumeMounts:
             - name: sys-kernel-debug
               mountPath: /sys/kernel/debug
