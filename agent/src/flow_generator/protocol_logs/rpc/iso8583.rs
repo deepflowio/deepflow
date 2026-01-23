@@ -351,26 +351,16 @@ impl L7ProtocolParserInterface for Iso8583Log {
 
             if is_00x000(&info.f3) {
                 if info.f25 == "28" {
-                    if info.mti == "0200-金融类请求" {
+                    if info.mti == "0200-金融类请求" || info.mti == "0210-金融类应答" {
                         info.endpoint = format!(
-                            "{}:{}-28消费一次性付款类",
-                            info.mti,
-                            take_first_n(&info.f3, 6)
-                        );
-                    } else if info.mti == "0210-金融类应答" {
-                        info.endpoint = format!(
-                            "{}:{}-28消费一次性付款类",
-                            info.mti,
+                            "0200-金融类:{}-28消费一次性付款类",
                             take_first_n(&info.f3, 6)
                         );
                     }
                 } else if info.f25 == "00" {
-                    if info.mti == "0200-金融类请求" {
+                    if info.mti == "0200-金融类请求" || info.mti == "0210-金融类应答" {
                         info.endpoint =
-                            format!("{}:{}-00-代收", info.mti, take_first_n(&info.f3, 6));
-                    } else if info.mti == "0210-金融类应答" {
-                        info.endpoint =
-                            format!("{}:{}-00-代收", info.mti, take_first_n(&info.f3, 6));
+                            format!("0200-金融类:{}-00-代收", take_first_n(&info.f3, 6));
                     }
                 }
             }
