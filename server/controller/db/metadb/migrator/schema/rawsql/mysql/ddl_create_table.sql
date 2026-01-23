@@ -178,7 +178,7 @@ TRUNCATE TABLE agent_group_configuration;
 CREATE TABLE IF NOT EXISTS agent_group_configuration_changelog (
     id                              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     agent_group_configuration_id    INTEGER NOT NULL,
-    user_id                         INTEGER NOT NULL,
+    user                            VARCHAR(256) NOT NULL,
     remarks                         TEXT NOT NULL,
     yaml_diff                       MEDIUMTEXT NOT NULL,
     lcuuid                          CHAR(64) NOT NULL,

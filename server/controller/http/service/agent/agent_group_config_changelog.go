@@ -181,7 +181,7 @@ func (c *ConfigChangelog) Create(configLcuuid string, create *model.AgentGroupCo
 		Lcuuid:             ctrlcommon.GenerateUUID(time.Now().GoString()),
 		AgentGroupConfigID: config.ID,
 		YamlDiff:           create.YamlDiff,
-		UserID:             create.UserID,
+		User:               create.User,
 		Remarks:            create.Remarks,
 	}
 
