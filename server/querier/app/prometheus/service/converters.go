@@ -350,10 +350,10 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		extraLabelMatchers, err := parseExtraFiltersToMatchers(p.extraFilters)
 		if err == nil {
 			filters = append(filters, p.parseExtraFiltersToWhereClause(extraLabelMatchers, prefixNone, db,
-				func(tagName, tagAlias string, isDeepFlowTag bool) {
+				func(tagName string, isTag bool) {
 					if db == "" || db == chCommon.DB_NAME_PROMETHEUS || db == chCommon.DB_NAME_EXT_METRICS {
-						if isDeepFlowTag && (len(q.Hints.Grouping) == 0 || tagAlias != "") {
-							expectedDeepFlowNativeTags[tagName] = tagAlias
+						if len(q.Hints.Grouping) == 0 && isTag {
+							expectedDeepFlowNativeTags[tagName] = tagName
 						}
 					}
 				}))
@@ -381,6 +381,13 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 
 	sql := parseToQuerierSQL(ctx, db, table, metricsArray, filters, groupBy, orderBy)
 	return ctx, sql, db, dataPrecision, queryMetric, err
+}
+
+func (p *prometheusReader) parseExtraFilters(filter *extraFilters, db string) (string, string) {
+	if filter.label == "" || filter.operator == "" {
+		return "", ""
+	}
+	return filter.label, fmt.Sprintf("%s %s %s", filter.label, filter.operator, escapeSingleQuote(filter.value))
 }
 
 func (p *prometheusReader) parseMatchers(matcher *prompb.LabelMatcher, prefixType prefix, db string) (string, string, bool, string) {
@@ -418,21 +425,23 @@ func (p *prometheusReader) parseMatchers(matcher *prompb.LabelMatcher, prefixTyp
 }
 
 // parse extra-filters to filters in `where` clause
-func (p *prometheusReader) parseExtraFiltersToWhereClause(extraLabelMatchers [][]*prompb.LabelMatcher, prefixType prefix, db string, handleTags func(string, string, bool)) string {
-	outerFilters := make([]string, 0, len(extraLabelMatchers))
-	for i := 0; i < len(extraLabelMatchers); i++ {
-		innerFilters := make([]string, 0, len(extraLabelMatchers[i]))
-		for j := 0; j < len(extraLabelMatchers[i]); j++ {
-			matcher := extraLabelMatchers[i][j]
-			tagName, tagAlias, isDeepFlowTag, newFilter := p.parseMatchers(matcher, prefixType, db)
+func (p *prometheusReader) parseExtraFiltersToWhereClause(extraLabelFilters [][]*extraFilters, prefixType prefix, db string, handleTags func(string, bool)) string {
+	outerFilters := make([]string, 0, len(extraLabelFilters))
+	for i := 0; i < len(extraLabelFilters); i++ {
+		innerFilters := make([]string, 0, len(extraLabelFilters[i]))
+		for j := 0; j < len(extraLabelFilters[i]); j++ {
+			matcher := extraLabelFilters[i][j]
+			tagName, newFilter := p.parseExtraFilters(matcher, db)
 			if newFilter == "" {
 				continue
 			}
 			innerFilters = append(innerFilters, newFilter)
-			handleTags(tagName, tagAlias, isDeepFlowTag)
+			handleTags(tagName, matcher.isTag)
 		}
 		// inside matchers use 'AND' for connected
-		outerFilters = append(outerFilters, fmt.Sprintf("(%s)", strings.Join(innerFilters, " AND ")))
+		if len(innerFilters) > 0 {
+			outerFilters = append(outerFilters, fmt.Sprintf("(%s)", strings.Join(innerFilters, " AND ")))
+		}
 	}
 	// outside matchers use 'OR' for connected
 	return fmt.Sprintf("(%s)", strings.Join(outerFilters, " OR "))
@@ -1125,12 +1134,12 @@ func (p *prometheusReader) parseQueryRequestToSQL(ctx context.Context, queryReq 
 		}
 	}
 	if len(p.extraFilters) > 0 {
-		extraLabelMatchers, err := parseExtraFiltersToMatchers(p.extraFilters)
+		extraLabelFilters, err := parseExtraFiltersToMatchers(p.extraFilters)
 		if err == nil {
-			filters = append(filters, p.parseExtraFiltersToWhereClause(extraLabelMatchers, prefixNone, chCommon.DB_NAME_PROMETHEUS,
-				func(tagName, tagAlias string, isDeepFlowTag bool) {
-					if isDeepFlowTag && cap(groupBy) == 0 {
-						expectedQueryTags[tagName] = tagAlias
+			filters = append(filters, p.parseExtraFiltersToWhereClause(extraLabelFilters, prefixNone, chCommon.DB_NAME_PROMETHEUS,
+				func(tagName string, isTag bool) {
+					if cap(groupBy) == 0 && isTag {
+						expectedQueryTags[tagName] = tagName
 					}
 				}))
 		}
@@ -1552,14 +1561,23 @@ func findNestedType(dbType string) string {
 	return dbType[leftParen+1 : rightParen]
 }
 
-func parseExtraFiltersToMatchers(filters string) ([][]*prompb.LabelMatcher, error) {
+// 专门给 extraFilters 做一个结构体，以解析实际的 tag + value
+// 注意：仅能用于 DeepFlow tag 查询
+type extraFilters struct {
+	label    string
+	value    string
+	operator string
+	isTag    bool
+}
+
+func parseExtraFiltersToMatchers(filters string) ([][]*extraFilters, error) {
 	fakeSQL := fmt.Sprintf("select 1 from t where %s", filters)
 	stmt, err := sqlparser.Parse(fakeSQL)
 	if err != nil {
 		return nil, err
 	}
 	selectStmt := stmt.(*sqlparser.Select)
-	labelMatchers := make([][]*prompb.LabelMatcher, 0)
+	labelMatchers := make([][]*extraFilters, 0)
 	_, err = iterateExprs(selectStmt.Where.Expr, &labelMatchers)
 	if err != nil {
 		return nil, err
@@ -1567,7 +1585,7 @@ func parseExtraFiltersToMatchers(filters string) ([][]*prompb.LabelMatcher, erro
 	return labelMatchers, nil
 }
 
-func iterateExprs(node sqlparser.Expr, labelMatchers *[][]*prompb.LabelMatcher) (sqlparser.Expr, error) {
+func iterateExprs(node sqlparser.Expr, labelMatchers *[][]*extraFilters) (sqlparser.Expr, error) {
 	switch node := node.(type) {
 	case *sqlparser.AndExpr:
 		left, err := iterateExprs(node.Left, labelMatchers)
@@ -1600,7 +1618,7 @@ func iterateExprs(node sqlparser.Expr, labelMatchers *[][]*prompb.LabelMatcher) 
 		}
 		return node, nil
 	case *sqlparser.ParenExpr:
-		(*labelMatchers) = append((*labelMatchers), []*prompb.LabelMatcher{})
+		(*labelMatchers) = append((*labelMatchers), []*extraFilters{})
 		expr, err := iterateExprs(node.Expr, labelMatchers)
 		if err != nil {
 			return expr, err
@@ -1614,28 +1632,32 @@ func iterateExprs(node sqlparser.Expr, labelMatchers *[][]*prompb.LabelMatcher) 
 			comparExpr = node.Left
 		}
 		var colName, colValue, op string
+		var istag bool
 		switch comparExpr.(type) {
 		case *sqlparser.SQLVal:
 			colValue = sqlparser.String(comparExpr)
 			colName = sqlparser.String(node.Right)
 			op = node.Operator
+			istag = false
 		case *sqlparser.ColName:
 			colName = sqlparser.String(comparExpr)
 			colValue = sqlparser.String(node.Right)
 			op = node.Operator
+			istag = true
 		}
 		lastIndex := len(*labelMatchers) - 1
 		if lastIndex < 0 {
-			(*labelMatchers) = append((*labelMatchers), []*prompb.LabelMatcher{})
+			(*labelMatchers) = append((*labelMatchers), []*extraFilters{})
 			lastIndex = len(*labelMatchers) - 1
 		}
 
-		(*labelMatchers)[lastIndex] = append((*labelMatchers)[lastIndex], &prompb.LabelMatcher{
-			Type: parseOperator(op),
+		(*labelMatchers)[lastIndex] = append((*labelMatchers)[lastIndex], &extraFilters{
+			operator: op,
 			// some tag will escape by sqlparser
 			// https://github.com/xwb1989/sqlparser/blob/master/token.go#L85
-			Name:  removeEscapeQuote(colName, "`"),
-			Value: removeEscapeQuote(colValue, "'"),
+			label: removeEscapeQuote(colName, "`"),
+			value: removeEscapeQuote(colValue, "'"),
+			isTag: istag,
 		})
 		return node, nil
 	default:
