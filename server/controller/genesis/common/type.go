@@ -30,7 +30,8 @@ type GenesisSync interface {
 }
 
 type GenesisSyncType interface {
-	model.GenesisVinterface | model.GenesisVPC | model.GenesisHost | model.GenesisVM | model.GenesisVIP | model.GenesisNetwork | model.GenesisPort | model.GenesisLldp | model.GenesisIP | model.GenesisProcess
+	GetLcuuid() string
+	GetVtapID() uint32
 }
 
 type GenesisSyncData struct {

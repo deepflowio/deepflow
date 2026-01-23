@@ -86,7 +86,41 @@ func (gs *GenesisSyncTypeOperation[T]) Update(orgID int, vtapID uint32, vtapKey 
 		return
 	}
 
-	gs.store.SetDefault(gs.formatKey(orgID, vtapID, vtapKey), items)
+	key := gs.formatKey(orgID, vtapID, vtapKey)
+	if vtapID != 0 {
+		newData := map[string]T{}
+		for _, item := range items {
+			newData[item.GetLcuuid()] = item
+		}
+
+		curData := map[string]T{}
+		storeData, ok := gs.store.Get(key)
+		if ok {
+			for _, item := range storeData.([]T) {
+				curData[item.GetLcuuid()] = item
+			}
+		}
+
+		// add
+		for lcuuid, data := range newData {
+			_, ok := curData[lcuuid]
+			if ok {
+				continue
+			}
+			log.Infof("sync (%s) add (%#+v)", vtapKey, data, logger.NewORGPrefix(orgID))
+		}
+
+		// delete
+		for lcuuid, data := range curData {
+			_, ok := newData[lcuuid]
+			if ok {
+				continue
+			}
+			log.Infof("sync (%s) delete (%#+v)", vtapKey, data, logger.NewORGPrefix(orgID))
+		}
+	}
+
+	gs.store.SetDefault(key, items)
 
 	if vtapID == 0 {
 		return
