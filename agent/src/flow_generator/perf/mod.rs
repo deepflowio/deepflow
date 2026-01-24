@@ -369,6 +369,7 @@ impl FlowLog {
             param.set_captured_byte(payload.len());
             param.set_oracle_conf(flow_config.oracle_parse_conf);
             param.set_iso8583_conf(&flow_config.iso8583_parse_conf);
+            param.set_web_sphere_mq_conf(&flow_config.web_sphere_mq_parse_conf);
 
             for protocol in checker.possible_protocols(
                 packet.lookup_key.proto.into(),

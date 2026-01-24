@@ -181,6 +181,10 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ip4 uint32, 
 	if epcID <= 0 {
 		return 0
 	}
+	// If server port is 0, protocol is also ignored
+	if serverPort == 0 {
+		protocol = 0
+	}
 	serviceProtocol := toServiceProtocol(protocol)
 	var serviceId uint32
 
@@ -493,8 +497,8 @@ func printClusterIP4PortTable(name string, sb *strings.Builder, clusterIP4PortTa
 		sb.WriteString("\n1  epcID   ipv4            protocol          port            serviceID\n")
 		sb.WriteString("------------------------------------------------------------------------\n")
 	}
-	epcIP4s := make([]uint64, 0)
 	for i := range clusterIP4PortTable {
+		epcIP4s := make([]uint64, 0)
 		for epcIP := range clusterIP4PortTable[i] {
 			epcIP4s = append(epcIP4s, epcIP)
 		}
