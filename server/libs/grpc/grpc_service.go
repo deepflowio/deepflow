@@ -208,7 +208,7 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ip4 uint32, 
 	}
 
 	// priority 4. pod cluster
-	if podClusterID != 0 {
+	if podClusterID != 0 && serverPort != 0 {
 		// firstly query with port
 		if len(s.customServiceClusterIDPortTable) > 0 {
 			serviceId = s.customServiceClusterIDPortTable[genPodXIDPortKey(podClusterID, serviceProtocol, serverPort)]
@@ -217,7 +217,7 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ip4 uint32, 
 			}
 		}
 		// secondary query without port
-		if len(s.customServiceClusterIDTable) > 0 && serverPort != 0 {
+		if len(s.customServiceClusterIDTable) > 0 {
 			serviceId = s.customServiceClusterIDTable[genPodXIDKey(podClusterID, serviceProtocol)]
 			if serviceId > 0 {
 				return serviceId
