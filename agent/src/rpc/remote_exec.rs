@@ -370,7 +370,7 @@ impl Executor {
 }
 
 #[derive(Default)]
-struct CommandResult {
+struct DataChunk {
     request_id: Option<u64>,
 
     errno: i32,
@@ -396,7 +396,7 @@ struct Responser {
 
     // request id, command id, future
     pending_command: Option<(Option<u64>, String, BoxFuture<'static, Result<Output>>)>,
-    result: CommandResult,
+    result: DataChunk,
 }
 
 impl Responser {
@@ -408,18 +408,18 @@ impl Responser {
             msg_recv: receiver,
             pending_lsns: None,
             pending_command: None,
-            result: CommandResult::default(),
+            result: DataChunk::default(),
         }
     }
 
-    fn generate_result_batch(&mut self) -> Option<(pb::CommandResult, Option<String>)> {
+    fn generate_result_batch(&mut self) -> Option<(pb::DataChunk, Option<String>)> {
         let batch_len = self.batch_len;
         let r = &mut self.result;
         if r.output.is_empty() {
             return None;
         }
 
-        let mut pb_result = pb::CommandResult {
+        let mut pb_result = pb::DataChunk {
             errno: Some(r.errno),
             total_len: Some(r.total_len as u64),
             pkt_count: Some((r.total_len.saturating_sub(1) / batch_len + 1) as u32),
@@ -452,7 +452,7 @@ impl Responser {
             agent_id: Some(self.agent_id.read().deref().into()),
             request_id,
             errmsg: Some(msg.into_owned()),
-            command_result: Some(pb::CommandResult {
+            command_result: Some(pb::DataChunk {
                 errno: code,
                 ..Default::default()
             }),
@@ -516,7 +516,7 @@ impl Stream for Responser {
                                     return Poll::Ready(Some(pb::RemoteExecResponse {
                                         agent_id: Some(self.agent_id.read().deref().into()),
                                         request_id: request_id,
-                                        command_result: Some(pb::CommandResult::default()),
+                                        command_result: Some(pb::DataChunk::default()),
                                         ..Default::default()
                                     }));
                                 }
@@ -727,6 +727,7 @@ impl Stream for Responser {
                             self.pending_command = Some((msg.request_id, cmd_id, output));
                             continue;
                         }
+                        pb::ExecutionType::DryReplayPcap => todo!(),
                     }
                 }
                 _ => (),
