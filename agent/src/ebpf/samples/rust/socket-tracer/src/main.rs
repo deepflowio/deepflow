@@ -248,6 +248,8 @@ extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, sd: *mut SK
             proto_tag.push_str("TLS");
         } else if sk_proto_safe(sd) == SOCK_DATA_ORACLE {
             proto_tag.push_str("ORACLE");
+        } else if sk_proto_safe(sd) == SOCK_DATA_SQL_SERVER {
+            proto_tag.push_str("SQLSERVER");
         } else if sk_proto_safe(sd) == SOCK_DATA_OPENWIRE {
             proto_tag.push_str("OPENWIRE");
         } else if sk_proto_safe(sd) == SOCK_DATA_ZMTP {
