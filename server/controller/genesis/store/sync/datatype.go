@@ -94,27 +94,69 @@ func (g *GenesisSyncTypeOperation[T]) Update(orgID int, key string, timestamp ti
 	if key == "" {
 		for _, item := range items {
 			itemLcuuid := item.GetLcuuid()
-			if oLastSeen, ok := g.lastSeen[orgID]; ok {
-				oLastSeen[itemLcuuid] = timestamp
+			if orgLastSeen, ok := g.lastSeen[orgID]; ok {
+				orgLastSeen[itemLcuuid] = timestamp
 			} else {
 				g.lastSeen[orgID] = map[string]time.Time{itemLcuuid: timestamp}
 			}
-			if _, ok := g.dataStore[orgID]; ok {
-				g.dataStore[orgID][itemLcuuid] = item
+			if orgDataStore, ok := g.dataStore[orgID]; ok {
+				if _, ok := orgDataStore[itemLcuuid]; !ok && item.GetVtapID() != 0 {
+					log.Infof("sync add (%#+v)", item, logger.NewORGPrefix(orgID))
+				}
+				orgDataStore[itemLcuuid] = item
 			} else {
 				g.dataStore[orgID] = map[string]T{itemLcuuid: item}
+				if item.GetVtapID() == 0 {
+					continue
+				}
+				log.Infof("sync add (%#+v)", item, logger.NewORGPrefix(orgID))
 			}
 		}
 	} else {
-		if _, ok := g.lastSeen[orgID]; ok {
-			g.lastSeen[orgID][key] = timestamp
+		if orgLastSeen, ok := g.lastSeen[orgID]; ok {
+			orgLastSeen[key] = timestamp
 		} else {
 			g.lastSeen[orgID] = map[string]time.Time{key: timestamp}
 		}
-		if _, ok := g.dataStore2[orgID]; ok {
-			g.dataStore2[orgID][key] = items
+		if orgDataStore2, ok := g.dataStore2[orgID]; ok {
+			if orgItems, ok := orgDataStore2[key]; ok {
+				newData := map[string]T{}
+				for _, item := range items {
+					newData[item.GetLcuuid()] = item
+				}
+
+				curData := map[string]T{}
+				for _, item := range orgItems {
+					curData[item.GetLcuuid()] = item
+				}
+
+				// add
+				for lcuuid, data := range newData {
+					_, ok := curData[lcuuid]
+					if ok || data.GetVtapID() == 0 {
+						continue
+					}
+					log.Infof("sync (%s) add (%#+v)", key, data, logger.NewORGPrefix(orgID))
+				}
+
+				// delete
+				for lcuuid, data := range curData {
+					_, ok := newData[lcuuid]
+					if ok || data.GetVtapID() == 0 {
+						continue
+					}
+					log.Infof("sync (%s) delete (%#+v)", key, data, logger.NewORGPrefix(orgID))
+				}
+			}
+			orgDataStore2[key] = items
 		} else {
 			g.dataStore2[orgID] = map[string][]T{key: items}
+			for _, item := range items {
+				if item.GetVtapID() == 0 {
+					continue
+				}
+				log.Infof("sync (%s) add (%#+v)", key, item, logger.NewORGPrefix(orgID))
+			}
 		}
 	}
 }
