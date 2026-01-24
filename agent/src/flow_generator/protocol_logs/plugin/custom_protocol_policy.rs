@@ -255,6 +255,7 @@ pub struct CustomPolicyInfo {
     pub x_request_id: Option<String>,
     pub attributes: Vec<KeyVal>,
     pub metrics: Vec<MetricKeyVal>,
+    pub biz_response_code: String,
 }
 
 impl L7LogAttribute for CustomPolicyInfo {
@@ -303,6 +304,11 @@ impl From<(CustomPolicyInfo, PacketDirection)> for CustomInfo {
             },
             attributes: info.attributes,
             metrics: info.metrics,
+            biz_response_code: if info.biz_response_code.is_empty() {
+                None
+            } else {
+                Some(info.biz_response_code)
+            },
             ..Default::default()
         }
     }

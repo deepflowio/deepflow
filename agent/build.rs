@@ -290,9 +290,9 @@ fn main() -> Result<()> {
      * We are pushing the generated protobuf code to repo as a workaround.
      *
      * TODO: Fix this issue in the rust-build image.
-     *
-    compile_wasm_plugin_proto()?;
      */
+    // uncomment the next line to compile wasm plugin proto
+    // compile_wasm_plugin_proto()?;
     make_pulsar_proto()?;
     make_brpc_proto()?;
     #[cfg(feature = "libtrace")]

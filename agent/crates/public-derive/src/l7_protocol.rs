@@ -45,6 +45,7 @@ fn expected_fields() -> HashMap<NativeTag, FieldOptions> {
         NativeTag::BizType,
         NativeTag::BizCode,
         NativeTag::BizScenario,
+        NativeTag::BizResponseCode,
     ];
     HashMap::from_iter(
         fields

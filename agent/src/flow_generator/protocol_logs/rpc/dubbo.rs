@@ -169,6 +169,8 @@ pub struct DubboInfo {
     biz_code: String,
     #[serde(skip_serializing_if = "value_is_default")]
     biz_scenario: String,
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_response_code: String,
 }
 
 impl L7LogAttribute for DubboInfo {
@@ -235,6 +237,7 @@ impl DubboInfo {
         }
         swap_if!(self, biz_code, is_empty, other);
         swap_if!(self, biz_scenario, is_empty, other);
+        swap_if!(self, biz_response_code, is_empty, other);
     }
 
     fn add_trace_id(&mut self, trace_id: String, trace_type: &TraceType) {
@@ -262,18 +265,6 @@ impl DubboInfo {
         });
     }
 
-    // when response_code is overwritten, put it into the attributes.
-    fn response_code_to_attribute(&mut self) {
-        self.attributes.push(KeyVal {
-            key: SYS_RESPONSE_CODE_ATTR.to_string(),
-            val: self
-                .status_code
-                .as_ref()
-                .map(ToString::to_string)
-                .unwrap_or_default(),
-        });
-    }
-
     pub fn merge_custom_info(&mut self, custom: CustomInfo) {
         // req rewrite
         if !custom.req.domain.is_empty() {
@@ -286,7 +277,6 @@ impl DubboInfo {
 
         //resp rewrite
         if let Some(code) = custom.resp.code {
-            self.response_code_to_attribute();
             self.status_code = Some(code);
         }
 
@@ -317,6 +307,10 @@ impl DubboInfo {
                     val: prev.into_inner(),
                 });
             }
+        }
+
+        if let Some(biz_response_code) = custom.biz_response_code {
+            self.biz_response_code = biz_response_code;
         }
 
         // extend attribute
@@ -497,6 +491,7 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 ..Default::default()
             }),
             flags: flags.bits(),
+            biz_response_code: f.biz_response_code,
             ..Default::default()
         }
     }

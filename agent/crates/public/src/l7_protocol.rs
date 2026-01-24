@@ -331,6 +331,7 @@ pub struct L7LogBase {
     pub biz_type: u8,
     pub biz_code: String,
     pub biz_scenario: String,
+    pub biz_response_code: String,
 }
 
 impl L7LogAttribute for L7LogBase {

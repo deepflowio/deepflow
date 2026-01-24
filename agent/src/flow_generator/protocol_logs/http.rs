@@ -327,6 +327,8 @@ pub struct HttpInfo {
     biz_code: String,
     #[serde(skip_serializing_if = "value_is_default")]
     biz_scenario: String,
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_response_code: String,
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
@@ -447,16 +449,6 @@ impl HttpInfo {
             || self.msg_type == LogMessageType::Other
     }
 
-    // when response_code is overwritten, put it into the attributes.
-    fn response_code_to_attribute(&mut self) {
-        if let Some(code) = self.status_code {
-            self.attributes.push(KeyVal {
-                key: SYS_RESPONSE_CODE_ATTR.to_string(),
-                val: code.to_string(),
-            });
-        }
-    }
-
     pub fn merge_custom_to_http(&mut self, custom: CustomInfo, dir: PacketDirection) {
         if dir == PacketDirection::ClientToServer {
             if let Ok(v) = Version::try_from(custom.req.version.as_str()) {
@@ -486,7 +478,6 @@ impl HttpInfo {
 
         if dir == PacketDirection::ServerToClient {
             if let Some(code) = custom.resp.code {
-                self.response_code_to_attribute();
                 self.status_code = Some(code as u16);
             }
 
@@ -541,6 +532,9 @@ impl HttpInfo {
         }
         if let Some(biz_scenario) = custom.biz_scenario {
             self.biz_scenario = biz_scenario;
+        }
+        if let Some(biz_response_code) = custom.biz_response_code {
+            self.biz_response_code = biz_response_code;
         }
 
         if let Some(is_async) = custom.is_async {
@@ -636,6 +630,7 @@ impl HttpInfo {
         super::swap_if!(self, dubbo_service_version, is_empty, other);
         super::swap_if!(self, biz_code, is_empty, other);
         super::swap_if!(self, biz_scenario, is_empty, other);
+        super::swap_if!(self, biz_response_code, is_empty, other);
 
         let other_trace_ids = mem::take(&mut other.trace_ids);
         self.trace_ids.merge(other_trace_ids);
@@ -934,6 +929,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             flags: flags.bits(),
             biz_code: f.biz_code,
             biz_scenario: f.biz_scenario,
+            biz_response_code: f.biz_response_code,
             ..Default::default()
         }
     }

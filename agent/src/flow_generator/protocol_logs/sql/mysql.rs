@@ -194,6 +194,9 @@ pub struct MysqlInfo {
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
+
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_response_code: String,
 }
 
 impl L7LogAttribute for MysqlInfo {
@@ -623,6 +626,7 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
                 None
             },
             flags,
+            biz_response_code: f.biz_response_code,
             ..Default::default()
         };
         return log;
