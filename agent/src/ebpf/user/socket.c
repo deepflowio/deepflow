@@ -3716,32 +3716,26 @@ static char *flow_info(struct socket_bpf_data *sd)
 static bool allow_datadump(struct socket_bpf_data *sd)
 {
 	bool match = true;
-	bool has_filter = false;
 
 	/* pid filter */
 	if (datadump_pid > 0) {
-		has_filter = true;
 		match &= (sd->process_id == datadump_pid ||
 			  sd->thread_id == datadump_pid);
 	}
 
 	/* comm filter */
 	if (strlen(datadump_comm) > 0) {
-		has_filter = true;
 		match &= strcmp((char *)sd->process_kname,
 				(char *)datadump_comm) == 0;
 	}
 
 	/* protocol filter */
 	if (datadump_proto > 0) {
-		has_filter = true;
 		match &= sd->l7_protocal_hint == datadump_proto;
 	}
 
 	/* ip filter */
 	if (strlen(datadump_ipaddr) > 0) {
-		has_filter = true;
-
 		char sbuf[64], dbuf[64];
 
 		if (sd->tuple.addr_len == 16) {
@@ -3765,12 +3759,11 @@ static bool allow_datadump(struct socket_bpf_data *sd)
 
 	/* port filter */
 	if (datadump_port > 0) {
-		has_filter = true;
 		match &= (datadump_port == sd->tuple.dport ||
 			  datadump_port == sd->tuple.num);
 	}
 
-	return has_filter && match;
+	return match;
 }
 
 static int __unused get_fd_path(pid_t pid, u32 fd, char *buf, size_t bufsize)
