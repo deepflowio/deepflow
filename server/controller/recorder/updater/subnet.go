@@ -25,7 +25,27 @@ import (
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// SubnetMessageFactory Subnet资源的消息工厂
+type SubnetMessageFactory struct{}
+
+func (f *SubnetMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedSubnets{}
+}
+
+func (f *SubnetMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedSubnet{}
+}
+
+func (f *SubnetMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedSubnets{}
+}
+
+func (f *SubnetMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedSubnetFields{}
+}
 
 type Subnet struct {
 	UpdaterBase[
@@ -33,36 +53,12 @@ type Subnet struct {
 		*diffbase.Subnet,
 		*metadbmodel.Subnet,
 		metadbmodel.Subnet,
-		*message.AddedSubnets,
-		message.AddedSubnets,
-		message.AddNoneAddition,
-		*message.UpdatedSubnet,
-		message.UpdatedSubnet,
-		*message.UpdatedSubnetFields,
-		message.UpdatedSubnetFields,
-		*message.DeletedSubnets,
-		message.DeletedSubnets,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 	updater := &Subnet{
-		newUpdaterBase[
-			cloudmodel.Subnet,
-			*diffbase.Subnet,
-			*metadbmodel.Subnet,
-			metadbmodel.Subnet,
-			*message.AddedSubnets,
-			message.AddedSubnets,
-			message.AddNoneAddition,
-			*message.UpdatedSubnet,
-			message.UpdatedSubnet,
-			*message.UpdatedSubnetFields,
-			message.UpdatedSubnetFields,
-			*message.DeletedSubnets,
-			message.DeletedSubnets,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
 			wholeCache,
 			db.NewSubnet().SetMetadata(wholeCache.GetMetadata()),
@@ -70,7 +66,12 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &SubnetMessageFactory{})
+	}
+
 	return updater
 }
 
@@ -102,7 +103,7 @@ func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*metadbmodel
 	return dbItem, true
 }
 
-func (s *Subnet) generateUpdateInfo(diffBase *diffbase.Subnet, cloudItem *cloudmodel.Subnet) (*message.UpdatedSubnetFields, map[string]interface{}, bool) {
+func (s *Subnet) generateUpdateInfo(diffBase *diffbase.Subnet, cloudItem *cloudmodel.Subnet) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedSubnetFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// PeerConnectionMessageFactory PeerConnection资源的消息工厂
+type PeerConnectionMessageFactory struct{}
+
+func (f *PeerConnectionMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedPeerConnections{}
+}
+
+func (f *PeerConnectionMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedPeerConnection{}
+}
+
+func (f *PeerConnectionMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedPeerConnections{}
+}
+
+func (f *PeerConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedPeerConnectionFields{}
+}
 
 type PeerConnection struct {
 	UpdaterBase[
@@ -32,36 +52,12 @@ type PeerConnection struct {
 		*diffbase.PeerConnection,
 		*metadbmodel.PeerConnection,
 		metadbmodel.PeerConnection,
-		*message.AddedPeerConnections,
-		message.AddedPeerConnections,
-		message.AddNoneAddition,
-		*message.UpdatedPeerConnection,
-		message.UpdatedPeerConnection,
-		*message.UpdatedPeerConnectionFields,
-		message.UpdatedPeerConnectionFields,
-		*message.DeletedPeerConnections,
-		message.DeletedPeerConnections,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConnection) *PeerConnection {
 	updater := &PeerConnection{
-		newUpdaterBase[
-			cloudmodel.PeerConnection,
-			*diffbase.PeerConnection,
-			*metadbmodel.PeerConnection,
-			metadbmodel.PeerConnection,
-			*message.AddedPeerConnections,
-			message.AddedPeerConnections,
-			message.AddNoneAddition,
-			*message.UpdatedPeerConnection,
-			message.UpdatedPeerConnection,
-			*message.UpdatedPeerConnectionFields,
-			message.UpdatedPeerConnectionFields,
-			*message.DeletedPeerConnections,
-			message.DeletedPeerConnections,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
 			wholeCache,
 			db.NewPeerConnection().SetMetadata(wholeCache.GetMetadata()),
@@ -69,7 +65,12 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &PeerConnectionMessageFactory{})
+	}
+
 	return updater
 }
 
@@ -105,7 +106,7 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 	return dbItem, true
 }
 
-func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, cloudItem *cloudmodel.PeerConnection) (*message.UpdatedPeerConnectionFields, map[string]interface{}, bool) {
+func (c *PeerConnection) generateUpdateInfo(diffBase *diffbase.PeerConnection, cloudItem *cloudmodel.PeerConnection) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedPeerConnectionFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

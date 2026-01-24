@@ -26,7 +26,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// PodServiceMessageFactory defines the message factory for PodService
+type PodServiceMessageFactory struct{}
+
+func (f *PodServiceMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedPodServices{}
+}
+
+func (f *PodServiceMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedPodService{}
+}
+
+func (f *PodServiceMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedPodServices{}
+}
+
+func (f *PodServiceMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedPodServiceFields{}
+}
 
 type PodService struct {
 	UpdaterBase[
@@ -34,36 +54,12 @@ type PodService struct {
 		*diffbase.PodService,
 		*metadbmodel.PodService,
 		metadbmodel.PodService,
-		*message.AddedPodServices,
-		message.AddedPodServices,
-		message.AddNoneAddition,
-		*message.UpdatedPodService,
-		message.UpdatedPodService,
-		*message.UpdatedPodServiceFields,
-		message.UpdatedPodServiceFields,
-		*message.DeletedPodServices,
-		message.DeletedPodServices,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *PodService {
 	updater := &PodService{
-		newUpdaterBase[
-			cloudmodel.PodService,
-			*diffbase.PodService,
-			*metadbmodel.PodService,
-			metadbmodel.PodService,
-			*message.AddedPodServices,
-			message.AddedPodServices,
-			message.AddNoneAddition,
-			*message.UpdatedPodService,
-			message.UpdatedPodService,
-			*message.UpdatedPodServiceFields,
-			message.UpdatedPodServiceFields,
-			*message.DeletedPodServices,
-			message.DeletedPodServices,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
 			wholeCache,
 			db.NewPodService().SetMetadata(wholeCache.GetMetadata()),
@@ -71,11 +67,17 @@ func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &PodServiceMessageFactory{})
+	}
+
 	updater.toLoggable = true
 	return updater
 }
 
+// Implement DataGenerator interface
 func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*metadbmodel.PodService, bool) {
 	vpcID, exists := s.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
@@ -148,7 +150,7 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*met
 	return dbItem, true
 }
 
-func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem *cloudmodel.PodService) (*message.UpdatedPodServiceFields, map[string]interface{}, bool) {
+func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem *cloudmodel.PodService) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedPodServiceFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.PodIngressLcuuid != cloudItem.PodIngressLcuuid {
@@ -172,7 +174,6 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 		mapInfo["name"] = cloudItem.Name
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
-
 	if diffBase.Label != cloudItem.Label {
 		mapInfo["label"] = cloudItem.Label
 		structInfo.Label.Set(diffBase.Label, cloudItem.Label)

@@ -28,7 +28,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// ConfigMapMessageFactory ConfigMap资源的消息工厂
+type ConfigMapMessageFactory struct{}
+
+func (f *ConfigMapMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedConfigMaps{}
+}
+
+func (f *ConfigMapMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedConfigMap{}
+}
+
+func (f *ConfigMapMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedConfigMaps{}
+}
+
+func (f *ConfigMapMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedConfigMapFields{}
+}
 
 type ConfigMap struct {
 	UpdaterBase[
@@ -36,36 +56,12 @@ type ConfigMap struct {
 		*diffbase.ConfigMap,
 		*metadbmodel.ConfigMap,
 		metadbmodel.ConfigMap,
-		*message.AddedConfigMaps,
-		message.AddedConfigMaps,
-		message.AddNoneAddition,
-		*message.UpdatedConfigMap,
-		message.UpdatedConfigMap,
-		*message.UpdatedConfigMapFields,
-		message.UpdatedConfigMapFields,
-		*message.DeletedConfigMaps,
-		message.DeletedConfigMaps,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewConfigMap(wholeCache *cache.Cache, cloudData []cloudmodel.ConfigMap) *ConfigMap {
 	updater := &ConfigMap{
-		newUpdaterBase[
-			cloudmodel.ConfigMap,
-			*diffbase.ConfigMap,
-			*metadbmodel.ConfigMap,
-			metadbmodel.ConfigMap,
-			*message.AddedConfigMaps,
-			message.AddedConfigMaps,
-			message.AddNoneAddition,
-			*message.UpdatedConfigMap,
-			message.UpdatedConfigMap,
-			*message.UpdatedConfigMapFields,
-			message.UpdatedConfigMapFields,
-			*message.DeletedConfigMaps,
-			message.DeletedConfigMaps,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN,
 			wholeCache,
 			db.NewConfigMap().SetMetadata(wholeCache.GetMetadata()),
@@ -73,8 +69,13 @@ func NewConfigMap(wholeCache *cache.Cache, cloudData []cloudmodel.ConfigMap) *Co
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	updater.toLoggable = true
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &ConfigMapMessageFactory{})
+	}
+
 	return updater
 }
 
@@ -125,7 +126,7 @@ func (h *ConfigMap) generateDBItemToAdd(cloudItem *cloudmodel.ConfigMap) (*metad
 	return dbItem, true
 }
 
-func (h *ConfigMap) generateUpdateInfo(diffBase *diffbase.ConfigMap, cloudItem *cloudmodel.ConfigMap) (*message.UpdatedConfigMapFields, map[string]interface{}, bool) {
+func (h *ConfigMap) generateUpdateInfo(diffBase *diffbase.ConfigMap, cloudItem *cloudmodel.ConfigMap) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedConfigMapFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
@@ -149,5 +150,6 @@ func (h *ConfigMap) generateUpdateInfo(diffBase *diffbase.ConfigMap, cloudItem *
 			structInfo.Data.Set(diffBase.Data, string(yamlDataBytes))
 		}
 	}
+
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

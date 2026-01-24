@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// NATVMConnectionMessageFactory NATVMConnection资源的消息工厂
+type NATVMConnectionMessageFactory struct{}
+
+func (f *NATVMConnectionMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedNATVMConnections{}
+}
+
+func (f *NATVMConnectionMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedNATVMConnection{}
+}
+
+func (f *NATVMConnectionMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedNATVMConnections{}
+}
+
+func (f *NATVMConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedNATVMConnectionFields{}
+}
 
 type NATVMConnection struct {
 	UpdaterBase[
@@ -32,36 +52,12 @@ type NATVMConnection struct {
 		*diffbase.NATVMConnection,
 		*metadbmodel.NATVMConnection,
 		metadbmodel.NATVMConnection,
-		*message.AddedNATVMConnections,
-		message.AddedNATVMConnections,
-		message.AddNoneAddition,
-		*message.UpdatedNATVMConnection,
-		message.UpdatedNATVMConnection,
-		*message.UpdatedNATVMConnectionFields,
-		message.UpdatedNATVMConnectionFields,
-		*message.DeletedNATVMConnections,
-		message.DeletedNATVMConnections,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMConnection) *NATVMConnection {
 	updater := &NATVMConnection{
-		newUpdaterBase[
-			cloudmodel.NATVMConnection,
-			*diffbase.NATVMConnection,
-			*metadbmodel.NATVMConnection,
-			metadbmodel.NATVMConnection,
-			*message.AddedNATVMConnections,
-			message.AddedNATVMConnections,
-			message.AddNoneAddition,
-			*message.UpdatedNATVMConnection,
-			message.UpdatedNATVMConnection,
-			*message.UpdatedNATVMConnectionFields,
-			message.UpdatedNATVMConnectionFields,
-			*message.DeletedNATVMConnections,
-			message.DeletedNATVMConnections,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
 			wholeCache,
 			db.NewNATVMConnection().SetMetadata(wholeCache.GetMetadata()),
@@ -69,7 +65,12 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &NATVMConnectionMessageFactory{})
+	}
+
 	return updater
 }
 
@@ -79,7 +80,7 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, cloudItem.Lcuuid,
-		))
+		), c.metadata.LogPrefixes)
 		return nil, false
 	}
 	natID, exists := c.cache.ToolDataSet.GetNATGatewayIDByLcuuid(cloudItem.NATGatewayLcuuid)
@@ -87,7 +88,7 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, cloudItem.NATGatewayLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, cloudItem.Lcuuid,
-		))
+		), c.metadata.LogPrefixes)
 		return nil, false
 	}
 
@@ -101,6 +102,6 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 }
 
 // 保留接口
-func (c *NATVMConnection) generateUpdateInfo(diffBase *diffbase.NATVMConnection, cloudItem *cloudmodel.NATVMConnection) (*message.UpdatedNATVMConnectionFields, map[string]interface{}, bool) {
+func (c *NATVMConnection) generateUpdateInfo(diffBase *diffbase.NATVMConnection, cloudItem *cloudmodel.NATVMConnection) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

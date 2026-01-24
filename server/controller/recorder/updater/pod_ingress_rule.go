@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// PodIngressRuleMessageFactory defines the message factory for PodIngressRule
+type PodIngressRuleMessageFactory struct{}
+
+func (f *PodIngressRuleMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedPodIngressRules{}
+}
+
+func (f *PodIngressRuleMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedPodIngressRule{}
+}
+
+func (f *PodIngressRuleMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedPodIngressRules{}
+}
+
+func (f *PodIngressRuleMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedPodIngressRuleFields{}
+}
 
 type PodIngressRule struct {
 	UpdaterBase[
@@ -32,36 +52,12 @@ type PodIngressRule struct {
 		*diffbase.PodIngressRule,
 		*metadbmodel.PodIngressRule,
 		metadbmodel.PodIngressRule,
-		*message.AddedPodIngressRules,
-		message.AddedPodIngressRules,
-		message.AddNoneAddition,
-		*message.UpdatedPodIngressRule,
-		message.UpdatedPodIngressRule,
-		*message.UpdatedPodIngressRuleFields,
-		message.UpdatedPodIngressRuleFields,
-		*message.DeletedPodIngressRules,
-		message.DeletedPodIngressRules,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngressRule) *PodIngressRule {
 	updater := &PodIngressRule{
-		newUpdaterBase[
-			cloudmodel.PodIngressRule,
-			*diffbase.PodIngressRule,
-			*metadbmodel.PodIngressRule,
-			metadbmodel.PodIngressRule,
-			*message.AddedPodIngressRules,
-			message.AddedPodIngressRules,
-			message.AddNoneAddition,
-			*message.UpdatedPodIngressRule,
-			message.UpdatedPodIngressRule,
-			*message.UpdatedPodIngressRuleFields,
-			message.UpdatedPodIngressRuleFields,
-			*message.DeletedPodIngressRules,
-			message.DeletedPodIngressRules,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN,
 			wholeCache,
 			db.NewPodIngressRule().SetMetadata(wholeCache.GetMetadata()),
@@ -69,10 +65,16 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &PodIngressRuleMessageFactory{})
+	}
+
 	return updater
 }
 
+// Implement DataGenerator interface
 func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRule) (*metadbmodel.PodIngressRule, bool) {
 	podIngressID, exists := r.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
 	if !exists {
@@ -82,7 +84,6 @@ func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRul
 		), r.metadata.LogPrefixes)
 		return nil, false
 	}
-
 	dbItem := &metadbmodel.PodIngressRule{
 		Name:         cloudItem.Name,
 		Protocol:     cloudItem.Protocol,
@@ -96,6 +97,6 @@ func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRul
 }
 
 // 保留接口
-func (r *PodIngressRule) generateUpdateInfo(diffBase *diffbase.PodIngressRule, cloudItem *cloudmodel.PodIngressRule) (*message.UpdatedPodIngressRuleFields, map[string]interface{}, bool) {
+func (r *PodIngressRule) generateUpdateInfo(diffBase *diffbase.PodIngressRule, cloudItem *cloudmodel.PodIngressRule) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }
