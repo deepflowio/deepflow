@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// LBVMConnectionMessageFactory LBVMConnection资源的消息工厂
+type LBVMConnectionMessageFactory struct{}
+
+func (f *LBVMConnectionMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedLBVMConnections{}
+}
+
+func (f *LBVMConnectionMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedLBVMConnection{}
+}
+
+func (f *LBVMConnectionMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedLBVMConnections{}
+}
+
+func (f *LBVMConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedLBVMConnectionFields{}
+}
 
 type LBVMConnection struct {
 	UpdaterBase[
@@ -32,36 +52,16 @@ type LBVMConnection struct {
 		*diffbase.LBVMConnection,
 		*metadbmodel.LBVMConnection,
 		metadbmodel.LBVMConnection,
-		*message.AddedLBVMConnections,
-		message.AddedLBVMConnections,
-		message.AddNoneAddition,
-		*message.UpdatedLBVMConnection,
-		message.UpdatedLBVMConnection,
-		*message.UpdatedLBVMConnectionFields,
-		message.UpdatedLBVMConnectionFields,
-		*message.DeletedLBVMConnections,
-		message.DeletedLBVMConnections,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConnection) *LBVMConnection {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, &LBVMConnectionMessageFactory{})
+	}
+
 	updater := &LBVMConnection{
-		newUpdaterBase[
-			cloudmodel.LBVMConnection,
-			*diffbase.LBVMConnection,
-			*metadbmodel.LBVMConnection,
-			metadbmodel.LBVMConnection,
-			*message.AddedLBVMConnections,
-			message.AddedLBVMConnections,
-			message.AddNoneAddition,
-			*message.UpdatedLBVMConnection,
-			message.UpdatedLBVMConnection,
-			*message.UpdatedLBVMConnectionFields,
-			message.UpdatedLBVMConnectionFields,
-			*message.DeletedLBVMConnections,
-			message.DeletedLBVMConnections,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
 			wholeCache,
 			db.NewLBVMConnection().SetMetadata(wholeCache.GetMetadata()),
@@ -69,9 +69,11 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
+
+// 实现 DataGenerator 接口
 
 func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnection) (*metadbmodel.LBVMConnection, bool) {
 	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
@@ -79,7 +81,7 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, cloudItem.Lcuuid,
-		))
+		), c.metadata.LogPrefixes)
 		return nil, false
 	}
 	lbID, exists := c.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
@@ -87,7 +89,7 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, cloudItem.Lcuuid,
-		))
+		), c.metadata.LogPrefixes)
 		return nil, false
 	}
 
@@ -101,6 +103,6 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 }
 
 // 保留接口
-func (c *LBVMConnection) generateUpdateInfo(diffBase *diffbase.LBVMConnection, cloudItem *cloudmodel.LBVMConnection) (*message.UpdatedLBVMConnectionFields, map[string]interface{}, bool) {
+func (l *LBVMConnection) generateUpdateInfo(diffBase *diffbase.LBVMConnection, cloudItem *cloudmodel.LBVMConnection) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

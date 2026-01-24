@@ -25,7 +25,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// VPCMessageFactory VPC资源的消息工厂
+type VPCMessageFactory struct{}
+
+func (f *VPCMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedVPCs{}
+}
+
+func (f *VPCMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedVPC{}
+}
+
+func (f *VPCMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedVPCs{}
+}
+
+func (f *VPCMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedVPCFields{}
+}
 
 type VPC struct {
 	UpdaterBase[
@@ -33,36 +53,16 @@ type VPC struct {
 		*diffbase.VPC,
 		*metadbmodel.VPC,
 		metadbmodel.VPC,
-		*message.AddedVPCs,
-		message.AddedVPCs,
-		message.AddNoneAddition,
-		*message.UpdatedVPC,
-		message.UpdatedVPC,
-		*message.UpdatedVPCFields,
-		message.UpdatedVPCFields,
-		*message.DeletedVPCs,
-		message.DeletedVPCs,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_VPC_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_VPC_EN, &VPCMessageFactory{})
+	}
+
 	updater := &VPC{
-		newUpdaterBase[
-			cloudmodel.VPC,
-			*diffbase.VPC,
-			*metadbmodel.VPC,
-			metadbmodel.VPC,
-			*message.AddedVPCs,
-			message.AddedVPCs,
-			message.AddNoneAddition,
-			*message.UpdatedVPC,
-			message.UpdatedVPC,
-			*message.UpdatedVPCFields,
-			message.UpdatedVPCFields,
-			*message.DeletedVPCs,
-			message.DeletedVPCs,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			wholeCache,
 			db.NewVPC().SetMetadata(wholeCache.GetMetadata()),
@@ -70,9 +70,11 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
+
+// 实现 DataGenerator 接口
 
 func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*metadbmodel.VPC, bool) {
 	if cloudItem.Label == "" {
@@ -93,8 +95,9 @@ func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*metadbmodel.VPC, 
 	return dbItem, true
 }
 
-func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.VPC) (*message.UpdatedVPCFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedVPCFields)
+func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.VPC) (types.UpdatedFields, map[string]interface{}, bool) {
+	// 创建具体的UpdatedVPCFields，然后转换为接口类型
+	structInfo := &message.UpdatedVPCFields{}
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -130,5 +133,6 @@ func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.V
 		structInfo.TunnelID.Set(diffBase.TunnelID, cloudItem.TunnelID)
 	}
 
+	// 返回接口类型
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// PodGroupConfigMapConnectionMessageFactory defines the message factory for PodGroupConfigMapConnection
+type PodGroupConfigMapConnectionMessageFactory struct{}
+
+func (f *PodGroupConfigMapConnectionMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedPodGroupConfigMapConnections{}
+}
+
+func (f *PodGroupConfigMapConnectionMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedPodGroupConfigMapConnection{}
+}
+
+func (f *PodGroupConfigMapConnectionMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedPodGroupConfigMapConnections{}
+}
+
+func (f *PodGroupConfigMapConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedPodGroupConfigMapConnectionFields{}
+}
 
 type PodGroupConfigMapConnection struct {
 	UpdaterBase[
@@ -32,36 +52,16 @@ type PodGroupConfigMapConnection struct {
 		*diffbase.PodGroupConfigMapConnection,
 		*metadbmodel.PodGroupConfigMapConnection,
 		metadbmodel.PodGroupConfigMapConnection,
-		*message.AddedPodGroupConfigMapConnections,
-		message.AddedPodGroupConfigMapConnections,
-		message.AddNoneAddition,
-		*message.UpdatedPodGroupConfigMapConnection,
-		message.UpdatedPodGroupConfigMapConnection,
-		*message.UpdatedPodGroupConfigMapConnectionFields,
-		message.UpdatedPodGroupConfigMapConnectionFields,
-		*message.DeletedPodGroupConfigMapConnections,
-		message.DeletedPodGroupConfigMapConnections,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewPodGroupConfigMapConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupConfigMapConnection) *PodGroupConfigMapConnection {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, &PodGroupConfigMapConnectionMessageFactory{})
+	}
+
 	updater := &PodGroupConfigMapConnection{
-		newUpdaterBase[
-			cloudmodel.PodGroupConfigMapConnection,
-			*diffbase.PodGroupConfigMapConnection,
-			*metadbmodel.PodGroupConfigMapConnection,
-			metadbmodel.PodGroupConfigMapConnection,
-			*message.AddedPodGroupConfigMapConnections,
-			message.AddedPodGroupConfigMapConnections,
-			message.AddNoneAddition,
-			*message.UpdatedPodGroupConfigMapConnection,
-			message.UpdatedPodGroupConfigMapConnection,
-			*message.UpdatedPodGroupConfigMapConnectionFields,
-			message.UpdatedPodGroupConfigMapConnectionFields,
-			*message.DeletedPodGroupConfigMapConnections,
-			message.DeletedPodGroupConfigMapConnections,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN,
 			wholeCache,
 			db.NewPodGroupConfigMapConnection().SetMetadata(wholeCache.GetMetadata()),
@@ -69,37 +69,40 @@ func NewPodGroupConfigMapConnection(wholeCache *cache.Cache, cloudData []cloudmo
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
 
-func (h *PodGroupConfigMapConnection) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupConfigMapConnection) (*metadbmodel.PodGroupConfigMapConnection, bool) {
-	podGroupID, exists := h.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
+// Implement DataGenerator interface
+
+func (p *PodGroupConfigMapConnection) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupConfigMapConnection) (*metadbmodel.PodGroupConfigMapConnection, bool) {
+	podGroupID, exists := p.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, cloudItem.Lcuuid,
-		), h.metadata.LogPrefixes)
+		), p.metadata.LogPrefixes)
 		return nil, false
 	}
-	configMapID, exists := h.cache.ToolDataSet.GetConfigMapIDByLcuuid(cloudItem.ConfigMapLcuuid)
+	configMapID, exists := p.cache.ToolDataSet.GetConfigMapIDByLcuuid(cloudItem.ConfigMapLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, cloudItem.ConfigMapLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, cloudItem.Lcuuid,
-		), h.metadata.LogPrefixes)
+		), p.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &metadbmodel.PodGroupConfigMapConnection{
 		PodGroupID:  podGroupID,
 		ConfigMapID: configMapID,
-		Domain:      h.metadata.GetDomainLcuuid(),
-		SubDomain:   h.metadata.GetSubDomainLcuuid(),
+		Domain:      p.metadata.GetDomainLcuuid(),
+		SubDomain:   p.metadata.GetSubDomainLcuuid(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
 }
 
-func (h *PodGroupConfigMapConnection) generateUpdateInfo(diffBase *diffbase.PodGroupConfigMapConnection, cloudItem *cloudmodel.PodGroupConfigMapConnection) (*message.UpdatedPodGroupConfigMapConnectionFields, map[string]interface{}, bool) {
+// 保留接口
+func (p *PodGroupConfigMapConnection) generateUpdateInfo(diffBase *diffbase.PodGroupConfigMapConnection, cloudItem *cloudmodel.PodGroupConfigMapConnection) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

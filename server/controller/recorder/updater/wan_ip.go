@@ -28,7 +28,27 @@ import (
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// WANIPMessageFactory WANIP资源的消息工厂
+type WANIPMessageFactory struct{}
+
+func (f *WANIPMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedWANIPs{}
+}
+
+func (f *WANIPMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedWANIP{}
+}
+
+func (f *WANIPMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedWANIPs{}
+}
+
+func (f *WANIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedWANIPFields{}
+}
 
 type WANIP struct {
 	UpdaterBase[
@@ -36,45 +56,25 @@ type WANIP struct {
 		*diffbase.WANIP,
 		*metadbmodel.WANIP,
 		metadbmodel.WANIP,
-		*message.AddedWANIPs,
-		message.AddedWANIPs,
-		message.AddNoneAddition,
-		*message.UpdatedWANIP,
-		message.UpdatedWANIP,
-		*message.UpdatedWANIPFields,
-		message.UpdatedWANIPFields,
-		*message.DeletedWANIPs,
-		message.DeletedWANIPs,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, &WANIPMessageFactory{})
+	}
+
 	updater := &WANIP{
-		newUpdaterBase[
-			cloudmodel.IP,
-			*diffbase.WANIP,
-			*metadbmodel.WANIP,
-			metadbmodel.WANIP,
-			*message.AddedWANIPs,
-			message.AddedWANIPs,
-			message.AddNoneAddition,
-			*message.UpdatedWANIP,
-			message.UpdatedWANIP,
-			*message.UpdatedWANIPFields,
-			message.UpdatedWANIPFields,
-			*message.DeletedWANIPs,
-			message.DeletedWANIPs,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
 			wholeCache,
 			db.NewWANIP().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.WANIPs,
-			nil,
+			[]cloudmodel.IP(nil),
 		),
 	}
 	updater.setDomainToolDataSet(domainToolDataSet)
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
 
@@ -88,25 +88,16 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.WANI
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
-		))
+		), i.metadata.LogPrefixes)
 		return nil, false
 	}
 	var subnetID int
 
-	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
-	// which may cause recorder performance issues.
-
-	// if cloudItem.SubnetLcuuid != "" {
-	// 	subnetID, exists = i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-	// 	if !exists && i.domainToolDataSet != nil {
-	// 		subnetID, _ = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-	// 	}
-	// }
 	ip := rcommon.FormatIP(cloudItem.IP)
 	if ip == "" {
 		log.Error(ipIsInvalid(
 			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid, cloudItem.IP,
-		))
+		), i.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &metadbmodel.WANIP{
@@ -129,39 +120,14 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.WANI
 	return dbItem, true
 }
 
-func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmodel.IP) (*message.UpdatedWANIPFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedWANIPFields)
+func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmodel.IP) (types.UpdatedFields, map[string]interface{}, bool) {
+	// 创建具体的UpdatedWANIPFields，然后转换为接口类型
+	structInfo := &message.UpdatedWANIPFields{}
 	mapInfo := make(map[string]interface{})
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-
-	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
-	// which may cause recorder performance issues.
-
-	// if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
-	// 	if cloudItem.SubnetLcuuid == "" {
-	// 		mapInfo["vl2_net_id"] = 0
-	// 	} else {
-	// 		subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-	// 		if !exists {
-	// 			if i.domainToolDataSet != nil {
-	// 				subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
-	// 			}
-	// 			if !exists {
-	// 				log.Error(resourceAForResourceBNotFound(
-	// 					ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-	// 					ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid,
-	// 				))
-	// 				return nil, nil, false
-	// 			}
-	// 		}
-	// 		mapInfo["vl2_net_id"] = subnetID
-	// 	}
-	// 	structInfo.SubnetID.SetNew(mapInfo["vl2_net_id"].(int))
-	// 	structInfo.SubnetLcuuid.Set(diffBase.SubnetLcuuid, cloudItem.SubnetLcuuid)
-	// }
-
+	// 返回接口类型
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

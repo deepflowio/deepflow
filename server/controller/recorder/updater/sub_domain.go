@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// SubDomainMessageFactory SubDomain资源的消息工厂
+type SubDomainMessageFactory struct{}
+
+func (f *SubDomainMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedSubDomains{}
+}
+
+func (f *SubDomainMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedSubDomain{}
+}
+
+func (f *SubDomainMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedSubDomains{}
+}
+
+func (f *SubDomainMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedSubDomainFields{}
+}
 
 type SubDomain struct {
 	UpdaterBase[
@@ -32,36 +52,16 @@ type SubDomain struct {
 		*diffbase.SubDomain,
 		*metadbmodel.SubDomain,
 		metadbmodel.SubDomain,
-		*message.AddedSubDomains,
-		message.AddedSubDomains,
-		message.AddNoneAddition,
-		*message.UpdatedSubDomain,
-		message.UpdatedSubDomain,
-		*message.UpdatedSubDomainFields,
-		message.UpdatedSubDomainFields,
-		*message.DeletedSubDomains,
-		message.DeletedSubDomains,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *SubDomain {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, &SubDomainMessageFactory{})
+	}
+
 	updater := &SubDomain{
-		newUpdaterBase[
-			cloudmodel.SubDomain,
-			*diffbase.SubDomain,
-			*metadbmodel.SubDomain,
-			metadbmodel.SubDomain,
-			*message.AddedSubDomains,
-			message.AddedSubDomains,
-			message.AddNoneAddition,
-			*message.UpdatedSubDomain,
-			message.UpdatedSubDomain,
-			*message.UpdatedSubDomainFields,
-			message.UpdatedSubDomainFields,
-			*message.DeletedSubDomains,
-			message.DeletedSubDomains,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
 			wholeCache,
 			db.NewSubDomain().SetMetadata(wholeCache.GetMetadata()),
@@ -69,7 +69,7 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
 
@@ -86,12 +86,14 @@ func (d *SubDomain) generateDBItemToAdd(cloudItem *cloudmodel.SubDomain) (*metad
 	return dbItem, true
 }
 
-func (d *SubDomain) generateUpdateInfo(diffBase *diffbase.SubDomain, cloudItem *cloudmodel.SubDomain) (*message.UpdatedSubDomainFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedSubDomainFields)
+func (d *SubDomain) generateUpdateInfo(diffBase *diffbase.SubDomain, cloudItem *cloudmodel.SubDomain) (types.UpdatedFields, map[string]interface{}, bool) {
+	// 创建具体的UpdatedSubDomainFields，然后转换为接口类型
+	structInfo := &message.UpdatedSubDomainFields{}
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
+	// 返回接口类型
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

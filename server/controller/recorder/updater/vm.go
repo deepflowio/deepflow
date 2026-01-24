@@ -28,45 +28,39 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 	"github.com/deepflowio/deepflow/server/controller/recorder/statsd"
 )
 
+type VMMessageFactory struct{}
+
+func (f *VMMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedVMs{}
+}
+
+func (f *VMMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedVM{}
+}
+
+func (f *VMMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedVMs{}
+}
+
+func (f *VMMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedVMFields{}
+}
+
 type VM struct {
-	UpdaterBase[
-		cloudmodel.VM,
-		*diffbase.VM,
-		*metadbmodel.VM,
-		metadbmodel.VM,
-		*message.AddedVMs,
-		message.AddedVMs,
-		message.AddNoneAddition,
-		*message.UpdatedVM,
-		message.UpdatedVM,
-		*message.UpdatedVMFields,
-		message.UpdatedVMFields,
-		*message.DeletedVMs,
-		message.DeletedVMs,
-		message.DeleteNoneAddition]
+	UpdaterBase[cloudmodel.VM, *diffbase.VM, *metadbmodel.VM, metadbmodel.VM]
 }
 
 func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_VM_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_VM_EN, &VMMessageFactory{})
+	}
+
 	updater := &VM{
-		newUpdaterBase[
-			cloudmodel.VM,
-			*diffbase.VM,
-			*metadbmodel.VM,
-			metadbmodel.VM,
-			*message.AddedVMs,
-			message.AddedVMs,
-			message.AddNoneAddition,
-			*message.UpdatedVM,
-			message.UpdatedVM,
-			*message.UpdatedVMFields,
-			message.UpdatedVMFields,
-			*message.DeletedVMs,
-			message.DeletedVMs,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN,
 			wholeCache,
 			db.NewVM().SetMetadata(wholeCache.GetMetadata()),
@@ -74,7 +68,7 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
 
@@ -87,36 +81,44 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*metadbmodel.VM, boo
 		), m.metadata.LogPrefixes)
 		return nil, false
 	}
-	var hostID int
+
+	hostID := 0
 	if cloudItem.LaunchServer != "" {
 		hostID, _ = m.cache.ToolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
 	}
-	cloudTags := map[string]string{}
-	if cloudItem.CloudTags != nil {
-		cloudTags = cloudItem.CloudTags
-	}
+
 	networkID := 0
 	if cloudItem.NetworkLcuuid != "" {
-		networkID, exists = m.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
-		if !exists {
+		var ok bool
+		networkID, ok = m.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+		if !ok {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid,
 			), m.metadata.LogPrefixes)
 		}
 	}
+
+	var cloudTags map[string]string
+	cloudTagJson, err := json.Marshal(cloudItem.CloudTags)
+	if err != nil {
+		log.Error(err, m.metadata.LogPrefixes)
+	} else {
+		json.Unmarshal(cloudTagJson, &cloudTags)
+	}
+
 	if cloudItem.Label == "" {
 		cloudItem.Label = ctrlrcommon.GenerateResourceShortUUID(ctrlrcommon.RESOURCE_TYPE_CHOST_EN)
 	}
+
 	dbItem := &metadbmodel.VM{
 		Name:             cloudItem.Name,
 		Label:            cloudItem.Label,
-		IP:               cloudItem.IP,
-		Hostname:         cloudItem.Hostname,
-		UID:              cloudItem.Label,
 		State:            cloudItem.State,
 		HType:            cloudItem.HType,
 		LaunchServer:     cloudItem.LaunchServer,
+		IP:               cloudItem.IP,
+		Hostname:         cloudItem.Hostname,
 		HostID:           hostID,
 		Domain:           m.metadata.GetDomainLcuuid(),
 		Region:           cloudItem.RegionLcuuid,
@@ -139,8 +141,9 @@ func (m *VM) recordStatsd(cloudItem *cloudmodel.VM) {
 	m.statsd.GetMonitor(statsd.TagTypeVMSyncDelay).Fill(int(syncDelay))
 }
 
-func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (*message.UpdatedVMFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedVMFields)
+func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (types.UpdatedFields, map[string]interface{}, bool) {
+	// 创建具体的UpdatedVMFields，然后转换为接口类型
+	structInfo := &message.UpdatedVMFields{}
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
