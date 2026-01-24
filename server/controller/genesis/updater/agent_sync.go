@@ -34,16 +34,23 @@ import (
 )
 
 func (v *GenesisSyncRpcUpdater) ParseAgentVinterfaceInfo(orgID int, teamID, vtapID uint32, peer, deviceType string, message *agent.GenesisSyncRequest) []model.GenesisVinterface {
+	platformData := message.GetPlatformData()
+	// 采集器未注册时（vtapID==0），即使没有 Interfaces 也需要处理 vinterface 来让采集器能够注册
+	// 采集器已经注册时（vtapID!=0），采集器重启会出现 Interfaces 为空的情况，为了避免 vinterface 异常增删，不解析当前消息
+	if len(platformData.Interfaces) == 0 && vtapID != 0 {
+		return []model.GenesisVinterface{}
+	}
+
 	isContainer := deviceType == common.DEVICE_TYPE_DOCKER_HOST
 	epoch := time.Now()
 	k8sClusterID := message.GetKubernetesClusterId()
 	VIFs := []model.GenesisVinterface{}
-	ipAddrs := message.GetPlatformData().GetRawIpAddrs()
+	ipAddrs := platformData.GetRawIpAddrs()
 	if len(ipAddrs) == 0 {
 		log.Errorf("get sync data (raw ip addrs) empty", logger.NewORGPrefix(orgID))
 		return []model.GenesisVinterface{}
 	}
-	netNSs := message.GetPlatformData().GetRawIpNetns()
+	netNSs := platformData.GetRawIpNetns()
 	if len(netNSs) == 0 {
 		netNSs = []string{""}
 		ipAddrs = ipAddrs[:1]
@@ -107,7 +114,7 @@ func (v *GenesisSyncRpcUpdater) ParseAgentVinterfaceInfo(orgID int, teamID, vtap
 	}
 
 	deviceIDToMinMAC := map[string]uint64{}
-	for _, iface := range message.GetPlatformData().Interfaces {
+	for _, iface := range platformData.Interfaces {
 		ifaceMAC := iface.GetMac()
 		ifaceDeviceID := iface.GetDeviceId()
 		if iMac, ok := deviceIDToMinMAC[ifaceDeviceID]; ok {
@@ -122,7 +129,7 @@ func (v *GenesisSyncRpcUpdater) ParseAgentVinterfaceInfo(orgID int, teamID, vtap
 	for key, value := range deviceIDToMinMAC {
 		deviceIDToUUID[key] = ccommon.GetUUIDByOrgID(orgID, key+fmt.Sprintf("%d", value))
 	}
-	for _, iface := range message.GetPlatformData().Interfaces {
+	for _, iface := range platformData.Interfaces {
 		vIF := model.GenesisVinterface{
 			Name: iface.GetName(),
 			Mac:  common.Uint64ToMac(iface.GetMac()).String(),
