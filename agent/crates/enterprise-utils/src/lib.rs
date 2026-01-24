@@ -84,6 +84,7 @@ pub mod l7 {
                     RewriteNativeTag(public::l7_protocol::NativeTag, Arc<String>),
                     AddAttribute(Arc<String>, Arc<String>),
                     AddMetric(Arc<String>, f32),
+                    SaveHeader(Arc<String>),
                     SavePayload(Arc<String>),
                 }
             }

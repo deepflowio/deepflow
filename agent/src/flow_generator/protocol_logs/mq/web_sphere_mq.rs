@@ -41,7 +41,6 @@ use crate::{
         error::{Error, Result},
         protocol_logs::{
             auto_merge_custom_field,
-            consts::*,
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
@@ -164,11 +163,6 @@ impl WebSphereMqInfo {
         //resp rewrite
         if let Some(code) = custom.resp.code {
             base.msg_type = LogMessageType::Response;
-            // when response_code is overwritten, put it into the attributes.
-            base.attributes.push(KeyVal {
-                key: SYS_RESPONSE_CODE_ATTR.to_string(),
-                val: base.response_code.clone(),
-            });
             base.response_code = code.to_string();
         }
 
@@ -223,6 +217,9 @@ impl WebSphereMqInfo {
         }
         if let Some(biz_scenario) = custom.biz_scenario {
             base.biz_scenario = biz_scenario;
+        }
+        if let Some(biz_response_code) = custom.biz_response_code {
+            base.biz_response_code = biz_response_code;
         }
     }
 }
@@ -429,6 +426,7 @@ impl WebSphereMqLog {
 
         for op in self.custom_field_store.drain_with(policies, &*info) {
             match &op.op {
+                Op::SaveHeader(_) => (),
                 Op::SavePayload(key) => {
                     info.attributes.push(KeyVal {
                         key: key.to_string(),

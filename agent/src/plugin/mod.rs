@@ -116,6 +116,7 @@ pub struct CustomInfo {
     pub biz_type: u8,
     pub biz_code: Option<String>,
     pub biz_scenario: Option<String>,
+    pub biz_response_code: Option<String>,
 
     #[serde(skip)]
     pub is_on_blacklist: bool,
@@ -456,6 +457,7 @@ impl CustomInfo {
             biz_type: pb_info.biz_type.unwrap_or_default() as u8,
             biz_code: pb_info.biz_code,
             biz_scenario: pb_info.biz_scenario,
+            biz_response_code: pb_info.biz_response_code,
             is_async: pb_info.is_async,
             is_reversed: pb_info.is_reversed,
             ..Default::default()
@@ -690,6 +692,7 @@ impl From<CustomInfo> for L7ProtocolSendLog {
                 x_request_id_1: w.trace.x_request_id_1,
                 ..Default::default()
             }),
+            biz_response_code: w.biz_response_code.unwrap_or_default(),
             ..Default::default()
         }
     }

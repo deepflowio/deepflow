@@ -194,6 +194,9 @@ pub struct MysqlInfo {
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
+
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_response_code: String,
 }
 
 impl L7LogAttribute for MysqlInfo {
@@ -623,6 +626,7 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
                 None
             },
             flags,
+            biz_response_code: f.biz_response_code,
             ..Default::default()
         };
         return log;
@@ -1413,7 +1417,7 @@ impl MysqlLog {
         };
         for op in self.custom_field_store.drain_with(policies, &*info) {
             match &op.op {
-                Op::AddMetric(_, _) | Op::SavePayload(_) => (),
+                Op::AddMetric(_, _) | Op::SaveHeader(_) | Op::SavePayload(_) => (),
                 _ => auto_merge_custom_field(op, info),
             }
         }
@@ -1925,10 +1929,6 @@ mod tests {
 
     #[test]
     fn comment_extractor() {
-        flexi_logger::Logger::try_with_env()
-            .unwrap()
-            .start()
-            .unwrap();
         let testcases = vec![
             (
                 "/* traceparent: 00-trace_id-span_id-01 */ SELECT * FROM table",

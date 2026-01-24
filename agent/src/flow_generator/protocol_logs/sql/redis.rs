@@ -172,6 +172,9 @@ pub struct RedisInfo {
 
     #[serde(skip)]
     is_on_blacklist: bool,
+
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_response_code: String,
 }
 
 impl L7LogAttribute for RedisInfo {
@@ -349,6 +352,7 @@ impl From<RedisInfo> for L7ProtocolSendLog {
                 ..Default::default()
             }),
             flags,
+            biz_response_code: f.biz_response_code,
             ..Default::default()
         };
         return log;
@@ -419,6 +423,7 @@ impl L7ProtocolParserInterface for RedisLog {
             );
             for op in self.custom_field_store.drain_with(cp, &info) {
                 match &op.op {
+                    Op::SaveHeader(_) => (),
                     Op::SavePayload(key) => {
                         info.attributes.push(KeyVal {
                             key: key.to_string(),
