@@ -7819,9 +7819,9 @@ Field Reference:
 | 126 | Additional Data |
 | 128 | Message Authentication Code (MAC) |
 
-##### WebSphereMQ {#processors.request_log.application_protocol_inference.protocol_special_config.webspheremq}
+##### WebSphereMQ {#processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq}
 
-###### Parse XML {#processors.request_log.application_protocol_inference.protocol_special_config.webspheremq.parse_xml_enabled}
+###### Parse XML {#processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.parse_xml_enabled}
 
 **Tags**:
 
@@ -7830,7 +7830,7 @@ Field Reference:
 
 **FQCN**:
 
-`processors.request_log.application_protocol_inference.protocol_special_config.webspheremq.parse_xml_enabled`
+`processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.parse_xml_enabled`
 
 **Default value**:
 ```yaml
@@ -7838,7 +7838,7 @@ processors:
   request_log:
     application_protocol_inference:
       protocol_special_config:
-        webspheremq:
+        web_sphere_mq:
           parse_xml_enabled: false
 ```
 

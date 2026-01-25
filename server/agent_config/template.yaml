@@ -5476,7 +5476,7 @@ processors:
         # type: section
         # name: WebSphereMQ
         # description:
-        webspheremq:
+        web_sphere_mq:
           # type: bool
           # name:
           #   en: Parse XML

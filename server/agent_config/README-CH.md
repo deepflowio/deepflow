@@ -7652,9 +7652,9 @@ processors:
 | 126 | 附加信息 |
 | 128 | 报文鉴别码 |
 
-##### WebSphereMQ {#processors.request_log.application_protocol_inference.protocol_special_config.webspheremq}
+##### WebSphereMQ {#processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq}
 
-###### 解析 XML {#processors.request_log.application_protocol_inference.protocol_special_config.webspheremq.parse_xml_enabled}
+###### 解析 XML {#processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.parse_xml_enabled}
 
 **标签**:
 
@@ -7663,7 +7663,7 @@ processors:
 
 **FQCN**:
 
-`processors.request_log.application_protocol_inference.protocol_special_config.webspheremq.parse_xml_enabled`
+`processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.parse_xml_enabled`
 
 **默认值**:
 ```yaml
@@ -7671,7 +7671,7 @@ processors:
   request_log:
     application_protocol_inference:
       protocol_special_config:
-        webspheremq:
+        web_sphere_mq:
           parse_xml_enabled: false
 ```
 
