@@ -222,7 +222,7 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ip4 uint32, 
 		}
 		// secondary query without port
 		if len(s.customServiceClusterIDTable) > 0 {
-			serviceId = s.customServiceClusterIDTable[genPodXIDKey(podClusterID, serviceProtocol)]
+			serviceId = s.customServiceClusterIDTable[genPodXIDKey(podClusterID, 0)]
 			if serviceId > 0 {
 				return serviceId
 			}
@@ -256,7 +256,7 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ip4 uint32, 
 		}
 		// secondary query without port
 		if len(s.customServiceClusterIP6Table) != 0 && serverPort != 0 {
-			serviceId = s.customServiceClusterIP6Table[genEpcIDIP6Key(epcID, ip6, serviceProtocol)]
+			serviceId = s.customServiceClusterIP6Table[genEpcIDIP6Key(epcID, ip6, 0)]
 		}
 		return serviceId
 	}
@@ -269,7 +269,7 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ip4 uint32, 
 	}
 
 	if len(s.customServiceClusterIP4Table) > 0 && serverPort != 0 {
-		serviceId = s.customServiceClusterIP4Table[genEpcIDIP4Key(epcID, ip4, serviceProtocol)]
+		serviceId = s.customServiceClusterIP4Table[genEpcIDIP4Key(epcID, ip4, 0)]
 	}
 
 	return serviceId
