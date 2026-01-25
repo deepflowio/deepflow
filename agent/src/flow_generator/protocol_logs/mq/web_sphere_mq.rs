@@ -333,7 +333,7 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
 
             let wasm_results = self.wasm_hook(param, payload[pos..pos + parsed_size].as_ref());
             if let Some(customs) = wasm_results {
-                if customs.len() == 1 {
+                if customs.len() >= 1 {
                     let custom = customs.into_iter().next().unwrap();
                     info.merge_wasm_info(custom);
                 }
