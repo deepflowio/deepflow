@@ -934,8 +934,10 @@ pub unsafe extern "C" fn merge_php_stacks(
         } else {
             let native_frames: Vec<&str> = u_trace.split(';').filter(|f| !f.is_empty()).collect();
 
-            // Find PHP entry point (execute_ex or similar)
-            let entry_idx = native_frames.iter().position(|frame| {
+            // Find the LAST PHP entry point (execute_ex or similar)
+            // In recursive PHP calls, there can be multiple execute_ex frames
+            // We want to insert interpreter frames after the LAST one (current context)
+            let entry_idx = native_frames.iter().rposition(|frame| {
                 frame.contains("execute_ex")
                     || frame.contains("zend_execute")
                     || frame.contains("php_execute_script")
@@ -945,7 +947,7 @@ pub unsafe extern "C" fn merge_php_stacks(
             let mut result_frames: Vec<&str> = Vec::new();
 
             if let Some(idx) = entry_idx {
-                // Frames before and including the PHP entry point
+                // Frames before and including the LAST PHP entry point
                 result_frames.extend(native_frames[..=idx].iter());
 
                 // Insert ALL PHP interpreter frames right after the entry point
@@ -954,9 +956,11 @@ pub unsafe extern "C" fn merge_php_stacks(
                 // Append remaining native frames (C library calls like sqlite3, etc.)
                 result_frames.extend(native_frames[idx + 1..].iter());
             } else {
-                // No PHP entry point found, append PHP frames at the end
-                result_frames.extend(native_frames.iter());
+                // No PHP entry point found in native stack (DWARF unwind may have stopped early)
+                // Since we have PHP interpreter frames, we know PHP called the native code
+                // Strategy: PHP frames first (as callers), then native frames (as callees)
                 result_frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
+                result_frames.extend(native_frames.iter());
             }
 
             // NOTE: Do NOT use dedup() - it breaks recursive call stacks
