@@ -1728,31 +1728,50 @@ fn replace_builtin_frames_with_js(native_trace: &str, js_trace: &str) -> String 
     let has_jit_markers = native_frames.iter().any(|f| is_v8_jit_frame(f));
 
     // If no JIT markers, check for Invoke + [/path/to/node] pattern
+    // In this case, replace the [/path/to/node] frames with JS frames
     if !has_jit_markers {
         // Find if there's Invoke followed by [/path/to/node] frames
-        let mut invoke_idx = None;
-        let mut last_node_binary_idx = None;
+        let invoke_idx = native_frames.iter().position(|f| is_v8_entry_point(f));
 
-        for (idx, frame) in native_frames.iter().enumerate() {
-            if is_v8_entry_point(frame) {
-                invoke_idx = Some(idx);
-            }
-            // Only track node binary frames AFTER invoke
-            if invoke_idx.is_some() && is_node_binary_frame(frame) {
-                last_node_binary_idx = Some(idx);
-            }
-        }
+        if let Some(invoke_pos) = invoke_idx {
+            // Check if there are [/path/to/node] frames after invoke
+            let has_node_frames = native_frames[invoke_pos + 1..]
+                .iter()
+                .any(|f| is_node_binary_frame(f));
 
-        // If we found Invoke followed by [/path/to/node], insert JS frames after it
-        if let (Some(_invoke), Some(last_node)) = (invoke_idx, last_node_binary_idx) {
-            trace!(
-                "No JIT markers but found Invoke+[node] pattern, inserting after idx {}",
-                last_node
-            );
-            let mut result: Vec<&str> = native_frames[..=last_node].to_vec();
-            result.extend(js_frames.iter());
-            result.extend(native_frames[last_node + 1..].iter());
-            return result.join(";");
+            if has_node_frames {
+                trace!(
+                    "No JIT markers but found Invoke+[node] pattern, replacing node frames after idx {}",
+                    invoke_pos
+                );
+                // Build result: frames before and including invoke, then replace [node] frames with JS frames
+                let mut result: Vec<&str> = native_frames[..=invoke_pos].to_vec();
+                let mut js_frame_idx = 0;
+
+                for native_frame in native_frames[invoke_pos + 1..].iter() {
+                    if is_node_binary_frame(native_frame) && js_frame_idx < js_frames.len() {
+                        // Replace [/path/to/node] frame with JS frame
+                        result.push(js_frames[js_frame_idx]);
+                        js_frame_idx += 1;
+                    } else {
+                        // Insert remaining JS frames before non-node native frame
+                        while js_frame_idx < js_frames.len() {
+                            result.push(js_frames[js_frame_idx]);
+                            js_frame_idx += 1;
+                        }
+                        // Keep native frame
+                        result.push(native_frame);
+                    }
+                }
+
+                // Append any remaining JS frames
+                while js_frame_idx < js_frames.len() {
+                    result.push(js_frames[js_frame_idx]);
+                    js_frame_idx += 1;
+                }
+
+                return result.join(";");
+            }
         }
 
         // No pattern found, just append JS frames at the end
@@ -1762,13 +1781,23 @@ fn replace_builtin_frames_with_js(native_trace: &str, js_trace: &str) -> String 
     }
 
     // Original logic: replace JIT markers with JS frames
+    // Also replace [/path/to/node] frames after V8 entry point
     let mut result_frames: Vec<&str> = Vec::new();
     let mut js_frame_idx = 0;
     let mut last_replacement_idx: Option<usize> = None;
+    let mut passed_entry_point = false;
 
     for native_frame in native_frames.iter() {
-        // Check if this frame should be replaced
-        let should_replace = is_v8_jit_frame(native_frame);
+        // Track if we've passed a V8 entry point
+        if is_v8_entry_point(native_frame) {
+            passed_entry_point = true;
+        }
+
+        // Check if this frame should be replaced:
+        // 1. JIT frames ([unknown], Builtins_) are always replaced
+        // 2. [/path/to/node] frames are replaced only after V8 entry point
+        let should_replace = is_v8_jit_frame(native_frame)
+            || (passed_entry_point && is_node_binary_frame(native_frame));
 
         if should_replace && js_frame_idx < js_frames.len() {
             // Replace with JS frame
