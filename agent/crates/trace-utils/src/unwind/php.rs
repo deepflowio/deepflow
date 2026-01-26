@@ -887,61 +887,6 @@ impl PhpUnwindTable {
 // const PHP_EVAL_FNAME: &'static str = "eval"; // Currently unused
 // const INCOMPLETE_PHP_STACK: &'static str = "[lost] incomplete PHP c stack"; // Currently unused
 
-/// Find PHP entry point in native stack for optimal insertion
-/// Returns the character position where PHP stack should be inserted
-fn find_php_entry_point(u_trace: &str) -> Option<usize> {
-    // Look for key PHP functions that indicate where PHP execution begins
-    let php_markers = [
-        "execute_ex",           // Primary PHP execution function
-        "zend_execute",         // Zend engine execution
-        "php_execute_script",   // Script execution entry point
-        "zend_execute_scripts", // Script execution
-    ];
-
-    for marker in &php_markers {
-        if let Some(pos) = u_trace.find(marker) {
-            // Find the start of this frame (beginning of line or after ';')
-            let frame_start = u_trace[..pos].rfind(';').map(|p| p + 1).unwrap_or(0);
-            return Some(frame_start);
-        }
-    }
-
-    None
-}
-
-/// Split trace string at specified character position
-fn split_at_position(trace: &str, pos: usize) -> (&str, &str) {
-    if pos == 0 {
-        ("", trace)
-    } else if pos >= trace.len() {
-        (trace, "")
-    } else {
-        // Ensure we split at frame boundary (at ';' or start)
-        let actual_pos = if trace.chars().nth(pos) == Some(';') {
-            pos + 1
-        } else {
-            pos
-        };
-        (&trace[..pos], &trace[actual_pos..])
-    }
-}
-
-fn is_php_runtime_helper(frame: &str) -> bool {
-    frame.contains("_emalloc")
-        || frame.contains("_efree")
-        || frame.contains("malloc")
-        || frame.contains("free")
-        || frame.contains("zend_mm_")
-        || frame.contains("rc_dtor_func")
-        || frame.contains("add_function")
-        || frame.contains("sub_function")
-        || frame.contains("mul_function")
-        || frame.contains("div_function")
-        || frame.contains("pow_function")
-        || frame.contains("concat_function")
-        || (frame.contains("zend_") && !frame.contains("zend_execute"))
-}
-
 #[no_mangle]
 pub unsafe extern "C" fn merge_php_stacks(
     trace_str: *mut c_void,
@@ -974,95 +919,49 @@ pub unsafe extern "C" fn merge_php_stacks(
         let _ = write!(&mut trace, "{}", i_trace);
     } else {
         // Both stacks available - find the right insertion point
-        // Look for PHP entry points in native stack
-        if let Some(php_entry_pos) = find_php_entry_point(u_trace) {
-            let (before_php, from_php) = split_at_position(u_trace, php_entry_pos);
-            let clean_i_trace = if i_trace.starts_with(';') {
-                &i_trace[1..]
-            } else {
-                i_trace
-            };
+        // PHP native stack from DWARF unwind does NOT contain interpreter frames
+        // Strategy: Insert ALL PHP frames right after execute_ex, then append remaining native frames
 
-            let mut merged_frames: Vec<&str> = Vec::new();
-
-            // Frames before the PHP entry point (main, start_thread, etc.)
-            merged_frames.extend(before_php.split(';').filter(|f| !f.is_empty()));
-
-            // Split native portion at entry: execute_ex should come before PHP frames
-            let mut native_frames = from_php.split(';').filter(|f| !f.is_empty());
-            if let Some(entry_frame) = native_frames.next() {
-                merged_frames.push(entry_frame);
-            }
-
-            // Insert PHP interpreter/userland frames right after execute_ex
-            if !clean_i_trace.is_empty() {
-                merged_frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
-            }
-
-            // Any remaining native frames (helpers like _emalloc) must appear after PHP frames
-            merged_frames.extend(native_frames);
-
-            if merged_frames.is_empty() {
-                // Fallback if everything was filtered out
-                merged_frames.extend(u_trace.split(';').filter(|f| !f.is_empty()));
-            }
-
-            // NOTE: Do NOT use dedup() here! It will remove consecutive duplicate frames,
-            // which breaks recursive call stacks (e.g., fibonacci:9 appearing multiple times)
-            let merged_string = merged_frames.join(";");
-            let _ = write!(&mut trace, "{}", merged_string);
+        // Clean up PHP stack (remove leading semicolon if present)
+        let clean_i_trace = if i_trace.starts_with(';') {
+            &i_trace[1..]
         } else {
-            // No clear PHP entry point found in native stack
-            // But we know there's a calling relationship: native code calls PHP functions
+            i_trace
+        };
 
-            // Clean up PHP stack (remove leading semicolon if present)
-            let clean_i_trace = if i_trace.starts_with(';') {
-                &i_trace[1..]
+        if clean_i_trace.is_empty() {
+            let _ = write!(&mut trace, "{}", u_trace);
+        } else {
+            let native_frames: Vec<&str> = u_trace.split(';').filter(|f| !f.is_empty()).collect();
+
+            // Find PHP entry point (execute_ex or similar)
+            let entry_idx = native_frames.iter().position(|frame| {
+                frame.contains("execute_ex")
+                    || frame.contains("zend_execute")
+                    || frame.contains("php_execute_script")
+                    || frame.contains("zend_execute_scripts")
+            });
+
+            let mut result_frames: Vec<&str> = Vec::new();
+
+            if let Some(idx) = entry_idx {
+                // Frames before and including the PHP entry point
+                result_frames.extend(native_frames[..=idx].iter());
+
+                // Insert ALL PHP interpreter frames right after the entry point
+                result_frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
+
+                // Append remaining native frames (C library calls like sqlite3, etc.)
+                result_frames.extend(native_frames[idx + 1..].iter());
             } else {
-                i_trace
-            };
-
-            if clean_i_trace.is_empty() {
-                let _ = write!(&mut trace, "{}", u_trace);
-            } else {
-                // Check if native stack contains likely interpreter functions
-                if u_trace.contains("execute_ex")
-                    || u_trace.contains("zend_execute")
-                    || u_trace.contains("php_execute_script")
-                {
-                    let mut frames: Vec<&str> = Vec::new();
-                    frames.extend(u_trace.split(';').filter(|f| !f.is_empty()));
-                    frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
-                    // NOTE: Do NOT use dedup() - it breaks recursive call stacks
-                    let _ = write!(&mut trace, "{}", frames.join(";"));
-                } else {
-                    // No clear interpreter functions, but native stack might contain C helpers
-                    let native_frames: Vec<&str> =
-                        u_trace.split(';').filter(|f| !f.is_empty()).collect();
-                    let has_c_helpers = native_frames
-                        .iter()
-                        .any(|frame| is_php_runtime_helper(frame));
-
-                    let mut frames: Vec<&str> = Vec::new();
-                    if has_c_helpers {
-                        let helper_idx = native_frames
-                            .iter()
-                            .rposition(|frame| is_php_runtime_helper(frame))
-                            .unwrap_or(native_frames.len().saturating_sub(1));
-
-                        frames.extend(native_frames.iter().take(helper_idx));
-                        frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
-                        frames.extend(native_frames.iter().skip(helper_idx));
-                    } else {
-                        frames.extend(native_frames.iter());
-                        frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
-                    }
-
-                    // NOTE: Do NOT use dedup() - it breaks recursive call stacks
-                    let merged = frames.join(";");
-                    let _ = write!(&mut trace, "{}", merged);
-                }
+                // No PHP entry point found, append PHP frames at the end
+                result_frames.extend(native_frames.iter());
+                result_frames.extend(clean_i_trace.split(';').filter(|f| !f.is_empty()));
             }
+
+            // NOTE: Do NOT use dedup() - it breaks recursive call stacks
+            let merged_string = result_frames.join(";");
+            let _ = write!(&mut trace, "{}", merged_string);
         }
     }
 
