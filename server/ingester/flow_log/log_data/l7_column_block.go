@@ -52,6 +52,7 @@ type L7BaseBlock struct {
 	ColBizType                proto.ColUInt8
 	ColBizCode                proto.ColStr
 	ColBizScenario            proto.ColStr
+	ColBizResponseCode        proto.ColStr
 	ColProcessId0             proto.ColInt32
 	ColProcessId1             proto.ColInt32
 	ColProcessKname0          proto.ColStr
@@ -95,6 +96,7 @@ func (b *L7BaseBlock) Reset() {
 	b.ColBizType.Reset()
 	b.ColBizCode.Reset()
 	b.ColBizScenario.Reset()
+	b.ColBizResponseCode.Reset()
 	b.ColProcessId0.Reset()
 	b.ColProcessId1.Reset()
 	b.ColProcessKname0.Reset()
@@ -139,6 +141,7 @@ func (b *L7BaseBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_BIZ_TYPE, Data: &b.ColBizType},
 		proto.InputColumn{Name: ckdb.COLUMN_BIZ_CODE, Data: &b.ColBizCode},
 		proto.InputColumn{Name: ckdb.COLUMN_BIZ_SCENARIO, Data: &b.ColBizScenario},
+		proto.InputColumn{Name: ckdb.COLUMN_BIZ_RESPONSE_CODE, Data: &b.ColBizResponseCode},
 		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_ID_0, Data: &b.ColProcessId0},
 		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_ID_1, Data: &b.ColProcessId1},
 		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_KNAME_0, Data: &b.ColProcessKname0},
@@ -191,6 +194,7 @@ func (n *L7Base) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColBizType.Append(n.BizType)
 	block.ColBizCode.Append(n.BizCode)
 	block.ColBizScenario.Append(n.BizScenario)
+	block.ColBizResponseCode.Append(n.BizResponseCode)
 	block.ColProcessId0.Append(int32(n.ProcessID0))
 	block.ColProcessId1.Append(int32(n.ProcessID1))
 	block.ColProcessKname0.Append(n.ProcessKName0)

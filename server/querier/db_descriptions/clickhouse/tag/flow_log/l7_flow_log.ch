@@ -76,7 +76,7 @@ request_domain            , 请求域名                 ,
 request_resource          , 请求资源                 ,
 request_id                , 请求 ID                  ,
 response_status           , 响应状态                 ,
-response_code             , 响应码                   ,
+response_code             , 应用响应码               ,
 response_exception        , 响应异常                 ,
 response_result           , 响应结果                 ,
 events                    , 事件                     ,
@@ -130,3 +130,4 @@ observation_point         , 观测点                   , 采集位置在流量�
 biz_type                  , 业务类型                 ,
 biz_code                  , 业务识别码               , 用于识别业务类型（例如手机银行转账、缴费）。
 biz_scenario              , 业务场景                 , 用于细分业务场景（如本人转本人、本地跨行）。
+biz_response_code         , 业务响应码               ,

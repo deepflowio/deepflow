@@ -130,3 +130,4 @@ observation_point         , observation_point         , observation_point       
 biz_type                  , biz_type                  , biz_type                   , int            ,                       , Business Info     , 111          , 0             , 
 biz_code                  , biz_code                  , biz_code                   , string         ,                       , Business Info     , 111          , 0             , 
 biz_scenario              , biz_scenario              , biz_scenario               , string         ,                       , Business Info     , 111          , 0             , 
+biz_response_code         , biz_response_code         , biz_response_code          , string         ,                       , Business Info     , 111          , 0             ,
