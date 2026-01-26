@@ -1740,10 +1740,6 @@ fn replace_builtin_frames_with_js(native_trace: &str, js_trace: &str) -> String 
                 .any(|f| is_node_binary_frame(f));
 
             if has_node_frames {
-                trace!(
-                    "No JIT markers but found Invoke+[node] pattern, replacing node frames after idx {}",
-                    invoke_pos
-                );
                 // Build result: frames before and including invoke, then replace [node] frames with JS frames
                 let mut result: Vec<&str> = native_frames[..=invoke_pos].to_vec();
                 let mut js_frame_idx = 0;
@@ -1785,17 +1781,21 @@ fn replace_builtin_frames_with_js(native_trace: &str, js_trace: &str) -> String 
     let mut result_frames: Vec<&str> = Vec::new();
     let mut js_frame_idx = 0;
     let mut last_replacement_idx: Option<usize> = None;
-    let mut passed_entry_point = false;
 
-    for native_frame in native_frames.iter() {
-        // Track if we've passed a V8 entry point
-        if is_v8_entry_point(native_frame) {
-            passed_entry_point = true;
-        }
+    // Find the LAST V8 entry point (like PHP's rposition fix)
+    // There can be multiple entry points (Execution::Call -> Invoke -> ...)
+    // We want to replace frames only after the LAST one
+    let last_entry_point_idx = native_frames.iter().rposition(|f| is_v8_entry_point(f));
+
+    for (frame_idx, native_frame) in native_frames.iter().enumerate() {
+        // Check if we've passed the LAST V8 entry point
+        let passed_entry_point = last_entry_point_idx
+            .map(|idx| frame_idx > idx)
+            .unwrap_or(false);
 
         // Check if this frame should be replaced:
         // 1. JIT frames ([unknown], Builtins_) are always replaced
-        // 2. [/path/to/node] frames are replaced only after V8 entry point
+        // 2. [/path/to/node] frames are replaced only after the LAST V8 entry point
         let should_replace = is_v8_jit_frame(native_frame)
             || (passed_entry_point && is_node_binary_frame(native_frame));
 
