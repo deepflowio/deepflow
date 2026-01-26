@@ -406,6 +406,9 @@ impl L7LogBase {
         if other.is_reversed {
             self.is_reversed = other.is_reversed;
         }
+        if self.biz_response_code.is_empty() {
+            self.biz_response_code = std::mem::take(&mut other.biz_response_code);
+        }
     }
 
     fn get_trace_id(&self) -> Field {

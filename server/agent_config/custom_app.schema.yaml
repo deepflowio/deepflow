@@ -917,6 +917,7 @@ $defs:
             - biz_type
             - biz_code
             - biz_scenario
+            - biz_response_code
             enum@en:
             - Version
             - Request Type
@@ -924,7 +925,7 @@ $defs:
             - Request Resource
             - Request ID
             - Endpoint
-            - Response Code
+            - Application Response Code
             - Response Exception
             - Response Result
             - Trace ID
@@ -933,9 +934,10 @@ $defs:
             - X Request ID 0
             - X Request ID 1
             - HTTP Proxy Client
-            - Biz Type
-            - Biz Code
-            - Biz Scenario
+            - Business Type
+            - Business Code
+            - Business Scenario
+            - Business Response Code
             enum@ch:
             - 版本
             - 请求类型
@@ -943,7 +945,7 @@ $defs:
             - 请求资源
             - 请求 ID
             - 端点
-            - 响应代码
+            - 应用响应码
             - 响应异常
             - 响应结果
             - Trace ID
@@ -955,50 +957,13 @@ $defs:
             - 业务类型
             - 业务代码
             - 业务场景
+            - 业务响应码
             description@en: |-
               Can fill in one of the following fields to overwrite the corresponding field value.
               Note: This requires support in the corresponding protocol, otherwise the configuration will not take effect.
-              When overwriting `Response Code` (`response_code`), the original non-empty value will be saved into the attribute as `sys_response_code`.
-              - version
-              - request_type
-              - request_domain
-              - request_resource
-              - request_id
-              - endpoint
-              - response_code
-              - response_exception
-              - response_result
-              - trace_id
-              - span_id
-              - x_request_id
-              - x_request_id_0
-              - x_request_id_1
-              - http_proxy_client
-              - biz_type
-              - biz_code
-              - biz_scenario
             description@ch: |-
               可以填写以下几种字段之一，用于覆写对应字段的值。
               注意对应的协议需要支持，否则配置无效。
-              当重写 `响应代码` (`response_code`) 时，自动将原来的非空值以 `sys_response_code` 为名写入 attribute 中。
-              - version
-              - request_type
-              - request_domain
-              - request_resource
-              - request_id
-              - endpoint
-              - response_code
-              - response_exception
-              - response_result
-              - trace_id
-              - span_id
-              - x_request_id
-              - x_request_id_0
-              - x_request_id_1
-              - http_proxy_client
-              - biz_type
-              - biz_code
-              - biz_scenario
           remap:
             type: string
             title@en: Remap

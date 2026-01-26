@@ -60,25 +60,26 @@ type L7Base struct {
 	ServerPort uint16 `json:"server_port" category:"$tag" sub:"transport_layer"`
 
 	// 流信息
-	FlowID       uint64 `json:"flow_id" category:"$tag" sub:"flow_info"`
-	TapType      uint8  `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
-	NatSource    uint8  `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source"`
-	TapPortType  uint8  `json:"capture_nic_type category:"$tag" sub:"capture_info"`
-	SignalSource uint16 `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"l7_signal_source"`
-	TunnelType   uint8  `json:"tunnel_type" category:"$tag" sub:"tunnel_info"`
-	TapPort      uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
-	TapSide      string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
-	TapSideEnum  uint8
-	VtapID       uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
-	ReqTcpSeq    uint32 `json:"req_tcp_seq" category:"$tag" sub:"transport_layer"`
-	RespTcpSeq   uint32 `json:"resp_tcp_seq" category:"$tag" sub:"transport_layer"`
-	StartTime    int64  `json:"start_time" category:"$tag" sub:"flow_info"` // us
-	EndTime      int64  `json:"end_time" category:"$tag" sub:"flow_info"`   // us
-	GPID0        uint32 `json:"gprocess_id_0" category:"$tag" sub:"universal_tag"`
-	GPID1        uint32 `json:"gprocess_id_1" category:"$tag" sub:"universal_tag"`
-	BizType      uint8  `json:"biz_type" category:"$tag" sub:"business_info"`
-	BizCode      string `json:"biz_code" category:"$tag" sub:"business_info"`
-	BizScenario  string `json:"biz_scenario" category:"$tag" sub:"business_info"`
+	FlowID          uint64 `json:"flow_id" category:"$tag" sub:"flow_info"`
+	TapType         uint8  `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
+	NatSource       uint8  `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source"`
+	TapPortType     uint8  `json:"capture_nic_type category:"$tag" sub:"capture_info"`
+	SignalSource    uint16 `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"l7_signal_source"`
+	TunnelType      uint8  `json:"tunnel_type" category:"$tag" sub:"tunnel_info"`
+	TapPort         uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
+	TapSide         string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
+	TapSideEnum     uint8
+	VtapID          uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
+	ReqTcpSeq       uint32 `json:"req_tcp_seq" category:"$tag" sub:"transport_layer"`
+	RespTcpSeq      uint32 `json:"resp_tcp_seq" category:"$tag" sub:"transport_layer"`
+	StartTime       int64  `json:"start_time" category:"$tag" sub:"flow_info"` // us
+	EndTime         int64  `json:"end_time" category:"$tag" sub:"flow_info"`   // us
+	GPID0           uint32 `json:"gprocess_id_0" category:"$tag" sub:"universal_tag"`
+	GPID1           uint32 `json:"gprocess_id_1" category:"$tag" sub:"universal_tag"`
+	BizType         uint8  `json:"biz_type" category:"$tag" sub:"business_info"`
+	BizCode         string `json:"biz_code" category:"$tag" sub:"business_info"`
+	BizScenario     string `json:"biz_scenario" category:"$tag" sub:"business_info"`
+	BizResponseCode string `json:"biz_response_code" category:"$tag" sub:"business_info"`
 
 	ProcessID0             uint32 `json:"process_id_0" category:"$tag" sub:"service_info"`
 	ProcessID1             uint32 `json:"process_id_1" category:"$tag" sub:"service_info"`
@@ -133,6 +134,7 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("biz_type", ckdb.UInt8).SetComment("Business Type"),
 		ckdb.NewColumn("biz_code", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
 		ckdb.NewColumn("biz_scenario", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
+		ckdb.NewColumn("biz_response_code", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
 
 		ckdb.NewColumn("process_id_0", ckdb.Int32).SetComment("客户端进程ID"),
 		ckdb.NewColumn("process_id_1", ckdb.Int32).SetComment("服务端进程ID"),
@@ -561,6 +563,7 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.BizType = uint8(l.BizType)
 	b.BizCode = log.BizCode
 	b.BizScenario = log.BizScenario
+	b.BizResponseCode = log.BizResponseCode
 
 	b.ProcessID0 = l.ProcessId_0
 	b.ProcessID1 = l.ProcessId_1
