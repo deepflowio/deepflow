@@ -1155,6 +1155,7 @@ pub struct EbpfProfileLanguages {
     pub python_disabled: bool,
     pub php_disabled: bool,
     pub nodejs_disabled: bool,
+    pub lua_disabled: bool,
 }
 
 impl Default for EbpfProfileLanguages {
@@ -1163,6 +1164,7 @@ impl Default for EbpfProfileLanguages {
             python_disabled: false,
             php_disabled: false,
             nodejs_disabled: false,
+            lua_disabled: false,
         }
     }
 }

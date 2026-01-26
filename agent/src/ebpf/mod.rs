@@ -128,6 +128,8 @@ pub const FEATURE_PROFILE_PYTHON: c_int = 9;
 pub const FEATURE_PROFILE_PHP: c_int = 10;
 #[allow(dead_code)]
 pub const FEATURE_PROFILE_V8: c_int = 11;
+#[allow(dead_code)]
+pub const FEATURE_PROFILE_LUA: c_int = 12;
 
 //追踪器当前状态
 #[allow(dead_code)]

@@ -5088,8 +5088,76 @@ inputs:
 
 **详细描述**:
 
-禁用 Node.js（V8）解释器剖析。禁用后将不采集 Node.js 进程的函数调用栈，
-可节省约 6.4 MB 内核内存（v8_unwind_info_map）。
+禁用 Node.js (V8 引擎) 剖析功能。禁用后将不会采集 Node.js 进程的函数调用栈，可节省约 6.4 MB 的内核内存。
+
+此配置项控制以下 eBPF map 的创建：
+- `v8_unwind_info_map`：存储进程级 unwinding 信息，包括 V8 内部结构偏移量 (~6.4 MB)
+
+适用场景：
+- 环境中确定不运行 Node.js 应用
+- 仅关注其他语言的性能分析
+- 内存受限的环境需要优化资源使用
+
+**重要提示**：修改此配置将自动触发 deepflow-agent 重启，因为 eBPF maps 无法在运行时动态创建或销毁。
+
+##### 禁用 Lua 剖析 {#inputs.ebpf.profile.languages.lua_disabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.languages.lua_disabled`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      languages:
+        lua_disabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+禁用 Lua 解释器剖析功能。禁用后将不会采集 Lua 进程的函数调用栈，可节省约 13 MB 的内核内存。
+
+此配置项控制以下 eBPF maps 的创建：
+- `lua_tstate_map`：缓存每线程 lua_State 栈（按线程，容量较大，约 7 MB）
+- `lua_lang_flags_map`：记录进程 Lua/LuaJIT 类型标记（约 2.5 MB）
+- `lua_unwind_info_map`：存储进程级 unwinding 元信息（约 3 MB）
+- `lua_offsets_map`、`luajit_offsets_map`：存储 Lua/LuaJIT 结构偏移表（总计 < 2 KB）
+
+适用场景：
+- 环境中确定不运行 Lua/LuaJIT 应用（如 OpenResty/nginx-lua）
+- 仅关注其他语言的性能分析
+- 内存受限的环境需要优化资源使用
+
+**重要提示**：修改此配置将自动触发 deepflow-agent 重启，因为 eBPF maps 无法在运行时动态创建或销毁。
+
+**内存节省效果总结**：
+
+| 配置方式 | Python | PHP | Node.js | Lua | 总计内存占用 | 节省内存 |
+| -------- | ------ | --- | ------- | --- | ----------- | -------- |
+| 全部启用（默认） | 6.1 MB | 5.2 MB | 6.4 MB | ~13 MB | ~30-33 MB | 0 MB |
+| 仅 Python | 6.1 MB | 0 MB | 0 MB | 0 MB | ~6.1 MB | ~24-27 MB |
+| 仅 PHP | 0 MB | 5.2 MB | 0 MB | 0 MB | ~5.2 MB | ~25-28 MB |
+| 仅 Node.js | 0 MB | 0 MB | 6.4 MB | 0 MB | ~6.4 MB | ~23-26 MB |
+| 仅 Lua | 0 MB | 0 MB | 0 MB | ~13 MB | ~13 MB | ~17-20 MB |
+| 全部禁用 | 0 MB | 0 MB | 0 MB | 0 MB | ~0 MB | ~30-33 MB |
+
+**注意事项**：
+- 修改语言开关需要重启 deepflow-agent 才能生效
+- eBPF maps 使用预分配机制，空载和满载占用相同的内核内存
+- 禁用时，对应语言的 eBPF maps 会被创建但 max_entries 设为 1（最小化内存占用）
+- 禁用时，不会创建对应语言的 unwind table，也不会加载进程的 unwinding 信息
+- 禁用不需要的语言除了节省内存，还能减少 CPU 开销
 
 ### 调优 {#inputs.ebpf.tunning}
 

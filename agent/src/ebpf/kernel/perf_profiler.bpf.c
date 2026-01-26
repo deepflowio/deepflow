@@ -99,15 +99,17 @@ typedef struct {
 } stack_t;
 
 /*
- * Stack map for interpreter stacks (Python, PHP, V8).
+ * Stack map for interpreter stacks (Python, PHP, V8, Lua).
  * Now uses stack_t to store frame_types and extra_data.
  * Due to the limitation of the number of eBPF instruction in kernel, this
  * feature is suitable for Linux5.2+
  *
  * Map sizes are configured in user space program
  */
-MAP_HASH(custom_stack_map_a, __u32, stack_t, 1, FEATURE_FLAG_DWARF_UNWINDING)
-MAP_HASH(custom_stack_map_b, __u32, stack_t, 1, FEATURE_FLAG_DWARF_UNWINDING)
+MAP_HASH(custom_stack_map_a, __u32, stack_t, 1,
+	 FEATURE_FLAG_DWARF_UNWINDING | FEATURE_FLAG_PROFILE_LUA)
+MAP_HASH(custom_stack_map_b, __u32, stack_t, 1,
+	 FEATURE_FLAG_DWARF_UNWINDING | FEATURE_FLAG_PROFILE_LUA)
 
 /*
  * The following maps are used for DWARF based unwinding
@@ -315,7 +317,7 @@ MAP_HASH(lua_tstate_map, __u32, struct lua_state_cache_t, LUA_TSTATE_ENTRIES, FE
 /* Records which Lua runtime a process uses (key: tgid, value: LANG_* bitmask).
  * Memory: LUA_TSTATE_ENTRIES(65536) * (key 4B + value 4B + hash header) -> roughly sub‑MB.
  */
-MAP_HASH(lang_flags_map, __u32, __u32, LUA_TSTATE_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
+MAP_HASH(lua_lang_flags_map, __u32, __u32, LUA_TSTATE_ENTRIES, FEATURE_FLAG_PROFILE_ONCPU)
 /* Per-process Lua unwinding metadata (key: tgid, value: lua_unwind_info_t).
  * Memory: LUA_TSTATE_ENTRIES(65536) * (key 4B + value 16B + hash header) -> roughly low MB.
  */
@@ -922,7 +924,7 @@ PERF_EVENT_PROG(oncpu_profile) (struct bpf_perf_event_data * ctx) {
 		pre_python_unwind(ctx, state, &oncpu_maps, PROG_PYTHON_UNWIND_PE_IDX);
 	}
 
-	__u32 *flags = lang_flags_map__lookup(&key->tgid);
+	__u32 *flags = lua_lang_flags_map__lookup(&key->tgid);
 	if (flags && (*flags & (LANG_LUA | LANG_LUAJIT))) {
 		state->lua_is_jit = (*flags & LANG_LUAJIT) ? 1 : 0;
 

@@ -5224,6 +5224,53 @@ inputs:
 Disable Node.js (V8) interpreter profiling. When disabled, Node.js process stack traces will not be collected,
 saving approximately 6.4 MB of kernel memory (v8_unwind_info_map).
 
+**Important**: Changing this configuration will automatically trigger deepflow-agent restart, as eBPF maps cannot be dynamically created or destroyed at runtime.
+
+##### Lua profiling disabled {#inputs.ebpf.profile.languages.lua_disabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.languages.lua_disabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      languages:
+        lua_disabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Disable Lua interpreter profiling. When disabled, Lua process stack traces will not be collected, saving approximately 13 MB of kernel memory (lua_tstate_map, lua_lang_flags_map, lua_unwind_info_map, lua_offsets_map, luajit_offsets_map).
+
+**Important**: Changing this configuration will automatically trigger deepflow-agent restart, as eBPF maps cannot be dynamically created or destroyed at runtime.
+
+**Memory saving summary**:
+- All enabled (default): ~30-33 MB
+- Python only: ~6.1 MB (saves ~24-27 MB)
+- PHP only: ~5.2 MB (saves ~25-28 MB)
+- Node.js only: ~6.4 MB (saves ~23-26 MB)
+- Lua only: ~13 MB (saves ~17-20 MB)
+- All disabled: ~0 MB (saves ~30-33 MB)
+
+**Notes**:
+- Changing language switches requires deepflow-agent restart
+- eBPF maps use pre-allocation mechanism (same memory usage whether empty or full)
+- When disabled, language-specific eBPF maps are created with max_entries=1 (minimized memory)
+- When disabled, unwind tables are not created and process unwinding info is not loaded
+- Disabling unused languages saves memory and reduces CPU overhead
+
 ### Tunning {#inputs.ebpf.tunning}
 
 #### Collector Queue Size {#inputs.ebpf.tunning.collector_queue_size}
