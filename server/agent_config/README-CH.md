@@ -4042,6 +4042,74 @@ TCP 和 UDP 的端口白名单列表，白名单生效优先级低于 kprobe 黑
 
 配置样例: `ports: 80,1000-2000`
 
+#### SockOps {#inputs.ebpf.socket.sock_ops}
+
+##### TCP Option Trace {#inputs.ebpf.socket.sock_ops.tcp_option_trace}
+
+###### TCP Option 注入 {#inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      sock_ops:
+        tcp_option_trace:
+          enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否开启 TCP Option Tracing SockOps 程序，用于在满足条件的 TCP 连接上注入 DeepFlow 元数据（如进程 PID）。
+注意：该功能依赖 cgroup v2（统一层级）和内核版本 > 5.10。在 cgroup v1 主机上 SockOps 绑定会失败.
+兼容性：已在 x86 上验证内核 > 5.10；arm 目前仅在 6.8 内核上测试。
+限制：PID 跟踪依赖per-CPU syscall map。CPU 拥堵、软中断可能在不同 CPU 运行时，注入的元数据可能缺失或过期。
+
+###### PID 注入窗口 {#inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      sock_ops:
+        tcp_option_trace:
+          sampling_window_bytes: 16384
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | Bytes |
+| Range | [0, 1048576] |
+
+**详细描述**:
+
+控制 PID 注入之间的最小 TCP 负载间隔字节数。缺省为 16KB，与历史行为一致；值越小注入越频繁，值越大越稀疏。
+设置为0关闭采样窗口功能，对所有数据包注入。
+
 #### 调优 {#inputs.ebpf.socket.tunning}
 
 ##### 最大采集速率 {#inputs.ebpf.socket.tunning.max_capture_rate}
@@ -4320,72 +4388,6 @@ inputs:
 1. 该特性的生效的前提条件是`out_of_order_reassembly_protocols`开启并生效；
    - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
 2. 配置`HTTP2`或`gRPC`会全部开启这两个协议
-
-### TCP Option Trace {#inputs.ebpf.socket.sock_ops.tcp_option_trace}
-
-#### 启用 {#inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled`
-
-**默认值**:
-```yaml
-inputs:
-  ebpf:
-    socket:
-      sock_ops:
-        tcp_option_trace:
-          enabled: false
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | bool |
-
-**详细描述**:
-
-是否开启 TCP Option Tracing SockOps 程序，用于在满足条件的 TCP 连接上注入 DeepFlow 元数据（如进程 PID）。
-
-注意：该功能依赖 cgroup v2（统一层级）。在 cgroup v1 主机上 SockOps 绑定会失败。
-
-限制：PID 跟踪依赖 `agent/src/ebpf/user/extended/bpf/tcp_option_tracing.bpf.c` 中的 per-CPU syscall map。当 CPU 拥堵或软中断在不同 CPU 上处理 TCP 时，注入的元数据可能缺失或过期。
-
-#### PID 注入窗口 {#inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes}
-
-**标签**:
-
-`hot_update`
-
-**FQCN**:
-
-`inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes`
-
-**默认值**:
-```yaml
-inputs:
-  ebpf:
-    socket:
-      sock_ops:
-        tcp_option_trace:
-          sampling_window_bytes: 16384
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Unit | Bytes |
-| Range | [0, 1048576] |
-
-**详细描述**:
-
-控制两次 PID 注入之间的最小 TCP 负载间隔字节数。缺省为 16KB，与历史行为一致；值越小注入越频繁，值越大越稀疏。设置为 `0` 表示关闭采样，对每个满足条件的数据包都注入 PID。
 
 ### File {#inputs.ebpf.file}
 
@@ -10948,3 +10950,4 @@ dev:
 **详细描述**:
 
 未发布的采集器特性可以通过该选项开启。
+
