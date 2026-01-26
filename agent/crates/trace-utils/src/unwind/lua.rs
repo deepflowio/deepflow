@@ -310,7 +310,8 @@ pub unsafe extern "C" fn lua_format_folded_stack_trace(
     let raw = slice::from_raw_parts(frames, frame_count as usize);
     let mut buf_vec = Vec::with_capacity(frame_count as usize * 32);
 
-    for &encoded in raw {
+    // We want the root->leaf order here (folded stacks are "root;...;leaf").
+    for &encoded in raw.iter().rev() {
         if encoded == 0 {
             continue;
         }
@@ -698,7 +699,7 @@ pub struct LjOfs {
     pub off_global_state_dispatchmode: u32,
 }
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 const LUA_51_OFFSETS: Option<LuaOfs> = Some(LuaOfs {
     features: LUA_FEAT_CI_ARRAY
         | LUA_FEAT_LINEINFO
@@ -723,15 +724,15 @@ const LUA_51_OFFSETS: Option<LuaOfs> = Some(LuaOfs {
     off_proto_lineinfo: 0,
     off_proto_abslineinfo: 0,
     off_tstring_len: 0,
-    sizeof_tstring: 16,
+    sizeof_tstring: 24,
     sizeof_callinfo: 40,
-    sizeof_tvalue: 24,
+    sizeof_tvalue: 16,
 });
 
-#[cfg(not(target_arch = "aarch64"))]
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
 const LUA_51_OFFSETS: Option<LuaOfs> = None;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 const LUA_52_OFFSETS: Option<LuaOfs> = Some(LuaOfs {
     features: LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
     off_l_ci: 32,
@@ -758,10 +759,10 @@ const LUA_52_OFFSETS: Option<LuaOfs> = Some(LuaOfs {
     sizeof_tvalue: 16,
 });
 
-#[cfg(not(target_arch = "aarch64"))]
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
 const LUA_52_OFFSETS: Option<LuaOfs> = None;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 const LUA_53_OFFSETS: Option<LuaOfs> = Some(LuaOfs {
     features: LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
     off_l_ci: 32,
@@ -788,10 +789,10 @@ const LUA_53_OFFSETS: Option<LuaOfs> = Some(LuaOfs {
     sizeof_tvalue: 16,
 });
 
-#[cfg(not(target_arch = "aarch64"))]
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
 const LUA_53_OFFSETS: Option<LuaOfs> = None;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 const LUA_54_OFFSETS: Option<LuaOfs> = Some(LuaOfs {
     features: LUA_FEAT_CI_LINKED | LUA_FEAT_LINEINFO | LUA_FEAT_PC_INSTR_INDEX | LUA_FEAT_LCF,
     off_l_ci: 32,
@@ -818,10 +819,10 @@ const LUA_54_OFFSETS: Option<LuaOfs> = Some(LuaOfs {
     sizeof_tvalue: 16,
 });
 
-#[cfg(not(target_arch = "aarch64"))]
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
 const LUA_54_OFFSETS: Option<LuaOfs> = None;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 const LJ_OFFSETS_21: Option<LjOfs> = Some(LjOfs {
     fr2: 1,
     gc64: 1,
@@ -841,22 +842,22 @@ const LJ_OFFSETS_21: Option<LjOfs> = Some(LjOfs {
     off_global_state_dispatchmode: 146,
 });
 
-#[cfg(not(target_arch = "aarch64"))]
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
 const LJ_OFFSETS_21: Option<LjOfs> = None;
 
 // Feature flags for offsets should be the same across all architectures,
-// but aarch64 flags are defined here to avoid unused issue.
-#[cfg(target_arch = "aarch64")]
+// but are only defined for supported architectures to avoid unused warnings.
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 const LUA_FEAT_CI_ARRAY: u32 = 1 << 0;
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 const LUA_FEAT_CI_LINKED: u32 = 1 << 1;
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 const LUA_FEAT_LINEINFO: u32 = 1 << 2;
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 const LUA_FEAT_PC_INSTR_INDEX: u32 = 1 << 3;
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 const LUA_FEAT_CLOSURE_ISC: u32 = 1 << 4;
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 const LUA_FEAT_LCF: u32 = 1 << 5;
 
 #[derive(Hash, Eq, PartialEq, Copy, Clone)]
