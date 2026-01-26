@@ -1721,9 +1721,9 @@ PROGPE(php_unwind) (struct bpf_perf_event_data * ctx) {
 	// bpf_debug("[PHP_UNWIND] jit_ret_addr=0x%llx retry_done=%d",
 	//	state->php_jit_return_address, state->php_jit_retry_done);
 
-	// If DWARF unwinding failed (state->stack.len == 0, likely JIT code) and we haven't retried yet,
+	// If DWARF unwinding we haven't retried yet,
 	// retry DWARF unwinding from JIT return address (inside execute_ex)
-	if (state->stack.len == 0 && state->php_has_jit &&
+	if (state->php_has_jit &&
 	    state->php_jit_return_address != 0 && !state->php_jit_retry_done) {
 
 		// Check if DWARF information is available for this process
