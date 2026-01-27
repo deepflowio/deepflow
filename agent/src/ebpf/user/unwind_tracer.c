@@ -39,6 +39,7 @@
 #include "tracer.h"
 #include "extended/extended.h"
 #include "profile/perf_profiler.h"
+#include "../kernel/include/perf_profiler.h"
 
 #include "trace_utils.h"
 
@@ -245,7 +246,25 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
     if (offset < 0) {
         ebpf_warning("unwind tracer init: failed to get field stack offset in task struct from btf");
         ebpf_warning("unwinder may not handle in kernel perf events correctly");
-    } else if (!bpf_table_set_value(tracer, MAP_UNWIND_SYSINFO_NAME, 0, &offset)) {
+    }
+
+    // Initialize unwind_sysinfo_t with both offsets
+    unwind_sysinfo_t sysinfo = {0};
+    sysinfo.task_struct_stack_offset = (offset >= 0) ? offset : 0;
+
+    // Calculate stack_ptregs_offset: THREAD_SIZE - sizeof(struct pt_regs)
+    // On ARM64: typically 16KB (16384) - 336 = 16048
+    // On x86_64: typically 16KB (16384) - 168 = 16216
+#if defined(__aarch64__)
+    // ARM64 pt_regs is 336 bytes (42 regs * 8 bytes)
+    // THREAD_SIZE is 16KB for most ARM64 kernels
+    sysinfo.stack_ptregs_offset = 16384 - 336;  // 16048
+#else
+    // x86_64 pt_regs is 168 bytes (21 regs * 8 bytes)
+    sysinfo.stack_ptregs_offset = 16384 - 168;  // 16216
+#endif
+
+    if (!bpf_table_set_value(tracer, MAP_UNWIND_SYSINFO_NAME, 0, &sysinfo)) {
         ebpf_warning("unwind tracer init: update %s error", MAP_UNWIND_SYSINFO_NAME);
         ebpf_warning("unwinder may not handle in kernel perf events correctly");
     }

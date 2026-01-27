@@ -701,20 +701,35 @@ int get_usermode_regs(struct pt_regs *regs, regs_t * dst)
 		return -1;
 	}
 
-	struct pt_regs *user_regs_addr =
-	    ((struct pt_regs *)(stack + THREAD_SIZE -
-				TOP_OF_KERNEL_STACK_PADDING)) - 1;
+	// Calculate user_regs address
+	// Use userspace-provided offset if available, because eBPF's sizeof(struct pt_regs)
+	// may differ from the kernel's actual size (e.g., 320 vs 336 bytes on ARM64)
+	struct pt_regs *user_regs_addr;
+	if (sysinfo->stack_ptregs_offset > 0) {
+		user_regs_addr = (struct pt_regs *)(stack + sysinfo->stack_ptregs_offset);
+	} else {
+		// Fallback to compile-time calculation (may be incorrect on ARM64)
+		user_regs_addr = ((struct pt_regs *)(stack + THREAD_SIZE -
+					TOP_OF_KERNEL_STACK_PADDING)) - 1;
+	}
+	// Debug: Print stack addresses for diagnosis
+	bpf_debug("[KSTACK] stack=0x%lx ptregs_off=%u", (__u64)stack, sysinfo->stack_ptregs_offset);
+	bpf_debug("[KSTACK] user_regs_addr=0x%lx", (__u64)user_regs_addr);
 	struct pt_regs user_regs;
 	ret =
 	    bpf_probe_read_kernel(&user_regs, sizeof(user_regs),
 				  (void *)user_regs_addr);
 	if (ret) {
+		bpf_debug("[KSTACK] bpf_probe_read_kernel failed ret=%d", ret);
 		return -1;
 	}
 
 	dst->ip = PT_REGS_IP(&user_regs);
 	dst->sp = PT_REGS_SP(&user_regs);
 	dst->bp = PT_REGS_FP(&user_regs);
+	// Debug: Print read values
+	bpf_debug("[KSTACK] read: pc=0x%lx sp=0x%lx", dst->ip, dst->sp);
+	bpf_debug("[KSTACK] read: fp=0x%lx", dst->bp);
 #if defined(__aarch64__)
 	// On ARM64, capture LR from the saved user registers
 	dst->lr = user_regs.regs[30];
@@ -778,6 +793,7 @@ int collect_stack_and_send_output(struct pt_regs *ctx,
 	if (key->flags & STACK_TRACE_FLAGS_DWARF && stack != NULL) {
 		if (stack->len > 0) {
 			key->userstack = get_stackid(stack_map, stack);
+			bpf_debug("[STACK] userstack(DWARF) id=%d len=%d", key->userstack, stack->len);
 		} else {
 			// DWARF unwinding failed (likely JIT code with no debug info)
 			// Clear DWARF flag to allow fallback to FP-based unwinding via bpf_get_stackid()
@@ -788,6 +804,7 @@ int collect_stack_and_send_output(struct pt_regs *ctx,
 	if (intp_stack != NULL && intp_stack->len > 0) {
 		// Reuse stack_map (custom_stack_map_a/b) for interpreter stack
 		key->intpstack = get_stackid(stack_map, intp_stack);
+		bpf_debug("[STACK] intpstack id=%d len=%d", key->intpstack, intp_stack->len);
 	}
 #endif
 
@@ -805,9 +822,11 @@ int collect_stack_and_send_output(struct pt_regs *ctx,
 	}
 
 	key->kernstack = bpf_get_stackid(ctx, stack_map, KERN_STACKID_FLAGS);
+	bpf_debug("[STACK] kernstack id=%d", key->kernstack);
 	if (!(key->flags & STACK_TRACE_FLAGS_DWARF)) {
 		key->userstack =
 		    bpf_get_stackid(ctx, stack_map, USER_STACKID_FLAGS);
+		bpf_debug("[STACK] userstack(FP) id=%d", key->userstack);
 	}
 
 	if (-EEXIST == key->kernstack) {
@@ -1093,13 +1112,13 @@ int dwarf_unwind(void *ctx, unwind_state_t * state,
 			// This can happen when IP is in special regions like [uprobes] that have no DWARF info
 			if (regs->ip < shard_info->offset + shard_info->pc_min ||
 			    regs->ip >= shard_info->offset + shard_info->pc_max) {
-			// 	bpf_debug("[DWARF] frame#%d: ip=%lx not in shard range, stopping",
-			// 		state->stack.len, regs->ip);
+				bpf_debug("[DWARF] frame#%d: ip=%lx not in shard range, stopping",
+					state->stack.len, regs->ip);
 				goto finish;
 			}
 		}
-		// bpf_debug("frame#%d", state->stack.len);
-		// bpf_debug("ip=%lx bp=%lx sp=%lx", regs->ip, regs->bp, regs->sp);
+		bpf_debug("[DWARF] frame#%d", state->stack.len);
+		bpf_debug("[DWARF] ip=%lx bp=%lx sp=%lx", regs->ip, regs->bp, regs->sp);
 		if (shard_info) {
 			// add frame if ip is in executable segments
 			add_frame(&state->stack, regs->ip);
@@ -1121,6 +1140,12 @@ int dwarf_unwind(void *ctx, unwind_state_t * state,
 		}
 
 		unwind_entry_t *ue = shard->entries + index;
+		// Debug: Print unwind entry details
+		bpf_debug("[DWARF] ue: cfa_type=%d cfa_off=%d", ue->cfa_type, ue->cfa_offset);
+		bpf_debug("[DWARF] ue: rbp_type=%d rbp_off=%d", ue->rbp_type, ue->rbp_offset);
+#if defined(__aarch64__)
+		bpf_debug("[DWARF] ue: ra_type=%d ra_off=%d", ue->ra_type, ue->ra_offset);
+#endif
 		__u64 cfa = 0;
 		switch (ue->cfa_type) {
 		case CFA_TYPE_NO_ENTRY:
@@ -1141,10 +1166,11 @@ int dwarf_unwind(void *ctx, unwind_state_t * state,
 			}
 			break;
 		default:
-			// bpf_debug("unsupported cfa_type %d tgid=%d ip=%lx", ue->cfa_type, state->key.tgid, regs->ip);
+			bpf_debug("[DWARF] unsupported cfa_type %d ip=%lx", ue->cfa_type, regs->ip);
 			__sync_fetch_and_add(error_count_ptr, 1);
 			goto finish;
 		}
+		bpf_debug("[DWARF] cfa=0x%lx", cfa);
 		// Recover Return Address (IP for next frame)
 		// On x86_64: RA is always at CFA-8 (fixed convention)
 		// On ARM64: RA may be in LR register or saved on stack at variable offset
@@ -1178,9 +1204,11 @@ int dwarf_unwind(void *ctx, unwind_state_t * state,
 			break;
 		default:
 			// RA_TYPE_UNSUPPORTED - cannot unwind
+			bpf_debug("[DWARF] unsupported ra_type %d", ue->ra_type);
 			__sync_fetch_and_add(error_count_ptr, 1);
 			goto finish;
 		}
+		bpf_debug("[DWARF] after RA recovery: new_ip=0x%lx", regs->ip);
 #else
 		// x86_64: RA is always at CFA-8
 		if (bpf_probe_read_user
@@ -1209,10 +1237,11 @@ int dwarf_unwind(void *ctx, unwind_state_t * state,
 			}
 			break;
 		case REG_TYPE_UNSUPPORTED:
-			// bpf_debug("unsupported rpb_type %d", ue->rbp_type);
+			bpf_debug("[DWARF] unsupported rbp_type %d", ue->rbp_type);
 			__sync_fetch_and_add(error_count_ptr, 1);
 			goto finish;
 		}
+		bpf_debug("[DWARF] after BP recovery: new_bp=0x%lx new_sp=0x%lx", regs->bp, cfa);
 #if defined(__aarch64__)
 		// ARM64: After using LR for RA recovery, ALWAYS invalidate it.
 		// Reason: LR register can only be valid for the FIRST (leaf) frame.
@@ -1836,13 +1865,13 @@ int unwind_one_v8_frame(unwind_state_t *state, v8_proc_info_t *vi,
 	bool be_not_marker = false;
 
 	int frame_idx = state->intp_stack.len;
-	// bpf_debug("[V8 eBPF] Frame#%d", frame_idx);
-	// bpf_debug("[V8 eBPF] fp=0x%lx sp=0x%lx, pc=0x%lx", fp, sp, pc);
+	bpf_debug("[V8 eBPF] Frame#%d", frame_idx);
+	bpf_debug("[V8 eBPF] fp=0x%lx sp=0x%lx, pc=0x%lx", fp, sp, pc);
 	__sync_fetch_and_add(&vi->unwinding_attempted, 1);
 
 	// Validate frame pointer
 	if (fp < sp || fp >= sp + V8_MAX_FRAME_SIZE) {
-		// bpf_debug("[V8 eBPF] Invalid FP: fp=0x%lx sp=0x%lx", fp, sp);
+		bpf_debug("[V8 eBPF] Invalid FP: fp=0x%lx sp=0x%lx", fp, sp);
 		__sync_fetch_and_add(&vi->unwinding_failed, 1);
 		return -1;
 	}
@@ -1851,13 +1880,13 @@ int unwind_one_v8_frame(unwind_state_t *state, v8_proc_info_t *vi,
 	if (bpf_probe_read_user(&fp_marker, sizeof(fp_marker), (void *)(fp + vi->fp_marker)) ||
 	    bpf_probe_read_user(&fp_function, sizeof(fp_function), (void *)(fp + vi->fp_function)) ||
 	    bpf_probe_read_user(&fp_bytecode_offset, sizeof(fp_bytecode_offset), (void *)(fp + vi->fp_bytecode_offset))) {
-		// bpf_debug("[V8 eBPF] Read FP context failed", 0);
+		bpf_debug("[V8 eBPF] Read FP context failed", 0);
 		__sync_fetch_and_add(&vi->unwinding_failed, 1);
 		return -1;
 	}
 
-	// bpf_debug("[V8 eBPF] marker=0x%lx func=0x%lx bytecode=0x%lx",
-	// 	fp_marker, fp_function, fp_bytecode_offset);
+	bpf_debug("[V8 eBPF] marker=0x%lx func=0x%lx bytecode=0x%lx",
+		fp_marker, fp_function, fp_bytecode_offset);
 
 	// Check for Stub/Entry/Internal frames (SMI marker)
 	// Note: V8 frame markers use special encoding (shift=1, not full SMI shift=32)
@@ -1868,27 +1897,27 @@ int unwind_one_v8_frame(unwind_state_t *state, v8_proc_info_t *vi,
 		delta_or_marker = fp_marker >> V8_SMI_TAG_SHIFT;
 		if (delta_or_marker > 0 && delta_or_marker < 32) {
 			add_frame_ex(&state->intp_stack, FRAME_TYPE_V8, pointer_and_type, delta_or_marker, 0);
-			// bpf_debug("[V8 eBPF] Added stub marker 0x%lx", delta_or_marker);
+			bpf_debug("[V8 eBPF] Added stub marker 0x%lx", delta_or_marker);
 			goto unwind_frame;
 		}
 		be_not_marker = true;
-		// bpf_debug("[V8 eBPF] Not a stub marker");
+		bpf_debug("[V8 eBPF] Not a stub marker");
 	}
 
 	// Validate JSFunction object
 	jsfunc = v8_verify_pointer(fp_function);
 	jsfunc_type = v8_read_object_type(vi, jsfunc);
 	if (jsfunc_type < vi->type_JSFunction_first || jsfunc_type > vi->type_JSFunction_last) {
-		// bpf_debug("[V8 eBPF] Not a JSFunction: type=0x%x", jsfunc_type);
+		bpf_debug("[V8 eBPF] Not a JSFunction: type=0x%x", jsfunc_type);
 		// Not a V8 frame, continue unwinding with frame pointer
 		// This handles native frames before entering V8 code
 		if (be_not_marker && frame_idx != 0) {
-			return -1;
+			bpf_debug("[V8 eBPF] Not a V8 frame, continue unwinding with frame pointer", 0);
 		}
 		goto unwind_frame;
 	}
 
-	// bpf_debug("[V8 eBPF] Valid JSFunction: type=0x%x", jsfunc_type);
+	bpf_debug("[V8 eBPF] Valid JSFunction: type=0x%x", jsfunc_type);
 
 	// Read and validate SharedFunctionInfo
 	sfi = v8_read_object_ptr(jsfunc + vi->off_JSFunction_shared);
@@ -2010,13 +2039,13 @@ unwind_frame:
 	// FIXME: the following 8 and 16 should be replaced due to 64-bit or 32-bit diff
 	if (bpf_probe_read_user(&new_fp, sizeof(new_fp), (void *)fp) ||
 	    bpf_probe_read_user(&ret_addr, sizeof(ret_addr), (void *)(fp + 8))) {
-		// bpf_debug("[V8 eBPF] Read next FP failed at frame=%d", frame_idx);
+		bpf_debug("[V8 eBPF] Read next FP failed at frame=%d", frame_idx);
 		__sync_fetch_and_add(&vi->unwinding_failed, 1);
 		return -1;
 	}
 
 	if (new_fp <= fp) {
-		// bpf_debug("[V8 eBPF] Invalid next FP=0x%lx (curr=0x%lx)", new_fp, fp);
+		bpf_debug("[V8 eBPF] Invalid next FP=0x%lx (curr=0x%lx)", new_fp, fp);
 		__sync_fetch_and_add(&vi->unwinding_failed, 1);
 		return -1;
 	}
@@ -2031,17 +2060,17 @@ unwind_frame:
 	// See: https://chromium.googlesource.com/v8/v8/+/main/src/execution/arm64/frame-constants-arm64.h
 	if (pointer_and_type == V8_MAKE_PTR(V8_TYPE_MARKER, fp) && delta_or_marker == 1) {
 		state->regs.sp += V8_ENTRYFRAME_CALLEE_SAVED_REGS_BEFORE_FP_LR_PAIR * sizeof(__u64);
-		// bpf_debug("[V8 eBPF] Entry Frame: adjusted SP by %d bytes",
-		//           V8_ENTRYFRAME_CALLEE_SAVED_REGS_BEFORE_FP_LR_PAIR * sizeof(__u64));
+		bpf_debug("[V8 eBPF] Entry Frame: adjusted SP by %d bytes",
+		          V8_ENTRYFRAME_CALLEE_SAVED_REGS_BEFORE_FP_LR_PAIR * sizeof(__u64));
 		// EntryFrame marks the boundary between V8 JavaScript and native C++ code.
 		// Stop V8 unwinding here - any further frames are native and should be
 		// handled by DWARF/FP-based unwinding, not V8 interpreter unwinding.
-		// bpf_debug("[V8 eBPF] Unwound to fp=0x%lx ret=0x%lx (stopping at EntryFrame)", new_fp, ret_addr);
+		bpf_debug("[V8 eBPF] Unwound to fp=0x%lx ret=0x%lx (stopping at EntryFrame)", new_fp, ret_addr);
 		__sync_fetch_and_add(&vi->unwinding_success, 1);
 		return -1;  // Signal to stop V8 unwinding
 	}
 
-	// bpf_debug("[V8 eBPF] Unwound to fp=0x%lx ret=0x%lx", new_fp, ret_addr);
+	bpf_debug("[V8 eBPF] Unwound to fp=0x%lx ret=0x%lx", new_fp, ret_addr);
 	__sync_fetch_and_add(&vi->unwinding_success, 1);
 	return 0;
 }
@@ -2063,7 +2092,8 @@ int pre_v8_unwind(void *ctx, unwind_state_t *state,
 
 	// Tail call to DWARF unwinding before V8
 	// This will first unwind native frames, then proceed to V8 interpreter frames
-	bpf_tail_call(ctx, maps->progs_jmp, jmp_idx);
+	state->runs = 0;
+	bpf_tail_call(ctx, maps->progs_jmp, PROG_V8_UNWIND_PE_IDX);
 	return 0;
 }
 

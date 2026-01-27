@@ -103,6 +103,11 @@ struct stack_trace_key_t {
 
 typedef struct {
 	__u32 task_struct_stack_offset;
+	// Offset from stack base to pt_regs structure
+	// This is THREAD_SIZE - sizeof(struct pt_regs) on most kernels
+	// On ARM64: typically 16KB - 336 = 16048
+	// Must be passed from userspace because eBPF sizeof(struct pt_regs) may differ from kernel
+	__u32 stack_ptregs_offset;
 } unwind_sysinfo_t;
 
 #define CLASS_NAME_LEN 32
