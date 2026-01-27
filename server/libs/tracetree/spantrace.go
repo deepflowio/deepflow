@@ -73,7 +73,7 @@ type SpanTrace struct {
 	RequestDomain          string
 	RequestResource        string // notice: will be cut to 255 when write
 	ResponseResult         string
-	L7ProtocolStr          string
+	BizProtocol            string
 	RequestId              uint64
 	SyscallTraceIDRequest  uint64
 	SyscallTraceIDResponse uint64
@@ -134,7 +134,7 @@ func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
 	t.RequestDomain = decoder.ReadString255()
 	t.RequestResource = decoder.ReadString255()
 	t.ResponseResult = decoder.ReadString255()
-	t.L7ProtocolStr = decoder.ReadString255()
+	t.BizProtocol = decoder.ReadString255()
 	t.RequestId = decoder.ReadVarintU64()
 
 	t.SyscallTraceIDRequest = decoder.ReadVarintU64()

@@ -1175,6 +1175,15 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"observation_point",
 		),
 	}
+	tagResourceMap["l7_protocol_str"] = map[string]*Tag{
+		"default": NewTag(
+			"biz_protocol",
+			"",
+			"biz_protocol %s %s",
+			"%s (biz_protocol, %s)",
+			"biz_protocol",
+		),
+	}
 	// tap_port_type & Enum(tap_port_type)
 	tagResourceMap["tap_port_type"] = map[string]*Tag{
 		"enum": NewTag(

@@ -153,7 +153,7 @@ const (
 	COLUMN_L7_ERROR                   = "l7_error"
 	COLUMN_L7_PARSE_FAILED            = "l7_parse_failed"
 	COLUMN_L7_PROTOCOL                = "l7_protocol"
-	COLUMN_L7_PROTOCOL_STR            = "l7_protocol_str"
+	COLUMN_BIZ_PROTOCOL               = "biz_protocol"
 	COLUMN_L7_REQUEST                 = "l7_request"
 	COLUMN_L7_RESPONSE                = "l7_response"
 	COLUMN_L7_SERVER_ERROR            = "l7_server_error"
@@ -499,7 +499,7 @@ var ColumnNames = []string{
 	COLUMN_L7_ERROR,
 	COLUMN_L7_PARSE_FAILED,
 	COLUMN_L7_PROTOCOL,
-	COLUMN_L7_PROTOCOL_STR,
+	COLUMN_BIZ_PROTOCOL,
 	COLUMN_L7_REQUEST,
 	COLUMN_L7_RESPONSE,
 	COLUMN_L7_SERVER_ERROR,
