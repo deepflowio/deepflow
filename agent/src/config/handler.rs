@@ -1322,6 +1322,7 @@ pub enum TraceType {
     XTingyun(String),
     CloudWise,
     Customize(String),
+    B3,
 }
 
 // The value here must be lower case
@@ -1334,6 +1335,7 @@ const TRACE_TYPE_SW8: &str = "sw8";
 const TRACE_TYPE_TRACE_PARENT: &str = "traceparent";
 const TRACE_TYPE_X_TINGYUN: &str = "x-tingyun";
 const TRACE_TYPE_CLOUD_WISE: &str = "cloudwise";
+const TRACE_TYPE_B3: &str = "b3";
 
 const TRACE_TYPE_CLOUD_WISE_UPPER: &str = "CLOUDWISE";
 
@@ -1362,6 +1364,7 @@ impl From<&str> for TraceType {
             SOFA_NEW_RPC_TRACE_CTX_KEY => TraceType::NewRpcTraceContext,
             TRACE_TYPE_X_TINGYUN => TraceType::XTingyun(sub_tag),
             TRACE_TYPE_CLOUD_WISE => TraceType::CloudWise,
+            TRACE_TYPE_B3 => TraceType::B3,
             _ if tag.len() > 0 => TraceType::Customize(tag),
             _ => TraceType::Disabled,
         }
@@ -1384,6 +1387,7 @@ impl TraceType {
             TraceType::XTingyun(_) => context.eq_ignore_ascii_case(TRACE_TYPE_X_TINGYUN),
             TraceType::CloudWise => context.eq_ignore_ascii_case(TRACE_TYPE_CLOUD_WISE),
             TraceType::Customize(tag) => context.eq_ignore_ascii_case(&tag),
+            TraceType::B3 => context.eq_ignore_ascii_case(TRACE_TYPE_B3),
             _ => false,
         }
     }
@@ -1401,6 +1405,7 @@ impl TraceType {
             TraceType::XTingyun(_) => TRACE_TYPE_X_TINGYUN,
             TraceType::CloudWise => TRACE_TYPE_CLOUD_WISE_UPPER,
             TraceType::Customize(tag) => &tag,
+            TraceType::B3 => TRACE_TYPE_B3,
             _ => "",
         }
     }
@@ -1496,6 +1501,20 @@ impl TraceType {
         cloud_platform::cloudwise::decode_trace_id(value)
     }
 
+    // B3 Trace Format:
+    // b3: TRACEID-SPANID-1
+    // b3: 4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-1
+    fn decode_b3(value: &str, id_type: u8) -> Option<&str> {
+        let mut segs = value.split("-");
+        if id_type == Self::TRACE_ID {
+            segs.nth(0)
+        } else if id_type == Self::SPAN_ID {
+            segs.nth(1)
+        } else {
+            unreachable!()
+        }
+    }
+
     fn decode_id<'a, 'b>(&'b self, value: &'a str, id_type: u8) -> Option<Cow<'a, str>> {
         let value = value.trim();
         match self {
@@ -1514,6 +1533,7 @@ impl TraceType {
             }
             TraceType::XTingyun(sub_tag) => Self::decode_tingyun(value, sub_tag),
             TraceType::CloudWise => Self::decode_cloud_wise(value).map(|s| s.into()),
+            TraceType::B3 => Self::decode_b3(value, id_type).map(|s| s.into()),
         }
     }
 
