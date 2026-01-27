@@ -222,10 +222,10 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 
 	var refresh bool
 	var localVersion uint64 = 0
-	var now time.Time = time.Now()
 	if vtapID == 0 {
 		log.Infof("genesis sync received message with vtap_id 0 from %s", remote, logger.NewORGPrefix(orgID))
 	} else {
+		now := time.Now()
 		if lTime, ok := g.vtapToLastSeen.Load(vtap); ok {
 			lastTime := lTime.(time.Time)
 			var agingTime float64 = 0
@@ -284,7 +284,6 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 				WorkloadResourceEnabled: enabled,
 			},
 		)
-		g.vtapToLastSeen.Store(vtap, now)
 		return &agent.GenesisSyncResponse{Version: &localVersion}, nil
 	}
 
