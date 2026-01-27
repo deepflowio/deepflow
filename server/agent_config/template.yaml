@@ -5491,7 +5491,7 @@ processors:
           #     Whether to parse XML.
           #   ch: |-
           #     是否解析 XML 数据内容。
-          parse_xml_enabled: false
+          parse_xml_enabled: true
         # type: section
         # name: MySQL
         # description:

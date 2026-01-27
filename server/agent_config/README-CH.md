@@ -7672,7 +7672,7 @@ processors:
     application_protocol_inference:
       protocol_special_config:
         web_sphere_mq:
-          parse_xml_enabled: false
+          parse_xml_enabled: true
 ```
 
 **模式**:
