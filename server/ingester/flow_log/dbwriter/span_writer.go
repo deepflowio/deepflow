@@ -107,7 +107,7 @@ func (t *SpanWithTraceID) Encode() {
 	encoder.WriteString255(t.RequestDomain)
 	encoder.WriteString255(t.RequestResource)
 	encoder.WriteString255(t.ResponseResult)
-	encoder.WriteString255(t.L7ProtocolStr)
+	encoder.WriteString255(t.BizProtocol)
 	if t.RequestId != nil {
 		encoder.WriteVarintU64(*t.RequestId)
 	} else {

@@ -284,12 +284,12 @@ func (s *SkyWalkingAdapter) swTagsToSpanRequestInfo(layer string, tags []*query.
 		return
 	}
 	if layer == LayerHTTP {
-		span.L7Protocol, span.L7ProtocolStr, span.L7ProtocolEnum = int(datatype.L7_PROTOCOL_HTTP_1), datatype.L7_PROTOCOL_HTTP_1.String(false), datatype.L7_PROTOCOL_HTTP_1.String(false)
+		span.L7Protocol, span.BizProtocol, span.L7ProtocolEnum = int(datatype.L7_PROTOCOL_HTTP_1), datatype.L7_PROTOCOL_HTTP_1.String(false), datatype.L7_PROTOCOL_HTTP_1.String(false)
 	}
 	s.getTagValue(tags, span)
 	// for which not match l7protocol, but found l7protocolstr by tag.value, try to match
-	if span.L7Protocol == 0 && len(span.L7ProtocolStr) > 0 {
-		l7ProtocolStrLower := strings.ToLower(span.L7ProtocolStr)
+	if span.L7Protocol == 0 && len(span.BizProtocol) > 0 {
+		l7ProtocolStrLower := strings.ToLower(span.BizProtocol)
 		for l7ProtocolEnumStr, l7ProtocolMap := range datatype.L7ProtocolStringMap {
 			if strings.Contains(l7ProtocolEnumStr, l7ProtocolStrLower) {
 				span.L7Protocol = int(l7ProtocolMap)
@@ -303,10 +303,10 @@ func (s *SkyWalkingAdapter) swTagsToSpanRequestInfo(layer string, tags []*query.
 func (s *SkyWalkingAdapter) getTagValue(tags []*query.KeyValue, span *model.ExSpan) {
 	httpURL := ""
 	for _, v := range tags {
-		if span.L7Protocol == 0 && len(span.L7ProtocolStr) == 0 {
+		if span.L7Protocol == 0 && len(span.BizProtocol) == 0 {
 			// if layer != http (maybe is unknown), but have some http attributes, it's http
 			if strings.HasPrefix(v.Key, "http") {
-				span.L7Protocol, span.L7ProtocolStr, span.L7ProtocolEnum = int(datatype.L7_PROTOCOL_HTTP_1), datatype.L7_PROTOCOL_HTTP_1.String(false), datatype.L7_PROTOCOL_HTTP_1.String(false)
+				span.L7Protocol, span.BizProtocol, span.L7ProtocolEnum = int(datatype.L7_PROTOCOL_HTTP_1), datatype.L7_PROTOCOL_HTTP_1.String(false), datatype.L7_PROTOCOL_HTTP_1.String(false)
 			}
 		}
 		switch v.Key {
@@ -322,7 +322,7 @@ func (s *SkyWalkingAdapter) getTagValue(tags []*query.KeyValue, span *model.ExSp
 		case AttributeDbStatement, AttributeCacheKey:
 			span.RequestResource = *v.Value
 		case AttributeDbType, AttributeDbSystem, AttributeHttpScheme, AttributeRpcSystem, AttributeMessagingSystem, AttributeMessagingProtocol:
-			span.L7ProtocolStr = *v.Value
+			span.BizProtocol = *v.Value
 		}
 	}
 

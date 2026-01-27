@@ -159,13 +159,13 @@ type L7FlowLog struct {
 
 	L7Base
 
-	L7Protocol    uint8  `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol"`
-	L7ProtocolStr string `json:"l7_protocol_str" category:"$tag" sub:"application_layer"`
-	Version       string `json:"version" category:"$tag" sub:"application_layer"`
-	Type          uint8  `json:"type" category:"$tag" sub:"application_layer" enumfile:"l7_log_type"`
-	IsTLS         uint8  `json:"is_tls" category:"$tag" sub:"application_layer"`
-	IsAsync       uint8  `json:"is_async" category:"$tag" sub:"application_layer"`
-	IsReversed    uint8  `json:"is_reversed" category:"$tag" sub:"application_layer"`
+	L7Protocol  uint8  `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol"`
+	BizProtocol string `json:"biz_protocol" category:"$tag" sub:"application_layer"`
+	Version     string `json:"version" category:"$tag" sub:"application_layer"`
+	Type        uint8  `json:"type" category:"$tag" sub:"application_layer" enumfile:"l7_log_type"`
+	IsTLS       uint8  `json:"is_tls" category:"$tag" sub:"application_layer"`
+	IsAsync     uint8  `json:"is_async" category:"$tag" sub:"application_layer"`
+	IsReversed  uint8  `json:"is_reversed" category:"$tag" sub:"application_layer"`
 
 	RequestType     string `json:"request_type" category:"$tag" sub:"application_layer"`
 	RequestDomain   string `json:"request_domain" category:"$tag" sub:"application_layer"`
@@ -223,7 +223,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 	l7Columns = append(l7Columns, L7BaseColumns()...)
 	l7Columns = append(l7Columns,
 		ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("0:未知 1:其他, 20:http1, 21:http2, 40:dubbo, 60:mysql, 80:redis, 100:kafka, 101:mqtt, 120:dns"),
-		ckdb.NewColumn("l7_protocol_str", ckdb.LowCardinalityString).SetIndex(ckdb.IndexNone).SetComment("应用协议"),
+		ckdb.NewColumn("biz_protocol", ckdb.LowCardinalityString).SetIndex(ckdb.IndexNone).SetComment("应用协议"),
 		ckdb.NewColumn("version", ckdb.LowCardinalityString).SetComment("协议版本"),
 		ckdb.NewColumn("type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("日志类型, 0:请求, 1:响应, 2:会话"),
 		ckdb.NewColumn("is_tls", ckdb.UInt8),
@@ -330,9 +330,9 @@ func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 	}
 	h.L7Protocol = uint8(l.Base.Head.Proto)
 	if l.ExtInfo != nil && l.ExtInfo.ProtocolStr != "" {
-		h.L7ProtocolStr = l.ExtInfo.ProtocolStr
+		h.BizProtocol = l.ExtInfo.ProtocolStr
 	} else {
-		h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String(h.IsTLS == 1)
+		h.BizProtocol = datatype.L7Protocol(h.L7Protocol).String(h.IsTLS == 1)
 	}
 
 	h.ResponseStatus = uint8(datatype.STATUS_UNKNOWN)
