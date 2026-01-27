@@ -165,15 +165,13 @@ MAP_ARRAY(unwind_sysinfo, __u32, unwind_sysinfo_t, 1, FEATURE_FLAG_DWARF_UNWINDI
  *   - To increase capacity, modify max_entries below and rebuild
  */
 
-// Python: stores thread state address for stack unwinding
-// - python_tstate_addr_map: key=PID, value=thread_state_address (per-thread)
-//   Pre-allocated: 65536 * (4 + 8 + 32) ≈ 2.8 MB (htab_elem overhead included)
+// Python: stores per-process Python unwinding information
 // - python_unwind_info_map: key=PID, value=python_unwind_info_t (per-process)
-//   Pre-allocated: 65536 * (4 + 16 + 32) ≈ 3.3 MB (htab_elem overhead included)
+//   Contains auto_tls_key_addr, version, TSD info for multi-threaded PyThreadState lookup
+//   Pre-allocated: 65536 * (4 + 24 + 32) ≈ 3.8 MB (htab_elem overhead included)
 // - python_offsets_map: key=offsets_id, value=python_offsets_t (per-version, reference counted)
 //   Supports 1 Python version at a time (upgrades replace entry)
 //   Pre-allocated: 1 * (1 + 216 + 32) ≈ 249 bytes
-MAP_HASH(python_tstate_addr_map, __u32, __u64, 65536, FEATURE_FLAG_PROFILE_PYTHON)
 MAP_HASH(python_unwind_info_map, __u32, python_unwind_info_t, 65536, FEATURE_FLAG_PROFILE_PYTHON)
 MAP_HASH(python_offsets_map, __u8, python_offsets_t, 1, FEATURE_FLAG_PROFILE_PYTHON)
 
@@ -1345,6 +1343,116 @@ __u32 get_symbol_id(symbol_t * symbol)
 	return id;
 }
 
+/*
+ * TSD (Thread Specific Data) helper functions for multi-threaded Python support
+ *
+ * These functions read thread-local storage to get per-thread PyThreadState,
+ * enabling correct Python stack unwinding in multi-threaded applications.
+ */
+
+/*
+ * Get the thread pointer base (TPBASE) from the current task's task_struct.
+ * On x86_64, this is the fsbase value; on arm64, it's tp_value.
+ *
+ * The TPBASE points to the C library's per-thread data structure (struct pthread)
+ * which contains thread-local storage including Python's PyThreadState pointer.
+ */
+static inline __attribute__ ((always_inline))
+int tsd_get_base(void **tsd_base)
+{
+	__u32 zero = 0;
+	unwind_sysinfo_t *sysinfo = unwind_sysinfo__lookup(&zero);
+	if (sysinfo == NULL || sysinfo->tpbase_offset == 0) {
+		bpf_debug("[TSD] sysinfo or tpbase_offset not available");
+		return -1;
+	}
+
+	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+
+	/*
+	 * Read task->thread.fsbase (x86_64) or equivalent from task_struct.
+	 * We use the dynamically calculated tpbase_offset since the struct layout
+	 * varies by kernel version.
+	 */
+	void *tpbase_ptr = ((char *)task) + sysinfo->tpbase_offset;
+	if (bpf_probe_read_kernel(tsd_base, sizeof(void *), tpbase_ptr)) {
+		bpf_debug("[TSD] Failed to read tpbase value");
+		return -1;
+	}
+
+	return 0;
+}
+
+/*
+ * Read from Thread Specific Data location associated with the provided key.
+ *
+ * For musl libc (indirect):
+ *   pthread->tsd is a pointer to an array, so we need an extra dereference
+ *   tsd_addr = *(tsd_base + offset) + key * 8
+ *
+ * For glibc (direct):
+ *   pthread->specific_1stblock is an inline array
+ *   tsd_addr = tsd_base + 0x10 + offset + key * 16
+ *   (each entry is struct pthread_key_data { uintptr_t seq; void *data; })
+ */
+static inline __attribute__ ((always_inline))
+int tsd_read(const tsd_info_t *tsi, const void *tsd_base, int key, void **out)
+{
+	const void *tsd_addr = tsd_base + tsi->offset;
+
+	if (tsi->indirect) {
+		/* musl: read the pointer that points to the TSD array */
+		if (bpf_probe_read_user(&tsd_addr, sizeof(tsd_addr), tsd_addr)) {
+			bpf_debug("[TSD] Failed to read indirect TSD pointer");
+			return -1;
+		}
+	}
+
+	/* Calculate final address using key and multiplier */
+	tsd_addr += key * tsi->multiplier;
+
+	bpf_debug("[TSD] Reading from tsd_addr=%lx (key=%d)", (unsigned long)tsd_addr, key);
+	if (bpf_probe_read_user(out, sizeof(*out), tsd_addr)) {
+		bpf_debug("[TSD] Failed to read TSD value");
+		return -1;
+	}
+
+	return 0;
+}
+
+/*
+ * Get PyThreadState for the current thread using Thread Specific Data (TSD).
+ *
+ * Python stores each thread's PyThreadState in thread-local storage using
+ * pthread_setspecific(autoTLSkey, tstate). We read this value using TSD functions.
+ */
+static inline __attribute__ ((always_inline))
+void *get_py_thread_state(python_unwind_info_t *py_info)
+{
+	void *tsd_base;
+	if (tsd_get_base(&tsd_base) != 0) {
+		return NULL;
+	}
+
+	/* Read the autoTLSkey value from Python runtime */
+	int auto_tls_key;
+	if (bpf_probe_read_user(&auto_tls_key, sizeof(auto_tls_key),
+				(void *)py_info->auto_tls_key_addr)) {
+		bpf_debug("[PYTHON] Failed to read autoTLSkey");
+		return NULL;
+	}
+
+	bpf_debug("[PYTHON] autoTLSkey=%d, tsd_base=%lx", auto_tls_key, (unsigned long)tsd_base);
+
+	/* Read PyThreadState from TSD */
+	void *thread_state = NULL;
+	if (tsd_read(&py_info->tsd_info, tsd_base, auto_tls_key, &thread_state) != 0) {
+		return NULL;
+	}
+
+	return thread_state;
+}
+
 static inline __attribute__ ((always_inline))
 int pre_python_unwind(void *ctx, unwind_state_t * state,
 		 map_group_t *maps, int jmp_idx) {
@@ -1361,20 +1469,11 @@ int pre_python_unwind(void *ctx, unwind_state_t * state,
         return 0;
 	}
 
-	void *thread_state;
-	if (bpf_probe_read_user
-	    (&thread_state, sizeof(thread_state),
-	     (void *)py_unwind_info->thread_state_address) != 0) {
-        return 0;
-	}
-
+	/* Get per-thread PyThreadState using TSD mechanism */
+	void *thread_state = get_py_thread_state(py_unwind_info);
 	if (thread_state == NULL) {
-        __u64 *addr = python_tstate_addr_map__lookup(&state->key.tgid);
-        if (addr && *addr != 0) {
-            thread_state = (void *)*addr;
-        } else {
-            return 0;
-		}
+		bpf_debug("[PYTHON] Failed to get thread state via TSD");
+        return 0;
 	}
 
 	if (bpf_probe_read_user
@@ -2139,18 +2238,11 @@ PROGPE(v8_unwind) (struct bpf_perf_event_data *ctx) {
 	return 0;
 }
 
-URETPROG(python_save_tstate_addr) (struct pt_regs * ctx) {
-	__u64 ret = PT_REGS_RC(ctx);
-	__u32 tgid = bpf_get_current_pid_tgid() >> 32;
-
-	__u64 *addr = python_tstate_addr_map__lookup(&tgid);
-	if (addr) {
-		*addr = ret;
-	} else {
-		python_tstate_addr_map__update(&tgid, &ret);
-	}
-	return 0;
-}
+/*
+ * NOTE: python_save_tstate_addr uprobe has been removed.
+ * The TSD mechanism now handles per-thread PyThreadState lookup directly
+ * without needing to intercept PyEval_SaveThread calls.
+ */
 
 PROGPE(oncpu_output) (struct bpf_perf_event_data * ctx) {
 	__u32 zero = 0;

@@ -18,8 +18,11 @@ use std::{
     cell::OnceCell, collections::HashMap, ffi::CStr, fs, io::Write, mem, path::PathBuf, slice,
 };
 
+#[cfg(target_arch = "x86_64")]
+use ahash::AHashMap;
 use libc::c_void;
 use log::{debug, trace, warn};
+use object::{Object, ObjectSection, ObjectSymbol};
 use regex::Regex;
 use semver::{Version, VersionReq};
 
@@ -29,7 +32,72 @@ use crate::{
     utils::{bpf_delete_elem, bpf_update_elem, get_errno, IdGenerator, BPF_ANY},
 };
 
+/// Maximum distance from _PyRuntime for a valid autoTLSkey address
+/// autoTLSkey should be within a few KB of _PyRuntime
+/// This is a validation threshold, not a version-specific offset
+#[cfg(target_arch = "x86_64")]
+const PYRUNTIME_MAX_DISTANCE: u64 = 0x10000;
+
 use super::elf_utils::MappedFile;
+
+#[cfg(target_arch = "x86_64")]
+use iced_x86::{Decoder, DecoderOptions, Mnemonic, OpKind, Register};
+
+#[cfg(target_arch = "x86_64")]
+#[derive(Clone, Copy, Debug)]
+enum Value {
+    Known(u64),
+    /// Address expressed as _PyRuntime + offset (can be negative)
+    RuntimeBase(i64),
+    Unknown,
+}
+
+#[cfg(target_arch = "x86_64")]
+impl Value {
+    fn add(self, rhs: i64) -> Self {
+        match self {
+            Value::Known(v) => Value::Known(v.wrapping_add(rhs as u64)),
+            Value::RuntimeBase(off) => Value::RuntimeBase(off.saturating_add(rhs)),
+            Value::Unknown => Value::Unknown,
+        }
+    }
+
+    fn sub(self, rhs: i64) -> Self {
+        match self {
+            Value::Known(v) => Value::Known(v.wrapping_sub(rhs as u64)),
+            Value::RuntimeBase(off) => Value::RuntimeBase(off.saturating_sub(rhs)),
+            Value::Unknown => Value::Unknown,
+        }
+    }
+
+    fn shl(self, shift: u8) -> Self {
+        if shift >= 63 {
+            return Value::Unknown;
+        }
+        match self {
+            Value::Known(v) => Value::Known(v << shift),
+            Value::RuntimeBase(off) => {
+                Value::RuntimeBase(off.checked_shl(shift as u32).unwrap_or(0))
+            }
+            Value::Unknown => Value::Unknown,
+        }
+    }
+
+    fn or(self, rhs: u64) -> Self {
+        match self {
+            Value::Known(v) => Value::Known(v | rhs),
+            _ => Value::Unknown,
+        }
+    }
+
+    fn to_runtime_addr(self, runtime_addr: u64) -> Option<u64> {
+        match self {
+            Value::Known(v) => Some(v),
+            Value::RuntimeBase(off) => Some(runtime_addr.wrapping_add(off as u64)),
+            Value::Unknown => None,
+        }
+    }
+}
 
 fn error_not_python(pid: u32) -> Error {
     Error::BadInterpreterType(pid, "python")
@@ -175,11 +243,393 @@ impl Interpreter {
         }
         Err(error_not_supported_version(self.pid, self.version.clone()))
     }
+
+    /// Find the autoTLSkey address from PyGILState_GetThisThreadState function.
+    ///
+    /// Python stores each thread's PyThreadState in thread-local storage using
+    /// pthread_setspecific/getspecific. The key is stored in autoTLSkey variable
+    /// within _PyRuntime structure.
+    ///
+    /// This function analyzes the PyGILState_GetThisThreadState function to find
+    /// the address of the autoTLSkey variable.
+    const GIL_STATE_SYMBOL: &'static str = "PyGILState_GetThisThreadState";
+
+    fn find_auto_tls_key_address(&mut self) -> Result<u64> {
+        if !VersionReq::parse(">=3.7.0").unwrap().matches(&self.version) {
+            return Err(error_not_supported_version(self.pid, self.version.clone()));
+        }
+
+        // Get _PyRuntime address as reference point
+        let runtime_addr = match self.find_symbol_address(Self::RUNTIME_SYMBOL)? {
+            Some(addr) => addr,
+            None => return Err(Error::Msg("_PyRuntime symbol not found".to_string())),
+        };
+
+        // Read PyGILState_GetThisThreadState function code
+        let (sym_addr, code) = self.read_symbol_code(Self::GIL_STATE_SYMBOL, 512)?;
+
+        // Analyze the function to find the autoTLSkey address
+        #[cfg(target_arch = "x86_64")]
+        {
+            self.decode_auto_tls_key_x86(&code, sym_addr, runtime_addr)
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            self.decode_auto_tls_key_arm64(&code, sym_addr, runtime_addr)
+        }
+
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        {
+            Err(Error::Msg(
+                "autoTLSkey extraction not supported on this architecture".to_string(),
+            ))
+        }
+    }
+
+    fn read_symbol_code(&mut self, name: &str, size: usize) -> Result<(u64, Vec<u8>)> {
+        for file in [Some(&mut self.exe), self.lib.as_mut()] {
+            let Some(file) = file else {
+                continue;
+            };
+            file.load()?;
+            let obj = object::File::parse(&*file.contents)?;
+
+            if let Some(sym) = obj
+                .symbols()
+                .chain(obj.dynamic_symbols())
+                .find(|s| s.name().map(|n| n == name).unwrap_or(false))
+            {
+                let addr = sym.address();
+
+                // Find the section containing this symbol
+                for section in obj.sections() {
+                    let sec_addr = section.address();
+                    let sec_size = section.size();
+                    if addr >= sec_addr && addr < sec_addr + sec_size {
+                        let section_data = section.data()?;
+                        let offset = (addr - sec_addr) as usize;
+                        let read_size = size.min(section_data.len() - offset);
+                        let code = section_data[offset..offset + read_size].to_vec();
+
+                        // Calculate the actual address in memory
+                        let ba = file.base_address()?;
+                        let mem_addr = addr + ba;
+
+                        return Ok((mem_addr, code));
+                    }
+                }
+            }
+        }
+        Err(Error::Msg(format!("Symbol {} not found", name)))
+    }
+
+    /// Decode autoTLSkey address from x86_64 assembly
+    #[cfg(target_arch = "x86_64")]
+    fn decode_auto_tls_key_x86(
+        &self,
+        code: &[u8],
+        code_addr: u64,
+        runtime_addr: u64,
+    ) -> Result<u64> {
+        let decoder = Decoder::with_ip(64, code, code_addr, DecoderOptions::NONE);
+        let mut regs = AHashMap::new();
+        regs.insert(Register::RAX, Value::RuntimeBase(0));
+        for instr in decoder {
+            Self::propagate_known(&mut regs, &instr);
+
+            let op0 = Self::canon_reg(instr.op0_register());
+            if op0 == Register::RDI {
+                // Fast path: mov/lea from [_PyRuntime + disp] into EDI/RDI
+                if instr.op1_kind() == OpKind::Memory && instr.memory_base() == Register::RAX {
+                    let disp = instr.memory_displacement64() as u64;
+                    let target_addr = runtime_addr.wrapping_add(disp);
+                    if let Some(addr) = self.validate_auto_tls_candidate(target_addr, runtime_addr)
+                    {
+                        debug!(
+                            "Found autoTLSkey address {:#x} (mov/lea from RAX base)",
+                            addr
+                        );
+                        return Ok(addr);
+                    }
+                }
+
+                if instr.mnemonic() == Mnemonic::Lea && instr.op1_kind() == OpKind::Memory {
+                    if let Some(val) = Self::compute_mem_addr(&instr, &regs).or_else(|| {
+                        Self::assume_runtime_base(&instr, runtime_addr).map(Value::Known)
+                    }) {
+                        if let Some(addr) = val.to_runtime_addr(runtime_addr) {
+                            if let Some(valid) =
+                                self.validate_auto_tls_candidate(addr, runtime_addr)
+                            {
+                                debug!("Found autoTLSkey address {:#x} (LEA)", valid);
+                                return Ok(valid);
+                            }
+                        }
+                    }
+                }
+
+                if instr.mnemonic() == Mnemonic::Mov && instr.op1_kind() == OpKind::Memory {
+                    if let Some(val) = Self::compute_mem_addr(&instr, &regs).or_else(|| {
+                        Self::assume_runtime_base(&instr, runtime_addr).map(Value::Known)
+                    }) {
+                        if let Some(addr) = val.to_runtime_addr(runtime_addr) {
+                            if let Some(valid) =
+                                self.validate_auto_tls_candidate(addr, runtime_addr)
+                            {
+                                debug!("Found autoTLSkey address {:#x} (MOV)", valid);
+                                return Ok(valid);
+                            }
+                        }
+                    }
+                }
+
+                if let Some(val) = regs
+                    .get(&Register::RDI)
+                    .and_then(|v| v.to_runtime_addr(runtime_addr))
+                {
+                    if let Some(addr) = self.validate_auto_tls_candidate(val, runtime_addr) {
+                        debug!("Found autoTLSkey address {:#x}", addr);
+                        return Ok(addr);
+                    }
+                }
+            }
+        }
+
+        // Fallback: calculate from known _PyRuntime offsets for Python 3.10
+        // autoTLSkey is at _PyRuntime.gilstate.autoTSSkey._key
+        let fallback_addr = runtime_addr + PY310_INITIAL_STATE.auto_tls_key_offset;
+        debug!(
+            "Could not find autoTLSkey from disassembly, using fallback offset {:#x}",
+            fallback_addr
+        );
+        Ok(fallback_addr)
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn validate_auto_tls_candidate(&self, target_addr: u64, runtime_addr: u64) -> Option<u64> {
+        let distance = if target_addr > runtime_addr {
+            target_addr - runtime_addr
+        } else {
+            runtime_addr - target_addr
+        };
+
+        if distance < PYRUNTIME_MAX_DISTANCE {
+            let auto_tls_key_addr = if self.version >= Version::new(3, 7, 0) && target_addr % 8 == 0
+            {
+                target_addr + 4
+            } else {
+                target_addr
+            };
+            Some(auto_tls_key_addr)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn canon_reg(reg: Register) -> Register {
+        match reg {
+            Register::RAX | Register::EAX => Register::RAX,
+            Register::RBX | Register::EBX => Register::RBX,
+            Register::RCX | Register::ECX => Register::RCX,
+            Register::RDX | Register::EDX => Register::RDX,
+            Register::RSI | Register::ESI => Register::RSI,
+            Register::RDI | Register::EDI => Register::RDI,
+            Register::R8 | Register::R8D => Register::R8,
+            Register::R9 | Register::R9D => Register::R9,
+            Register::R10 | Register::R10D => Register::R10,
+            Register::R11 | Register::R11D => Register::R11,
+            Register::R12 | Register::R12D => Register::R12,
+            Register::R13 | Register::R13D => Register::R13,
+            Register::R14 | Register::R14D => Register::R14,
+            Register::R15 | Register::R15D => Register::R15,
+            _ => reg,
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn propagate_known(map: &mut AHashMap<Register, Value>, instr: &iced_x86::Instruction) {
+        match instr.mnemonic() {
+            Mnemonic::Mov => {
+                if instr.op0_kind() != OpKind::Register {
+                    return;
+                }
+                let dst = Self::canon_reg(instr.op0_register());
+                let val = match instr.op1_kind() {
+                    OpKind::Immediate32 => Some(Value::Known(instr.immediate32() as u64)),
+                    OpKind::Immediate64 => Some(Value::Known(instr.immediate64())),
+                    OpKind::Register => map.get(&Self::canon_reg(instr.op1_register())).copied(),
+                    OpKind::Memory => Self::compute_mem_addr(instr, map),
+                    _ => None,
+                };
+                if let Some(v) = val {
+                    map.insert(dst, v);
+                }
+            }
+            Mnemonic::Lea => {
+                if instr.op0_kind() != OpKind::Register || instr.op1_kind() != OpKind::Memory {
+                    return;
+                }
+                if let Some(addr) = Self::compute_mem_addr(instr, map) {
+                    map.insert(Self::canon_reg(instr.op0_register()), addr);
+                }
+            }
+            Mnemonic::Add => {
+                if instr.op0_kind() != OpKind::Register {
+                    return;
+                }
+                let dst = Self::canon_reg(instr.op0_register());
+                if let Some(base) = map.get(&dst).copied() {
+                    let delta = match instr.op1_kind() {
+                        OpKind::Immediate32 => instr.immediate32() as i64,
+                        OpKind::Immediate8 => instr.immediate8() as i64,
+                        OpKind::Register => {
+                            match map.get(&Self::canon_reg(instr.op1_register())).copied() {
+                                Some(Value::Known(v)) => v as i64,
+                                Some(Value::RuntimeBase(off)) => off,
+                                _ => 0,
+                            }
+                        }
+                        _ => 0,
+                    };
+                    map.insert(dst, base.add(delta));
+                }
+            }
+            Mnemonic::Sub => {
+                if instr.op0_kind() != OpKind::Register {
+                    return;
+                }
+                let dst = Self::canon_reg(instr.op0_register());
+                if let Some(base) = map.get(&dst).copied() {
+                    let delta = match instr.op1_kind() {
+                        OpKind::Immediate32 => instr.immediate32() as i64,
+                        OpKind::Immediate8 => instr.immediate8() as i64,
+                        OpKind::Register => {
+                            match map.get(&Self::canon_reg(instr.op1_register())).copied() {
+                                Some(Value::Known(v)) => v as i64,
+                                Some(Value::RuntimeBase(off)) => off,
+                                _ => 0,
+                            }
+                        }
+                        _ => 0,
+                    };
+                    map.insert(dst, base.sub(delta));
+                }
+            }
+            Mnemonic::Shl => {
+                if instr.op0_kind() != OpKind::Register || instr.op1_kind() != OpKind::Immediate8 {
+                    return;
+                }
+                let dst = Self::canon_reg(instr.op0_register());
+                if let Some(base) = map.get(&dst).copied() {
+                    let shift = instr.immediate8();
+                    map.insert(dst, base.shl(shift));
+                }
+            }
+            Mnemonic::And => {
+                if instr.op0_kind() != OpKind::Register {
+                    return;
+                }
+                let dst = Self::canon_reg(instr.op0_register());
+                if let Some(base) = map.get(&dst).copied() {
+                    let mask = match instr.op1_kind() {
+                        OpKind::Immediate32 => instr.immediate32() as u64,
+                        OpKind::Immediate8 => instr.immediate8() as u64,
+                        _ => return,
+                    };
+                    map.insert(dst, base.or(mask));
+                }
+            }
+            Mnemonic::Or => {
+                if instr.op0_kind() != OpKind::Register {
+                    return;
+                }
+                let dst = Self::canon_reg(instr.op0_register());
+                if let Some(base) = map.get(&dst).copied() {
+                    let val = match instr.op1_kind() {
+                        OpKind::Immediate32 => instr.immediate32() as u64,
+                        OpKind::Immediate8 => instr.immediate8() as u64,
+                        _ => return,
+                    };
+                    map.insert(dst, base.or(val));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn compute_mem_addr(
+        instr: &iced_x86::Instruction,
+        map: &AHashMap<Register, Value>,
+    ) -> Option<Value> {
+        let disp = instr.memory_displacement64() as i64;
+        let base_val = match instr.memory_base() {
+            Register::RIP => Value::Known(instr.next_ip()),
+            Register::None => Value::Known(0),
+            base => map
+                .get(&Self::canon_reg(base))
+                .copied()
+                .unwrap_or(Value::Unknown),
+        };
+
+        let with_disp = match base_val {
+            Value::Known(v) => Value::Known(v.wrapping_add(disp as u64)),
+            Value::RuntimeBase(off) => Value::RuntimeBase(off.saturating_add(disp)),
+            Value::Unknown => Value::Unknown,
+        };
+
+        let result = if instr.memory_index() != Register::None {
+            let idx_val = map.get(&Self::canon_reg(instr.memory_index())).copied()?;
+            let scale = instr.memory_index_scale() as i64;
+            match (with_disp, idx_val) {
+                (Value::Known(a), Value::Known(b)) => {
+                    Value::Known(a.wrapping_add((b as i64 * scale) as u64))
+                }
+                (Value::RuntimeBase(off), Value::Known(b)) => {
+                    Value::RuntimeBase(off.saturating_add((b as i64 * scale) as i64))
+                }
+                _ => Value::Unknown,
+            }
+        } else {
+            with_disp
+        };
+
+        Some(result)
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn assume_runtime_base(instr: &iced_x86::Instruction, runtime_addr: u64) -> Option<u64> {
+        if instr.memory_base() == Register::RAX {
+            return Some(runtime_addr.wrapping_add(instr.memory_displacement64() as u64));
+        }
+        None
+    }
+
+    /// Decode autoTLSkey address from ARM64 assembly
+    #[cfg(target_arch = "aarch64")]
+    fn decode_auto_tls_key_arm64(
+        &self,
+        _code: &[u8],
+        _code_addr: u64,
+        runtime_addr: u64,
+    ) -> Result<u64> {
+        // TODO: Implement ARM64 pattern analysis
+        // For now, use fallback from Python 3.10 known offset
+        let fallback_addr = runtime_addr + PY310_INITIAL_STATE.auto_tls_key_offset;
+        warn!(
+            "ARM64 autoTLSkey extraction not implemented, using fallback {:#x}",
+            fallback_addr
+        );
+        Ok(fallback_addr)
+    }
 }
 
 pub struct InterpreterInfo {
     pub version: Version,
     pub thread_address: u64,
+    pub auto_tls_key_addr: u64,
 }
 
 impl InterpreterInfo {
@@ -202,9 +652,24 @@ impl InterpreterInfo {
         );
 
         let mut intp = Interpreter::new(pid, exe_area, lib_area)?;
+
+        // Get auto_tls_key_addr for multi-threading support
+        let auto_tls_key_addr = match intp.find_auto_tls_key_address() {
+            Ok(addr) => addr,
+            Err(e) => {
+                warn!("Failed to find autoTLSkey address for process#{pid}: {e}, using fallback");
+                // Fallback: calculate from known Python 3.10 _PyRuntime offset
+                let runtime_addr = intp
+                    .find_symbol_address(Interpreter::RUNTIME_SYMBOL)?
+                    .ok_or_else(|| Error::Msg("_PyRuntime not found".to_string()))?;
+                runtime_addr + PY310_INITIAL_STATE.auto_tls_key_offset
+            }
+        };
+
         Ok(Self {
             version: intp.version.clone(),
             thread_address: intp.thread_state_address()?,
+            auto_tls_key_addr,
         })
     }
 
@@ -220,18 +685,63 @@ impl InterpreterInfo {
     }
 }
 
+/// Python runtime state offsets
+/// These are offsets within the _PyRuntime global structure for a specific Python version
 pub struct InitialState {
+    /// Offset of _PyRuntime.gilstate.tstate_current (points to current thread's PyThreadState)
+    /// For single-threaded or main thread access
     tstate_current: u64,
+
+    /// Offset of _PyRuntime.gilstate.autoTSSkey._key (pthread_key_t value) on x86_64
+    /// Used for multi-threaded PyThreadState lookup via TSD
+    /// Note: This is the offset to the pthread_key_t value, not the Py_tss_t struct itself
+    #[cfg(target_arch = "x86_64")]
+    auto_tls_key_offset: u64,
+
+    /// Offset of _PyRuntime.gilstate.autoTSSkey._key (pthread_key_t value) on ARM64
+    /// Used for multi-threaded PyThreadState lookup via TSD
+    /// Note: This offset needs verification on actual ARM64 Python builds
+    #[cfg(target_arch = "aarch64")]
+    auto_tls_key_offset: u64,
 }
 
+#[cfg(target_arch = "x86_64")]
 const PY310_INITIAL_STATE: &InitialState = &InitialState {
     tstate_current: 568,
+    auto_tls_key_offset: 0x24c, // _PyRuntime.gilstate.autoTSSkey._key
 };
+
+#[cfg(target_arch = "aarch64")]
+const PY310_INITIAL_STATE: &InitialState = &InitialState {
+    tstate_current: 568,
+    auto_tls_key_offset: 0x57c, // _PyRuntime.gilstate.autoTSSkey._key (0x578 + 4)
+};
+
+/// Thread Specific Data information for accessing per-thread PyThreadState
+/// This is used to correctly unwind Python stacks in multi-threaded applications
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TSDInfo {
+    /// Offset from thread pointer base (TPBASE) to TSD storage
+    pub offset: i16,
+    /// TSD key multiplier (glibc=16, musl=8)
+    pub multiplier: u8,
+    /// Whether indirect addressing is needed (musl=1, glibc=0)
+    pub indirect: u8,
+}
 
 #[repr(C)]
 pub struct PythonUnwindInfo {
-    pub thread_state_address: u64,
+    /// Address of autoTLSkey variable in Python runtime
+    pub auto_tls_key_addr: u64,
+    /// Python version encoded as 0xMMmm (e.g., 0x030A for 3.10)
+    pub version: u16,
+    /// Thread Specific Data info for multi-threading support
+    pub tsd_info: TSDInfo,
+    /// ID for looking up python_offsets in the offsets map
     pub offsets_id: u8,
+    /// Padding for alignment
+    pub _padding: [u8; 5],
 }
 
 #[repr(C)]
@@ -394,11 +904,39 @@ impl PythonUnwindTable {
                 id as u8
             }
         };
-        let info = PythonUnwindInfo {
-            thread_state_address: info.thread_address,
-            offsets_id,
+
+        // Extract TSD info for multi-threading support
+        let tsd_info = match super::tsd::extract_tsd_info(pid) {
+            Ok(tsd) => {
+                debug!(
+                    "Extracted TSD info for process#{pid}: offset={}, multiplier={}, indirect={}",
+                    tsd.offset, tsd.multiplier, tsd.indirect
+                );
+                tsd
+            }
+            Err(e) => {
+                debug!("Failed to extract TSD info for process#{pid}: {e}, using defaults");
+                super::tsd::get_default_tsd_info(pid)
+            }
         };
-        self.update_unwind_info_map(pid, &info);
+
+        // Encode version as 0xMMmm (e.g., 3.10 -> 0x030A)
+        let version = ((info.version.major as u16) << 8) | (info.version.minor as u16);
+
+        let unwind_info = PythonUnwindInfo {
+            auto_tls_key_addr: info.auto_tls_key_addr,
+            version,
+            tsd_info,
+            offsets_id,
+            _padding: [0; 5],
+        };
+
+        debug!(
+            "Loading Python unwind info for process#{pid}: autoTLSkey={:#x}, version={:#x}",
+            unwind_info.auto_tls_key_addr, unwind_info.version
+        );
+
+        self.update_unwind_info_map(pid, &unwind_info);
     }
 
     pub unsafe fn unload(&mut self, pid: u32) {
