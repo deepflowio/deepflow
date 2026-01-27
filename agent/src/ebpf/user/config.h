@@ -100,6 +100,7 @@
 #define PROG_OFFCPU_PYTHON_UNWIND_FOR_KP     "df_KP_offcpu_python_unwind"
 #define PROG_OFFCPU_OUTPUT_FOR_KP            "df_KP_offcpu_output"
 #define PROG_MEMORY_DWARF_UNWIND_FOR_KP      "df_KP_memory_dwarf_unwind"
+#define PROG_MEMORY_PYTHON_UNWIND_FOR_KP     "df_KP_memory_python_unwind"
 #define PROG_MEMORY_OUTPUT_FOR_KP            "df_KP_memory_output"
 
 enum {
@@ -137,6 +138,7 @@ enum {
 	PROG_OFFCPU_PYTHON_UNWIND_KP_IDX,
 	PROG_OFFCPU_OUTPUT_KP_IDX,
 	PROG_MEMORY_DWARF_UNWIND_KP_IDX,
+	PROG_MEMORY_PYTHON_UNWIND_KP_IDX,
 	PROG_MEMORY_OUTPUT_KP_IDX,
 	CP_PROG_KP_NUM
 };
