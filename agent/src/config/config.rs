@@ -1696,10 +1696,18 @@ impl Default for Iso8583Config {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct WebSphereMqConfig {
     pub parse_xml_enabled: bool,
+}
+
+impl Default for WebSphereMqConfig {
+    fn default() -> Self {
+        Self {
+            parse_xml_enabled: true,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -3487,9 +3495,17 @@ impl Default for Iso8583ParseConfig {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WebSphereMqParseConfig {
     pub parse_xml_enabled: bool,
+}
+
+impl Default for WebSphereMqParseConfig {
+    fn default() -> Self {
+        Self {
+            parse_xml_enabled: true,
+        }
+    }
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
