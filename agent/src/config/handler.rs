@@ -14,15 +14,19 @@
  * limitations under the License.
  */
 
-use std::borrow::Cow;
-use std::cmp::{max, min};
-use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
-use std::{fmt, u32};
+use std::{
+    borrow::Cow,
+    cmp::{max, min},
+    collections::{HashMap, HashSet},
+    fmt,
+    hash::{Hash, Hasher},
+    iter,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    path::PathBuf,
+    str,
+    sync::Arc,
+    time::Duration,
+};
 
 use arc_swap::{access::Map, ArcSwap};
 use base64::{prelude::BASE64_STANDARD, Engine};
@@ -1014,53 +1018,88 @@ impl BlacklistTrie {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct DnsNxdomainTrieNode {
-    children: HashMap<char, Box<DnsNxdomainTrieNode>>,
+struct DomainNameTrieNode {
+    children: HashMap<String, DomainNameTrieNode>,
     unconcerned: bool,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct DnsNxdomainTrie {
-    root: DnsNxdomainTrieNode,
+impl DomainNameTrieNode {
+    pub fn insert(&mut self, segments: &mut iter::Rev<str::Split<'_, char>>) {
+        match segments.next() {
+            None => self.unconcerned = true,
+            Some(seg) => {
+                let child = self
+                    .children
+                    .entry(seg.to_string())
+                    .or_insert_with(|| DomainNameTrieNode::default());
+                child.insert(segments);
+            }
+        }
+    }
+
+    pub fn search(&self, segments: &mut iter::Rev<str::Split<'_, char>>) -> bool {
+        if self.unconcerned {
+            return true;
+        }
+        match segments.next() {
+            None => self.unconcerned,
+            Some(seg) => self
+                .children
+                .get(seg)
+                .map(|child| child.search(segments))
+                .unwrap_or(false),
+        }
+    }
 }
 
-impl DnsNxdomainTrie {
-    pub fn insert(&mut self, rule: &String) {
-        let mut node = &mut self.root;
-        // the reversal is because what is matched is the suffix of the domain name
-        for ch in rule.chars().rev() {
-            node = node
-                .children
-                .entry(ch)
-                .or_insert_with(|| Box::new(DnsNxdomainTrieNode::default()));
+#[derive(Clone, Default)]
+pub struct DomainNameTrie {
+    entries: HashSet<String>,
+    root: DomainNameTrieNode,
+}
+
+impl fmt::Debug for DomainNameTrie {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DomainNameTrie")
+            .field("entries", &self.entries)
+            .finish_non_exhaustive()
+    }
+}
+
+impl PartialEq for DomainNameTrie {
+    fn eq(&self, other: &Self) -> bool {
+        self.entries == other.entries
+    }
+}
+
+impl Eq for DomainNameTrie {}
+
+impl DomainNameTrie {
+    const SEP: char = '.';
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn insert(&mut self, rule: &str) {
+        if self.entries.contains(rule) {
+            return;
         }
-        node.unconcerned = true;
+        self.entries.insert(rule.to_string());
+        let mut segments = rule.split(Self::SEP).rev();
+        self.root.insert(&mut segments);
     }
 
     pub fn is_unconcerned(&self, input: &str) -> bool {
         if input.is_empty() {
             return false;
         }
-        let mut node = &self.root;
-        // the reversal is because what is matched is the suffix of the domain name
-        for c in input.chars().rev() {
-            match node.children.get(&c) {
-                Some(child) => {
-                    if child.unconcerned {
-                        return true;
-                    }
-                    node = child.as_ref();
-                }
-                None => {
-                    break;
-                }
-            }
-        }
-        false
+        let mut segments = input.split(Self::SEP).rev();
+        self.root.search(&mut segments)
     }
 }
 
-impl From<&Vec<String>> for DnsNxdomainTrie {
+impl From<&Vec<String>> for DomainNameTrie {
     fn from(v: &Vec<String>) -> Self {
         let mut t = Self::default();
         v.iter().for_each(|r| t.insert(r));
@@ -1098,8 +1137,7 @@ pub struct LogParserConfig {
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
     pub l7_log_blacklist: HashMap<String, Vec<TagFilterOperator>>,
     pub l7_log_blacklist_trie: HashMap<L7Protocol, BlacklistTrie>,
-    pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
-    pub unconcerned_dns_nxdomain_trie: DnsNxdomainTrie,
+    pub unconcerned_dns_nxdomain_trie: DomainNameTrie,
     pub mysql_decompress_payload: bool,
     pub custom_app: CustomAppConfig,
 }
@@ -1119,8 +1157,7 @@ impl Default for LogParserConfig {
             obfuscate_enabled_protocols: L7ProtocolBitmap::default(),
             l7_log_blacklist: HashMap::new(),
             l7_log_blacklist_trie: HashMap::new(),
-            unconcerned_dns_nxdomain_response_suffixes: vec![],
-            unconcerned_dns_nxdomain_trie: DnsNxdomainTrie::default(),
+            unconcerned_dns_nxdomain_trie: DomainNameTrie::default(),
             mysql_decompress_payload: true,
             custom_app: CustomAppConfig::default(),
         }
@@ -1165,7 +1202,7 @@ impl fmt::Debug for LogParserConfig {
             .field("l7_log_blacklist_trie", &self.l7_log_blacklist)
             .field(
                 "unconcerned_dns_nxdomain_trie",
-                &self.unconcerned_dns_nxdomain_response_suffixes,
+                &self.unconcerned_dns_nxdomain_trie,
             )
             .field("mysql_decompress_payload", &self.mysql_decompress_payload)
             .field("custom_app", &self.custom_app)
@@ -2258,13 +2295,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     }
                     blacklist_trie
                 },
-                unconcerned_dns_nxdomain_response_suffixes: conf
-                    .processors
-                    .request_log
-                    .filters
-                    .unconcerned_dns_nxdomain_response_suffixes
-                    .clone(),
-                unconcerned_dns_nxdomain_trie: DnsNxdomainTrie::from(
+                unconcerned_dns_nxdomain_trie: DomainNameTrie::from(
                     &conf
                         .processors
                         .request_log
@@ -5170,7 +5201,6 @@ impl ConfigHandler {
             filters.unconcerned_dns_nxdomain_response_suffixes = new_filters
                 .unconcerned_dns_nxdomain_response_suffixes
                 .clone();
-            restart_agent = !first_run;
         }
         if filters.cbpf_disabled != new_filters.cbpf_disabled {
             info!(
@@ -5840,5 +5870,21 @@ mod tests {
             assert_eq!(tt.decode_trace_id(value).as_ref().map(|s| s.as_ref()), tid);
             assert_eq!(tt.decode_span_id(value).as_ref().map(|s| s.as_ref()), sid);
         }
+    }
+
+    #[test]
+    fn test_domain_name_trie() {
+        let mut trie = DomainNameTrie::default();
+        trie.insert("www.xxx.yyy.zzz");
+        trie.insert("xxx.yyy.zzz");
+
+        assert!(trie.is_unconcerned("vv.www.xxx.yyy.zzz"));
+        assert!(trie.is_unconcerned("www.xxx.yyy.zzz"));
+        assert!(trie.is_unconcerned("xxx.yyy.zzz"));
+        assert!(trie.is_unconcerned("uuu.xxx.yyy.zzz"));
+
+        assert!(!trie.is_unconcerned("xx.yyy.zzz"));
+        assert!(!trie.is_unconcerned("xxx.yyy.zzz.aaa"));
+        assert!(!trie.is_unconcerned("yyy.zzz"));
     }
 }
