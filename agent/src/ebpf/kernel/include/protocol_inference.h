@@ -942,14 +942,19 @@ static __inline bool infer_pgsql_startup_message(const char *buf, size_t count)
 /*
  * ref: https://developer.aliyun.com/article/751984
  * | char tag | int32 len | payload |
- * tag 的取值参考 src/flow_generator/protocol_logs/sql/postgresql.rs
+ * tag ref: src/flow_generator/protocol_logs/sql/postgresql.rs
+ *
+ * Message flow patterns in PostgreSQL protocol:
+ * 'P' (Parse) is usually followed by 'B' (Bind), but sometimes directly followed by 'S' (Sync).
+ * 'B' (Bind) is usually followed by 'E' (Execute), or sometimes 'S' (Sync).
+ * 'E' (Execute) is usually followed by 'S' (Sync).
+ * 'S' (Sync) generally does not have any message following it; it signals the end of a batch of messages.
+ * The 'Q' (Query) and 'C' (Close) messages always end with a null terminator character '\0'.
  */
 static __inline enum message_type infer_pgsql_query_message(const char *buf,
 							    const char *s_buf,
 							    size_t count)
 {
-	// Only a judgement query.
-	static const char tag_q = 'Q';
 	// In the protocol format, the size of the "len" field is 4 bytes,
 	// and the minimum command length is 4 bytes for "COPY/MOVE",
 	// The minimal length is therefore 8.
@@ -965,10 +970,13 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 	if (count < min_msg_len) {
 		return MSG_UNKNOWN;
 	}
+
 	// Tag check
-	if (buf[0] != tag_q) {
+	char tag = buf[0];
+	if (tag != 'Q' && tag != 'P' && tag != 'B' &&
+	    tag != 'E' && tag != 'S' && tag != 'C')
 		return MSG_UNKNOWN;
-	}
+
 	// Payload length check
 	__u32 length;
 	bpf_probe_read_user(&length, sizeof(length), s_buf + 1);
@@ -976,17 +984,26 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 	if (length < min_payload_len || length > max_payload_len) {
 		return MSG_UNKNOWN;
 	}
+
 	// If the input includes a whole message (1 byte tag + length),
 	// check the last character.
 	if (length + 1 <= (__u32) count) {
 		char last_char = ' ';	//Non-zero initial value
 		bpf_probe_read_user(&last_char, sizeof(last_char),
 				    s_buf + length);
-		if (last_char != '\0')
-			return MSG_UNKNOWN;
+		if (last_char == '\0' && (tag == 'Q' || tag == 'C'))
+			return MSG_REQUEST;
 	}
 
-	return MSG_REQUEST;
+	size_t pos = length + 1;
+	if (pos + 5 > count)
+		return MSG_UNKNOWN;
+
+	bpf_probe_read_user(&tag, sizeof(tag), s_buf + pos);
+	if (tag == 'B' || tag == 'E' || tag == 'S')
+		return MSG_REQUEST;
+
+	return MSG_UNKNOWN;
 }
 
 static __inline enum message_type infer_postgre_message(const char *buf,
@@ -1017,12 +1034,8 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 		case 'C': case 'E': case 'S': case 'D': case 'H': case 'd':
 		case 'c':
 			return MSG_REQUEST;
-		case 'Z': case 'I': case '1': case '2': case '3': case 'K':
-		case 'T': case 'n': case 'N': case 't': case 'G': case 'W':
-		case 'R':
-			return MSG_RESPONSE;
 		default:
-			return MSG_UNKNOWN;
+			return MSG_RESPONSE;
 		}
 		/* *INDENT-ON* */
 	}
