@@ -8094,7 +8094,7 @@ Match field value.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
