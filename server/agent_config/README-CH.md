@@ -7672,7 +7672,7 @@ processors:
     application_protocol_inference:
       protocol_special_config:
         web_sphere_mq:
-          parse_xml_enabled: false
+          parse_xml_enabled: true
 ```
 
 **模式**:
@@ -8468,6 +8468,14 @@ processors:
 特征字段，中间用`,`分隔。
 如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
 
+支持从如下 Header 中提取 trace id，其格式如下:
+- traceparent: 00-TRACEID-SPANID-01
+- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+- sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
+- sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+- uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
+- b3: TRACEID-SPANID-1
+
 ##### Copy APM TraceID {#processors.request_log.tag_extraction.tracing_tag.copy_apm_trace_id}
 
 **标签**:
@@ -8530,6 +8538,14 @@ processors:
 的结果填充到应用调用日志的`span_id`字段中，作为调用链追踪的特征值。参数支持填写多个不同的
 特征字段，中间用`,`分隔。
 如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
+
+支持从如下 Header 中提取 span id，其格式如下:
+- traceparent: 00-TRACEID-SPANID-01
+- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+- sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
+- sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+- uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
+- b3: TRACEID-SPANID-1
 
 #### HTTP 端点 {#processors.request_log.tag_extraction.http_endpoint}
 
