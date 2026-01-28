@@ -7919,7 +7919,7 @@ processors:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
