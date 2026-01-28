@@ -33,7 +33,7 @@ use crate::{
         l7_protocol_log::{L7ParseResult, L7ProtocolParserInterface, LogCache, ParseParam},
         meta_packet::ApplicationFlags,
     },
-    config::handler::LogParserConfig,
+    config::handler::{DomainNameTrie, LogParserConfig},
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{pb_adapter::KeyVal, set_captured_byte},
@@ -243,7 +243,7 @@ impl DnsInfo {
         Ok(info)
     }
 
-    fn parse_response(p: &Packet) -> Result<Self> {
+    fn parse_response(nxdomain_trie: Option<&DomainNameTrie>, p: &Packet) -> Result<Self> {
         let mut info = DnsInfo {
             trans_id: p.id(),
             msg_type: LogMessageType::Response,
@@ -272,7 +272,15 @@ impl DnsInfo {
                 // simple-dns do not have dname support, perhaps this is not often used
                 _ => String::new(),
             };
+            match nxdomain_trie {
+                Some(trie) => info.is_unconcerned |= trie.is_unconcerned(&answer),
+                _ => (),
+            }
             info.answers.push((rr.rdata.type_code(), answer, rr.ttl));
+        }
+        // nxdomain responses may not have any answers, need to check qname in question.
+        if let Some(trie) = nxdomain_trie {
+            info.is_unconcerned |= trie.is_unconcerned(&info.query_name);
         }
         Ok(info)
     }
@@ -281,16 +289,13 @@ impl DnsInfo {
     fn parse(params: &ParseParam, payload: &[u8]) -> Result<Self> {
         let p = Packet::parse(payload)?;
         let mut info = if p.has_flags(PacketFlag::RESPONSE) {
-            let mut info = Self::parse_response(&p)?;
-            if let Some(c) = params.parse_config {
-                for (_, answer, _) in info.answers.iter() {
-                    if c.unconcerned_dns_nxdomain_trie.is_unconcerned(answer) {
-                        info.is_unconcerned = true;
-                        break;
-                    }
+            let nxdomain_trie = match params.parse_config.as_ref() {
+                Some(c) if !c.unconcerned_dns_nxdomain_trie.is_empty() => {
+                    Some(&c.unconcerned_dns_nxdomain_trie)
                 }
-            }
-            info
+                _ => None,
+            };
+            Self::parse_response(nxdomain_trie, &p)?
         } else {
             Self::parse_request(&p)?
         };
@@ -555,7 +560,7 @@ mod tests {
         );
     }
 
-    fn run(name: &str) -> String {
+    fn run(name: &str, parser_config: Option<&LogParserConfig>) -> String {
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name));
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let mut packets = capture.collect::<Vec<_>>();
@@ -587,6 +592,9 @@ mod tests {
                 true,
             );
             param.set_captured_byte(payload.len());
+            if let Some(config) = parser_config {
+                param.set_log_parser_config(config);
+            }
             let is_dns = dns.check_payload(payload, param).is_some();
             let info = dns.parse_payload(payload, param);
             if let Ok(info) = info {
@@ -614,7 +622,36 @@ mod tests {
 
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
-            let output = run(item.0);
+            let output = run(item.0, None);
+
+            if output != expected {
+                let output_path = Path::new("actual.txt");
+                fs::write(&output_path, &output).unwrap();
+                assert!(
+                    output == expected,
+                    "output different from expected {}, written to {:?}",
+                    item.1,
+                    output_path
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn nxdomain_ignore() {
+        let config = LogParserConfig {
+            unconcerned_dns_nxdomain_trie: DomainNameTrie::from(&vec![
+                "node.net".to_string(),
+                "svc.cluster.local".to_string(),
+            ]),
+            ..Default::default()
+        };
+
+        let files = vec![("nxdomain.pcap", "nxdomain.result")];
+
+        for item in files.iter() {
+            let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
+            let output = run(item.0, Some(&config));
 
             if output != expected {
                 let output_path = Path::new("actual.txt");
