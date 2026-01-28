@@ -265,6 +265,7 @@ impl From<WebSphereMqInfo> for L7ProtocolSendLog {
             flags: flags.bits(),
             biz_code: f.base.biz_code,
             biz_scenario: f.base.biz_scenario,
+            biz_response_code: f.base.biz_response_code,
             ..Default::default()
         }
     }

@@ -62,10 +62,7 @@ use crate::{
             L7Protocol, L7Stats, PacketDirection, SignalSource, TunnelField,
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{
-            L7PerfCache, L7PerfCacheCounter, L7ProtocolBitmap, L7ProtocolParser,
-            L7ProtocolParserInterface,
-        },
+        l7_protocol_log::{L7PerfCache, L7PerfCacheCounter, L7ProtocolBitmap},
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader, ProtocolData},
         tagged_flow::TaggedFlow,
@@ -347,18 +344,7 @@ impl FlowMap {
             ntp_diff,
             stats_counter,
             system_time,
-            l7_protocol_checker: L7ProtocolChecker::new(
-                &config.l7_protocol_enabled_bitmap,
-                &config
-                    .l7_protocol_parse_port_bitmap
-                    .iter()
-                    .filter_map(|(name, bitmap)| {
-                        L7ProtocolParser::try_from(name.as_ref())
-                            .ok()
-                            .map(|p| (p.protocol(), bitmap.clone()))
-                    })
-                    .collect(),
-            ),
+            l7_protocol_checker: L7ProtocolChecker::from(config),
             time_key_buffer: None,
             plugin_digest: 0, // force initial load
             wasm_vm: Default::default(),

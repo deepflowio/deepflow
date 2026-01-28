@@ -391,8 +391,14 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 					s.MetricsValues = append(s.MetricsValues, float64(t))
 				case string:
 					// strings go into attributes
-					s.AttributeNames = append(s.AttributeNames, strings.Clone(key))
-					s.AttributeValues = append(s.AttributeValues, strings.Clone(t))
+					f, err := strconv.ParseFloat(t, 64)
+					if err == nil {
+						s.MetricsNames = append(s.MetricsNames, strings.Clone(key))
+						s.MetricsValues = append(s.MetricsValues, f)
+					} else {
+						s.AttributeNames = append(s.AttributeNames, strings.Clone(key))
+						s.AttributeValues = append(s.AttributeValues, strings.Clone(t))
+					}
 				default:
 					// fallback: stringify other types into attributes
 					strVal := fmt.Sprintf("%v", t)

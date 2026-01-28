@@ -16,9 +16,9 @@
 
 pub(crate) mod cgroups;
 pub(crate) mod command;
-pub(crate) mod environment;
+pub mod environment;
 pub(crate) mod guard;
-pub(crate) mod hasher;
+pub mod hasher;
 pub(crate) mod logger;
 pub(crate) mod lru;
 pub(crate) mod npb_bandwidth_watcher;

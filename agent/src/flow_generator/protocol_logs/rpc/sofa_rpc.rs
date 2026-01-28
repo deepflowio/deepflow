@@ -728,7 +728,7 @@ mod test {
 
         let req_param = &mut ParseParam::new(
             &p[0],
-            log_cache.clone(),
+            Some(log_cache.clone()),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),
@@ -766,7 +766,7 @@ mod test {
 
         let resp_param = &mut ParseParam::new(
             &p[1],
-            log_cache.clone(),
+            Some(log_cache.clone()),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),
@@ -823,7 +823,7 @@ mod test {
 
         let req_param = &mut ParseParam::new(
             &p[0],
-            log_cache.clone(),
+            Some(log_cache.clone()),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),
@@ -861,7 +861,7 @@ mod test {
 
         let resp_param = &mut ParseParam::new(
             &p[1],
-            log_cache.clone(),
+            Some(log_cache.clone()),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),

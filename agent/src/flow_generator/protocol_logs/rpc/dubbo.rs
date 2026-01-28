@@ -1296,7 +1296,7 @@ mod tests {
             let mut dubbo = DubboLog::default();
             let param = &mut ParseParam::new(
                 packet as &MetaPacket,
-                log_cache.clone(),
+                Some(log_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
@@ -1394,7 +1394,7 @@ mod tests {
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let param = &mut ParseParam::new(
             &meta_packet,
-            log_cache.clone(),
+            Some(log_cache.clone()),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),
@@ -1505,7 +1505,7 @@ mod tests {
             }
             let param = &mut ParseParam::new(
                 &*packet,
-                rrt_cache.clone(),
+                Some(rrt_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),

@@ -202,7 +202,10 @@ where
         is_reversed: bool,
     ) -> Option<String> {
         let key = LogCacheKey::new(param, self.session_id(), is_reversed);
-        match param.l7_perf_cache.borrow_mut().rrt_cache.get(&key) {
+        let Some(perf_cache) = param.l7_perf_cache.as_ref() else {
+            return None;
+        };
+        match perf_cache.borrow_mut().rrt_cache.get(&key) {
             Some(cached) if cached.endpoint.is_some() => {
                 let log = LogCache {
                     time: param.time,
@@ -234,6 +237,9 @@ where
             error!("flow_id: {}, packet time 0", param.flow_id);
             return None;
         }
+        let Some(perf_cache) = param.l7_perf_cache.as_ref() else {
+            return None;
+        };
 
         let cur_info = LogCache {
             time: param.time,
@@ -261,12 +267,10 @@ where
             return Some(stats);
         }
 
-        let (mut rtt_cache, mut timeout_cache) = RefMut::map_split(
-            param.l7_perf_cache.borrow_mut(),
-            |perf_cache: &mut L7PerfCache| {
+        let (mut rtt_cache, mut timeout_cache) =
+            RefMut::map_split(perf_cache.borrow_mut(), |perf_cache: &mut L7PerfCache| {
                 (&mut perf_cache.rrt_cache, &mut perf_cache.timeout_cache)
-            },
-        );
+            });
         let key = LogCacheKey::new(param, self.session_id(), self.is_reversed());
         let prev_info = rtt_cache.get_mut(&key);
         let timeout_counter = timeout_cache.get_or_insert_mut(param.flow_id);

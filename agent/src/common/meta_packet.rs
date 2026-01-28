@@ -24,6 +24,7 @@ use std::time::Duration;
 use std::{error::Error, net::Ipv6Addr, ptr};
 
 use bitflags::bitflags;
+use pcap::Linktype;
 use pnet::packet::{
     icmp::{IcmpType, IcmpTypes},
     icmpv6::{Icmpv6Type, Icmpv6Types},
@@ -96,6 +97,14 @@ impl<'a> RawPacket<'a> {
             Self::Borrowed(b) => *self = Self::OwnedVec(b.to_vec()),
             Self::Owned(o) => *self = Self::OwnedVec(o.to_vec()),
             _ => {}
+        }
+    }
+
+    pub fn into_owned(self) -> RawPacket<'static> {
+        match self {
+            Self::Borrowed(b) => RawPacket::OwnedVec(b.to_vec()),
+            Self::Owned(o) => RawPacket::OwnedVec(o.to_vec()),
+            Self::OwnedVec(v) => RawPacket::OwnedVec(v),
         }
     }
 
@@ -1321,6 +1330,14 @@ impl<'a> MetaPacket<'a> {
             }
         }
     }
+
+    pub fn into_owned(mut self) -> MetaPacket<'static> {
+        let raw = match self.raw.take() {
+            Some(raw) => Some(raw.into_owned()),
+            None => None,
+        };
+        MetaPacket { raw, ..self }
+    }
 }
 
 impl<'a> Iterator for MetaPacket<'a> {
@@ -1480,6 +1497,76 @@ pub enum ProtocolData {
 impl Default for ProtocolData {
     fn default() -> Self {
         Self::TcpHeader(MetaPacketTcpHeader::default())
+    }
+}
+
+// used in remote exec pcap replay and unit tests
+pub struct PcapData<'a> {
+    pub link_type: pcap::Linktype,
+    pub timestamp: Duration,
+    pub data: &'a [u8],
+}
+
+impl<'a> TryFrom<PcapData<'a>> for MetaPacket<'a> {
+    type Error = error::Error;
+
+    fn try_from(packet: PcapData<'a>) -> Result<Self, Self::Error> {
+        match packet.link_type {
+            Linktype::ETHERNET => {
+                let mut meta = MetaPacket::empty();
+                meta.update(packet.data, true, true, packet.timestamp, 0)?;
+                return Ok(meta);
+            }
+            _ => (),
+        }
+
+        // hack other link types (sll/sll2) because MetaPacket cannot parse them (yet)
+
+        // change SLL header to look like ethernet header just before L3 header
+        let mut data = match packet.link_type {
+            // 2 bytes longer than ethernet header
+            Linktype::LINUX_SLL => (&packet.data[2..]).to_vec(),
+            Linktype::LINUX_SLL2 => {
+                // 6 bytes longer, and L3 type is in first 2 bytes
+                let mut data = (&packet.data[6..]).to_vec();
+                data[12..14].copy_from_slice(&packet.data[0..2]);
+                data
+            }
+            _ => {
+                return Err(error::Error::ParsePacketFailed(format!(
+                    "unsupported link type: {:?}",
+                    packet.link_type
+                )))
+            }
+        };
+
+        let mut meta = MetaPacket::empty();
+        meta.update(&data[..], true, true, packet.timestamp, 0)?;
+
+        let src_ip = meta.lookup_key.src_ip;
+        let dst_ip = meta.lookup_key.dst_ip;
+        // fake mac with ip
+        (&mut data[0..12]).fill(0);
+        match dst_ip {
+            IpAddr::V4(ip) => {
+                data[0..4].copy_from_slice(&ip.octets());
+            }
+            IpAddr::V6(ip) => {
+                data[0..6].copy_from_slice(&ip.octets()[0..6]);
+            }
+        }
+        match src_ip {
+            IpAddr::V4(ip) => {
+                data[6..10].copy_from_slice(&ip.octets());
+            }
+            IpAddr::V6(ip) => {
+                data[6..12].copy_from_slice(&ip.octets()[0..6]);
+            }
+        }
+
+        let mut meta = MetaPacket::empty();
+        meta.update(data, true, true, packet.timestamp, 0)?;
+        Ok(meta)
     }
 }
 

@@ -666,7 +666,7 @@ pub struct ParseParam<'a> {
 
     pub parse_config: Option<&'a LogParserConfig>,
 
-    pub l7_perf_cache: Rc<RefCell<L7PerfCache>>,
+    pub l7_perf_cache: Option<Rc<RefCell<L7PerfCache>>>,
 
     // plugins
     pub wasm_vm: Rc<RefCell<Option<WasmVm>>>,
@@ -727,7 +727,7 @@ impl<'a> ParseParam<'a> {
 
     pub fn new(
         packet: &'a MetaPacket<'a>,
-        cache: Rc<RefCell<L7PerfCache>>,
+        cache: Option<Rc<RefCell<L7PerfCache>>>,
         wasm_vm: Rc<RefCell<Option<WasmVm>>>,
         #[cfg(any(target_os = "linux", target_os = "android"))] so_func: Rc<
             RefCell<Option<Vec<SoPluginFunc>>>,
@@ -832,6 +832,26 @@ impl<'a> ParseParam<'a> {
     pub fn set_web_sphere_mq_conf(&mut self, conf: &WebSphereMqParseConfig) {
         self.web_sphere_mq_parse_conf = conf.clone();
     }
+
+    pub fn reversed(&self) -> Self {
+        Self {
+            ip_src: self.ip_dst,
+            ip_dst: self.ip_src,
+            port_src: self.port_dst,
+            port_dst: self.port_src,
+            direction: self.direction.reversed(),
+            #[cfg(feature = "libtrace")]
+            ebpf_param: self.ebpf_param.clone(),
+            l7_perf_cache: self.l7_perf_cache.clone(),
+            wasm_vm: self.wasm_vm.clone(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            so_func: self.so_func.clone(),
+            stats_counter: self.stats_counter.clone(),
+            iso8583_parse_conf: self.iso8583_parse_conf.clone(),
+            web_sphere_mq_parse_conf: self.web_sphere_mq_parse_conf.clone(),
+            ..*self
+        }
+    }
 }
 
 /*
@@ -891,11 +911,11 @@ impl L7ProtocolChecker for L7ProtocolBitmap {
     }
 }
 
-impl From<&[String]> for L7ProtocolBitmap {
-    fn from(vs: &[String]) -> Self {
+impl<T: AsRef<str>> From<&[T]> for L7ProtocolBitmap {
+    fn from(vs: &[T]) -> Self {
         let mut bitmap = L7ProtocolBitmap(0);
         for v in vs.iter() {
-            if let Ok(p) = L7ProtocolParser::try_from(v.as_str()) {
+            if let Ok(p) = L7ProtocolParser::try_from(v.as_ref()) {
                 bitmap.set_enabled(p.protocol());
             }
         }

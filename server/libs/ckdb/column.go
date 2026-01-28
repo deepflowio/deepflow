@@ -60,6 +60,7 @@ const (
 	COLUMN_BIZ_TYPE                   = "biz_type"
 	COLUMN_BIZ_CODE                   = "biz_code"
 	COLUMN_BIZ_SCENARIO               = "biz_scenario"
+	COLUMN_BIZ_RESPONSE_CODE          = "biz_response_code"
 	COLUMN_BODY                       = "body"
 	COLUMN_BYTE                       = "byte"
 	COLUMN_BYTES                      = "bytes"
@@ -405,6 +406,7 @@ var ColumnNames = []string{
 	COLUMN_BIZ_TYPE,
 	COLUMN_BIZ_CODE,
 	COLUMN_BIZ_SCENARIO,
+	COLUMN_BIZ_RESPONSE_CODE,
 	COLUMN_BODY,
 	COLUMN_BYTE,
 	COLUMN_BYTES,

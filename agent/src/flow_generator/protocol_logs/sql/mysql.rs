@@ -1714,7 +1714,7 @@ mod tests {
 
             let mut param = ParseParam::new(
                 &*packet,
-                log_cache.clone(),
+                Some(log_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
@@ -1890,7 +1890,7 @@ mod tests {
             if packet.get_l4_payload().is_some() {
                 let param = &ParseParam::new(
                     &*packet,
-                    rrt_cache.clone(),
+                    Some(rrt_cache.clone()),
                     Default::default(),
                     #[cfg(any(target_os = "linux", target_os = "android"))]
                     Default::default(),

@@ -100,7 +100,7 @@ pub mod l7 {
                     _: public::l7_protocol::L7ProtocolEnum,
                     _: u16,
                 ) -> Option<PolicySlice> {
-                    unimplemented!()
+                    None
                 }
                 pub fn counters(
                     &self,
@@ -123,7 +123,6 @@ pub mod l7 {
                     _: super::enums::TrafficDirection,
                     _: enums::Source,
                 ) {
-                    unimplemented!()
                 }
             }
 
@@ -131,12 +130,10 @@ pub mod l7 {
             pub struct Store;
             impl Store {
                 pub fn is_empty(&self) -> bool {
-                    unimplemented!()
+                    true
                 }
 
-                pub fn clear(&mut self) {
-                    unimplemented!()
-                }
+                pub fn clear(&mut self) {}
 
                 pub fn into_iter_with<L: public::l7_protocol::L7Log>(
                     self,

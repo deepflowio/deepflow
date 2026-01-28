@@ -403,7 +403,7 @@ var ColumnAdd71 = []*ColumnAdds{
 	{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
-		ColumnNames: []string{"biz_code", "biz_scenario"},
+		ColumnNames: []string{"biz_code", "biz_scenario", "biz_response_code"},
 		ColumnType:  ckdb.String,
 	},
 	{
@@ -464,7 +464,7 @@ var IndexAdd71 = []*IndexAdds{
 	{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log_local"},
-		ColumnNames: []string{"biz_code", "biz_scenario"},
+		ColumnNames: []string{"biz_code", "biz_scenario", "biz_response_code"},
 		IndexType:   ckdb.IndexBloomfilter,
 	},
 }
