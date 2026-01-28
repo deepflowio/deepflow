@@ -24,7 +24,7 @@ use std::{
 };
 
 use arc_swap::access::Access;
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use parking_lot::RwLock;
 
 use tokio::runtime::Runtime;
@@ -282,6 +282,7 @@ impl Synchronizer {
                     "syncing version {} -> {} to remote",
                     args.version, args.peer_version
                 );
+                trace!("genesis_sync request: {msg:?}");
                 match args
                     .runtime
                     .block_on(args.session.grpc_genesis_sync_with_statsd(msg))
