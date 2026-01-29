@@ -34,7 +34,8 @@ const TRACE_TREE_VERSION_0x16 = 0x16 // before 20251231
 const TRACE_TREE_VERSION_0x17 = 0x17 // before 20260115
 const TRACE_TREE_VERSION_0x18 = 0x18 // before 20260116
 const TRACE_TREE_VERSION_0x19 = 0x19 // before 20260127
-const TRACE_TREE_VERSION = 0x20
+const TRACE_TREE_VERSION_0x20 = 0x20 // before 20260129
+const TRACE_TREE_VERSION = 0x21
 
 func HashSearchIndex(key string) uint64 {
 	return utils.DJBHash(17, key)
@@ -99,7 +100,9 @@ type TreeNode struct {
 	Topic         string
 	QuerierRegion string
 
+	ResponseException              string
 	ResponseDurationSum            uint64
+	ResponseCode                   uint32
 	ResponseTotal                  uint32
 	ResponseStatusServerErrorCount uint32
 	Total                          uint32
@@ -216,7 +219,9 @@ func (t *TraceTree) Encode() {
 		encoder.WriteU8(node.PseudoLink)
 		encoder.WriteString255(node.Topic)
 		encoder.WriteString255(node.QuerierRegion)
+		encoder.WriteString255(node.ResponseException)
 		encoder.WriteVarintU64(node.ResponseDurationSum)
+		encoder.WriteVarintU32(node.ResponseCode)
 		encoder.WriteVarintU32(node.ResponseTotal)
 		encoder.WriteVarintU32(node.ResponseStatusServerErrorCount)
 		encoder.WriteVarintU32(node.Total)
@@ -306,7 +311,9 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		if version >= TRACE_TREE_VERSION {
 			n.QuerierRegion = decoder.ReadString255()
 		}
+		n.ResponseException = decoder.ReadString255()
 		n.ResponseDurationSum = decoder.ReadVarintU64()
+		n.ResponseCode = decoder.ReadVarintU32()
 		n.ResponseTotal = decoder.ReadVarintU32()
 		n.ResponseStatusServerErrorCount = decoder.ReadVarintU32()
 		n.Total = decoder.ReadVarintU32()
