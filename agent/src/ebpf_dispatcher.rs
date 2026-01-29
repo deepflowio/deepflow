@@ -1049,7 +1049,7 @@ impl EbpfCollector {
 
             if ebpf::set_tcp_option_tracing_enabled(tcp_option_trace.enabled) != 0 {
                 warn!(
-                    "failed to set tcp option tracing enabled to {}",
+                    "tcp option tracing enable failed (set enabled = {})",
                     tcp_option_trace.enabled
                 );
             }
@@ -1526,7 +1526,7 @@ impl EbpfCollector {
 
                 if ebpf::set_tcp_option_tracing_enabled(tcp_option_trace.enabled) != 0 {
                     warn!(
-                        "failed to set tcp option tracing enabled to {}",
+                        "tcp option tracing enable failed (set enabled = {})",
                         tcp_option_trace.enabled
                     );
                 }
