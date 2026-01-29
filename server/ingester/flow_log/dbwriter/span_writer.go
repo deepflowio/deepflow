@@ -108,6 +108,7 @@ func (t *SpanWithTraceID) Encode() {
 	encoder.WriteString255(t.RequestResource)
 	encoder.WriteString255(t.ResponseResult)
 	encoder.WriteString255(t.BizProtocol)
+	encoder.WriteString255(t.ResponseException)
 	if t.RequestId != nil {
 		encoder.WriteVarintU64(*t.RequestId)
 	} else {
