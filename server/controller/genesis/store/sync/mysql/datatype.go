@@ -104,7 +104,7 @@ func (gs *GenesisSyncTypeOperation[T]) Update(orgID int, vtapID uint32, vtapKey 
 		// add
 		for lcuuid, data := range newData {
 			_, ok := curData[lcuuid]
-			if ok {
+			if ok || data.GetVtapID() == 0 {
 				continue
 			}
 			log.Infof("sync (%s) add (%#+v)", vtapKey, data, logger.NewORGPrefix(orgID))
@@ -113,7 +113,7 @@ func (gs *GenesisSyncTypeOperation[T]) Update(orgID int, vtapID uint32, vtapKey 
 		// delete
 		for lcuuid, data := range curData {
 			_, ok := newData[lcuuid]
-			if ok {
+			if ok || data.GetVtapID() == 0 {
 				continue
 			}
 			log.Infof("sync (%s) delete (%#+v)", vtapKey, data, logger.NewORGPrefix(orgID))
