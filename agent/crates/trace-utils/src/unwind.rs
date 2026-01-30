@@ -16,6 +16,7 @@
 
 pub mod dwarf;
 pub mod elf_utils;
+pub mod tpbase;
 
 use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
 use std::collections::{hash_map::Entry, HashMap, HashSet};
