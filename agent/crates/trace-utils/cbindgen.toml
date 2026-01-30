@@ -60,7 +60,8 @@ include = [
   "LuaUnwindInfo",
   "LuaUnwindTable",
   "LuaOfs",
-  "LjOfs"
+  "LjOfs",
+  "TSDInfo"
 ]
 exclude = [
   "bpf_update_elem",
@@ -80,6 +81,7 @@ ProcessShardList = "process_shard_list_t"
 UnwindEntry = "unwind_entry_t"
 UnwindEntryShard = "unwind_entry_shard_t"
 UnwindTable = "unwind_table_t"
+TSDInfo = "tsd_info_t"
 PyCframe = "py_cframe_t"
 PyCodeObject = "py_code_object_t"
 PyFrameObject = "py_frame_object_t"
