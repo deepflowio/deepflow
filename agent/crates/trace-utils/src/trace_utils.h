@@ -173,8 +173,41 @@ typedef struct {
 
 #if defined(DF_ENTERPRISE)
 typedef struct {
-    uint64_t thread_state_address;
+    /**
+     * Offset from thread pointer base (TPBASE) to TSD storage
+     */
+    int16_t offset;
+    /**
+     * TSD key multiplier (glibc=16, musl=8)
+     */
+    uint8_t multiplier;
+    /**
+     * Whether indirect addressing is needed (musl=1, glibc=0)
+     */
+    uint8_t indirect;
+} tsd_info_t;
+
+typedef struct {
+    /**
+     * Address of autoTLSkey variable in Python runtime
+     */
+    uint64_t auto_tls_key_addr;
+    /**
+     * Python version encoded as 0xMMmm (e.g., 0x030A for 3.10)
+     */
+    uint16_t version;
+    /**
+     * Thread Specific Data info for multi-threading support
+     */
+    tsd_info_t tsd_info;
+    /**
+     * ID for looking up python_offsets in the offsets map
+     */
     uint8_t offsets_id;
+    /**
+     * Padding for alignment
+     */
+    uint8_t _padding[5];
 } python_unwind_info_t;
 #endif
 
@@ -708,6 +741,12 @@ void rust_log_wrapper(LogLevel level,
                       const char *_function_name,
                       const char *file_path,
                       int line_number);
+
+/**
+ * Read TPBASE offset from kernel functions
+ * Returns the offset of fsbase/tpidr in task_struct, or -1 on failure
+ */
+int64_t read_tpbase_offset(void);
 
 int rustc_demangle(const char *mangled, char *out, size_t out_size);
 

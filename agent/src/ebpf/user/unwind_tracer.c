@@ -190,11 +190,33 @@ static bool requires_dwarf_unwind_table(int pid) {
 }
 
 int unwind_tracer_init(struct bpf_tracer *tracer) {
-    int32_t offset = read_offset_of_stack_in_task_struct();
-    if (offset < 0) {
+    /* Initialize unwind_sysinfo with task_struct offsets */
+    int32_t stack_offset = read_offset_of_stack_in_task_struct();
+    if (stack_offset < 0) {
         ebpf_warning("unwind tracer init: failed to get field stack offset in task struct from btf");
         ebpf_warning("unwinder may not handle in kernel perf events correctly");
-    } else if (!bpf_table_set_value(tracer, MAP_UNWIND_SYSINFO_NAME, 0, &offset)) {
+    }
+
+    /* Get tpbase_offset for TLS access (needed for Python multi-threading support) */
+    int64_t tpbase_offset = read_tpbase_offset();
+    if (tpbase_offset < 0) {
+        ebpf_warning("unwind tracer init: failed to get tpbase offset from kernel");
+        ebpf_warning("Python multi-threaded profiling may not work correctly");
+        tpbase_offset = 0;
+    } else {
+        ebpf_info("unwind tracer init: tpbase_offset=%ld", tpbase_offset);
+    }
+
+    /* Update unwind_sysinfo map with both offsets */
+    struct {
+        uint32_t task_struct_stack_offset;
+        uint64_t tpbase_offset;
+    } sysinfo = {
+        .task_struct_stack_offset = stack_offset > 0 ? (uint32_t)stack_offset : 0,
+        .tpbase_offset = (uint64_t)tpbase_offset,
+    };
+
+    if (!bpf_table_set_value(tracer, MAP_UNWIND_SYSINFO_NAME, 0, &sysinfo)) {
         ebpf_warning("unwind tracer init: update %s error", MAP_UNWIND_SYSINFO_NAME);
         ebpf_warning("unwinder may not handle in kernel perf events correctly");
     }
