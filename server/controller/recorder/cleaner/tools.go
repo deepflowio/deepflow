@@ -75,10 +75,11 @@ func pageDeleteExpiredAndPublish[MDPT msgConstraint.DeletePtr[MDT], MDT msgConst
 		if end > total {
 			end = total
 		}
-		if err := db.Unscoped().Delete(items[i:end]).Error; err != nil {
+		batchItems := items[i:end]
+		if err := db.Unscoped().Delete(batchItems).Error; err != nil {
 			log.Errorf("metadb delete %s resource failed: %s", resourceType, err.Error(), db.LogPrefixORGID)
 		} else {
-			publishTagrecorder[MDPT, MDT, MT](db, items, resourceType, toolData)
+			publishTagrecorder[MDPT, MDT, MT](db, batchItems, resourceType, toolData)
 		}
 	}
 
