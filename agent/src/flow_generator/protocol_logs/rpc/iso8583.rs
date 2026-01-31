@@ -29,6 +29,7 @@ use crate::{
     },
     flow_generator::{
         protocol_logs::{
+            calc_rrt_now,
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
@@ -67,6 +68,7 @@ pub struct Iso8583Info {
     captured_request_byte: u32,
     captured_response_byte: u32,
 
+    // nanoseconds
     pub rrt: u64,
 
     #[serde(skip)]
@@ -343,6 +345,19 @@ impl L7ProtocolParserInterface for Iso8583Log {
                     self.perf_stats.as_mut().map(|p| p.inc_resp());
                 }
                 _ => {}
+            }
+
+            // f7 is format as 'MMddhhmmss'
+            if info.f7.len() == 10 {
+                // 'hhmmss' part of f7
+                if let Some(rrt_us) = calc_rrt_now(&info.f7[4..]) {
+                    info.rrt = rrt_us * 1000; // convert to nanoseconds
+                    if let Some(perf_stats) = self.perf_stats.as_mut() {
+                        perf_stats.rrt_count += 1;
+                        perf_stats.rrt_sum += rrt_us;
+                        perf_stats.rrt_max = perf_stats.rrt_max.max(rrt_us as u32);
+                    }
+                }
             }
 
             if is_00x000(&info.f3) {

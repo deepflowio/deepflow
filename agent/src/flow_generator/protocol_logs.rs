@@ -65,6 +65,7 @@ use std::{
     fmt,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use base64::{prelude::BASE64_STANDARD, Engine};
@@ -710,5 +711,88 @@ cfg_if::cfg_if! {
                 _ => warn!("Ignored operation {op:?} that is not supported by auto custom field merging"),
             }
         }
+    }
+}
+
+// Calculate RRT with 0–1 second tolerance.
+// If RRT < 0, treat it as 0.
+// If RRT > 120s, consider it invalid.
+// Return value in microseconds (us)
+pub fn calc_rrt_now(hhmmss: &str) -> Option<u64> {
+    if hhmmss.len() != 6 {
+        return None;
+    }
+
+    let input_mm: i64 = hhmmss[2..4].parse().ok()?;
+    let input_ss: i64 = hhmmss[4..6].parse().ok()?;
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?;
+
+    let total_sec = now.as_secs() as i64;
+    let now_micro = now.subsec_micros() as i64;
+
+    let now_mm = (total_sec / 60) % 60;
+    let now_ss = total_sec % 60;
+
+    calc_rrt_core(input_mm, input_ss, now_mm, now_ss, now_micro)
+}
+
+fn calc_rrt_core(
+    input_mm: i64,
+    input_ss: i64,
+    now_mm: i64,
+    now_ss: i64,
+    now_micro: i64,
+) -> Option<u64> {
+    let input_sec = input_mm * 60 + input_ss;
+    let now_sec = now_mm * 60 + now_ss;
+
+    let mut diff_sec = now_sec - input_sec;
+
+    // 59 -> 00 cross-hour correction
+    if diff_sec < 0 && now_mm < input_mm {
+        diff_sec += 3600;
+    }
+
+    if diff_sec < 0 {
+        return Some(1000_000);
+        // return Some(0);
+    }
+
+    // RRT exceeding 120s is considered invalid
+    if diff_sec > 120 {
+        return Some(10000_000);
+        // return None;
+    }
+
+    Some(diff_sec as u64 * 1_000_000 + now_micro as u64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_59_to_00() {
+        // 12:00:10 vs 11:59:50
+        let us = calc_rrt_core(59, 50, 0, 10, 0).unwrap();
+        assert_eq!(us, 20_000_000);
+    }
+
+    #[test]
+    fn test_future() {
+        let us = calc_rrt_core(10, 20, 10, 10, 0).unwrap();
+        assert_eq!(us, 0);
+    }
+
+    #[test]
+    fn test_over_window() {
+        let res = calc_rrt_core(7, 0, 10, 30, 0);
+        assert!(res.is_none());
+    }
+
+    #[test]
+    fn test_micro() {
+        let us = calc_rrt_core(10, 30, 10, 31, 123_456).unwrap();
+        assert_eq!(us, 1_123_456);
     }
 }

@@ -40,7 +40,7 @@ use crate::{
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
-            auto_merge_custom_field,
+            auto_merge_custom_field, calc_rrt_now,
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
@@ -356,6 +356,15 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
                     self.perf_stats.as_mut().map(|p| p.inc_resp());
                 }
                 _ => {}
+            }
+
+            if let Some(rrt_us) = calc_rrt_now(&self.parser.orig_send_time) {
+                info.rrt = rrt_us * 1000; // convert to nanoseconds
+                if let Some(perf_stats) = self.perf_stats.as_mut() {
+                    perf_stats.rrt_count += 1;
+                    perf_stats.rrt_sum += rrt_us;
+                    perf_stats.rrt_max = perf_stats.rrt_max.max(rrt_us as u32);
+                }
             }
             info.base.attributes.push(KeyVal {
                 key: "mq_Index".to_string(),
