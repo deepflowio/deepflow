@@ -334,6 +334,7 @@ pub mod l7 {
             #[derive(Default)]
             pub struct WebSphereMqParser {
                 pub base: L7LogBase,
+                pub orig_send_time: String,
             }
 
             impl WebSphereMqParser {
