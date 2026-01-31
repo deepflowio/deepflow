@@ -40,7 +40,7 @@ use crate::{
     flow_generator::{
         error::{Error, Result},
         protocol_logs::{
-            auto_merge_custom_field,
+            auto_merge_custom_field, estimate_rrt_us_by_beijing_mmss,
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
@@ -356,6 +356,27 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
                     self.perf_stats.as_mut().map(|p| p.inc_resp());
                 }
                 _ => {}
+            }
+
+            // As the protocol is asynchronous and request/response are not correlated into a session,
+            // RRT cannot be measured using generic methods.
+            // However, the business payload provides the `OrigSendTime` field
+            // represents the request send time (second precision, in the format of "hhmmss", length = 6).
+            // RRT can roughly estimated by (response receive time - OrigSendTime).
+            if info.base.msg_type == LogMessageType::Response
+                && self.parser.orig_send_time.len() == 6
+            {
+                // get "mmss" part of orig_send_time, and must be in Beijing Time (UTC+8)
+                if let Some(rrt_us) =
+                    estimate_rrt_us_by_beijing_mmss(&self.parser.orig_send_time[2..], param.time)
+                {
+                    info.rrt = rrt_us;
+                    if let Some(perf_stats) = self.perf_stats.as_mut() {
+                        perf_stats.rrt_count += 1;
+                        perf_stats.rrt_sum += rrt_us;
+                        perf_stats.rrt_max = perf_stats.rrt_max.max(rrt_us as u32);
+                    }
+                }
             }
             info.base.attributes.push(KeyVal {
                 key: "mq_Index".to_string(),

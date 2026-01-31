@@ -32,6 +32,7 @@ use crate::{
     },
     flow_generator::{
         protocol_logs::{
+            estimate_rrt_us_by_beijing_mmss,
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
@@ -41,6 +42,8 @@ use crate::{
         AppProtoHead, Error, Result,
     },
 };
+
+use log::info;
 
 #[derive(Serialize, Debug, Default, Clone, PartialEq)]
 pub struct Iso8583Info {
@@ -70,6 +73,7 @@ pub struct Iso8583Info {
     captured_request_byte: u32,
     captured_response_byte: u32,
 
+    // precision: microseconds
     pub rrt: u64,
 
     #[serde(skip)]
@@ -352,6 +356,32 @@ impl L7ProtocolParserInterface for Iso8583Log {
                     }
                 }
                 _ => {}
+            }
+
+            // As the protocol is asynchronous and requests/responses are not correlated into a session,
+            // RRT cannot be measured using generic methods.
+            // But ISO8583 `Field 7 (Transmission Date & Time)` represents the request send time
+            // second precision, in the format of "MMddhhmmss", length = 10.
+            // RRT can be roughly estimated by (response receive time - Field 7).
+            if info.msg_type == LogMessageType::Response && info.f7.len() == 10 {
+                // get 'mmss' part of info.f7, info.f7 must be in Beijing Time (UTC+8)
+                let total_sec = (param.time / 1_000_000) as i64;
+                let adj_sec = total_sec - 10; // 减 10 秒
+
+                let mm = (adj_sec / 60) % 60;
+                let ss = adj_sec % 60;
+
+                let mmss = format!("{:02}{:02}", mm, ss);
+
+                if let Some(rrt_us) = estimate_rrt_us_by_beijing_mmss(&mmss, param.time) {
+                    info.rrt = rrt_us;
+                    if let Some(perf_stats) = self.perf_stats.as_mut() {
+                        perf_stats.rrt_count += 1;
+                        perf_stats.rrt_sum += rrt_us;
+                        perf_stats.rrt_max = perf_stats.rrt_max.max(rrt_us as u32);
+                    }
+                    info!("8583 rrt {} {} {}", rrt_us, param.time, mmss);
+                }
             }
 
             if is_00x000(&info.f3) {
