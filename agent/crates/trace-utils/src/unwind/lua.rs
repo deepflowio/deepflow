@@ -17,6 +17,8 @@
 use std::{
     collections::HashMap,
     ffi::CStr,
+    fs::File,
+    io::Read,
     mem::{self, MaybeUninit},
     ptr, slice, str,
     sync::{Mutex, OnceLock},
@@ -814,7 +816,7 @@ const LUA_54_OFFSETS: Option<LuaOfs> = Some(LuaOfs {
     off_proto_lineinfo: 88,
     off_proto_abslineinfo: 0,
     off_tstring_len: 0,
-    sizeof_tstring: 32,
+    sizeof_tstring: 24,
     sizeof_callinfo: 64,
     sizeof_tvalue: 16,
 });
@@ -1345,26 +1347,8 @@ fn detect_runtime_uncached(pid: u32) -> Option<LuaRuntimeInfo> {
         return None;
     }
 
-    let (kind, ver, label) = if best_path.contains("libluajit-5.1") || best_path.contains("luajit")
-    {
-        (2u32, "2.1", "LuaJIT 2.1")
-    } else if best_path.contains("liblua5.4") || best_path.ends_with("/lua5.4") {
-        (1u32, "5.4", "Pure Lua 5.4")
-    } else if best_path.contains("liblua5.3") || best_path.ends_with("/lua5.3") {
-        (1u32, "5.3", "Pure Lua 5.3")
-    } else if best_path.contains("liblua5.2") || best_path.ends_with("/lua5.2") {
-        (1u32, "5.2", "Pure Lua 5.2")
-    } else if best_path.contains("liblua5.1")
-        || best_path.ends_with("/lua5.1")
-        || best_path.ends_with("/lua")
-    {
-        (1u32, "5.1", "Pure Lua 5.1")
-    } else {
-        (1u32, "", "Pure Lua (unknown)")
-    };
-
     let mut info = LuaRuntimeInfo {
-        kind,
+        kind: 0,
         version: [0; LUA_RUNTIME_VERSION_LEN],
         detection_method: [0; LUA_RUNTIME_DETECT_METHOD_LEN],
         path: [0; LUA_RUNTIME_PATH_LEN],
@@ -1377,12 +1361,93 @@ fn detect_runtime_uncached(pid: u32) -> Option<LuaRuntimeInfo> {
         format!("/proc/{pid}/root/{best_path_str}")
     };
 
+    // NOTE: This is a heuristic. In particular, an unversioned `.../lua` executable may
+    // be Lua 5.2/5.3/5.4; do NOT default it to 5.1, otherwise the unwinder will use the
+    // wrong struct offsets and eBPF will fail to read `L->ci`.
+    let (kind, ver, label) = if best_path.contains("libluajit-5.1") || best_path.contains("luajit")
+    {
+        (2u32, "2.1", "LuaJIT 2.1")
+    } else if best_path.contains("liblua5.4") || best_path.ends_with("/lua5.4") {
+        (1u32, "5.4", "Pure Lua 5.4")
+    } else if best_path.contains("liblua5.3") || best_path.ends_with("/lua5.3") {
+        (1u32, "5.3", "Pure Lua 5.3")
+    } else if best_path.contains("liblua5.2") || best_path.ends_with("/lua5.2") {
+        (1u32, "5.2", "Pure Lua 5.2")
+    } else if best_path.contains("liblua5.1") || best_path.ends_with("/lua5.1") {
+        (1u32, "5.1", "Pure Lua 5.1")
+    } else if best_path.ends_with("/lua") || best_path.ends_with("/lua.bin") || best_path.ends_with("/lua.exe") {
+        match scan_lua_version_string(&full_path) {
+            Some(v) => (1u32, v, "Pure Lua (from binary string scan)"),
+            None => (1u32, "", "Pure Lua (unknown version)"),
+        }
+    } else {
+        (1u32, "", "Pure Lua (unknown)")
+    };
+
+    info.kind = kind;
     let method = format!("Library analysis: {} ({})", full_path, label);
-    copy_into(&mut info.version, ver.as_bytes());
+    if !ver.is_empty() {
+        copy_into(&mut info.version, ver.as_bytes());
+    }
     copy_into(&mut info.detection_method, method.as_bytes());
     copy_into(&mut info.path, full_path.as_bytes());
 
     Some(info)
+}
+
+fn scan_lua_version_string(path: &str) -> Option<&'static str> {
+    let mut file = File::open(path).ok()?;
+
+    const LIMIT: usize = 4 * 1024 * 1024;
+    const CHUNK: usize = 64 * 1024;
+    const NEEDLES: [(&[u8], &str); 4] = [
+        (b"Lua 5.4", "5.4"),
+        (b"Lua 5.3", "5.3"),
+        (b"Lua 5.2", "5.2"),
+        (b"Lua 5.1", "5.1"),
+    ];
+
+    let max_needle = NEEDLES
+        .iter()
+        .map(|(n, _)| n.len())
+        .max()
+        .unwrap_or(0);
+    if max_needle == 0 {
+        return None;
+    }
+
+    let mut buf = vec![0u8; CHUNK];
+    let mut overlap: Vec<u8> = Vec::with_capacity(max_needle.saturating_sub(1));
+    let mut total = 0usize;
+
+    while total < LIMIT {
+        let read_len = file.read(&mut buf).ok()?;
+        if read_len == 0 {
+            break;
+        }
+        total += read_len;
+
+        let mut window = Vec::with_capacity(overlap.len() + read_len);
+        window.extend_from_slice(&overlap);
+        window.extend_from_slice(&buf[..read_len]);
+
+        for (needle, ver) in NEEDLES {
+            if window.windows(needle.len()).any(|chunk| chunk == needle) {
+                return Some(ver);
+            }
+        }
+
+        let keep = max_needle.saturating_sub(1);
+        if keep == 0 {
+            overlap.clear();
+        } else if window.len() <= keep {
+            overlap = window;
+        } else {
+            overlap = window[window.len() - keep..].to_vec();
+        }
+    }
+
+    None
 }
 
 fn parse_version(v: &str) -> Option<(u32, u32)> {
