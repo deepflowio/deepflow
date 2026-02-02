@@ -230,7 +230,9 @@ func (r *ServiceRawData) ConvertDBData(md *MetaData) {
 			}
 			// 构建 podServiceID 到 podGroupIDs 的一对多映射
 			if groupIDs, ok := podServiceIDToPodGroupIDs[serviceID]; ok {
-				podServiceIDToPodGroupIDs[serviceID] = append(groupIDs, groupId)
+				if !slices.Contains(groupIDs, groupId) {
+					podServiceIDToPodGroupIDs[serviceID] = append(groupIDs, groupId)
+				}
 			} else {
 				podServiceIDToPodGroupIDs[serviceID] = []int{groupId}
 			}
