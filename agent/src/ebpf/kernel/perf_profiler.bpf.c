@@ -467,8 +467,30 @@ int get_usermode_regs(struct pt_regs *regs, regs_t * dst)
 		return 0;
 	}
 
-	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+#ifdef LINUX_VER_5_15_PLUS
+	// bpf_task_pt_regs requires a BTF-typed task_struct pointer.
+	struct task_struct *task_btf = bpf_get_current_task_btf();
+	struct pt_regs *pt_regs_addr = NULL;
+	if (task_btf) {
+		pt_regs_addr = bpf_task_pt_regs(task_btf);
+	}
+	if (pt_regs_addr) {
+		struct pt_regs user_regs;
+		int ret = bpf_probe_read_kernel(&user_regs, sizeof(user_regs),
+						(void *)pt_regs_addr);
+		if (!ret) {
+			dst->ip = PT_REGS_IP(&user_regs);
+			dst->sp = PT_REGS_SP(&user_regs);
+			dst->bp = PT_REGS_FP(&user_regs);
+#if defined(__aarch64__)
+			dst->lr = user_regs.regs[30];
+#endif
+			return 0;
+		}
+	}
+#endif
 
+	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 	__u32 zero = 0;
 	unwind_sysinfo_t *sysinfo = unwind_sysinfo__lookup(&zero);
 	if (!sysinfo) {
