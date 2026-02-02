@@ -17,10 +17,17 @@ CLANG ?= /usr/bin/clang
 LLVM_STRIP ?= /usr/bin/llvm-strip
 LLVM_OBJDUMP ?= /usr/bin/llvm-objdump
 CC ?= gcc
+PREFIX ?=
+ifneq ($(PREFIX),)
+	BUILD_DIR := build/$(PREFIX)
+else
+	BUILD_DIR := build
+endif
 TAEGET_KERN_SRC := socket_trace.bpf.c perf_profiler.bpf.c
 TAEGET_KERN_SRC += $(KERN_SRC_EXTRA)
-TAEGET_KERN_LL = $(TAEGET_KERN_SRC:c=ll)
-TAEGET_KERN_ELF = $(TAEGET_KERN_SRC:c=elf)
+TAEGET_KERN_LL = $(addprefix $(BUILD_DIR)/,$(TAEGET_KERN_SRC:c=ll))
+TAEGET_KERN_ELF = $(addprefix $(BUILD_DIR)/,$(TAEGET_KERN_SRC:c=elf))
+OBJDUMP ?=
 ifeq ($(V),1)
 	Q =
 	msg =
@@ -56,8 +63,9 @@ EBPF_CLAGS ?= -I. -Ivmlinux -Iinclude -I../../../crates/trace-utils/src \
         -DSTART_BOOTTIME_OFFSET_OVERRIDE=0      \
         -DSTART_BOOTTIME_VARNAME=real_start_time
 
-%.elf: %.c
+$(BUILD_DIR)/%.elf: %.c
 	$(call msg,BPF,$@,$(CORE))	
+	$(Q)mkdir -p $(BUILD_DIR)
 	$(Q)$(CLANG) $(EBPF_CLAGS) $(EXTRA_EBPF_CLAGS) -DCOMPILE_MUSL=$(C_USE_STATIC) -std=gnu99 -Wimplicit-function-declaration \
 		-ffreestanding -fno-builtin -Wall \
 		-Wno-deprecated-declarations \
@@ -69,11 +77,14 @@ EBPF_CLAGS ?= -I. -Ivmlinux -Iinclude -I../../../crates/trace-utils/src \
 		-fno-unwind-tables \
 		-fno-stack-protector \
 		-fno-asynchronous-unwind-tables -g -O2 $(FINAL_TARGET)
-	$(Q)$(LLVM_OBJDUMP) --source --debug-vars --line-numbers --symbol-description $@ > ${@:.elf=.objdump} 
+ifeq ($(OBJDUMP),1)
+	$(Q)$(LLVM_OBJDUMP) --source --debug-vars --line-numbers --symbol-description $@ > ${@:.elf=.objdump}
+endif
 	$(Q)$(LLVM_STRIP) -g $@ # strip useless DWARF info
 
 clean:
 	@rm -f ../user/extended/bpf/*.bpf.elf ../user/extended/bpf/*.bpf.ll
+	@rm -rf $(BUILD_DIR)
 	@rm $(TAEGET_KERN_ELF) $(TARGET) ${TAEGET_KERN_ELF:.elf=.ll} *.S *.objdump -rf
 
 .PHONY: all clean
