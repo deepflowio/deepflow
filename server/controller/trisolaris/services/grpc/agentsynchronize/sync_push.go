@@ -481,22 +481,11 @@ func (e *AgentEvent) noAgentResponse(in *api.SyncRequest, orgID int) *api.SyncRe
 		}
 	}
 
-	agentTypeForUnknowAgent := gAgentInfo.GetTridentTypeForUnknowVTap()
-	if agentTypeForUnknowAgent != 0 {
-		dynamicConfigInfo.AgentType = utils.Int2AgentTypePtr(agentTypeForUnknowAgent)
-		switch agentTypeForUnknowAgent {
-		case UNKNOW_VTAP_TYPE_KVM:
-			userConfig.Set(CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED, true)
-		case UNKNOW_VTAP_TYPE_WORKLOAD_V:
-			userConfig.Set(CONFIG_KEY_WORKLOAD_RESOURCE_ENABLED, true)
-		default:
-		}
-
-		return &api.SyncResponse{
-			Status:        &STATUS_SUCCESS,
-			DynamicConfig: dynamicConfigInfo,
-			UserConfig:    proto.String(e.marshalUserConfig(userConfig, nil)),
-		}
+	switch {
+	case userConfig.Bool(CONFIG_KEY_HYPERVISOR_RESOURCE_ENABLED):
+		dynamicConfigInfo.AgentType = utils.Int2AgentTypePtr(UNKNOW_VTAP_TYPE_KVM)
+	case userConfig.Bool(CONFIG_KEY_WORKLOAD_RESOURCE_ENABLED):
+		dynamicConfigInfo.AgentType = utils.Int2AgentTypePtr(UNKNOW_VTAP_TYPE_WORKLOAD_V)
 	}
 
 	return &api.SyncResponse{

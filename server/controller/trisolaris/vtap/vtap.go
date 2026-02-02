@@ -647,13 +647,6 @@ func (v *VTapInfo) GetSelfUpdateUrl() string {
 	return v.config.SelfUpdateUrl
 }
 
-func (v *VTapInfo) GetTridentTypeForUnknowVTap() int {
-	if v == nil {
-		return 0
-	}
-	return v.config.TridentTypeForUnknowVtap
-}
-
 func (v *VTapInfo) GetGroupData() []byte {
 	if v == nil {
 		return nil
