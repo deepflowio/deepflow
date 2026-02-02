@@ -723,6 +723,9 @@ static char *folded_stack_trace_string(struct bpf_tracer *t,
 			int ret = VEC_OK;
 			struct stack_str_hash_ext_data *ext = h->private;
 			vec_add1(ext->stack_str_kvps, kv, ret);
+			if (ret != VEC_OK) {
+				ebpf_warning("vec add failed\n");
+			}
 			return str;
 		}
 	}
