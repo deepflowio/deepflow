@@ -35,7 +35,8 @@ const TRACE_TREE_VERSION_0x17 = 0x17 // before 20260115
 const TRACE_TREE_VERSION_0x18 = 0x18 // before 20260116
 const TRACE_TREE_VERSION_0x19 = 0x19 // before 20260127
 const TRACE_TREE_VERSION_0x20 = 0x20 // before 20260129
-const TRACE_TREE_VERSION = 0x21
+const TRACE_TREE_VERSION_0x21 = 0x21 // before 20260202
+const TRACE_TREE_VERSION = 0x22
 
 func HashSearchIndex(key string) uint64 {
 	return utils.DJBHash(17, key)
@@ -106,6 +107,7 @@ type TreeNode struct {
 	ResponseTotal                  uint32
 	ResponseStatusServerErrorCount uint32
 	Total                          uint32
+	ResponseStatus                 uint8
 }
 
 func (t *TraceTree) Release() {
@@ -225,6 +227,7 @@ func (t *TraceTree) Encode() {
 		encoder.WriteVarintU32(node.ResponseTotal)
 		encoder.WriteVarintU32(node.ResponseStatusServerErrorCount)
 		encoder.WriteVarintU32(node.Total)
+		encoder.WriteU8(node.ResponseStatus)
 	}
 	t.encodedTreeNodes = encoder.Bytes()
 }
@@ -317,6 +320,7 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		n.ResponseTotal = decoder.ReadVarintU32()
 		n.ResponseStatusServerErrorCount = decoder.ReadVarintU32()
 		n.Total = decoder.ReadVarintU32()
+		n.ResponseStatus = decoder.ReadU8()
 	}
 	if decoder.Failed() {
 		return fmt.Errorf("trace tree decode failed, offset is %d, buf length is %d ", decoder.Offset(), len(decoder.Bytes()))
