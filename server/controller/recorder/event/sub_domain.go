@@ -80,8 +80,14 @@ func (r *SubDomain) ProduceFromMySQL() {
 				log.Infof("pod group ids: %v connected to config map (id: %d)", podGroupIDs, event.ConfigMapID, r.metadata.LogPrefixes)
 			}
 			for _, podGroupID := range podGroupIDs {
+				gtype, ok := r.ToolDataSet.GetPodGroupTypeByID(podGroupID)
+				if !ok {
+					log.Errorf("get pod group (id: %d) type failed", podGroupID, r.metadata.LogPrefixes)
+				}
+				event.PodGroupType = uint8(common.RESOURCE_POD_GROUP_TYPE_MAP[gtype])
 				event.PodGroupID = uint32(podGroupID)
 				r.convertAndEnqueue(item.ResourceLcuuid, event)
+				event.InstanceType = uint32(common.VIF_DEVICE_TYPE_POD) // 此处如此赋值原因同 RESOURCE_EVENT_TYPE_MODIFY 类型变更事件
 			}
 		}
 		r.metadata.DB.Delete(&item)
