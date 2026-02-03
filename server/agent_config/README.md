@@ -4127,6 +4127,80 @@ Use kprobe to collect data on ports that are not in the blacklist or whitelist.
 
 Example: `ports: 80,1000-2000`
 
+#### SockOps {#inputs.ebpf.socket.sock_ops}
+
+##### TCP Option Trace {#inputs.ebpf.socket.sock_ops.tcp_option_trace}
+
+###### TCP Option Tracing {#inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      sock_ops:
+        tcp_option_trace:
+          enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to enable the tcp-option tracing SockOps program, which injects DeepFlow metadata
+(for example, process PID) into a custom TCP option for eligible connections.
+Note: This feature requires cgroup v2 (unified hierarchy) and kernel > 5.10. On hosts
+using cgroup v1 the SockOps program will fail to attach and the agent will log a warning.
+Compatibility: validated on x86 with kernel > 5.10; on arm we have only tested with
+kernel 6.8 so far.
+Limitation: PID tracking relies on the per-CPU syscall map in. Under CPU congestion,
+softirqs handling TCP may run on a different CPU than the userspace thread, so the
+injected metadata can be missing or stale.
+
+###### PID Injection Window {#inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      sock_ops:
+        tcp_option_trace:
+          sampling_window_bytes: 16384
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | Bytes |
+| Range | [0, 1048576] |
+
+**Description**:
+
+Minimum number of TCP payload bytes between PID injections. Default 16KB matches the
+legacy behavior; smaller windows increase frequency, larger windows decrease it. Set to
+0 to disable sampling and inject on every eligible packet.
+
 #### Tunning {#inputs.ebpf.socket.tunning}
 
 ##### Max Capture Rate {#inputs.ebpf.socket.tunning.max_capture_rate}
@@ -7839,7 +7913,7 @@ processors:
     application_protocol_inference:
       protocol_special_config:
         web_sphere_mq:
-          parse_xml_enabled: false
+          parse_xml_enabled: true
 ```
 
 **Schema**:
@@ -8260,7 +8334,7 @@ Match field value.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8655,6 +8729,14 @@ setting it to empty.
 If multiple values are specified, the first match will be used.
 Fields rewritten by plugins have the highest priority.
 
+Supports extracting the trace id from the following headers, in the following format:
+- traceparent: 00-TRACEID-SPANID-01
+- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+- sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
+- sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+- uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
+- b3: TRACEID-SPANID-1
+
 ##### Copy APM TraceID {#processors.request_log.tag_extraction.tracing_tag.copy_apm_trace_id}
 
 **Tags**:
@@ -8718,6 +8800,14 @@ in multiple values separated by commas. This feature can be turned off by
 setting it to empty.
 If multiple values are specified, the first match will be used.
 Fields rewritten by plugins have the highest priority.
+
+Supports extracting the span id from the following headers, in the following format:
+- traceparent: 00-TRACEID-SPANID-01
+- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+- sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
+- sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+- uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
+- b3: TRACEID-SPANID-1
 
 #### HTTP Endpoint {#processors.request_log.tag_extraction.http_endpoint}
 

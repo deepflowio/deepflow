@@ -26,7 +26,7 @@ type ExSpan struct {
 	EndTimeUs       int64  `json:"end_time_us"`
 	TapSide         string `json:"tap_side"` // spankind=server: s-app/ spankind=client: c-app/ spankind=internal: app
 	L7Protocol      int    `json:"l7_protocol"`
-	L7ProtocolStr   string `json:"l7_protocol_str"`
+	BizProtocol     string `json:"biz_protocol"`
 	L7ProtocolEnum  string `json:"Enum(l7_protocol)"` // required, will show in span bar name in flamegraph
 	TraceID         string `json:"trace_id"`
 	SpanID          string `json:"span_id"`

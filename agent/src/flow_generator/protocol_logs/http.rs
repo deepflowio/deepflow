@@ -2600,7 +2600,7 @@ mod tests {
             span_set.insert(TraceType::Sw8.as_str());
             let param = &mut ParseParam::new(
                 packet as &MetaPacket,
-                log_cache.clone(),
+                Some(log_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
@@ -2797,7 +2797,7 @@ mod tests {
             parse_perf: true,
             parse_log: true,
             parse_config: Some(&conf),
-            l7_perf_cache: Rc::new(RefCell::new(L7PerfCache::new(1))),
+            l7_perf_cache: Some(Rc::new(RefCell::new(L7PerfCache::new(1)))),
             wasm_vm: Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             so_func: Default::default(),
@@ -2939,7 +2939,9 @@ mod tests {
         let packet = MetaPacket::empty();
         let mut param = ParseParam::new(
             &packet,
-            Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY))),
+            Some(Rc::new(RefCell::new(L7PerfCache::new(
+                L7_RRT_CACHE_CAPACITY,
+            )))),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),
@@ -3053,7 +3055,7 @@ mod tests {
             if packet.get_l4_payload().is_some() {
                 let param = &mut ParseParam::new(
                     &*packet,
-                    rrt_cache.clone(),
+                    Some(rrt_cache.clone()),
                     Default::default(),
                     #[cfg(any(target_os = "linux", target_os = "android"))]
                     Default::default(),
@@ -3078,7 +3080,7 @@ mod tests {
                 };
                 let param = &mut ParseParam::new(
                     &*packet,
-                    rrt_cache.clone(),
+                    Some(rrt_cache.clone()),
                     Default::default(),
                     #[cfg(any(target_os = "linux", target_os = "android"))]
                     Default::default(),
@@ -3319,7 +3321,9 @@ mod tests {
         let packet = MetaPacket::empty();
         let mut param = ParseParam::new(
             &packet,
-            Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY))),
+            Some(Rc::new(RefCell::new(L7PerfCache::new(
+                L7_RRT_CACHE_CAPACITY,
+            )))),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),

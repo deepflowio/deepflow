@@ -1023,8 +1023,39 @@ pub struct EbpfSocketTunning {
 pub struct EbpfSocket {
     pub uprobe: EbpfSocketUprobe,
     pub kprobe: EbpfSocketKprobe,
+    pub sock_ops: EbpfSocketSockOps,
     pub tunning: EbpfSocketTunning,
     pub preprocess: EbpfSocketPreprocess,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfSocketSockOps {
+    pub tcp_option_trace: EbpfTcpOptionTrace,
+}
+
+impl Default for EbpfSocketSockOps {
+    fn default() -> Self {
+        Self {
+            tcp_option_trace: EbpfTcpOptionTrace::default(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfTcpOptionTrace {
+    pub enabled: bool,
+    pub sampling_window_bytes: u32,
+}
+
+impl Default for EbpfTcpOptionTrace {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            sampling_window_bytes: 16 * 1024,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -1696,10 +1727,18 @@ impl Default for Iso8583Config {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct WebSphereMqConfig {
     pub parse_xml_enabled: bool,
+}
+
+impl Default for WebSphereMqConfig {
+    fn default() -> Self {
+        Self {
+            parse_xml_enabled: true,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -3487,9 +3526,17 @@ impl Default for Iso8583ParseConfig {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WebSphereMqParseConfig {
     pub parse_xml_enabled: bool,
+}
+
+impl Default for WebSphereMqParseConfig {
+    fn default() -> Self {
+        Self {
+            parse_xml_enabled: true,
+        }
+    }
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]

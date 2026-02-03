@@ -208,6 +208,8 @@ impl From<&PostgreInfo> for LogCache {
 pub struct PostgresqlLog {
     perf_stats: Option<L7PerfStats>,
     obfuscate_cache: Option<ObfuscateCache>,
+
+    has_request: bool,
 }
 
 impl L7ProtocolParserInterface for PostgresqlLog {
@@ -219,7 +221,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
             return Some(LogMessageType::Request);
         }
 
-        if self.parse(payload, &mut info).is_ok() {
+        if self.parse(payload, true, &mut info).is_ok() {
             Some(LogMessageType::Request)
         } else {
             None
@@ -239,11 +241,13 @@ impl L7ProtocolParserInterface for PostgresqlLog {
             self.perf_stats = Some(L7PerfStats::default())
         };
 
-        self.parse(payload, &mut info)?;
+        self.parse(payload, false, &mut info)?;
+
         set_captured_byte!(info, param);
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
+
         if !info.ignore && info.at_lease_one_block {
             if let Some(perf_stats) = self.perf_stats.as_mut() {
                 if let Some(stats) = info.perf_stats(param) {
@@ -284,7 +288,7 @@ impl PostgresqlLog {
         }
     }
 
-    fn parse(&mut self, payload: &[u8], info: &mut PostgreInfo) -> Result<()> {
+    fn parse(&mut self, payload: &[u8], strict: bool, info: &mut PostgreInfo) -> Result<()> {
         let mut offset = 0;
         loop {
             if offset >= payload.len() {
@@ -295,7 +299,7 @@ impl PostgresqlLog {
                 offset += len + 5; // len(data) + len 4B + tag 1B
                 let parsed = match info.msg_type {
                     LogMessageType::Request => {
-                        self.on_req_block(tag, &sub_payload[5..5 + len], info)?
+                        self.on_req_block(tag, &sub_payload[5..5 + len], strict, info)?
                     }
                     LogMessageType::Response => {
                         self.on_resp_block(tag, &sub_payload[5..5 + len], info)?
@@ -312,6 +316,11 @@ impl PostgresqlLog {
             }
         }
         if info.at_lease_one_block {
+            if info.msg_type == LogMessageType::Request {
+                self.has_request = true;
+            } else {
+                self.has_request = false;
+            }
             return Ok(());
         }
         Err(Error::L7ProtocolUnknown)
@@ -323,7 +332,13 @@ impl PostgresqlLog {
             && read_u64_be(payload) == SSL_REQ
     }
 
-    fn on_req_block(&mut self, tag: char, data: &[u8], info: &mut PostgreInfo) -> Result<bool> {
+    fn on_req_block(
+        &mut self,
+        tag: char,
+        data: &[u8],
+        strict: bool,
+        info: &mut PostgreInfo,
+    ) -> Result<bool> {
         match tag {
             'Q' => {
                 info.req_type = tag;
@@ -333,6 +348,7 @@ impl PostgresqlLog {
                         String::from_utf8_lossy(&m).to_string()
                     });
                 info.ignore = false;
+
                 Ok(true)
             }
             'P' => {
@@ -361,12 +377,22 @@ impl PostgresqlLog {
                 }
                 Err(Error::L7ProtocolUnknown)
             }
+            'E' if !strict && info.req_type == '\0' => {
+                info.req_type = tag;
+                info.ignore = false;
+
+                Ok(true)
+            }
             'B' | 'F' | 'C' | 'D' | 'H' | 'S' | 'X' | 'd' | 'c' | 'f' | 'E' => Ok(false),
             _ => Err(Error::L7ProtocolUnknown),
         }
     }
 
     fn on_resp_block(&mut self, tag: char, data: &[u8], info: &mut PostgreInfo) -> Result<bool> {
+        if !self.has_request {
+            return Err(Error::L7ProtocolUnknown);
+        }
+
         let mut data = data;
         match tag {
             'C' => {
@@ -590,7 +616,7 @@ mod test {
         let mut parser = PostgresqlLog::default();
         let req_param = &mut ParseParam::new(
             &p[0],
-            log_cache.clone(),
+            Some(log_cache.clone()),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),
@@ -610,7 +636,7 @@ mod test {
 
         let resp_param = &mut ParseParam::new(
             &p[1],
-            log_cache.clone(),
+            Some(log_cache.clone()),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),
@@ -661,7 +687,7 @@ mod test {
 
             let mut param = ParseParam::new(
                 &*packet,
-                log_cache.clone(),
+                Some(log_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),

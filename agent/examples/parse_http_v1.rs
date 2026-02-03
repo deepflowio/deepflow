@@ -57,7 +57,7 @@ fn main() {
             &packets[0].get_l4_payload().unwrap(),
             &ParseParam::new(
                 &packets[0],
-                log_cache.clone(),
+                Some(log_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
@@ -69,7 +69,7 @@ fn main() {
             &packets[1].get_l4_payload().unwrap(),
             &ParseParam::new(
                 &packets[1],
-                log_cache.clone(),
+                Some(log_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),

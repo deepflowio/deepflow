@@ -17,7 +17,10 @@
 use serde::Serialize;
 
 use enterprise_utils::l7::rpc::iso8583::{Iso8583ParseConfig, Iso8583Parser};
-use public::l7_protocol::{L7Protocol, LogMessageType};
+use public::{
+    enums::PacketDirection,
+    l7_protocol::{L7Protocol, LogMessageType},
+};
 
 use crate::config::handler::LogParserConfig;
 use crate::{
@@ -55,6 +58,7 @@ pub struct Iso8583Info {
     f33: String,
     f3: String,
     f25: String,
+    f39: String,
     // it is formed by connecting f7,f11,f32,f33 with -
     pub trace_ids: PrioFields,
 
@@ -189,6 +193,7 @@ impl From<Iso8583Info> for L7ProtocolSendLog {
                 ..Default::default()
             }),
             flags: flags.bits(),
+            biz_response_code: f.f39,
             ..Default::default()
         };
         log
@@ -271,18 +276,12 @@ impl L7ProtocolParserInterface for Iso8583Log {
                 } else if field.id == 25 {
                     info.f25 = field.value.clone();
                 } else if field.id == 39 {
+                    info.f39 = field.value.clone();
                     info.msg_type = LogMessageType::Response;
-                    if field.value == "00"
-                        || field.value == "10"
-                        || field.value == "11"
-                        || field.value == "16"
-                        || field.value == "A2"
-                        || field.value == "A4"
-                        || field.value == "A5"
-                        || field.value == "A6"
-                        || field.value == "Y1"
-                        || field.value == "Y3"
-                    {
+                    if matches!(
+                        field.value.as_str(),
+                        "00" | "10" | "11" | "16" | "A2" | "A4" | "A5" | "A6" | "Y1" | "Y3"
+                    ) {
                         info.response_status = L7ResponseStatus::Ok;
                     } else {
                         info.response_status = L7ResponseStatus::ClientError;
@@ -342,9 +341,15 @@ impl L7ProtocolParserInterface for Iso8583Log {
             match info.msg_type {
                 LogMessageType::Request => {
                     self.perf_stats.as_mut().map(|p| p.inc_req());
+                    if param.direction == PacketDirection::ServerToClient {
+                        info.is_reversed = true;
+                    }
                 }
                 LogMessageType::Response => {
                     self.perf_stats.as_mut().map(|p| p.inc_resp());
+                    if param.direction == PacketDirection::ClientToServer {
+                        info.is_reversed = true;
+                    }
                 }
                 _ => {}
             }

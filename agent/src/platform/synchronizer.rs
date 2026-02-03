@@ -24,7 +24,7 @@ use std::{
 };
 
 use arc_swap::access::Access;
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use parking_lot::RwLock;
 
 use tokio::runtime::Runtime;
@@ -278,10 +278,22 @@ impl Synchronizer {
                     }
                 };
 
-                debug!(
-                    "syncing version {} -> {} to remote",
-                    args.version, args.peer_version
-                );
+                if args.version == args.peer_version {
+                    debug!("version {} heartbeat to remote", args.version);
+                } else if log::log_enabled!(log::Level::Debug) {
+                    let n_interfaces = msg
+                        .platform_data
+                        .as_ref()
+                        .map(|p| p.interfaces.len())
+                        .unwrap_or(0);
+                    let n_processes = msg
+                        .process_data
+                        .as_ref()
+                        .map(|p| p.process_entries.len())
+                        .unwrap_or(0);
+                    debug!("syncing version {} -> {} to remote with {n_interfaces} interfaces and {n_processes} processes", args.version, args.peer_version);
+                }
+                trace!("genesis_sync request: {msg:?}");
                 match args
                     .runtime
                     .block_on(args.session.grpc_genesis_sync_with_statsd(msg))

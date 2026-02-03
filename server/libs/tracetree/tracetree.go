@@ -33,7 +33,10 @@ const TRACE_TREE_VERSION_0x15 = 0x15 // before 20251206
 const TRACE_TREE_VERSION_0x16 = 0x16 // before 20251231
 const TRACE_TREE_VERSION_0x17 = 0x17 // before 20260115
 const TRACE_TREE_VERSION_0x18 = 0x18 // before 20260116
-const TRACE_TREE_VERSION = 0x19
+const TRACE_TREE_VERSION_0x19 = 0x19 // before 20260127
+const TRACE_TREE_VERSION_0x20 = 0x20 // before 20260129
+const TRACE_TREE_VERSION_0x21 = 0x21 // before 20260202
+const TRACE_TREE_VERSION = 0x22
 
 func HashSearchIndex(key string) uint64 {
 	return utils.DJBHash(17, key)
@@ -60,6 +63,7 @@ type SpanInfo struct {
 	AutoServiceID1   uint32
 	AppService0      string
 	AppService1      string
+	ObservationPoint string
 	Endpoints        []string
 
 	IsIPv4 bool
@@ -70,12 +74,13 @@ type SpanInfo struct {
 }
 
 type NodeInfo struct {
-	SignalSource    uint8
-	AutoServiceType uint8
-	AutoServiceID   uint32
-	AppService      string
-	Endpoints0      []string
-	Endpoints1      []string
+	SignalSource     uint8
+	AutoServiceType  uint8
+	AutoServiceID    uint32
+	AppService       string
+	ObservationPoint string
+	Endpoints0       []string
+	Endpoints1       []string
 
 	IsIPv4 bool
 	IP4    uint32
@@ -96,10 +101,13 @@ type TreeNode struct {
 	Topic         string
 	QuerierRegion string
 
+	ResponseException              string
 	ResponseDurationSum            uint64
+	ResponseCode                   uint32
 	ResponseTotal                  uint32
 	ResponseStatusServerErrorCount uint32
 	Total                          uint32
+	ResponseStatus                 uint8
 }
 
 func (t *TraceTree) Release() {
@@ -161,6 +169,7 @@ func (t *TraceTree) Encode() {
 			encoder.WriteVarintU32(s.AutoServiceID1)
 			encoder.WriteString255(s.AppService0)
 			encoder.WriteString255(s.AppService1)
+			encoder.WriteString255(s.ObservationPoint)
 			encoder.WriteU16(uint16(len(s.Endpoints)))
 			for _, e := range s.Endpoints {
 				encoder.WriteString255(e)
@@ -189,6 +198,7 @@ func (t *TraceTree) Encode() {
 		encoder.WriteU8(nodeInfo.AutoServiceType)
 		encoder.WriteVarintU32(nodeInfo.AutoServiceID)
 		encoder.WriteString255(nodeInfo.AppService)
+		encoder.WriteString255(nodeInfo.ObservationPoint)
 		encoder.WriteU16(uint16(len(nodeInfo.Endpoints0)))
 		for _, e := range nodeInfo.Endpoints0 {
 			encoder.WriteString255(e)
@@ -211,10 +221,13 @@ func (t *TraceTree) Encode() {
 		encoder.WriteU8(node.PseudoLink)
 		encoder.WriteString255(node.Topic)
 		encoder.WriteString255(node.QuerierRegion)
+		encoder.WriteString255(node.ResponseException)
 		encoder.WriteVarintU64(node.ResponseDurationSum)
+		encoder.WriteVarintU32(node.ResponseCode)
 		encoder.WriteVarintU32(node.ResponseTotal)
 		encoder.WriteVarintU32(node.ResponseStatusServerErrorCount)
 		encoder.WriteVarintU32(node.Total)
+		encoder.WriteU8(node.ResponseStatus)
 	}
 	t.encodedTreeNodes = encoder.Bytes()
 }
@@ -246,6 +259,7 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 			s.AutoServiceID1 = decoder.ReadVarintU32()
 			s.AppService0 = decoder.ReadString255()
 			s.AppService1 = decoder.ReadString255()
+			s.ObservationPoint = decoder.ReadString255()
 			endpointCount := int(decoder.ReadU16())
 			s.Endpoints = make([]string, endpointCount)
 			for k := 0; k < endpointCount; k++ {
@@ -270,6 +284,7 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		nodeInfo.AutoServiceType = decoder.ReadU8()
 		nodeInfo.AutoServiceID = decoder.ReadVarintU32()
 		nodeInfo.AppService = decoder.ReadString255()
+		nodeInfo.ObservationPoint = decoder.ReadString255()
 		endpointCount := int(decoder.ReadU16())
 		nodeInfo.Endpoints0 = make([]string, endpointCount)
 		for j := 0; j < endpointCount; j++ {
@@ -299,10 +314,13 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		if version >= TRACE_TREE_VERSION {
 			n.QuerierRegion = decoder.ReadString255()
 		}
+		n.ResponseException = decoder.ReadString255()
 		n.ResponseDurationSum = decoder.ReadVarintU64()
+		n.ResponseCode = decoder.ReadVarintU32()
 		n.ResponseTotal = decoder.ReadVarintU32()
 		n.ResponseStatusServerErrorCount = decoder.ReadVarintU32()
 		n.Total = decoder.ReadVarintU32()
+		n.ResponseStatus = decoder.ReadU8()
 	}
 	if decoder.Failed() {
 		return fmt.Errorf("trace tree decode failed, offset is %d, buf length is %d ", decoder.Offset(), len(decoder.Bytes()))

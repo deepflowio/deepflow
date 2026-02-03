@@ -4042,6 +4042,74 @@ TCP 和 UDP 的端口白名单列表，白名单生效优先级低于 kprobe 黑
 
 配置样例: `ports: 80,1000-2000`
 
+#### SockOps {#inputs.ebpf.socket.sock_ops}
+
+##### TCP Option Trace {#inputs.ebpf.socket.sock_ops.tcp_option_trace}
+
+###### TCP Option 注入 {#inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      sock_ops:
+        tcp_option_trace:
+          enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否开启 TCP Option Tracing SockOps 程序，用于在满足条件的 TCP 连接上注入 DeepFlow 元数据（如进程 PID）。
+注意：该功能依赖 cgroup v2（统一层级）和内核版本 > 5.10。在 cgroup v1 主机上 SockOps 绑定会失败.
+兼容性：已在 x86 上验证内核 > 5.10；arm 目前仅在 6.8 内核上测试。
+限制：PID 跟踪依赖per-CPU syscall map。CPU 拥堵、软中断可能在不同 CPU 运行时，注入的元数据可能缺失或过期。
+
+###### PID 注入窗口 {#inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      sock_ops:
+        tcp_option_trace:
+          sampling_window_bytes: 16384
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | Bytes |
+| Range | [0, 1048576] |
+
+**详细描述**:
+
+控制 PID 注入之间的最小 TCP 负载间隔字节数。缺省为 16KB，与历史行为一致；值越小注入越频繁，值越大越稀疏。
+设置为0关闭采样窗口功能，对所有数据包注入。
+
 #### 调优 {#inputs.ebpf.socket.tunning}
 
 ##### 最大采集速率 {#inputs.ebpf.socket.tunning.max_capture_rate}
@@ -7672,7 +7740,7 @@ processors:
     application_protocol_inference:
       protocol_special_config:
         web_sphere_mq:
-          parse_xml_enabled: false
+          parse_xml_enabled: true
 ```
 
 **模式**:
@@ -8084,7 +8152,7 @@ processors:
 
 **标签**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8468,6 +8536,14 @@ processors:
 特征字段，中间用`,`分隔。
 如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
 
+支持从如下 Header 中提取 trace id，其格式如下:
+- traceparent: 00-TRACEID-SPANID-01
+- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+- sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
+- sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+- uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
+- b3: TRACEID-SPANID-1
+
 ##### Copy APM TraceID {#processors.request_log.tag_extraction.tracing_tag.copy_apm_trace_id}
 
 **标签**:
@@ -8530,6 +8606,14 @@ processors:
 的结果填充到应用调用日志的`span_id`字段中，作为调用链追踪的特征值。参数支持填写多个不同的
 特征字段，中间用`,`分隔。
 如果指定多个值，优先级从前到后降低。插件重写的字段优先级最高。
+
+支持从如下 Header 中提取 span id，其格式如下:
+- traceparent: 00-TRACEID-SPANID-01
+- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+- sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
+- sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+- uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
+- b3: TRACEID-SPANID-1
 
 #### HTTP 端点 {#processors.request_log.tag_extraction.http_endpoint}
 

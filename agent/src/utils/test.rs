@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-use std::{fmt, net::IpAddr, path::Path, time::Duration};
+use std::{fmt, path::Path, time::Duration};
 
 use pcap::{self, Linktype};
 
-use crate::common::meta_packet::MetaPacket;
+use crate::common::meta_packet::{MetaPacket, PcapData};
 
 pub struct Capture {
     cap: pcap::Capture<pcap::Offline>,
@@ -31,115 +31,33 @@ impl Capture {
         let dl_type = cap.get_datalink();
         Self { cap, dl_type }
     }
-
-    fn build_meta_packet(dl_type: Linktype, packet: &pcap::Packet) -> Option<MetaPacket<'static>> {
-        match dl_type {
-            Linktype::ETHERNET => {
-                let mut meta = MetaPacket::empty();
-                meta.update(
-                    packet.data.to_vec(),
-                    true,
-                    true,
-                    Duration::new(
-                        packet.header.ts.tv_sec as u64,
-                        packet.header.ts.tv_usec as u32 * 1000,
-                    ),
-                    0,
-                )
-                .unwrap();
-                return Some(meta);
-            }
-            _ => (),
-        }
-
-        // change SLL header to look like ethernet header just before L3 header
-        let mut data = match dl_type {
-            // 2 bytes longer than ethernet header
-            Linktype::LINUX_SLL => (&packet.data[2..]).to_vec(),
-            Linktype::LINUX_SLL2 => {
-                // 6 bytes longer, and L3 type is in first 2 bytes
-                let mut data = (&packet.data[6..]).to_vec();
-                data[12..14].copy_from_slice(&packet.data[0..2]);
-                data
-            }
-            _ => unimplemented!(),
-        };
-
-        let mut meta = MetaPacket::empty();
-        meta.update(
-            &data[..],
-            true,
-            true,
-            Duration::new(
-                packet.header.ts.tv_sec as u64,
-                packet.header.ts.tv_usec as u32 * 1000,
-            ),
-            0,
-        )
-        .unwrap();
-
-        let src_ip = meta.lookup_key.src_ip;
-        let dst_ip = meta.lookup_key.dst_ip;
-        // fake mac with ip
-        (&mut data[0..12]).fill(0);
-        match dst_ip {
-            IpAddr::V4(ip) => {
-                data[0..4].copy_from_slice(&ip.octets());
-            }
-            IpAddr::V6(ip) => {
-                data[0..6].copy_from_slice(&ip.octets()[0..6]);
-            }
-        }
-        match src_ip {
-            IpAddr::V4(ip) => {
-                data[6..10].copy_from_slice(&ip.octets());
-            }
-            IpAddr::V6(ip) => {
-                data[6..12].copy_from_slice(&ip.octets()[0..6]);
-            }
-        }
-
-        let mut meta = MetaPacket::empty();
-        meta.update(
-            data,
-            true,
-            true,
-            Duration::new(
-                packet.header.ts.tv_sec as u64,
-                packet.header.ts.tv_usec as u32 * 1000,
-            ),
-            0,
-        )
-        .unwrap();
-        Some(meta)
-    }
 }
 
 impl Iterator for Capture {
     type Item = MetaPacket<'static>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        while let Ok(packet) = self.cap.next() {
-            if let Some(meta) = Self::build_meta_packet(self.dl_type, &packet) {
-                return Some(meta);
-            }
-        }
-
-        #[cfg(target_os = "windows")]
-        while let Ok(packet) = self.cap.next_packet() {
-            if let Some(meta) = Self::build_meta_packet(self.dl_type, &packet) {
-                return Some(meta);
-            }
-        }
-
-        None
+        self.cap.next_packet().ok().and_then(|packet| {
+            let pcap_data = PcapData {
+                link_type: self.dl_type,
+                timestamp: Duration::new(
+                    packet.header.ts.tv_sec as u64,
+                    packet.header.ts.tv_usec as u32 * 1000,
+                ),
+                data: packet.data,
+            };
+            MetaPacket::try_from(pcap_data).ok().map(|p| p.into_owned())
+        })
     }
 }
 
 impl From<Capture> for Vec<Vec<u8>> {
-    fn from(c: Capture) -> Self {
-        c.into_iter().map(|p| p.raw.unwrap().to_vec()).collect()
+    fn from(mut c: Capture) -> Self {
+        let mut vec = Vec::new();
+        while let Ok(p) = c.cap.next_packet() {
+            vec.push(p.data.to_vec());
+        }
+        vec
     }
 }
 

@@ -30,7 +30,8 @@ const SPAN_TRACE_VERSION_0x12 = 0x12 // before 20251027
 const SPAN_TRACE_VERSION_0x13 = 0x13 // before 20251108
 const SPAN_TRACE_VERSION_0x14 = 0x14 // before 20251211
 const SPAN_TRACE_VERSION_0x15 = 0x15 // before 20251227
-const SPAN_TRACE_VERSION = 0x16
+const SPAN_TRACE_VERSION_0x16 = 0x16
+const SPAN_TRACE_VERSION = 0x17
 
 type SpanTrace struct {
 	QuerierRegion string // not store, easy to use when calculating
@@ -73,7 +74,8 @@ type SpanTrace struct {
 	RequestDomain          string
 	RequestResource        string // notice: will be cut to 255 when write
 	ResponseResult         string
-	L7ProtocolStr          string
+	BizProtocol            string
+	ResponseException      string
 	RequestId              uint64
 	SyscallTraceIDRequest  uint64
 	SyscallTraceIDResponse uint64
@@ -134,7 +136,8 @@ func (t *SpanTrace) Decode(decoder *codec.SimpleDecoder) error {
 	t.RequestDomain = decoder.ReadString255()
 	t.RequestResource = decoder.ReadString255()
 	t.ResponseResult = decoder.ReadString255()
-	t.L7ProtocolStr = decoder.ReadString255()
+	t.BizProtocol = decoder.ReadString255()
+	t.ResponseException = decoder.ReadString255()
 	t.RequestId = decoder.ReadVarintU64()
 
 	t.SyscallTraceIDRequest = decoder.ReadVarintU64()

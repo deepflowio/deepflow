@@ -52,57 +52,6 @@ static proc_event_list_t proc_events = { .head = { .prev = &proc_events.head, .n
 static pthread_mutex_t g_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
 static unwind_table_t *g_unwind_table = NULL;
 
-static pthread_mutex_t g_python_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
-static python_unwind_table_t *g_python_unwind_table = NULL;
-
-static pthread_mutex_t g_lua_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
-static lua_unwind_table_t *g_lua_unwind_table = NULL;
-static void lua_queue_existing_processes(struct bpf_tracer *tracer);
-
-static struct symbol lua_symbols[] = {
-    {
-        .type = LUA_UPROBE,
-        .symbol = "lua_resume",
-        .symbol_prefix = NULL,
-        .probe_func = UPROBE_FUNC_NAME(handle_entry_lua),
-        .is_probe_ret = false,
-    },
-    {
-        .type = LUA_UPROBE,
-        .symbol = "lua_pcall",
-        .symbol_prefix = NULL,
-        .probe_func = UPROBE_FUNC_NAME(handle_entry_lua),
-        .is_probe_ret = false,
-    },
-    {
-        .type = LUA_UPROBE,
-        .symbol = "lua_pcallk",
-        .symbol_prefix = NULL,
-        .probe_func = UPROBE_FUNC_NAME(handle_entry_lua),
-        .is_probe_ret = false,
-    },
-    {
-        .type = LUA_UPROBE,
-        .symbol = "lua_yield",
-        .symbol_prefix = NULL,
-        .probe_func = URETPROBE_FUNC_NAME(handle_entry_lua_cancel),
-        .is_probe_ret = false,
-    },
-    {
-        .type = LUA_UPROBE,
-        .symbol = "lua_yieldk",
-        .symbol_prefix = NULL,
-        .probe_func = URETPROBE_FUNC_NAME(handle_entry_lua_cancel),
-        .is_probe_ret = false,
-    },
-};
-
-static pthread_mutex_t g_php_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
-static php_unwind_table_t *g_php_unwind_table = NULL;
-
-static pthread_mutex_t g_v8_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
-static v8_unwind_table_t *g_v8_unwind_table = NULL;
-
 static struct {
     bool dwarf_enabled;
     struct {
@@ -266,228 +215,7 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
     g_unwind_table = table;
     pthread_mutex_unlock(&g_unwind_table_lock);
 
-    // Initialize Python unwinding tables (only if enabled)
-    if (python_profiler_enabled()) {
-        int unwind_info_map_fd = bpf_table_get_fd(tracer, MAP_PYTHON_UNWIND_INFO_NAME);
-        int offsets_map_fd = bpf_table_get_fd(tracer, MAP_PYTHON_OFFSETS_NAME);
-        if (unwind_info_map_fd < 0 || offsets_map_fd < 0) {
-            ebpf_warning("Failed to get Python unwind info map fd or offsets map fd\n");
-            return -1;
-        }
-        python_unwind_table_t *python_table = python_unwind_table_create(unwind_info_map_fd, offsets_map_fd);
-        pthread_mutex_lock(&g_python_unwind_table_lock);
-        g_python_unwind_table = python_table;
-        pthread_mutex_unlock(&g_python_unwind_table_lock);
-    }
-
-    // Initialize PHP unwinding tables (only if enabled)
-    if (php_profiler_enabled()) {
-        int php_unwind_info_map_fd = bpf_table_get_fd(tracer, MAP_PHP_UNWIND_INFO_NAME);
-        int php_offsets_map_fd = bpf_table_get_fd(tracer, MAP_PHP_OFFSETS_NAME);
-        if (php_unwind_info_map_fd < 0 || php_offsets_map_fd < 0) {
-            ebpf_warning("Failed to get PHP unwind info map fd or offsets map fd\n");
-            return -1;
-        }
-        php_unwind_table_t *php_table = php_unwind_table_create(php_unwind_info_map_fd, php_offsets_map_fd);
-        pthread_mutex_lock(&g_php_unwind_table_lock);
-        g_php_unwind_table = php_table;
-        pthread_mutex_unlock(&g_php_unwind_table_lock);
-    }
-
-    // Initialize V8 unwinding tables (only if enabled)
-    if (v8_profiler_enabled()) {
-        int v8_unwind_info_map_fd = bpf_table_get_fd(tracer, MAP_V8_UNWIND_INFO_NAME);
-        if (v8_unwind_info_map_fd < 0) {
-            ebpf_warning("Failed to get V8 unwind info map fd\n");
-            return -1;
-        }
-        v8_unwind_table_t *v8_table = v8_unwind_table_create(v8_unwind_info_map_fd);
-        pthread_mutex_lock(&g_v8_unwind_table_lock);
-        g_v8_unwind_table = v8_table;
-        pthread_mutex_unlock(&g_v8_unwind_table_lock);
-    }
-
-    int lua_lang_fd = bpf_table_get_fd(tracer, MAP_LUA_LANG_FLAGS_NAME);
-    int lua_unwind_info_fd = bpf_table_get_fd(tracer, MAP_LUA_UNWIND_INFO_NAME);
-    int lua_offsets_fd = bpf_table_get_fd(tracer, MAP_LUA_OFFSETS_NAME);
-    int luajit_offsets_fd = bpf_table_get_fd(tracer, MAP_LUAJIT_OFFSETS_NAME);
-
-    if (lua_lang_fd < 0 || lua_unwind_info_fd < 0 || lua_offsets_fd < 0 || luajit_offsets_fd < 0) {
-        ebpf_warning("Failed to get lua profiling map fds (lang:%d unwind:%d lua_ofs:%d lj_ofs:%d)\n",
-                     lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
-        return -1;
-    }
-
-    lua_unwind_table_t *lua_table =
-        lua_unwind_table_create(lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
-    if (lua_table == NULL) {
-        ebpf_warning("Failed to create lua unwind table\n");
-        return -1;
-    }
-    lua_set_map_fds(lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
-
-    pthread_mutex_lock(&g_lua_unwind_table_lock);
-    g_lua_unwind_table = lua_table;
-    pthread_mutex_unlock(&g_lua_unwind_table_lock);
-
-	if (dwarf_available() && get_dwarf_enabled() && tracer) {
-		lua_queue_existing_processes(tracer);
-	}
-
     return 0;
-}
-
-static struct symbol python_symbols[] = { { .type = PYTHON_UPROBE,
-                                            .symbol = "PyEval_SaveThread",
-                                            .probe_func = URETPROBE_FUNC_NAME(python_save_tstate_addr),
-                                            .is_probe_ret = true, }, };
-
-static void python_parse_and_register(int pid, struct tracer_probes_conf *conf) {
-    char *path = NULL;
-    int n = 0;
-
-    if (pid <= 1)
-        goto out;
-
-    if (!is_user_process(pid))
-        goto out;
-
-    // Python symbols may reside in the main executable or libpython.so
-    // Check both
-    path = get_elf_path_by_pid(pid);
-    if (path) {
-        n = add_probe_sym_to_tracer_probes(pid, path, conf, python_symbols, NELEMS(python_symbols));
-        if (n > 0) {
-            ebpf_info("python uprobe, pid:%d, path:%s\n", pid, path);
-            free(path);
-            return;
-        }
-    }
-
-    path = get_so_path_by_pid_and_name(pid, "python3");
-    if (!path) {
-        path = get_so_path_by_pid_and_name(pid, "python2");
-        if (!path) {
-            goto out;
-        }
-    }
-
-    ebpf_info("python uprobe, pid:%d, path:%s\n", pid, path);
-    add_probe_sym_to_tracer_probes(pid, path, conf, python_symbols, NELEMS(python_symbols));
-
-out:
-    free(path);
-    return;
-}
-
-static void lua_parse_and_register(int pid, struct tracer_probes_conf *conf) {
-    lua_runtime_info_t info = {0};
-    char path[sizeof(info.path)] = {0};
-    int n = 0;
-
-    if (pid <= 1) {
-        return;
-    }
-
-    if (!is_user_process(pid)) {
-        return;
-    }
-
-    if (lua_detect(pid, &info) != 0) {
-        return;
-    }
-
-    if (info.kind == 0 || info.path[0] == '\0') {
-        return;
-    }
-
-    size_t len = strnlen((const char *)info.path, sizeof(info.path));
-    if (len == 0) {
-        return;
-    }
-
-    if (len >= sizeof(path)) {
-        len = sizeof(path) - 1;
-    }
-    memcpy(path, info.path, len);
-    path[len] = '\0';
-
-    n = add_probe_sym_to_tracer_probes(pid, path, conf, lua_symbols, NELEMS(lua_symbols));
-    if (n > 0) {
-        ebpf_info("A lua %d uprobe, pid:%d, path:%s\n", n, pid, path);
-    }
-}
-
-static void lua_queue_existing_processes(struct bpf_tracer *tracer)
-{
-	DIR *dir = NULL;
-	struct dirent *entry = NULL;
-	if (tracer == NULL || tracer->state != TRACER_RUNNING) {
-		return;
-	}
-
-	dir = opendir("/proc");
-	if (!dir) {
-		ebpf_warning("Failed to open /proc when queuing existing lua processes.\n");
-		return;
-	}
-
-	while ((entry = readdir(dir))) {
-		if (entry->d_type != DT_DIR) {
-			continue;
-		}
-
-		int pid = atoi(entry->d_name);
-		if (pid <= 1) {
-			continue;
-		}
-
-		if (!process_probing_check(pid)) {
-			continue;
-		}
-
-		if (!is_lua_process(pid)) {
-			continue;
-		}
-
-		add_event_to_proc_list(&proc_events, tracer, pid, NULL);
-	}
-
-	closedir(dir);
-}
-
-static void clear_lua_probes_by_pid(struct bpf_tracer *tracer, int pid)
-{
-	struct probe *probe;
-	struct list_head *p, *n;
-	struct symbol_uprobe *sym_uprobe;
-
-	if (tracer == NULL) {
-		return;
-	}
-
-	list_for_each_safe(p, n, &tracer->probes_head) {
-		probe = container_of(p, struct probe, list);
-		if (!(probe->type == UPROBE && probe->private_data != NULL)) {
-			continue;
-		}
-		sym_uprobe = probe->private_data;
-
-		if (sym_uprobe->type != LUA_UPROBE) {
-			continue;
-		}
-
-		if (sym_uprobe->pid != pid) {
-			continue;
-		}
-
-		if (probe_detach(probe) != 0) {
-			ebpf_warning("path:%s, symbol name:%s probe_detach() failed.\n",
-				     sym_uprobe->binary_path, sym_uprobe->name);
-		}
-
-		free_probe_from_tracer(probe);
-	}
 }
 
 void unwind_tracer_drop() {
@@ -498,40 +226,15 @@ void unwind_tracer_drop() {
         g_unwind_table = NULL;
     }
     pthread_mutex_unlock(&g_unwind_table_lock);
-
-    pthread_mutex_lock(&g_python_unwind_table_lock);
-    if (g_python_unwind_table) {
-        python_unwind_table_destroy(g_python_unwind_table);
-        g_python_unwind_table = NULL;
-    }
-    pthread_mutex_unlock(&g_python_unwind_table_lock);
-
-    pthread_mutex_lock(&g_lua_unwind_table_lock);
-    if (g_lua_unwind_table) {
-        lua_unwind_table_destroy(g_lua_unwind_table);
-        g_lua_unwind_table = NULL;
-    }
-    pthread_mutex_unlock(&g_lua_unwind_table_lock);
-
-    pthread_mutex_lock(&g_php_unwind_table_lock);
-    if (g_php_unwind_table) {
-        php_unwind_table_destroy(g_php_unwind_table);
-        g_php_unwind_table = NULL;
-    }
-    pthread_mutex_unlock(&g_php_unwind_table_lock);
-
-    pthread_mutex_lock(&g_v8_unwind_table_lock);
-    if (g_v8_unwind_table) {
-        v8_unwind_table_destroy(g_v8_unwind_table);
-        g_v8_unwind_table = NULL;
-    }
-    pthread_mutex_unlock(&g_v8_unwind_table_lock);
 }
 
 void unwind_process_exec(int pid) {
     if (!dwarf_available() || !get_dwarf_enabled()) {
         return;
     }
+
+    // Enterprise hook for interpreter processing
+    extended_process_exec(pid);
 
     struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
     if (tracer == NULL || tracer->state != TRACER_RUNNING) {
@@ -548,13 +251,7 @@ void unwind_events_handle(void) {
     }
 
     struct process_create_event *event = NULL;
-    struct bpf_tracer *tracer = NULL;
-    int count = 0;
     pthread_mutex_lock(&g_unwind_table_lock);
-    pthread_mutex_lock(&g_python_unwind_table_lock);
-    pthread_mutex_lock(&g_lua_unwind_table_lock);
-    pthread_mutex_lock(&g_php_unwind_table_lock);
-    pthread_mutex_lock(&g_v8_unwind_table_lock);
     do {
         event = get_first_event(&proc_events);
         if (!event)
@@ -562,37 +259,6 @@ void unwind_events_handle(void) {
 
         if (get_sys_uptime() < event->expire_time) {
             break;
-        }
-
-        tracer = event->tracer;
-        if (tracer && python_profiler_enabled() && is_python_process(event->pid)) {
-            python_unwind_table_load(g_python_unwind_table, event->pid);
-            pthread_mutex_lock(&tracer->mutex_probes_lock);
-            python_parse_and_register(event->pid, tracer->tps);
-            tracer_uprobes_update(tracer);
-            tracer_hooks_process(tracer, HOOK_ATTACH, &count);
-            pthread_mutex_unlock(&tracer->mutex_probes_lock);
-        }
-
-        if (tracer && php_profiler_enabled() && is_php_process(event->pid)) {
-            php_unwind_table_load(g_php_unwind_table, event->pid);
-            // Note: PHP profiling doesn't require uprobe registration like Python
-        }
-
-        if (tracer && v8_profiler_enabled() && is_v8_process(event->pid)) {
-            v8_unwind_table_load(g_v8_unwind_table, event->pid);
-            // Note: V8 profiling doesn't require uprobe registration like Python
-        }
-
-        if (tracer && is_lua_process(event->pid)) {
-            if (g_lua_unwind_table) {
-                lua_unwind_table_load(g_lua_unwind_table, event->pid);
-            }
-            pthread_mutex_lock(&tracer->mutex_probes_lock);
-            lua_parse_and_register(event->pid, tracer->tps);
-            tracer_uprobes_update(tracer);
-            tracer_hooks_process(tracer, HOOK_ATTACH, &count);
-            pthread_mutex_unlock(&tracer->mutex_probes_lock);
         }
 
         if (g_unwind_table && requires_dwarf_unwind_table(event->pid)) {
@@ -603,10 +269,6 @@ void unwind_events_handle(void) {
         process_event_free(event);
 
     } while (true);
-    pthread_mutex_unlock(&g_v8_unwind_table_lock);
-    pthread_mutex_unlock(&g_php_unwind_table_lock);
-    pthread_mutex_unlock(&g_lua_unwind_table_lock);
-    pthread_mutex_unlock(&g_python_unwind_table_lock);
     pthread_mutex_unlock(&g_unwind_table_lock);
 }
 
@@ -615,6 +277,9 @@ void unwind_process_exit(int pid) {
     if (!dwarf_available() || !get_dwarf_enabled()) {
         return;
     }
+
+    // Enterprise hook
+    extended_process_exit(pid);
 
     struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
     if (tracer == NULL || tracer->state != TRACER_RUNNING) {
@@ -638,34 +303,6 @@ void unwind_process_exit(int pid) {
         unwind_table_unload(g_unwind_table, pid);
     }
     pthread_mutex_unlock(&g_unwind_table_lock);
-
-    pthread_mutex_lock(&g_python_unwind_table_lock);
-    if (g_python_unwind_table) {
-        python_unwind_table_unload(g_python_unwind_table, pid);
-    }
-    pthread_mutex_unlock(&g_python_unwind_table_lock);
-
-    pthread_mutex_lock(&g_lua_unwind_table_lock);
-    if (g_lua_unwind_table) {
-        lua_unwind_table_unload(g_lua_unwind_table, pid);
-    }
-    pthread_mutex_unlock(&g_lua_unwind_table_lock);
-
-    pthread_mutex_lock(&tracer->mutex_probes_lock);
-    clear_lua_probes_by_pid(tracer, pid);
-    pthread_mutex_unlock(&tracer->mutex_probes_lock);
-
-    pthread_mutex_lock(&g_php_unwind_table_lock);
-    if (g_php_unwind_table) {
-        php_unwind_table_unload(g_php_unwind_table, pid);
-    }
-    pthread_mutex_unlock(&g_php_unwind_table_lock);
-
-    pthread_mutex_lock(&g_v8_unwind_table_lock);
-    if (g_v8_unwind_table) {
-        v8_unwind_table_unload(g_v8_unwind_table, pid);
-    }
-    pthread_mutex_unlock(&g_v8_unwind_table_lock);
 }
 
 // Ensure exclusive access to *unwind_table before calling this function
@@ -692,6 +329,9 @@ static int load_running_processes(struct bpf_tracer *tracer, unwind_table_t *unw
         pid = atoi(entry->d_name);
         if (!process_probing_check(pid))
             continue;
+
+        extended_process_exec(pid);
+
         if (requires_dwarf_unwind_table(pid)) {
             unwind_table_load(unwind_table, pid);
         }

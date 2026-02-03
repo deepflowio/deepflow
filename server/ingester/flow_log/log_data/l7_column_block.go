@@ -52,6 +52,7 @@ type L7BaseBlock struct {
 	ColBizType                proto.ColUInt8
 	ColBizCode                proto.ColStr
 	ColBizScenario            proto.ColStr
+	ColBizResponseCode        proto.ColStr
 	ColProcessId0             proto.ColInt32
 	ColProcessId1             proto.ColInt32
 	ColProcessKname0          proto.ColStr
@@ -95,6 +96,7 @@ func (b *L7BaseBlock) Reset() {
 	b.ColBizType.Reset()
 	b.ColBizCode.Reset()
 	b.ColBizScenario.Reset()
+	b.ColBizResponseCode.Reset()
 	b.ColProcessId0.Reset()
 	b.ColProcessId1.Reset()
 	b.ColProcessKname0.Reset()
@@ -139,6 +141,7 @@ func (b *L7BaseBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_BIZ_TYPE, Data: &b.ColBizType},
 		proto.InputColumn{Name: ckdb.COLUMN_BIZ_CODE, Data: &b.ColBizCode},
 		proto.InputColumn{Name: ckdb.COLUMN_BIZ_SCENARIO, Data: &b.ColBizScenario},
+		proto.InputColumn{Name: ckdb.COLUMN_BIZ_RESPONSE_CODE, Data: &b.ColBizResponseCode},
 		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_ID_0, Data: &b.ColProcessId0},
 		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_ID_1, Data: &b.ColProcessId1},
 		proto.InputColumn{Name: ckdb.COLUMN_PROCESS_KNAME_0, Data: &b.ColProcessKname0},
@@ -191,6 +194,7 @@ func (n *L7Base) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColBizType.Append(n.BizType)
 	block.ColBizCode.Append(n.BizCode)
 	block.ColBizScenario.Append(n.BizScenario)
+	block.ColBizResponseCode.Append(n.BizResponseCode)
 	block.ColProcessId0.Append(int32(n.ProcessID0))
 	block.ColProcessId1.Append(int32(n.ProcessID1))
 	block.ColProcessKname0.Append(n.ProcessKName0)
@@ -209,7 +213,7 @@ type L7FlowLogBlock struct {
 	*L7BaseBlock
 	ColId                   proto.ColUInt64
 	ColL7Protocol           proto.ColUInt8
-	ColL7ProtocolStr        *proto.ColLowCardinality[string]
+	ColBizProtocol          *proto.ColLowCardinality[string]
 	ColVersion              *proto.ColLowCardinality[string]
 	ColType                 proto.ColUInt8
 	ColIsTls                proto.ColUInt8
@@ -254,7 +258,7 @@ func (b *L7FlowLogBlock) Reset() {
 	b.L7BaseBlock.Reset()
 	b.ColId.Reset()
 	b.ColL7Protocol.Reset()
-	b.ColL7ProtocolStr.Reset()
+	b.ColBizProtocol.Reset()
 	b.ColVersion.Reset()
 	b.ColType.Reset()
 	b.ColIsTls.Reset()
@@ -302,7 +306,7 @@ func (b *L7FlowLogBlock) ToInput(input proto.Input) proto.Input {
 	input = append(input,
 		proto.InputColumn{Name: ckdb.COLUMN__ID, Data: &b.ColId},
 		proto.InputColumn{Name: ckdb.COLUMN_L7_PROTOCOL, Data: &b.ColL7Protocol},
-		proto.InputColumn{Name: ckdb.COLUMN_L7_PROTOCOL_STR, Data: b.ColL7ProtocolStr},
+		proto.InputColumn{Name: ckdb.COLUMN_BIZ_PROTOCOL, Data: b.ColBizProtocol},
 		proto.InputColumn{Name: ckdb.COLUMN_VERSION, Data: b.ColVersion},
 		proto.InputColumn{Name: ckdb.COLUMN_TYPE, Data: &b.ColType},
 		proto.InputColumn{Name: ckdb.COLUMN_IS_TLS, Data: &b.ColIsTls},
@@ -350,7 +354,7 @@ func (b *L7FlowLogBlock) ToInput(input proto.Input) proto.Input {
 func (n *L7FlowLog) NewColumnBlock() ckdb.CKColumnBlock {
 	return &L7FlowLogBlock{
 		L7BaseBlock:        n.L7Base.NewColumnBlock().(*L7BaseBlock),
-		ColL7ProtocolStr:   new(proto.ColStr).LowCardinality(),
+		ColBizProtocol:     new(proto.ColStr).LowCardinality(),
 		ColVersion:         new(proto.ColStr).LowCardinality(),
 		ColRequestType:     new(proto.ColStr).LowCardinality(),
 		ColAppService:      new(proto.ColStr).LowCardinality(),
@@ -374,7 +378,7 @@ func (n *L7FlowLog) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	n.L7Base.AppendToColumnBlock(block.L7BaseBlock)
 	block.ColId.Append(n._id)
 	block.ColL7Protocol.Append(n.L7Protocol)
-	block.ColL7ProtocolStr.Append(n.L7ProtocolStr)
+	block.ColBizProtocol.Append(n.BizProtocol)
 	block.ColVersion.Append(n.Version)
 	block.ColType.Append(n.Type)
 	block.ColIsTls.Append(n.IsTLS)

@@ -86,7 +86,7 @@ pub(super) fn bench(c: &mut Criterion) {
             let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(8)));
             let req_param = ParseParam::new(
                 &packets[0],
-                rrt_cache.clone(),
+                Some(rrt_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
@@ -95,7 +95,7 @@ pub(super) fn bench(c: &mut Criterion) {
             );
             let resp_param = ParseParam::new(
                 &packets[1],
-                rrt_cache.clone(),
+                Some(rrt_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
