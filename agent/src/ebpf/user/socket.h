@@ -84,7 +84,8 @@ struct socket_bpf_data {
 	// 同一份应用数据（cap_data可能不同）接收、发送的两份cap_data会标记上相同标识
 
 	/* data info */
-	uint64_t timestamp;	// cap_data获取的时间戳
+	uint64_t timestamp;	// syscall timestamp
+	uint64_t cap_timestamp; // data capture timestamp
 	uint8_t direction;	// 数据的收发方向，枚举如下: 1 SOCK_DIR_SND, 2 SOCK_DIR_RCV
 	uint64_t syscall_len;	// 本次系统调用读、写数据的总长度
 	uint32_t cap_len;	// 返回的cap_data长度
@@ -395,6 +396,7 @@ prefetch_and_process_data(struct bpf_tracer *t, int id, int nb_rx, void **datas_
 			 * time precision is in nanosecond.
 			 */
 			sd->timestamp = sd->timestamp + boot_time;
+			sd->cap_timestamp = sd->cap_timestamp + boot_time;
 			callback(NULL, id, sd);
 		}
 
