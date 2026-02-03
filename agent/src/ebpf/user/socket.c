@@ -1244,6 +1244,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		memset(submit_data, 0, sizeof(*submit_data));
 
 		submit_data->timestamp = sd->timestamp;
+		submit_data->cap_timestamp = sd->cap_timestamp;
 		submit_data->direction = sd->direction;
 		submit_data->fd = sd->fd;
 		submit_data->source = sd->source;
@@ -3775,8 +3776,8 @@ static int __unused get_fd_path(pid_t pid, u32 fd, char *buf, size_t bufsize)
 	" CONTAINER_ID %s SOURCE %d COMM %s "				\
 	"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64		\
 	" " "TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64			\
-	" DATA_SEQ %" PRIu64 " TLS %s KernCapTime %s "			\
-	"KernMonoTime %llu us\n"
+	" DATA_SEQ %" PRIu64 " TLS %s SyscallTime %s "			\
+	"SyscallMonoTime %llu us CapTime %s CapMonoTime %llu us\n"
 
 static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 {
@@ -3787,10 +3788,16 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 	if (timestamp == NULL)
 		return;
 
-	int64_t k_fetch_time_us;
-	k_fetch_time_us = (sd->timestamp + boot_time) / NS_IN_USEC;
+	int64_t kern_time_us;
+	kern_time_us = (sd->timestamp + boot_time) / NS_IN_USEC;
+	char *kern_syscall_time = get_timestamp_from_us(kern_time_us);
+	if (kern_syscall_time == NULL) {
+		free(timestamp);
+		return;
+	}
 
-	char *kern_cap_time = get_timestamp_from_us(k_fetch_time_us);
+	kern_time_us = (sd->cap_timestamp + boot_time) / NS_IN_USEC;
+	char *kern_cap_time = get_timestamp_from_us(kern_time_us);
 	if (kern_cap_time == NULL) {
 		free(timestamp);
 		return;
@@ -3801,6 +3808,7 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 	char *flow_str = flow_info(sd);
 	if (flow_str == NULL) {
 		free(timestamp);
+		free(kern_syscall_time);
 		free(kern_cap_time);
 		return;
 	}
@@ -3836,7 +3844,8 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 		     sd->syscall_len, sd->socket_id,
 		     sd->syscall_trace_id_call, sd->tcp_seq,
 		     sd->cap_seq, sd->is_tls ? "true" : "false",
-		     kern_cap_time, sd->timestamp / NS_IN_USEC);
+		     kern_syscall_time, sd->timestamp / NS_IN_USEC,
+		     kern_cap_time, sd->cap_timestamp / NS_IN_USEC);
 
 	if (sd->source == DATA_SOURCE_GO_HTTP2_UPROBE) {
 		len +=
@@ -3891,6 +3900,7 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 	}
 
 	free(timestamp);
+	free(kern_syscall_time);
 	free(kern_cap_time);
 	free(flow_str);
 

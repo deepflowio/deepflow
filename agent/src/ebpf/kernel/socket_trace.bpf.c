@@ -1641,6 +1641,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	// the read operation.
 	v->timestamp = conn_info->direction == T_INGRESS ? bpf_ktime_get_ns() :
 	    time_stamp;
+	v->cap_timestamp = bpf_ktime_get_ns();
 	v->direction = conn_info->direction;
 	v->syscall_len = syscall_len;
 	v->msg_type = MSG_COMMON;
@@ -2842,6 +2843,7 @@ static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 	v->tgid = (__u32) (pid_tgid >> 32);
 	v->pid = (__u32) pid_tgid;
 	v->timestamp = bpf_ktime_get_ns();
+	v->cap_timestamp = v->timestamp;
 	v->source = source;
 	v->syscall_len = 0;
 	v->data_seq = seq;

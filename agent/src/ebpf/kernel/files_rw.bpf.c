@@ -403,6 +403,7 @@ static __inline int trace_io_event_common(void *ctx,
 	v->pid = (__u32) pid_tgid;
 	v->coroutine_id = trace_key.goid;
 	v->timestamp = data_args->enter_ts;
+	v->cap_timestamp = bpf_ktime_get_ns();
 	v->syscall_len = sizeof(*buffer);
 	v->source = DATA_SOURCE_IO_EVENT;
 	v->thread_trace_id = trace_id;
