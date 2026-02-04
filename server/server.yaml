@@ -358,8 +358,6 @@ controller:
       # unit: second , min: 1 max: 10
       delay-max: 0
 
-    trident-type-for-unknow-vtap: 0
-
     platform-vips:
     #  - 55.11.135.18
 
