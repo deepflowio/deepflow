@@ -469,7 +469,7 @@ jobs:
   build_agent_static_link:
     name: build agent static link
     runs-on: "cirun-aws-amd64-32c--${{ github.run_id }}"
-    if: "startsWith(github.ref, 'refs/tags/')" || github.event_name == 'workflow_dispatch'"
+    if: "startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
