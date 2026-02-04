@@ -37,6 +37,14 @@ pub enum Error {
     InvalidPointer(u64),
     #[error("Invalid or corrupted data")]
     InvalidData,
+    #[error("Kernel symbol not found: {0}")]
+    KernelSymbolNotFound(String),
+    #[error("BTF parsing failed: {0}")]
+    BtfParseError(String),
+    #[error("Architecture not supported: {0}")]
+    UnsupportedArch(String),
+    #[error("Permission denied: {0}")]
+    PermissionDenied(String),
     #[error("{0}")]
     Msg(String),
 }
