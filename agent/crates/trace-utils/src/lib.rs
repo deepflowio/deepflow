@@ -20,6 +20,7 @@ pub mod maps;
 pub mod remote_memory;
 pub mod unwind;
 pub mod utils;
+pub use utils::protect_cpu_affinity;
 
 // Standard library
 use std::io::Write;
@@ -29,7 +30,6 @@ use log::info;
 
 // Crate internal modules
 use unwind::UnwindTable;
-pub use utils::protect_cpu_affinity;
 
 // ============================================================================
 // Global Registry (Generic)
