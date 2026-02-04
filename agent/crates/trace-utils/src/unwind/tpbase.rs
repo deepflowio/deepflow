@@ -90,13 +90,12 @@ fn get_analyzers() -> Vec<Analyzer> {
 #[cfg(target_arch = "x86_64")]
 fn analyze_fsbase_write_task_x86(code: &[u8]) -> Option<u32> {
     // Pattern: REX.W MOV r/m64, r64 with RDI base and RSI source
-    // 48 89 b7 = mov %rsi, offset(%rdi)
+    // 48 89 b7 XX XX XX XX = mov %rsi, 0xXXXXXXXX(%rdi)
     let pattern = [0x48, 0x89, 0xb7];
 
-    if let Some(idx) = code.windows(3).position(|w| w == pattern) {
-        if idx + 7 <= code.len() {
-            let offset =
-                u32::from_le_bytes([code[idx + 3], code[idx + 4], code[idx + 5], code[idx + 6]]);
+    for w in code.windows(7) {
+        if &w[..3] == pattern {
+            let offset = u32::from_le_bytes([w[3], w[4], w[5], w[6]]);
             trace!(
                 "Found fsbase offset {:#x} from x86_fsbase_write_task",
                 offset
@@ -119,17 +118,17 @@ fn analyze_aout_dump_debugregs_x86(code: &[u8]) -> Option<u32> {
     // Pattern: mov XX(%rdi), %rXX or mov XX(%rsi), %rXX
 
     // Look for 48 8b XX XX XX XX XX patterns (mov r64, m64)
-    for i in 0..code.len().saturating_sub(7) {
+    // Using windows(7) to avoid bounds checking in inner loop
+    for w in code.windows(7) {
         // REX.W MOV r64, [rdi + disp32]
-        if code[i] == 0x48 && code[i + 1] == 0x8b {
-            let modrm = code[i + 2];
+        if w[0] == 0x48 && w[1] == 0x8b {
+            let modrm = w[2];
             let mod_field = modrm >> 6;
             let rm_field = modrm & 0x7;
 
             // mod=10 (disp32), rm=111 (rdi)
             if mod_field == 2 && rm_field == 7 {
-                let offset =
-                    u32::from_le_bytes([code[i + 3], code[i + 4], code[i + 5], code[i + 6]]);
+                let offset = u32::from_le_bytes([w[3], w[4], w[5], w[6]]);
                 // fsbase offset is typically in range TPBASE_MIN_OFFSET-TPBASE_MAX_OFFSET
                 // and should be related to thread.fsbase
                 // The actual fsbase is at offset-16 from debugreg storage
@@ -180,9 +179,17 @@ fn read_kernel_code(addr: u64, size: usize) -> Result<Vec<u8>> {
 fn read_kernel_code_from_kcore(file: &mut File, addr: u64, size: usize) -> Result<Vec<u8>> {
     use object::{elf, read::elf::FileHeader, Endianness};
 
-    // Read the entire header section first to parse program headers
+    // Read the ELF header and program headers first.
+    // Note: /proc/kcore is a virtual file representing kernel memory as an ELF core dump.
+    // The ELF header starts at offset 0 and is always present (typically 64 bytes for ELF64).
+    // The program headers follow immediately after and are also always present.
+    // A 4096-byte initial read is sufficient for the header area since:
+    // - ELF64 header is 64 bytes
+    // - Each program header is 56 bytes, and typical kernels have < 70 segments
+    // - Total header area rarely exceeds 4KB
+    // EOF will not occur here as /proc/kcore always provides this data when readable.
     file.seek(SeekFrom::Start(0))?;
-    let mut header_data = vec![0u8; 4096]; // Should be enough for headers
+    let mut header_data = vec![0u8; 4096];
     file.read_exact(&mut header_data)?;
 
     // Parse header to get program header info
@@ -227,6 +234,9 @@ fn find_and_read_segment<E: object::endian::Endian>(
 ) -> Result<Vec<u8>> {
     use object::{elf, read::elf::ProgramHeader};
 
+    // Pre-allocate buffer outside the loop to avoid repeated memory allocation
+    let mut buf = vec![0u8; size];
+
     // Find the segment containing our address
     for phdr in program_headers {
         if phdr.p_type(endian) != elf::PT_LOAD {
@@ -240,7 +250,6 @@ fn find_and_read_segment<E: object::endian::Endian>(
         if addr >= p_vaddr && addr < p_vaddr + p_memsz {
             let file_offset = p_offset + (addr - p_vaddr);
             file.seek(SeekFrom::Start(file_offset))?;
-            let mut buf = vec![0u8; size];
             file.read_exact(&mut buf)?;
             return Ok(buf);
         }
@@ -259,18 +268,23 @@ fn lookup_kernel_symbol(name: &str) -> Result<u64> {
 
     for line in reader.lines() {
         let line = line?;
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() >= 3 && parts[2] == name {
-            let addr = u64::from_str_radix(parts[0], 16)
-                .map_err(|e| Error::Msg(format!("Failed to parse address: {}", e)))?;
-            if addr == 0 {
-                // kallsyms may show 0 address when kptr_restrict is enabled
-                return Err(Error::Msg(
-                    "kallsyms shows 0 address, try running as root or set kptr_restrict=0"
-                        .to_string(),
-                ));
+        // Use iterator directly to avoid extra Vec allocation
+        let mut parts = line.split_whitespace();
+        let (addr_part, _, name_part) = (parts.next(), parts.next(), parts.next());
+        match name_part {
+            Some(n) if n == name => {
+                let addr = u64::from_str_radix(addr_part.unwrap(), 16)
+                    .map_err(|e| Error::Msg(format!("Failed to parse address: {}", e)))?;
+                if addr == 0 {
+                    // kallsyms may show 0 address when kptr_restrict is enabled
+                    return Err(Error::Msg(
+                        "kallsyms shows 0 address, try running as root or set kptr_restrict=0"
+                            .to_string(),
+                    ));
+                }
+                return Ok(addr);
             }
-            return Ok(addr);
+            _ => (),
         }
     }
 
@@ -291,47 +305,49 @@ pub fn extract_tpbase_offset() -> Result<u64> {
     }
 
     for analyzer in analyzers {
-        match lookup_kernel_symbol(analyzer.function_name) {
+        let addr = match lookup_kernel_symbol(analyzer.function_name) {
             Ok(addr) => {
                 trace!(
                     "Found kernel symbol {} at {:#x}",
                     analyzer.function_name,
                     addr
                 );
-
-                // Read function code (256 bytes should be enough for analysis)
-                match read_kernel_code(addr, 256) {
-                    Ok(code) => {
-                        if let Some(offset) = (analyzer.analyze)(&code) {
-                            // Sanity check: offset should be in reasonable range
-                            if offset >= TPBASE_MIN_OFFSET && offset <= TPBASE_MAX_OFFSET {
-                                debug!(
-                                    "Extracted TPBASE offset {} ({:#x}) from {}",
-                                    offset, offset, analyzer.function_name
-                                );
-                                return Ok(offset as u64);
-                            } else {
-                                warn!(
-                                    "TPBASE offset {} from {} seems invalid (expected {}-{})",
-                                    offset,
-                                    analyzer.function_name,
-                                    TPBASE_MIN_OFFSET,
-                                    TPBASE_MAX_OFFSET
-                                );
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        debug!(
-                            "Failed to read kernel code for {}: {}",
-                            analyzer.function_name, e
-                        );
-                    }
-                }
+                addr
             }
             Err(e) => {
                 trace!("Symbol {} not found: {}", analyzer.function_name, e);
+                continue;
             }
+        };
+
+        // Read function code (256 bytes should be enough for analysis)
+        let code = match read_kernel_code(addr, 256) {
+            Ok(code) => code,
+            Err(e) => {
+                debug!(
+                    "Failed to read kernel code for {}: {}",
+                    analyzer.function_name, e
+                );
+                continue;
+            }
+        };
+
+        let Some(offset) = (analyzer.analyze)(&code) else {
+            continue;
+        };
+
+        // Sanity check: offset should be in reasonable range
+        if offset >= TPBASE_MIN_OFFSET && offset <= TPBASE_MAX_OFFSET {
+            debug!(
+                "Extracted TPBASE offset {} ({:#x}) from {}",
+                offset, offset, analyzer.function_name
+            );
+            return Ok(offset as u64);
+        } else {
+            warn!(
+                "TPBASE offset {} from {} seems invalid (expected {}-{})",
+                offset, analyzer.function_name, TPBASE_MIN_OFFSET, TPBASE_MAX_OFFSET
+            );
         }
     }
 
@@ -422,20 +438,20 @@ fn parse_btf_task_struct_fsbase(btf_data: &[u8]) -> Result<u64> {
         return Err(Error::Msg("BTF data too small".to_string()));
     }
 
-    let magic = u16::from_le_bytes([btf_data[0], btf_data[1]]);
+    let magic = u16::from_le_bytes(btf_data[0..2].try_into().unwrap());
     if magic != 0xEB9F {
-        return Err(Error::Msg(format!("Invalid BTF magic: {:#x}", magic)));
+        return Err(Error::BtfParseError(format!(
+            "Invalid BTF magic: {:#x}",
+            magic
+        )));
     }
 
-    let hdr_len = u32::from_le_bytes([btf_data[4], btf_data[5], btf_data[6], btf_data[7]]) as usize;
-    let type_off =
-        u32::from_le_bytes([btf_data[8], btf_data[9], btf_data[10], btf_data[11]]) as usize;
-    let type_len =
-        u32::from_le_bytes([btf_data[12], btf_data[13], btf_data[14], btf_data[15]]) as usize;
-    let str_off =
-        u32::from_le_bytes([btf_data[16], btf_data[17], btf_data[18], btf_data[19]]) as usize;
-    let str_len =
-        u32::from_le_bytes([btf_data[20], btf_data[21], btf_data[22], btf_data[23]]) as usize;
+    // Use try_into().unwrap() for cleaner array slice conversion
+    let hdr_len = u32::from_le_bytes(btf_data[4..8].try_into().unwrap()) as usize;
+    let type_off = u32::from_le_bytes(btf_data[8..12].try_into().unwrap()) as usize;
+    let type_len = u32::from_le_bytes(btf_data[12..16].try_into().unwrap()) as usize;
+    let str_off = u32::from_le_bytes(btf_data[16..20].try_into().unwrap()) as usize;
+    let str_len = u32::from_le_bytes(btf_data[20..24].try_into().unwrap()) as usize;
 
     let type_section_start = hdr_len + type_off;
     let str_section_start = hdr_len + str_off;
@@ -558,25 +574,30 @@ fn find_btf_struct_by_name(type_section: &[u8], str_section: &[u8], name: &str) 
     Err(Error::Msg(format!("BTF struct '{}' not found", name)))
 }
 
-/// Find offset of a member in a BTF struct
+/// BTF member info containing both offset and type ID
 #[cfg(target_arch = "x86_64")]
-fn find_btf_member_offset(
+struct BtfMemberInfo {
+    /// Offset in bytes from the start of the struct
+    offset: u64,
+    /// BTF type ID of the member
+    type_id: u32,
+}
+
+/// Find both offset and type ID of a member in a BTF struct.
+/// This is the unified implementation that extracts all member info at once.
+#[cfg(target_arch = "x86_64")]
+fn find_btf_member_info(
     type_section: &[u8],
     str_section: &[u8],
     struct_id: u32,
     member_name: &str,
-) -> Result<u64> {
+) -> Result<BtfMemberInfo> {
     // Navigate to the struct type entry
     let mut offset = 0;
     let mut current_id = 1u32;
 
     while offset + 12 <= type_section.len() && current_id <= struct_id {
-        let info = u32::from_le_bytes([
-            type_section[offset + 4],
-            type_section[offset + 5],
-            type_section[offset + 6],
-            type_section[offset + 7],
-        ]);
+        let info = u32::from_le_bytes(type_section[offset + 4..offset + 8].try_into().unwrap());
 
         let kind = (info >> 24) & 0x1f;
         let vlen = info & 0xffff;
@@ -592,29 +613,36 @@ fn find_btf_member_offset(
                     break;
                 }
 
-                let mem_name_off = u32::from_le_bytes([
-                    type_section[member_offset],
-                    type_section[member_offset + 1],
-                    type_section[member_offset + 2],
-                    type_section[member_offset + 3],
-                ]) as usize;
+                let mem_name_off = u32::from_le_bytes(
+                    type_section[member_offset..member_offset + 4]
+                        .try_into()
+                        .unwrap(),
+                ) as usize;
 
-                let mem_offset_bits = u32::from_le_bytes([
-                    type_section[member_offset + 8],
-                    type_section[member_offset + 9],
-                    type_section[member_offset + 10],
-                    type_section[member_offset + 11],
-                ]);
+                let mem_type = u32::from_le_bytes(
+                    type_section[member_offset + 4..member_offset + 8]
+                        .try_into()
+                        .unwrap(),
+                );
+
+                let mem_offset_bits = u32::from_le_bytes(
+                    type_section[member_offset + 8..member_offset + 12]
+                        .try_into()
+                        .unwrap(),
+                );
 
                 if mem_name_off < str_section.len() {
                     let mem_name = get_btf_string(str_section, mem_name_off);
                     if mem_name == member_name {
                         // Convert bits to bytes (normal struct members are byte-aligned)
-                        return Ok((mem_offset_bits / 8) as u64);
+                        return Ok(BtfMemberInfo {
+                            offset: (mem_offset_bits / 8) as u64,
+                            type_id: mem_type,
+                        });
                     }
                 }
             }
-            return Err(Error::Msg(format!(
+            return Err(Error::BtfParseError(format!(
                 "Member '{}' not found in struct",
                 member_name
             )));
@@ -624,7 +652,21 @@ fn find_btf_member_offset(
         current_id += 1;
     }
 
-    Err(Error::Msg(format!("Struct ID {} not found", struct_id)))
+    Err(Error::BtfParseError(format!(
+        "Struct ID {} not found",
+        struct_id
+    )))
+}
+
+/// Find offset of a member in a BTF struct
+#[cfg(target_arch = "x86_64")]
+fn find_btf_member_offset(
+    type_section: &[u8],
+    str_section: &[u8],
+    struct_id: u32,
+    member_name: &str,
+) -> Result<u64> {
+    find_btf_member_info(type_section, str_section, struct_id, member_name).map(|info| info.offset)
 }
 
 /// Find type ID of a member in a BTF struct
@@ -635,62 +677,7 @@ fn find_btf_member_type(
     struct_id: u32,
     member_name: &str,
 ) -> Result<u32> {
-    let mut offset = 0;
-    let mut current_id = 1u32;
-
-    while offset + 12 <= type_section.len() && current_id <= struct_id {
-        let info = u32::from_le_bytes([
-            type_section[offset + 4],
-            type_section[offset + 5],
-            type_section[offset + 6],
-            type_section[offset + 7],
-        ]);
-
-        let kind = (info >> 24) & 0x1f;
-        let vlen = info & 0xffff;
-
-        let extra_size = btf_type_extra_size(kind, vlen);
-
-        if current_id == struct_id && (kind == BTF_KIND_STRUCT || kind == BTF_KIND_UNION) {
-            let members_start = offset + 12; // btf_type base size
-            for i in 0..vlen as usize {
-                let member_offset = members_start + i * 12;
-                if member_offset + 12 > type_section.len() {
-                    break;
-                }
-
-                let mem_name_off = u32::from_le_bytes([
-                    type_section[member_offset],
-                    type_section[member_offset + 1],
-                    type_section[member_offset + 2],
-                    type_section[member_offset + 3],
-                ]) as usize;
-
-                let mem_type = u32::from_le_bytes([
-                    type_section[member_offset + 4],
-                    type_section[member_offset + 5],
-                    type_section[member_offset + 6],
-                    type_section[member_offset + 7],
-                ]);
-
-                if mem_name_off < str_section.len() {
-                    let mem_name = get_btf_string(str_section, mem_name_off);
-                    if mem_name == member_name {
-                        return Ok(mem_type);
-                    }
-                }
-            }
-            return Err(Error::Msg(format!(
-                "Member '{}' not found in struct",
-                member_name
-            )));
-        }
-
-        offset += 12 + extra_size; // 12 = btf_type base size
-        current_id += 1;
-    }
-
-    Err(Error::Msg(format!("Struct ID {} not found", struct_id)))
+    find_btf_member_info(type_section, str_section, struct_id, member_name).map(|info| info.type_id)
 }
 
 /// Get null-terminated string from BTF string section
