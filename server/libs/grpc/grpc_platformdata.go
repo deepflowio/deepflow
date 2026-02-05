@@ -382,7 +382,7 @@ func (t *PlatformInfoTable) QueryPodIdInfo(orgId uint16, podId uint32) *Info {
 }
 
 func (t *PlatformInfoTable) QueryPodService(orgId uint16, podID, podNodeID, podClusterID, podGroupID uint32, epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) uint32 {
-	return t.ServiceTable[orgId].QueryPodService(podID, podNodeID, podClusterID, podGroupID, epcID, isIPv6, ipv4, ipv6, protocol, serverPort)
+	return t.ServiceTable[orgId].QueryPodService(t, orgId, podID, podNodeID, podClusterID, podGroupID, epcID, isIPv6, ipv4, ipv6, protocol, serverPort)
 }
 
 func (t *PlatformInfoTable) QueryCustomService(orgId uint16, epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, serverPort, podClusterId uint16, podServiceId, podGroupId, l3DeviceId, podId uint32, l3DeviceType uint8, protocol layers.IPProtocol) uint32 {

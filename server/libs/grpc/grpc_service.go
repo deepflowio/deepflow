@@ -135,7 +135,7 @@ func toServiceProtocol(protocol layers.IPProtocol) trident.ServiceProtocol {
 	}
 }
 
-func (s *ServiceTable) QueryPodService(podID, podNodeID, podClusterID, podGroupID uint32, epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) uint32 {
+func (s *ServiceTable) QueryPodService(t *PlatformInfoTable, orgId uint16, podID, podNodeID, podClusterID, podGroupID uint32, epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, protocol layers.IPProtocol, serverPort uint16) uint32 {
 	// If server port is 0, protocol is also ignored
 	if serverPort == 0 {
 		protocol = 0
@@ -148,6 +148,22 @@ func (s *ServiceTable) QueryPodService(podID, podNodeID, podClusterID, podGroupI
 	// The IP address in the data is a Pod IP, or a Node IP used by a HostNetwork Pod (which has no own Pod IP)
 	if podID != 0 {
 		serviceID = s.podServiceGroupIDPortTable[genPodXIDPortKey(podGroupID, serviceProtocol, serverPort)]
+		if serviceID == 0 {
+			// 当 eBPF 采集到 UDP 流量时（如 K8S 中经 IPVS 或 hostNetwork 的流量），流量中的 IP 可能并非该 Pod 所属的 IP。
+			// 如果基于 PodID + server_port 无法匹配到 serviceID，则无需再用 VPC IP 进行二次匹配。
+			// ----------------------------------------------------------------------------------------------------------------------------
+			// When eBPF collects UDP traffic (for example, traffic in Kubernetes via IPVS or hostNetwork), the IP address in the traffic may not belong to the Pod.,
+			// If the serviceID cannot be matched using PodID and server_port, then there is no need to try matching again using the VPC IP.
+			var info *Info
+			if isIPv6 {
+				info = t.QueryIPV6Infos(orgId, epcID, ipv6)
+			} else {
+				info = t.QueryIPV4Infos(orgId, epcID, ipv4)
+			}
+			if info != nil && info.PodID != podID {
+				return serviceID
+			}
+		}
 
 		// 数据中的 IP 地址是 Node IP，当然也包括由 Hostnetwork Pod（自身没有 IP）使用的 Node IP
 		// ----------------------------------------------------------------------------------------------------------------
