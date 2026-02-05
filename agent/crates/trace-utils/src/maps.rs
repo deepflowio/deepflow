@@ -21,7 +21,7 @@ use std::path::PathBuf;
 
 use log::trace;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MemoryArea {
     pub m_start: u64,
     pub mx_start: u64, // start address of executable section

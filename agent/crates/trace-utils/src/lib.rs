@@ -18,6 +18,7 @@ pub mod btf;
 pub mod error;
 pub mod maps;
 pub mod remote_memory;
+pub mod tsd;
 pub mod unwind;
 pub mod utils;
 
@@ -28,6 +29,7 @@ use std::io::Write;
 use log::info;
 
 // Crate internal modules
+pub use tsd::TSDInfo;
 use unwind::UnwindTable;
 pub use utils::protect_cpu_affinity;
 
