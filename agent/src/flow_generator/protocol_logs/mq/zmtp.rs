@@ -333,7 +333,7 @@ pub struct ZmtpLog {
     server_socket_type: Option<SocketType>,
     mechanism: Option<Mechanism>,
 
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 }
 
 fn parse_byte(payload: &[u8]) -> Option<(&[u8], u8)> {
@@ -690,11 +690,9 @@ impl L7ProtocolParserInterface for ZmtpLog {
         }
     }
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
         let mut info_list = self.parse(payload, param, false)?;
 
+        self.perf_stats.clear();
         info_list.iter_mut().for_each(|info| {
             let info = match info {
                 L7ProtocolInfo::ZmtpInfo(info) => info,
@@ -705,11 +703,14 @@ impl L7ProtocolParserInterface for ZmtpLog {
             if let Some(config) = param.parse_config {
                 info.set_is_on_blacklist(config);
             }
-            if let Some(perf_stats) = self.perf_stats.as_mut() {
+
+            if param.parse_perf {
+                let mut perf_stat = L7PerfStats::default();
                 if let Some(stats) = info.perf_stats(param) {
                     info.rtt = stats.rrt_sum;
-                    perf_stats.sequential_merge(&stats);
+                    perf_stat.sequential_merge(&stats);
                 }
+                self.perf_stats.push(perf_stat);
             }
         });
 
@@ -726,8 +727,8 @@ impl L7ProtocolParserInterface for ZmtpLog {
     fn protocol(&self) -> L7Protocol {
         L7Protocol::ZMTP
     }
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 

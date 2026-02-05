@@ -325,7 +325,7 @@ impl From<&WebSphereMqInfo> for LogCache {
 
 #[derive(Default)]
 pub struct WebSphereMqLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     parser: WebSphereMqParser,
 }
 
@@ -341,9 +341,7 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
         if !self.parser.parse_payload(payload, has_wasm) {
             return Err(Error::L7ProtocolUnknown);
         }
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
+        self.perf_stats.clear();
 
         let mut info = WebSphereMqInfo::default();
         if let Some(request_type) = &self.parser.request_type {
@@ -373,10 +371,12 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
 
         info.is_tls = param.is_tls();
         set_captured_byte!(info, param);
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if let Some(stats) = info.perf_stats(param) {
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
 
         Ok(L7ParseResult::Single(L7ProtocolInfo::WebSphereMqInfo(info)))
@@ -391,7 +391,7 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
     }
 
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+        std::mem::take(&mut self.perf_stats)
     }
 }
 

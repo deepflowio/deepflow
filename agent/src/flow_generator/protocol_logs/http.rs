@@ -913,7 +913,7 @@ impl From<&HttpInfo> for LogCache {
 #[derive(Default)]
 pub struct HttpLog {
     proto: L7Protocol,
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     http2_req_decoder: Option<Decoder<'static>>,
     http2_resp_decoder: Option<Decoder<'static>>,
 
@@ -929,9 +929,6 @@ impl L7ProtocolParserInterface for HttpLog {
 
         let mut info = HttpInfo::default();
 
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
         // http2 有两个版本, 现在可以直接通过proto区分解析哪个版本的协议.
         match self.proto {
             L7Protocol::Http1 => self.http1_check_protocol(payload),
@@ -993,9 +990,7 @@ impl L7ProtocolParserInterface for HttpLog {
             return Err(Error::NoParseConfig);
         };
 
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
+        self.perf_stats.clear();
 
         #[cfg(feature = "enterprise")]
         self.custom_field_store.clear();
@@ -1143,14 +1138,14 @@ impl L7ProtocolParserInterface for HttpLog {
             },
             _ => unreachable!(),
         };
-        new_log.perf_stats = self.perf_stats.take();
+        new_log.perf_stats = self.perf_stats();
         new_log.http2_req_decoder = self.http2_req_decoder.take();
         new_log.http2_resp_decoder = self.http2_resp_decoder.take();
         *self = new_log;
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 
@@ -1235,7 +1230,8 @@ impl HttpLog {
 
         info.is_on_blacklist = info.check_on_blacklist(config);
 
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if info.msg_type == LogMessageType::Response {
                 if let Some(endpoint) = info.load_endpoint_from_cache(param, info.is_reversed) {
                     info.endpoint = Some(endpoint.to_string());
@@ -1243,8 +1239,9 @@ impl HttpLog {
             }
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
     }
 
@@ -2883,25 +2880,43 @@ mod tests {
 
         assert_eq!(
             expected[0].1,
-            run_perf(expected[0].0, HttpLog::new_v1()),
+            run_perf(expected[0].0, HttpLog::new_v1()).iter().fold(
+                L7PerfStats::default(),
+                |mut s, i| {
+                    s.sequential_merge(&i);
+                    s
+                }
+            ),
             "parse pcap {} unexcepted",
             expected[0].0
         );
         assert_eq!(
             expected[1].1,
-            run_perf(expected[1].0, HttpLog::new_v2(false)),
+            run_perf(expected[1].0, HttpLog::new_v2(false)).iter().fold(
+                L7PerfStats::default(),
+                |mut s, i| {
+                    s.sequential_merge(&i);
+                    s
+                }
+            ),
             "parse pcap {} unexcepted",
             expected[1].0
         );
         assert_eq!(
             expected[2].1,
-            run_perf(expected[2].0, HttpLog::new_v2(true)),
+            run_perf(expected[2].0, HttpLog::new_v2(true)).iter().fold(
+                L7PerfStats::default(),
+                |mut s, i| {
+                    s.sequential_merge(&i);
+                    s
+                }
+            ),
             "parse pcap {} unexcepted",
             expected[2].0
         );
     }
 
-    fn run_perf(pcap: &str, mut http: HttpLog) -> L7PerfStats {
+    fn run_perf(pcap: &str, mut http: HttpLog) -> Vec<L7PerfStats> {
         let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), Some(1024));
@@ -2914,7 +2929,7 @@ mod tests {
         if http.protocol() == L7Protocol::Http2 || http.protocol() == L7Protocol::Grpc {
             http.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
         }
-
+        let mut perf_stats = vec![];
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {
                 packet.lookup_key.direction = PacketDirection::ClientToServer;
@@ -2934,8 +2949,9 @@ mod tests {
                 param.set_log_parser_config(&config);
                 let _ = http.parse_payload(packet.get_l4_payload().unwrap(), param);
             }
+            perf_stats.append(&mut http.perf_stats());
         }
-        http.perf_stats.unwrap()
+        perf_stats
     }
 
     #[test]
@@ -2943,6 +2959,7 @@ mod tests {
         fn execute_case(config: &LogParserConfig, packets: &[MetaPacket]) -> L7PerfStats {
             let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
             let mut http = HttpLog::new_v1();
+            let mut perf_stat = L7PerfStats::default();
             for packet in packets {
                 let Some(payload) = packet.get_l4_payload() else {
                     continue;
@@ -2958,8 +2975,11 @@ mod tests {
                 );
                 param.set_log_parser_config(&config);
                 let _ = http.parse_payload(payload, param);
+                for i in http.perf_stats() {
+                    perf_stat.sequential_merge(&i);
+                }
             }
-            http.perf_stats.unwrap()
+            perf_stat
         }
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join("httpv1.pcap"), None);

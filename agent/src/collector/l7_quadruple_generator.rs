@@ -280,17 +280,9 @@ impl SubQuadGen {
                     && m.biz_type == l7_stats.biz_type
                     && m.time_span == time_span
                     && m.is_reversed == l7_stats.is_reversed
+                    && m.l7_protocol == l7_stats.l7_protocol
             }) {
-                // flow L7Protocol of different client ports on the same server port may be inconsistent.
-                // unknown l7_protocol needs to be judged by the close_type and duration of the flow,
-                // so the L7Protocol of the same flow may be different. The principles are as follows:
-                // 1. Unknown l7_protocol can be overwritten by any protocol.
-                if l7_stats.l7_protocol == meter.l7_protocol {
-                    meter.app_meter.sequential_merge(app_meter);
-                } else if meter.l7_protocol == L7Protocol::Unknown {
-                    meter.l7_protocol = l7_stats.l7_protocol;
-                    meter.app_meter = *app_meter;
-                }
+                meter.app_meter.sequential_merge(app_meter);
             } else {
                 let meter = AppMeterWithL7Protocol {
                     app_meter: *app_meter,

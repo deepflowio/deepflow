@@ -38,7 +38,7 @@ use public::l7_protocol::{CustomProtocol, L7Protocol, LogMessageType};
 
 #[derive(Default)]
 pub struct CustomPolicyLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     parser: CustomPolicyParser,
     proto_str: String,
 }
@@ -83,10 +83,6 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             return Err(Error::NoParseConfig);
         };
 
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
-
         let protocol = CustomProtocol::CustomPolicy(self.proto_str.clone());
 
         let (port, direction) = match param.direction {
@@ -109,6 +105,7 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             return Err(Error::NoParseConfig);
         };
 
+        self.perf_stats.clear();
         if self.parser.parse_payload(payload, direction, policies) {
             let mut info = CustomInfo::from((&self.parser.info, param.direction));
             info.msg_type = param.direction.into();
@@ -125,7 +122,8 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             }
 
             info.set_is_on_blacklist(config);
-            if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if param.parse_perf {
+                let mut perf_stat = L7PerfStats::default();
                 if info.msg_type == LogMessageType::Response {
                     if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
                         info.req.endpoint = endpoint.to_string();
@@ -133,8 +131,9 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
                 }
                 if let Some(stats) = info.perf_stats(param) {
                     info.rrt = stats.rrt_sum;
-                    perf_stats.sequential_merge(&stats);
+                    perf_stat.sequential_merge(&stats);
                 }
+                self.perf_stats.push(perf_stat);
             }
 
             set_captured_byte!(info, param);
@@ -152,8 +151,8 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
         L7Protocol::Custom
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn custom_protocol(&self) -> Option<CustomProtocol> {
