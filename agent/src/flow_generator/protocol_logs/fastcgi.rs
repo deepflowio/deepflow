@@ -384,7 +384,7 @@ impl FastCGIRecord {
 
 #[derive(Default)]
 pub struct FastCGILog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 }
 
 impl FastCGILog {
@@ -475,12 +475,9 @@ impl L7ProtocolParserInterface for FastCGILog {
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let config = param.parse_config.and_then(|c| Some(&c.l7_log_dynamic));
-        if self.perf_stats.is_none() {
-            self.perf_stats = Some(L7PerfStats::default())
-        }
-
         let mut info = FastCGIInfo::default();
 
+        self.perf_stats.clear();
         match param.direction {
             PacketDirection::ClientToServer => {
                 info.msg_type = LogMessageType::Request;
@@ -563,7 +560,9 @@ impl L7ProtocolParserInterface for FastCGILog {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if info.msg_type == LogMessageType::Response {
                 if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
                     info.endpoint = Some(endpoint.to_string());
@@ -571,8 +570,9 @@ impl L7ProtocolParserInterface for FastCGILog {
             }
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
         Ok(L7ParseResult::Single(L7ProtocolInfo::FastCGIInfo(info)))
     }
@@ -581,8 +581,8 @@ impl L7ProtocolParserInterface for FastCGILog {
         L7Protocol::FastCGI
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn parsable_on_udp(&self) -> bool {
@@ -743,7 +743,7 @@ mod test {
         );
         let info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
         let mut req = info.unwrap_single();
-
+        let mut req_stat = parser.perf_stats().remove(0);
         (&mut parser).reset();
 
         let resp_param = &mut ParseParam::new(
@@ -764,8 +764,10 @@ mod test {
             .unwrap_single();
 
         req.merge_log(&mut resp).unwrap();
+
         if let L7ProtocolInfo::FastCGIInfo(info) = req {
-            return (info, parser.perf_stats.unwrap());
+            req_stat.sequential_merge(&parser.perf_stats().remove(0));
+            return (info, req_stat);
         }
         unreachable!()
     }

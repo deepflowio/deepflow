@@ -1874,7 +1874,7 @@ pub struct OpenWireLog {
 
     client_next_skip_len: Option<usize>,
     server_next_skip_len: Option<usize>,
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 }
 
 impl Default for OpenWireLog {
@@ -1890,7 +1890,7 @@ impl Default for OpenWireLog {
             version: DEFAULT_VERSION,
             client_next_skip_len: None,
             server_next_skip_len: None,
-            perf_stats: None,
+            perf_stats: vec![],
         }
     }
 }
@@ -1904,11 +1904,9 @@ impl L7ProtocolParserInterface for OpenWireLog {
         }
     }
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
-
         let mut infos = self.parse(payload, param);
+
+        self.perf_stats.clear();
 
         infos.iter_mut().for_each(|info| {
             let info = match info {
@@ -1919,7 +1917,9 @@ impl L7ProtocolParserInterface for OpenWireLog {
             if let Some(config) = param.parse_config {
                 info.set_is_on_blacklist(config);
             }
-            if let Some(perf_stats) = self.perf_stats.as_mut() {
+
+            if param.parse_perf {
+                let mut perf_stat = L7PerfStats::default();
                 if info.msg_type == LogMessageType::Response {
                     if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
                         info.topic = Some(endpoint.to_string());
@@ -1927,8 +1927,9 @@ impl L7ProtocolParserInterface for OpenWireLog {
                 }
                 if let Some(stats) = info.perf_stats(param) {
                     info.rtt = stats.rrt_sum;
-                    perf_stats.sequential_merge(&stats);
+                    perf_stat.sequential_merge(&stats);
                 }
+                self.perf_stats.push(perf_stat);
             }
         });
 
@@ -1948,8 +1949,8 @@ impl L7ProtocolParserInterface for OpenWireLog {
     fn parsable_on_udp(&self) -> bool {
         false
     }
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 

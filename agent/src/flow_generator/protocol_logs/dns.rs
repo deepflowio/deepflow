@@ -15,6 +15,7 @@
  */
 
 use std::fmt::Write;
+use std::mem;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use log::debug;
@@ -395,7 +396,7 @@ impl From<&DnsInfo> for LogCache {
 
 #[derive(Default)]
 pub struct DnsLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 }
 
 //解析器接口实现
@@ -421,16 +422,21 @@ impl L7ProtocolParserInterface for DnsLog {
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut infos = self.parse(payload, param, false)?;
 
+        self.perf_stats.clear();
+
         for info in &mut infos {
             info.is_tls = param.is_tls();
             if let Some(config) = param.parse_config {
                 info.set_is_on_blacklist(config);
             }
-            if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if param.parse_perf {
+                let mut perf_stat = L7PerfStats::default();
                 if let Some(stats) = info.perf_stats(param) {
                     info.rrt = stats.rrt_sum;
-                    perf_stats.sequential_merge(&stats);
+                    perf_stat.sequential_merge(&stats);
                 }
+
+                self.perf_stats.push(perf_stat);
             }
         }
 
@@ -450,18 +456,14 @@ impl L7ProtocolParserInterface for DnsLog {
         L7Protocol::DNS
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        mem::take(&mut self.perf_stats)
     }
 }
 
 impl DnsLog {
     fn parse(&mut self, payload: &[u8], param: &ParseParam, check: bool) -> Result<Vec<DnsInfo>> {
-        let proto = param.l4_protocol;
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
-        match proto {
+        match param.l4_protocol {
             IpProtocol::UDP => Ok(vec![DnsInfo::parse(param, payload)?]),
             IpProtocol::TCP => {
                 let mut offset = 0;
@@ -700,11 +702,58 @@ mod tests {
         ];
 
         for item in expected.iter() {
-            assert_eq!(item.1, run_perf(item.0), "parse pcap {} unexcepted", item.0);
+            assert_eq!(
+                item.1,
+                run_perf(item.0)
+                    .iter()
+                    .fold(L7PerfStats::default(), |mut s, i| {
+                        s.sequential_merge(&i);
+                        s
+                    }),
+                "parse pcap {} unexcepted",
+                item.0
+            );
+        }
+
+        let expected_multi = vec![(
+            "dns-tcp-multi.pcap",
+            vec![
+                L7PerfStats {
+                    request_count: 1,
+                    ..Default::default()
+                },
+                L7PerfStats {
+                    request_count: 1,
+                    ..Default::default()
+                },
+                L7PerfStats {
+                    response_count: 1,
+                    rrt_count: 1,
+                    rrt_sum: 294,
+                    rrt_max: 294,
+                    ..Default::default()
+                },
+                L7PerfStats {
+                    response_count: 1,
+                    rrt_count: 1,
+                    rrt_sum: 355,
+                    rrt_max: 355,
+                    ..Default::default()
+                },
+            ],
+        )];
+
+        for item in expected_multi.iter() {
+            assert_eq!(
+                item.1,
+                run_perf(item.0),
+                "parse multi pcap {} unexcepted",
+                item.0
+            );
         }
     }
 
-    fn run_perf(pcap: &str) -> L7PerfStats {
+    fn run_perf(pcap: &str) -> Vec<L7PerfStats> {
         let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
         let mut dns = DnsLog::default();
 
@@ -714,6 +763,7 @@ mod tests {
             unreachable!()
         }
         let first_dst_port = packets[0].lookup_key.dst_port;
+        let mut perf_stats = vec![];
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {
                 packet.lookup_key.direction = PacketDirection::ClientToServer;
@@ -735,8 +785,10 @@ mod tests {
                     true,
                 ),
             );
+
+            perf_stats.append(&mut dns.perf_stats());
         }
-        dns.perf_stats.unwrap()
+        perf_stats
     }
 
     #[test]

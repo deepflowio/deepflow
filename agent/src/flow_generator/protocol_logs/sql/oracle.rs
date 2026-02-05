@@ -241,7 +241,7 @@ impl From<&OracleInfo> for LogCache {
 
 #[derive(Default)]
 pub struct OracleLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     parser: OracleParser,
 }
 
@@ -272,9 +272,7 @@ impl L7ProtocolParserInterface for OracleLog {
             return Err(Error::L7ProtocolUnknown);
         };
 
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
+        self.perf_stats.clear();
 
         let mut log_info = OracleInfo {
             msg_type: param.direction.into(),
@@ -306,11 +304,13 @@ impl L7ProtocolParserInterface for OracleLog {
         if let Some(config) = param.parse_config {
             log_info.set_is_on_blacklist(config);
         }
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if let Some(stats) = log_info.perf_stats(param) {
                 log_info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
         Ok(L7ParseResult::Single(L7ProtocolInfo::OracleInfo(log_info)))
     }
@@ -319,8 +319,8 @@ impl L7ProtocolParserInterface for OracleLog {
         L7Protocol::Oracle
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn parsable_on_udp(&self) -> bool {

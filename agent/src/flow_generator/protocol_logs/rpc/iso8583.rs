@@ -208,7 +208,7 @@ impl From<&Iso8583Info> for LogCache {
 
 #[derive(Default)]
 pub struct Iso8583Log {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     parser: Iso8583Parser,
 }
 
@@ -238,9 +238,7 @@ impl L7ProtocolParserInterface for Iso8583Log {
             return Err(Error::L7ProtocolUnknown);
         }
 
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default());
-        };
+        self.perf_stats.clear();
 
         // 对每条解析到的消息构造 Iso8583Info，并返回 Multiple 或 Single
         let mut results: Vec<L7ProtocolInfo> = Vec::with_capacity(msgs.len());
@@ -330,10 +328,12 @@ impl L7ProtocolParserInterface for Iso8583Log {
             }
             info.is_async = true;
 
-            if let Some(perf_stats) = self.perf_stats.as_mut() {
+            if param.parse_perf {
+                let mut perf_stat = L7PerfStats::default();
                 if let Some(stats) = info.perf_stats(param) {
-                    perf_stats.sequential_merge(&stats);
+                    perf_stat.sequential_merge(&stats);
                 }
+                self.perf_stats.push(perf_stat);
             }
 
             if is_00x000(&info.f3) {
@@ -379,8 +379,8 @@ impl L7ProtocolParserInterface for Iso8583Log {
         L7Protocol::Iso8583
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn parsable_on_udp(&self) -> bool {

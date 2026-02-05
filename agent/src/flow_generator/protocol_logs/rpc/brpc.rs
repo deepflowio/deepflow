@@ -62,7 +62,7 @@ pub struct BrpcInfo {
 
 #[derive(Default)]
 pub struct BrpcLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     last_is_on_blacklist: bool,
 }
 
@@ -291,10 +291,6 @@ impl L7ProtocolParserInterface for BrpcLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
-
         let mut vec = Vec::new();
         let mut payload = payload;
 
@@ -302,7 +298,7 @@ impl L7ProtocolParserInterface for BrpcLog {
             payload = tmp;
             vec.push(L7ProtocolInfo::BrpcInfo(info));
         }
-
+        self.perf_stats.clear();
         for info in &mut vec {
             if let L7ProtocolInfo::BrpcInfo(info) = info {
                 info.is_tls = param.is_tls();
@@ -311,7 +307,9 @@ impl L7ProtocolParserInterface for BrpcLog {
                 if let Some(config) = param.parse_config {
                     info.set_is_on_blacklist(config);
                 }
-                if let Some(perf_stats) = self.perf_stats.as_mut() {
+
+                if param.parse_perf {
+                    let mut perf_stat = L7PerfStats::default();
                     if info.msg_type == LogMessageType::Response {
                         if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
                             info.endpoint = Some(endpoint.to_string());
@@ -319,8 +317,9 @@ impl L7ProtocolParserInterface for BrpcLog {
                     }
                     if let Some(stats) = info.perf_stats(param) {
                         info.rtt = stats.rrt_sum;
-                        perf_stats.sequential_merge(&stats);
+                        perf_stat.sequential_merge(&stats);
                     }
+                    self.perf_stats.push(perf_stat);
                 }
             }
         }
@@ -336,8 +335,8 @@ impl L7ProtocolParserInterface for BrpcLog {
         }
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -351,7 +350,7 @@ impl L7ProtocolParserInterface for BrpcLog {
     fn reset(&mut self) {
         let mut s = Self::default();
         s.last_is_on_blacklist = self.last_is_on_blacklist;
-        s.perf_stats = self.perf_stats.take();
+        s.perf_stats = self.perf_stats();
         *self = s;
     }
 }
