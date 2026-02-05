@@ -678,24 +678,11 @@ impl FlowLog {
         }
     }
 
-    pub fn copy_and_reset_l7_perf_data(
-        &mut self,
-        l7_timeout_count: u32,
-    ) -> (L7PerfStats, L7Protocol) {
-        let default_l7_perf = L7PerfStats {
-            err_timeout: l7_timeout_count,
-            ..Default::default()
-        };
-
+    pub fn copy_and_reset_l7_perf_data(&mut self) -> (Vec<L7PerfStats>, L7Protocol) {
         let l7_perf = self
             .l7_protocol_log_parser
             .as_mut()
-            .map_or(default_l7_perf.clone(), |l| {
-                l.perf_stats().map_or(default_l7_perf, |mut p| {
-                    p.err_timeout = l7_timeout_count;
-                    p
-                })
-            });
+            .map_or(vec![], |l| l.perf_stats());
 
         (l7_perf, self.l7_protocol_enum.get_l7_protocol())
     }

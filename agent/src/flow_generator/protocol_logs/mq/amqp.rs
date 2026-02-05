@@ -806,7 +806,7 @@ impl AmqpInfo {
 
 #[derive(Default)]
 pub struct AmqpLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     vhost: Option<String>,
 }
 
@@ -949,9 +949,7 @@ impl L7ProtocolParserInterface for AmqpLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
+        self.perf_stats.clear();
 
         let mut offset = 0;
         let mut vec = Vec::new();
@@ -1125,7 +1123,8 @@ impl L7ProtocolParserInterface for AmqpLog {
                 if let Some(config) = param.parse_config {
                     info.set_is_on_blacklist(config);
                 }
-                if let Some(perf_stats) = self.perf_stats.as_mut() {
+                if param.parse_perf {
+                    let mut perf_stat = L7PerfStats::default();
                     if info.msg_type == LogMessageType::Response {
                         if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
                             info.endpoint = Some(endpoint.to_string());
@@ -1133,8 +1132,9 @@ impl L7ProtocolParserInterface for AmqpLog {
                     }
                     if let Some(stats) = info.perf_stats(param) {
                         info.rtt = stats.rrt_sum;
-                        perf_stats.sequential_merge(&stats);
+                        perf_stat.sequential_merge(&stats);
                     }
+                    self.perf_stats.push(perf_stat);
                 }
             }
         }
@@ -1152,12 +1152,12 @@ impl L7ProtocolParserInterface for AmqpLog {
     fn reset(&mut self) {
         let mut s = Self::default();
         s.vhost = self.vhost.take();
-        s.perf_stats = self.perf_stats.take();
+        s.perf_stats = self.perf_stats();
         *self = s;
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn protocol(&self) -> L7Protocol {

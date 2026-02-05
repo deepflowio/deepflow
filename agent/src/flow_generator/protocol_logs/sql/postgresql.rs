@@ -206,7 +206,7 @@ impl From<&PostgreInfo> for LogCache {
 
 #[derive(Default)]
 pub struct PostgresqlLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     obfuscate_cache: Option<ObfuscateCache>,
 
     has_request: bool,
@@ -237,24 +237,20 @@ impl L7ProtocolParserInterface for PostgresqlLog {
             return Ok(L7ParseResult::None);
         }
 
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
-
         self.parse(payload, false, &mut info)?;
-
+        self.perf_stats.clear();
         set_captured_byte!(info, param);
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
 
-        if !info.ignore && info.at_lease_one_block {
-            if let Some(perf_stats) = self.perf_stats.as_mut() {
-                if let Some(stats) = info.perf_stats(param) {
-                    info.rrt = stats.rrt_sum;
-                    perf_stats.sequential_merge(&stats);
-                }
+        if param.parse_perf && !info.ignore && info.at_lease_one_block {
+            let mut perf_stat = L7PerfStats::default();
+            if let Some(stats) = info.perf_stats(param) {
+                info.rrt = stats.rrt_sum;
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
         Ok(if info.ignore || !param.parse_log {
             L7ParseResult::None
@@ -271,8 +267,8 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         false
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn set_obfuscate_cache(&mut self, obfuscate_cache: Option<ObfuscateCache>) {
@@ -612,6 +608,7 @@ mod test {
         let mut p = capture.collect::<Vec<_>>();
         p[0].lookup_key.direction = PacketDirection::ClientToServer;
         p[1].lookup_key.direction = PacketDirection::ServerToClient;
+        let mut perf_stat = L7PerfStats::default();
 
         let mut parser = PostgresqlLog::default();
         let req_param = &mut ParseParam::new(
@@ -631,7 +628,9 @@ mod test {
         );
         let info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
         let mut req = info.unwrap_single();
-
+        for i in parser.perf_stats() {
+            perf_stat.sequential_merge(&i);
+        }
         (&mut parser).reset();
 
         let resp_param = &mut ParseParam::new(
@@ -653,7 +652,10 @@ mod test {
 
         req.merge_log(&mut resp).unwrap();
         if let L7ProtocolInfo::PostgreInfo(info) = req {
-            return (info, parser.perf_stats.unwrap());
+            for i in parser.perf_stats() {
+                perf_stat.sequential_merge(&i);
+            }
+            return (info, perf_stat);
         }
         unreachable!()
     }

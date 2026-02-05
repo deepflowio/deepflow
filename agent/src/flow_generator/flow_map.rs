@@ -1645,24 +1645,19 @@ impl FlowMap {
     fn collect_l7_stats(
         &mut self,
         node: &mut FlowNode,
-        meta_flow_log: &mut Box<FlowLog>,
+        l7_protocol: L7Protocol,
         l7_info: &L7ProtocolInfo,
+        l7_stat: L7PerfStats,
         consistent_timestamp_in_l7_metrics: bool,
         time_in_micros: u64,
     ) {
-        let Some(mut perf_stats) = node.tagged_flow.flow.flow_perf_stats.take() else {
+        let flow = &mut node.tagged_flow.flow;
+        let Some(mut perf_stats) = flow.flow_perf_stats.take() else {
             return;
         };
+        perf_stats.l7.sequential_merge(&l7_stat);
+        flow.flow_perf_stats = Some(perf_stats);
 
-        let flow = &node.tagged_flow.flow;
-        let flow_id = flow.flow_id;
-        let l7_timeout_count = self
-            .perf_cache
-            .borrow_mut()
-            .timeout_cache
-            .pop_timeout_count(flow_id, false, l7_info.is_reversed());
-        let (l7_perf_stats, l7_protocol) =
-            meta_flow_log.copy_and_reset_l7_perf_data(l7_timeout_count as u32);
         let app_proto_head = l7_info.app_proto_head().unwrap();
         let time_span = if consistent_timestamp_in_l7_metrics
             && app_proto_head.msg_type == LogMessageType::Response
@@ -1676,9 +1671,9 @@ impl FlowMap {
 
         let mut l7_stats = L7Stats::default();
         l7_stats.is_reversed = l7_info.is_reversed();
-        l7_stats.stats = l7_perf_stats.clone();
+        l7_stats.stats = l7_stat;
         l7_stats.endpoint = l7_info.get_endpoint();
-        l7_stats.flow_id = flow_id;
+        l7_stats.flow_id = flow.flow_id;
         l7_stats.signal_source = flow.signal_source;
         l7_stats.time_in_second = Duration::from_secs(time_in_micros / Self::MICROS_IN_SECONDS);
         l7_stats.l7_protocol = l7_protocol;
@@ -1688,10 +1683,6 @@ impl FlowMap {
 
         self.l7_stats_output
             .send(self.l7_stats_allocator.allocate_one_with(l7_stats));
-
-        let l7_perf_stats_all = &mut perf_stats.l7;
-        l7_perf_stats_all.sequential_merge(&l7_perf_stats);
-        node.tagged_flow.flow.flow_perf_stats = Some(perf_stats);
     }
 
     fn collect_metric(
@@ -1767,13 +1758,30 @@ impl FlowMap {
                             // Here we determine whether to reverse flow.
                             self.rectify_flow_direction(node, packet, is_first_packet);
                         }
+
+                        let flow_id = node.tagged_flow.flow.flow_id;
+                        let (mut l7_perf_stats, l7_protocol) = log.copy_and_reset_l7_perf_data();
+
                         match info {
                             crate::common::l7_protocol_log::L7ParseResult::Single(s) => {
                                 let timestamp = packet.lookup_key.timestamp.as_micros();
+                                let mut l7_stat = if l7_perf_stats.is_empty() {
+                                    L7PerfStats::default()
+                                } else {
+                                    l7_perf_stats.remove(0)
+                                };
+                                // TODO: Distinguish timeout counts by endpoint
+                                l7_stat.err_timeout = self
+                                    .perf_cache
+                                    .borrow_mut()
+                                    .timeout_cache
+                                    .pop_timeout_count(flow_id, false, s.is_reversed())
+                                    as u32;
                                 self.collect_l7_stats(
                                     node,
-                                    &mut log,
+                                    l7_protocol,
                                     &s,
+                                    l7_stat,
                                     consistent_timestamp_in_l7_metrics,
                                     timestamp,
                                 );
@@ -1786,10 +1794,23 @@ impl FlowMap {
 
                                 let timestamp = packet.lookup_key.timestamp.as_micros();
                                 for i in m.into_iter() {
+                                    let mut l7_stat = if l7_perf_stats.is_empty() {
+                                        L7PerfStats::default()
+                                    } else {
+                                        l7_perf_stats.remove(0)
+                                    };
+                                    // TODO: Distinguish timeout counts by endpoint
+                                    l7_stat.err_timeout = self
+                                        .perf_cache
+                                        .borrow_mut()
+                                        .timeout_cache
+                                        .pop_timeout_count(flow_id, false, i.is_reversed())
+                                        as u32;
                                     self.collect_l7_stats(
                                         node,
-                                        &mut log,
+                                        l7_protocol,
                                         &i,
+                                        l7_stat,
                                         consistent_timestamp_in_l7_metrics,
                                         timestamp,
                                     );

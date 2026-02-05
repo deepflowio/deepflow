@@ -284,7 +284,7 @@ impl From<&WebSphereMqInfo> for LogCache {
 
 #[derive(Default)]
 pub struct WebSphereMqLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     parser: WebSphereMqParser,
 
     custom_field_store: Store,
@@ -299,10 +299,7 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
         let Some(config) = param.parse_config else {
             return Err(Error::NoParseConfig);
         };
-
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
+        self.perf_stats.clear();
 
         let custom_policies =
             config.get_custom_field_policies(L7Protocol::WebSphereMq.into(), param);
@@ -339,44 +336,43 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
                     info.merge_wasm_info(custom);
                 }
             }
-            match info.base.response_status {
-                L7ResponseStatus::ServerError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                }
-                L7ResponseStatus::ClientError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                }
-                _ => {}
-            }
-            match info.base.msg_type {
-                LogMessageType::Request => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
-                }
-                LogMessageType::Response => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
-                }
-                _ => {}
-            }
 
-            // As the protocol is asynchronous and request/response are not correlated into a session,
-            // RRT cannot be measured using generic methods.
-            // However, the business payload provides the `OrigSendTime` field
-            // represents the request send time (second precision, in the format of "hhmmss", length = 6).
-            // RRT can roughly estimated by (response receive time - OrigSendTime).
-            if info.base.msg_type == LogMessageType::Response
-                && self.parser.orig_send_time.len() == 6
-            {
-                // get "mmss" part of orig_send_time, and must be in Beijing Time (UTC+8)
-                if let Some(rrt_us) =
-                    estimate_rrt_us_by_beijing_mmss(&self.parser.orig_send_time[2..], param.time)
+            if param.parse_perf {
+                let mut perf_stat = L7PerfStats::default();
+                match info.base.response_status {
+                    L7ResponseStatus::ServerError => {
+                        perf_stat.inc_resp_err();
+                    }
+                    L7ResponseStatus::ClientError => {
+                        perf_stat.inc_req_err();
+                    }
+                    _ => {}
+                }
+                match info.base.msg_type {
+                    LogMessageType::Request => perf_stat.inc_req(),
+                    LogMessageType::Response => perf_stat.inc_resp(),
+                    _ => {}
+                }
+                // As the protocol is asynchronous and request/response are not correlated into a session,
+                // RRT cannot be measured using generic methods.
+                // However, the business payload provides the `OrigSendTime` field
+                // represents the request send time (second precision, in the format of "hhmmss", length = 6).
+                // RRT can roughly estimated by (response receive time - OrigSendTime).
+                if info.base.msg_type == LogMessageType::Response
+                    && self.parser.orig_send_time.len() == 6
                 {
-                    info.rrt = rrt_us;
-                    if let Some(perf_stats) = self.perf_stats.as_mut() {
-                        perf_stats.rrt_count += 1;
-                        perf_stats.rrt_sum += rrt_us;
-                        perf_stats.rrt_max = perf_stats.rrt_max.max(rrt_us as u32);
+                    // get "mmss" part of orig_send_time, and must be in Beijing Time (UTC+8)
+                    if let Some(rrt_us) = estimate_rrt_us_by_beijing_mmss(
+                        &self.parser.orig_send_time[2..],
+                        param.time,
+                    ) {
+                        info.rrt = rrt_us;
+                        perf_stat.rrt_count += 1;
+                        perf_stat.rrt_sum += rrt_us;
+                        perf_stat.rrt_max = perf_stat.rrt_max.max(rrt_us as u32);
                     }
                 }
+                self.perf_stats.push(perf_stat);
             }
             info.base.attributes.push(KeyVal {
                 key: "mq_Index".to_string(),
@@ -407,7 +403,7 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
     }
 
     fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+        std::mem::take(&mut self.perf_stats)
     }
 }
 

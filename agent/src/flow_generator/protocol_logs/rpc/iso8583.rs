@@ -215,7 +215,7 @@ impl From<&Iso8583Info> for LogCache {
 
 #[derive(Default)]
 pub struct Iso8583Log {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     parser: Iso8583Parser,
 }
 
@@ -245,9 +245,7 @@ impl L7ProtocolParserInterface for Iso8583Log {
             return Err(Error::L7ProtocolUnknown);
         }
 
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default());
-        };
+        self.perf_stats.clear();
 
         // 对每条解析到的消息构造 Iso8583Info，并返回 Multiple 或 Single
         let mut results: Vec<L7ProtocolInfo> = Vec::with_capacity(msgs.len());
@@ -331,24 +329,13 @@ impl L7ProtocolParserInterface for Iso8583Log {
             }
             info.is_async = true;
 
-            match info.response_status {
-                L7ResponseStatus::ServerError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                }
-                L7ResponseStatus::ClientError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                }
-                _ => {}
-            }
             match info.msg_type {
                 LogMessageType::Request => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
                     if param.direction == PacketDirection::ServerToClient {
                         info.is_reversed = true;
                     }
                 }
                 LogMessageType::Response => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
                     if param.direction == PacketDirection::ClientToServer {
                         info.is_reversed = true;
                     }
@@ -356,21 +343,34 @@ impl L7ProtocolParserInterface for Iso8583Log {
                 _ => {}
             }
 
-            // As the protocol is asynchronous and requests/responses are not correlated into a session,
-            // RRT cannot be measured using generic methods.
-            // But ISO8583 `Field 7 (Transmission Date & Time)` represents the request send time
-            // second precision, in the format of "MMddhhmmss", length = 10.
-            // RRT can be roughly estimated by (response receive time - Field 7).
-            if info.msg_type == LogMessageType::Response && info.f7.len() == 10 {
-                // get 'mmss' part of info.f7, info.f7 must be in Beijing Time (UTC+8)
-                if let Some(rrt_us) = estimate_rrt_us_by_beijing_mmss(&info.f7[6..], param.time) {
-                    info.rrt = rrt_us;
-                    if let Some(perf_stats) = self.perf_stats.as_mut() {
-                        perf_stats.rrt_count += 1;
-                        perf_stats.rrt_sum += rrt_us;
-                        perf_stats.rrt_max = perf_stats.rrt_max.max(rrt_us as u32);
+            if param.parse_perf {
+                let mut perf_stat = L7PerfStats::default();
+                match info.response_status {
+                    L7ResponseStatus::ServerError => perf_stat.inc_resp_err(),
+                    L7ResponseStatus::ClientError => perf_stat.inc_req_err(),
+                    _ => {}
+                }
+                match info.msg_type {
+                    LogMessageType::Request => perf_stat.inc_req(),
+                    LogMessageType::Response => perf_stat.inc_resp(),
+                    _ => {}
+                }
+                // As the protocol is asynchronous and requests/responses are not correlated into a session,
+                // RRT cannot be measured using generic methods.
+                // But ISO8583 `Field 7 (Transmission Date & Time)` represents the request send time
+                // second precision, in the format of "MMddhhmmss", length = 10.
+                // RRT can be roughly estimated by (response receive time - Field 7).
+                if info.msg_type == LogMessageType::Response && info.f7.len() == 10 {
+                    // get 'mmss' part of info.f7, info.f7 must be in Beijing Time (UTC+8)
+                    if let Some(rrt_us) = estimate_rrt_us_by_beijing_mmss(&info.f7[6..], param.time)
+                    {
+                        info.rrt = rrt_us;
+                        perf_stat.rrt_count += 1;
+                        perf_stat.rrt_sum += rrt_us;
+                        perf_stat.rrt_max = perf_stats.rrt_max.max(rrt_us as u32);
                     }
                 }
+                self.perf_stats.push(perf_stat);
             }
 
             if is_00x000(&info.f3) {
@@ -406,8 +406,8 @@ impl L7ProtocolParserInterface for Iso8583Log {
         L7Protocol::Iso8583
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn parsable_on_udp(&self) -> bool {
