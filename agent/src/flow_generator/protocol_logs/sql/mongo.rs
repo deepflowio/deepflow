@@ -230,7 +230,7 @@ impl From<&MongoDBInfo> for LogCache {
 #[derive(Default)]
 pub struct MongoDBLog {
     info: MongoDBInfo,
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 }
 
 impl L7ProtocolParserInterface for MongoDBLog {
@@ -257,9 +257,6 @@ impl L7ProtocolParserInterface for MongoDBLog {
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         let mut info = MongoDBInfo::default();
-        if self.perf_stats.is_none() {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
 
         self.parse(payload, param.l4_protocol, param.direction, &mut info)?;
         info.is_tls = param.is_tls();
@@ -267,14 +264,17 @@ impl L7ProtocolParserInterface for MongoDBLog {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+        self.perf_stats.clear();
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if let Some(mut stats) = info.perf_stats(param) {
                 if info.reply_false {
                     stats.inc_resp_err();
                 }
                 info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::MongoDBInfo(info)))
@@ -291,8 +291,8 @@ impl L7ProtocolParserInterface for MongoDBLog {
         false
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 

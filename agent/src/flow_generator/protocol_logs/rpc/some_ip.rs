@@ -178,7 +178,7 @@ impl From<&SomeIpInfo> for LogCache {
 
 #[derive(Debug, Default)]
 pub struct SomeIpLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 }
 
 impl L7ProtocolParserInterface for SomeIpLog {
@@ -199,18 +199,23 @@ impl L7ProtocolParserInterface for SomeIpLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
         let mut info = SomeIpInfo::default();
         self.parse(payload, &mut info, param)?;
         info.is_tls = param.is_tls();
         set_captured_byte!(info, param);
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+        self.perf_stats.clear();
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            match info.resq_status {
+                L7ResponseStatus::ServerError => perf_stat.inc_resp_err(),
+                L7ResponseStatus::ClientError => perf_stat.inc_req_err(),
+                _ => {}
+            }
+            self.perf_stats.push(perf_stat);
         }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::SomeIpInfo(info)))
@@ -223,8 +228,8 @@ impl L7ProtocolParserInterface for SomeIpLog {
         L7Protocol::SomeIp
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 
@@ -247,14 +252,8 @@ impl SomeIpLog {
             | E_UNKNOWN_METHOD
             | E_WRONG_PROTOCOL_VERSION
             | E_WRONG_INTERFACE_VERSION
-            | E_WRONG_MESSAGE_TYPE => {
-                self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                L7ResponseStatus::ClientError
-            }
-            _ => {
-                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                L7ResponseStatus::ServerError
-            }
+            | E_WRONG_MESSAGE_TYPE => L7ResponseStatus::ClientError,
+            _ => L7ResponseStatus::ServerError,
         }
     }
 

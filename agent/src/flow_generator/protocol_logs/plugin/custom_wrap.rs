@@ -52,8 +52,11 @@ impl L7ProtocolParserInterface for CustomWrapLog {
         L7Protocol::Custom
     }
 
-    fn perf_stats(&mut self) -> Option<crate::common::flow::L7PerfStats> {
-        self.parser.as_mut().and_then(|p| p.perf_stats())
+    fn perf_stats(&mut self) -> Vec<crate::common::flow::L7PerfStats> {
+        if let Some(p) = self.parser.as_mut() {
+            return p.perf_stats();
+        }
+        vec![]
     }
 
     fn reset(&mut self) {

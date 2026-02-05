@@ -307,7 +307,7 @@ pub trait L7ProtocolParserInterface {
     fn reset(&mut self) {}
 
     // return perf data
-    fn perf_stats(&mut self) -> Option<L7PerfStats>;
+    fn perf_stats(&mut self) -> Vec<L7PerfStats>;
 
     fn set_obfuscate_cache(&mut self, _: Option<ObfuscateCache>) {}
 }

@@ -32,7 +32,7 @@ use crate::{
 pub struct WasmLog {
     proto_num: Option<u8>,
     proto_str: String,
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 }
 
 impl L7ProtocolParserInterface for WasmLog {
@@ -57,9 +57,7 @@ impl L7ProtocolParserInterface for WasmLog {
         let Some(vm) = vm_ref.as_mut() else {
             return Err(Error::WasmParseFail);
         };
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default());
-        }
+        self.perf_stats.clear();
 
         if let Some(infos) = vm.on_parse_payload(payload, param, self.proto_num.unwrap()) {
             let l7_infos: Vec<L7ProtocolInfo> = infos
@@ -67,20 +65,16 @@ impl L7ProtocolParserInterface for WasmLog {
                 .map(|mut i| {
                     i.proto = self.proto_num.unwrap();
                     i.proto_str = self.proto_str.clone();
-                    match i.resp.status {
-                        L7ResponseStatus::ServerError => {
-                            self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                        }
-                        L7ResponseStatus::ClientError => {
-                            self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                        }
-                        _ => {}
-                    }
-
                     i.msg_type = param.direction.into();
                     set_captured_byte!(i, param);
 
-                    if let Some(perf_stats) = self.perf_stats.as_mut() {
+                    if param.parse_perf {
+                        let mut perf_stat = L7PerfStats::default();
+                        match i.resp.status {
+                            L7ResponseStatus::ServerError => perf_stat.inc_resp_err(),
+                            L7ResponseStatus::ClientError => perf_stat.inc_req_err(),
+                            _ => {}
+                        }
                         if i.msg_type == LogMessageType::Response {
                             if let Some(endpoint) =
                                 i.load_endpoint_from_cache(param, i.is_reversed())
@@ -90,8 +84,9 @@ impl L7ProtocolParserInterface for WasmLog {
                         }
                         if let Some(stats) = i.perf_stats(param) {
                             i.rrt = stats.rrt_sum;
-                            perf_stats.sequential_merge(&stats);
+                            perf_stat.sequential_merge(&stats);
                         }
+                        self.perf_stats.push(perf_stat);
                     }
 
                     L7ProtocolInfo::CustomInfo(i)
@@ -114,8 +109,8 @@ impl L7ProtocolParserInterface for WasmLog {
         ))
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 
@@ -123,6 +118,6 @@ pub fn get_wasm_parser(p: u8, s: String) -> WasmLog {
     WasmLog {
         proto_num: Some(p),
         proto_str: s,
-        perf_stats: None,
+        perf_stats: vec![],
     }
 }

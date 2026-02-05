@@ -361,12 +361,12 @@ impl From<&MemcachedInfo> for LogCache {
 
 #[derive(Default)]
 pub struct MemcachedLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 }
 
 impl MemcachedLog {
     fn reset(&mut self) {
-        self.perf_stats = None;
+        self.perf_stats = vec![];
     }
 
     fn parse_commands(mut payload: &[u8]) -> Result<Vec<MemcachedInfo>> {
@@ -608,9 +608,6 @@ impl L7ProtocolParserInterface for MemcachedLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
         let mut on_blacklist = false;
         let mut results = match param.direction {
             PacketDirection::ClientToServer => {
@@ -635,11 +632,15 @@ impl L7ProtocolParserInterface for MemcachedLog {
             });
         };
         let mut info_rrt = 0;
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+
+        self.perf_stats.clear();
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if let Some(stats) = info.perf_stats(param) {
                 info_rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
         for info in results.iter_mut() {
             info.is_on_blacklist = on_blacklist;
@@ -675,8 +676,8 @@ impl L7ProtocolParserInterface for MemcachedLog {
         false
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 

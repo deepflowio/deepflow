@@ -285,7 +285,7 @@ pub struct MqttLog {
     msg_type: LogMessageType,
     status: L7ResponseStatus,
     version: u8,
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 }
 
 impl L7ProtocolParserInterface for MqttLog {
@@ -301,9 +301,7 @@ impl L7ProtocolParserInterface for MqttLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
+        self.perf_stats.clear();
 
         let mut infos = self.parse(payload, param)?;
 
@@ -315,16 +313,24 @@ impl L7ProtocolParserInterface for MqttLog {
                 if let Some(config) = param.parse_config {
                     info.set_is_on_blacklist(config);
                 }
-                if let Some(perf_stats) = self.perf_stats.as_mut() {
+
+                if param.parse_perf {
+                    let mut perf_stat = L7PerfStats::default();
                     if info.msg_type == LogMessageType::Response {
                         if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
                             info.endpoint = Some(endpoint.to_string());
                         }
                     }
+                    match info.status {
+                        L7ResponseStatus::ClientError => perf_stat.inc_req_err(),
+                        L7ResponseStatus::ServerError => perf_stat.inc_resp_err(),
+                        _ => {}
+                    }
                     if let Some(stats) = info.perf_stats(param) {
                         info.rrt = stats.rrt_sum;
-                        perf_stats.sequential_merge(&stats);
+                        perf_stat.sequential_merge(&stats);
                     }
+                    self.perf_stats.push(perf_stat);
                 }
             } else {
                 unreachable!()
@@ -348,12 +354,12 @@ impl L7ProtocolParserInterface for MqttLog {
     fn reset(&mut self) {
         let mut s = Self::default();
         s.version = self.version;
-        s.perf_stats = self.perf_stats.take();
+        s.perf_stats = self.perf_stats();
         *self = s;
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 
@@ -559,14 +565,8 @@ impl MqttLog {
             NotAuthorized = 0x5,
             */
             0 => L7ResponseStatus::Ok,
-            1 | 2 | 4 | 5 => {
-                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                L7ResponseStatus::ClientError
-            }
-            3 => {
-                self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                L7ResponseStatus::ServerError
-            }
+            1 | 2 | 4 | 5 => L7ResponseStatus::ClientError,
+            3 => L7ResponseStatus::ServerError,
             _ => L7ResponseStatus::ParseFailed,
         }
     }
@@ -1173,7 +1173,7 @@ mod tests {
         if packets.len() < 2 {
             unreachable!()
         }
-
+        let mut perf_stat = L7PerfStats::default();
         let first_dst_port = packets[0].lookup_key.dst_port;
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {
@@ -1195,9 +1195,12 @@ mod tests {
                         true,
                     ),
                 );
+                for i in mqtt.perf_stats() {
+                    perf_stat.sequential_merge(&i);
+                }
                 mqtt.reset();
             }
         }
-        mqtt.perf_stats.unwrap()
+        perf_stat
     }
 }

@@ -234,7 +234,7 @@ fn test_parse() {
         unreachable!()
     }
 
-    let stat = p.perf_stats().unwrap();
+    let stat = p.perf_stats().remove(0);
     assert_eq!(stat.request_count, 1);
     assert_eq!(stat.response_count, 1);
     assert_eq!(stat.rrt_count, 1);

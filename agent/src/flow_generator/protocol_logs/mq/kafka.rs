@@ -810,14 +810,14 @@ impl From<&KafkaInfo> for LogCache {
 }
 
 pub struct KafkaLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     sessions: LruCache<u32, Api>,
 }
 
 impl Default for KafkaLog {
     fn default() -> Self {
         Self {
-            perf_stats: None,
+            perf_stats: vec![],
             sessions: LruCache::new(NonZeroUsize::new(Self::MAX_SESSION_PER_FLOW).unwrap()),
         }
     }
@@ -846,9 +846,8 @@ impl L7ProtocolParserInterface for KafkaLog {
         if param.l4_protocol != IpProtocol::TCP {
             return Err(error::Error::InvalidIpProtocol);
         }
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
+        self.perf_stats.clear();
+
         let mut info = KafkaInfo::default();
         match Self::parse(self, payload, param.direction, &mut info) {
             Ok(()) => {}
@@ -901,7 +900,9 @@ impl L7ProtocolParserInterface for KafkaLog {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if info.msg_type == LogMessageType::Response {
                 if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
                     info.endpoint = Some(endpoint.to_string());
@@ -909,8 +910,9 @@ impl L7ProtocolParserInterface for KafkaLog {
             }
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::KafkaInfo(info)))
@@ -927,8 +929,8 @@ impl L7ProtocolParserInterface for KafkaLog {
         false
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 
@@ -1794,7 +1796,7 @@ mod tests {
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap));
         let mut packets = capture.collect::<Vec<_>>();
-
+        let mut perf_stat = L7PerfStats::default();
         let first_dst_port = packets[0].lookup_key.dst_port;
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {
@@ -1817,7 +1819,10 @@ mod tests {
                     ),
                 );
             }
+            for i in kafka.perf_stats() {
+                perf_stat.sequential_merge(&i);
+            }
         }
-        kafka.perf_stats.unwrap()
+        perf_stat
     }
 }

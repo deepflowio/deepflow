@@ -48,7 +48,7 @@ use crate::{
 
 #[derive(Default)]
 pub struct CustomPolicyLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 
     policy: Option<ExtraProtocolCharacters>,
     l7_parser: Option<Box<L7ProtocolParser>>,
@@ -135,13 +135,9 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             return Err(Error::NoParseConfig);
         };
 
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
-
         trace!("apply biz decode policies to {biz_protocol}");
         let mut info = CustomPolicyInfo::default();
-
+        self.perf_stats.clear();
         self.store.clear();
         policies.apply(
             &mut self.store,
@@ -188,7 +184,9 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
         }
 
         info.set_is_on_blacklist(config);
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if info.msg_type == LogMessageType::Response && info.req.endpoint.is_empty() {
                 if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
                     info.req.endpoint = endpoint.to_string();
@@ -196,8 +194,9 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             }
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
 
         set_captured_byte!(info, param);
@@ -212,8 +211,8 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
         L7Protocol::Custom
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn custom_protocol(&self) -> Option<CustomProtocol> {

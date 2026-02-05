@@ -140,7 +140,7 @@ impl From<&PingInfo> for LogCache {
 #[derive(Default)]
 pub struct PingLog {
     proto: L7Protocol,
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 }
 
 impl L7ProtocolParserInterface for PingLog {
@@ -171,6 +171,8 @@ impl L7ProtocolParserInterface for PingLog {
             return Err(Error::PingHeaderParseFailed);
         }
 
+        self.perf_stats.clear();
+
         match IcmpType::new(icmp_data.icmp_type) {
             IcmpTypes::EchoRequest => {
                 let mut info = PingInfo {
@@ -181,11 +183,13 @@ impl L7ProtocolParserInterface for PingLog {
                     ..Default::default()
                 };
                 set_captured_byte!(info, param);
-                if let Some(perf_stats) = self.perf_stats.as_mut() {
+                if param.parse_perf {
+                    let mut perf_stat = L7PerfStats::default();
                     if let Some(stats) = info.perf_stats(param) {
                         info.rrt = stats.rrt_sum;
-                        perf_stats.sequential_merge(&stats);
+                        perf_stat.sequential_merge(&stats);
                     }
+                    self.perf_stats.push(perf_stat);
                 }
                 Ok(L7ParseResult::Single(L7ProtocolInfo::PingInfo(info)))
             }
@@ -199,11 +203,13 @@ impl L7ProtocolParserInterface for PingLog {
                     ..Default::default()
                 };
                 set_captured_byte!(info, param);
-                if let Some(perf_stats) = self.perf_stats.as_mut() {
+                if param.parse_perf {
+                    let mut perf_stat = L7PerfStats::default();
                     if let Some(stats) = info.perf_stats(param) {
                         info.rrt = stats.rrt_sum;
-                        perf_stats.sequential_merge(&stats);
+                        perf_stat.sequential_merge(&stats);
                     }
+                    self.perf_stats.push(perf_stat);
                 }
                 Ok(L7ParseResult::Single(L7ProtocolInfo::PingInfo(info)))
             }
@@ -215,8 +221,8 @@ impl L7ProtocolParserInterface for PingLog {
         L7Protocol::Ping
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn parsable_on_other(&self) -> bool {
