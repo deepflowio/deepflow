@@ -458,6 +458,13 @@ controller:
     # limit the total number of querier queried at a time
     querier_query_limit: 1000000
 
+  pcap:
+    page-size: 100000
+    max-packets: 5000
+    max-total-memory: 128  # in MB
+    max-packet-size: 128    # in KB
+    querier:
+      listen-port: 20416
 querier:
   # querier http listenport
   listen-port: 20416
