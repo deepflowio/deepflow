@@ -32,6 +32,15 @@
 
 #define UNWIND_SHARDS_PER_PROCESS 1024
 
+enum LogLevel {
+    LOG_LEVEL_ERROR = 1,
+    LOG_LEVEL_WARN = 2,
+    LOG_LEVEL_INFO = 3,
+    LOG_LEVEL_DEBUG = 4,
+    LOG_LEVEL_TRACE = 5,
+};
+typedef uint8_t LogLevel;
+
 enum CfaType {
     CFA_TYPE_RBP_OFFSET,  /* CFA = FP + offset (RBP on x86_64, X29 on ARM64) */
     CFA_TYPE_RSP_OFFSET,  /* CFA = SP + offset (RSP on x86_64, X31 on ARM64) */
@@ -414,6 +423,13 @@ void v8_unwind_table_load(v8_unwind_table_t *table, uint32_t pid);
 void v8_unwind_table_unload(v8_unwind_table_t *table, uint32_t pid);
 
 int32_t read_offset_of_stack_in_task_struct(void);
+
+void rust_log_wrapper(LogLevel level,
+                      int error_number,
+                      const char *msg,
+                      const char *function_name,
+                      const char *file_path,
+                      int line_number);
 
 int rustc_demangle(const char *mangled, char *out, size_t out_size);
 
