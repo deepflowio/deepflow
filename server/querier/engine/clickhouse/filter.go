@@ -913,6 +913,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					} else {
 						filter = fmt.Sprintf(tagItem.WhereTranslator, nameNoPrefix, op, t.Value)
 					}
+				} else if strings.HasPrefix(tagName, "custom_tag.") {
+					tagItem, ok = tag.GetTag("custom_tag.", db, table, "default")
+					if strings.Contains(op, "match") {
+						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, tagName, t.Value)
+					} else {
+						filter = fmt.Sprintf(tagItem.WhereTranslator, tagName, op, t.Value)
+					}
 				} else {
 					switch strings.Trim(t.Tag, "`") {
 					case "policy_type", "metric_value", "event_level", "team_id", "user_id", "target_tags", "_query_region", "_target_uid", "1", "_id":
