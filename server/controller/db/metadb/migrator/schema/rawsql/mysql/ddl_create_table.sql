@@ -2416,6 +2416,19 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_policy;
 
+CREATE TABLE IF NOT EXISTS silence_policy (
+    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    team_id                 INTEGER DEFAULT 1,
+    user_id                 INTEGER,
+    name                    CHAR(128) NOT NULL,
+    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    start_time              TIMESTAMP NOT NULL DEFAULT 0,
+    end_time                TIMESTAMP NOT NULL DEFAULT 0,
+    comb_policy_lcuuids     TEXT
+) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
+TRUNCATE TABLE silence_policy;
+
 CREATE TABLE IF NOT EXISTS alarm_event (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     status                  CHAR(64),
