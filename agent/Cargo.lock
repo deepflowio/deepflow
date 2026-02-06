@@ -2473,6 +2473,8 @@ name = "l7"
 version = "0.1.0"
 dependencies = [
  "bitflags 1.3.2",
+ "bytes 1.10.1",
+ "chrono",
  "serde",
 ]
 
