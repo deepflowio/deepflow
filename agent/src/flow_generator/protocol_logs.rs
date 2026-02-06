@@ -712,3 +712,112 @@ cfg_if::cfg_if! {
         }
     }
 }
+
+// Estimate RRT (microseconds) from a time string.
+//
+// Only integer-offset time zones are supported (non-integer ones like India and Nepal are not supported).
+// Since the timezone of the input time is unknown, for integer-offset time zones the minute and second
+// values are the same across time zones, only the hour may differ.
+// As RRT is limited to within 2 minutes, the hour can be ignored and RRT can be computed using only mm:ss.
+// If the response crosses an hour boundary, add 3600 seconds for correction.
+//
+// Input:
+// - mmss: "mmss" (4), must be in Beijing Time (UTC+8)
+// - now_us: current time in microseconds since epoch
+//
+// Behavior:
+// - infer current or previous hour for cross-hour
+// - Compute microsecond difference with now_us
+// - Clamp future time to 0
+// - Ignore if older than 2 minutes
+pub fn estimate_rrt_us_by_beijing_mmss(mmss: &str, now_us: u64) -> Option<u64> {
+    if mmss.len() != 4 || now_us == 0 {
+        return None;
+    }
+
+    let input_mm: i64 = mmss[0..2].parse().ok()?;
+    let input_ss: i64 = mmss[2..4].parse().ok()?;
+    let input_sec = input_mm * 60 + input_ss;
+
+    let now_sec = (now_us / 1_000_000) as i64;
+    let now_sec_in_hour = now_sec % 3600;
+
+    let mut diff_sec = now_sec_in_hour - input_sec;
+
+    // 59 -> 00 cross-hour correction
+    if diff_sec < 0 {
+        diff_sec += 3600;
+    }
+
+    // future time
+    if diff_sec < 0 {
+        return Some(0);
+    }
+
+    // RRT exceeding 120s is considered invalid
+    if diff_sec > 120 {
+        return None;
+    }
+
+    let diff_us = diff_sec * 1_000_000 + (now_us % 1_000_000) as i64;
+    Some(diff_us as u64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_now_us(min: i64, sec: i64) -> u64 {
+        let total_sec = min * 60 + sec;
+        (total_sec * 1_000_000) as u64
+    }
+
+    #[test]
+    fn test_normal_case() {
+        // 16:53:55 -> 16:54:10
+        let now_us = make_now_us(54, 10);
+        let rrt = estimate_rrt_us_by_beijing_mmss("5355", now_us).unwrap();
+        assert_eq!(rrt, 15_000_000);
+    }
+
+    #[test]
+    fn test_cross_hour_59_to_00() {
+        // 16:59:58 -> 17:00:02
+        let now_us = make_now_us(0, 2);
+        let rrt = estimate_rrt_us_by_beijing_mmss("5958", now_us).unwrap();
+        assert_eq!(rrt, 4_000_000);
+    }
+
+    #[test]
+    fn test_future_time_clamped() {
+        let now_us = make_now_us(10, 0);
+        let rrt = estimate_rrt_us_by_beijing_mmss("1010", now_us).unwrap();
+        assert_eq!(rrt, 0);
+    }
+
+    #[test]
+    fn test_older_than_120s_invalid() {
+        let now_us = make_now_us(10, 0);
+        let rrt = estimate_rrt_us_by_beijing_mmss("0700", now_us);
+        assert!(rrt.is_none());
+    }
+
+    #[test]
+    fn test_invalid_input_length() {
+        let now_us = make_now_us(10, 0);
+        assert!(estimate_rrt_us_by_beijing_mmss("123", now_us).is_none());
+    }
+
+    #[test]
+    fn test_invalid_string() {
+        let now_us = make_now_us(10, 0);
+        assert!(estimate_rrt_us_by_beijing_mmss("ab12", now_us).is_none());
+    }
+
+    #[test]
+    fn test_exact_120s_boundary() {
+        let now_us = make_now_us(10, 0);
+        let rrt = estimate_rrt_us_by_beijing_mmss("0800", now_us).unwrap();
+        assert_eq!(rrt, 120_000_000);
+    }
+}

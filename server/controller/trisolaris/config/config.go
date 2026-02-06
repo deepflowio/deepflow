@@ -45,8 +45,6 @@ type Config struct {
 	Push                           Push     `yaml:"push"`
 	SelfUpdateUrl                  string   `default:"grpc" yaml:"self-update-url"`
 	RemoteApiTimeout               uint16   `default:"30" yaml:"remote-api-timeout"`
-	TridentTypeForUnknowVtap       int      `default:"0" yaml:"trident-type-for-unknow-vtap"`
-	OldTridentTypeForUnknowVtap    int      `default:"0" yaml:"trident-type-for-unkonw-vtap"` // Compatible with older configurations
 	PlatformVips                   []string `yaml:"platform-vips"`
 	NodeType                       string   `default:"master" yaml:"node-type"`
 	RegionDomainPrefix             string   `yaml:"region-domain-prefix"`
@@ -78,9 +76,6 @@ type Config struct {
 }
 
 func (c *Config) Convert() {
-	if c.OldTridentTypeForUnknowVtap != 0 && c.TridentTypeForUnknowVtap == 0 {
-		c.TridentTypeForUnknowVtap = c.OldTridentTypeForUnknowVtap
-	}
 	if c.Chrony.Host != "" {
 		if value, ok := os.LookupEnv(c.Chrony.Host); ok {
 			c.Chrony.Host = value

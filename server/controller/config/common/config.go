@@ -45,6 +45,9 @@ type Querier struct {
 }
 
 type Pcap struct {
-	PageSize int     `default:"100000" yaml:"page_size"`
-	Querier  Querier `yaml:"querier"`
+	PageSize       int     `default:"100000" yaml:"page-size"`
+	MaxPackets     int     `default:"5000" yaml:"max-packets"`
+	MaxTotalMemory int     `default:"128" yaml:"max-total-memory"` // in MB
+	MaxPacketSize  int     `default:"128" yaml:"max-packet-size"`  // in KB
+	Querier        Querier `yaml:"querier"`
 }
