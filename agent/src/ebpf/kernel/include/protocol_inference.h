@@ -971,10 +971,31 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 		return MSG_UNKNOWN;
 	}
 
-	// Tag check
 	char tag = buf[0];
-	if (tag != 'Q' && tag != 'P' && tag != 'B' &&
-	    tag != 'E' && tag != 'S' && tag != 'C')
+
+	/*
+	 * NOTE:
+	 * In Linux 4.14, the eBPF verifier is very strict on complex boolean
+	 * expressions. The original explicit comparison:
+	 *
+	 *   if (tag != 'Q' && tag != 'P' && tag != 'B' &&
+	 *       tag != 'E' && tag != 'S' && tag != 'C')
+	 *
+	 * may fail verifier checks due to excessive branching and state explosion.
+	 *
+	 * To keep the program verifier-friendly, we intentionally simplify the
+	 * condition to a range check:
+	 *
+	 *   if (tag < 'B' || tag > 'S')
+	 *
+	 * This relaxes the validation and allows some non-target tag values
+	 * within ['B', 'S'], but is acceptable because:
+	 *   1) This is only a fast pre-filter.
+	 *   2) Invalid tags will be rejected by subsequent length/content checks.
+	 *
+	 * This trade-off is required for compatibility with Linux 4.14 eBPF verifier.
+	 */
+	if (tag < 'B' || tag > 'S')
 		return MSG_UNKNOWN;
 
 	// Payload length check
