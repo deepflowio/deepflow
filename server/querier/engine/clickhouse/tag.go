@@ -111,6 +111,11 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 			}
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPrefix, nameNoPrefix)
 			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
+		} else if strings.HasPrefix(nameNoBackQuote, "custom_tag.") {
+			nameNoPrefix := strings.TrimPrefix(nameNoBackQuote, "custom_tag.")
+			tagItem, ok = tag.GetTag("custom_tag.", db, table, "default")
+			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPrefix, nameNoPrefix)
+			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		} else {
 			stmts = append(stmts, &SelectTag{Value: name, Alias: alias})
 		}

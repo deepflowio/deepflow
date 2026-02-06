@@ -808,9 +808,6 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		Values: []interface{}{},
 	}
 	notSupportOperator := []string{}
-	if table == "alert_event" {
-		notSupportOperator = []string{"select", "group"}
-	}
 
 	// 查询 k8s_label
 	chClient := client.Client{
@@ -957,7 +954,7 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 	}
 
 	// 查询外部字段
-	if !slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_FLOW_LOG, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_EVENT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS, ckcommon.DB_NAME_APPLICATION_LOG, "_prometheus"}, db) || (db == ckcommon.DB_NAME_FLOW_LOG && table != ckcommon.TABLE_NAME_L7_FLOW_LOG) || (db == ckcommon.DB_NAME_PROFILE && table != ckcommon.TABLE_NAME_IN_PROCESS) || (db == ckcommon.DB_NAME_EVENT && !slices.Contains([]string{ckcommon.TABLE_NAME_EVENT, ckcommon.TABLE_NAME_FILE_EVENT}, table)) {
+	if !slices.Contains([]string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_FLOW_LOG, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_EVENT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS, ckcommon.DB_NAME_APPLICATION_LOG, "_prometheus"}, db) || (db == ckcommon.DB_NAME_FLOW_LOG && table != ckcommon.TABLE_NAME_L7_FLOW_LOG) || (db == ckcommon.DB_NAME_PROFILE && table != ckcommon.TABLE_NAME_IN_PROCESS) {
 		return response, nil
 	}
 	externalChClient := client.Client{
@@ -1030,7 +1027,7 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			externalTag := tagName.(string)
 			var categoryValue string
 			// fieltValueType := _tagName.([]interface{})[2]
-			if strings.HasPrefix(externalTag, "cloud.tag.") || strings.HasPrefix(externalTag, "k8s.label.") || strings.HasPrefix(externalTag, "os.app.") || strings.HasPrefix(externalTag, "k8s.annotation.") || strings.HasPrefix(externalTag, "k8s.env.") {
+			if strings.HasPrefix(externalTag, "cloud.tag.") || strings.HasPrefix(externalTag, "k8s.label.") || strings.HasPrefix(externalTag, "os.app.") || strings.HasPrefix(externalTag, "k8s.annotation.") || strings.HasPrefix(externalTag, "k8s.env.") || strings.HasPrefix(externalTag, "custom_tag.") {
 				categoryValue = "Custom Tag"
 				response.Values = append(response.Values, []interface{}{
 					externalTag, externalTag, externalTag, externalTag, externalTag, externalTag, "map_item",
@@ -1041,12 +1038,6 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 				response.Values = append(response.Values, []interface{}{
 					externalTag, externalTag, externalTag, externalTag, externalTag, externalTag, "map_item",
 					categoryValue, tagTypeToOperators["string"], []bool{true, true, true}, externalTag, externalTag, externalTag, "", false, notSupportOperator, tableName,
-				})
-			} else {
-				categoryValue = _tagName.([]interface{})[2].(string)
-				response.Values = append(response.Values, []interface{}{
-					externalTag, externalTag, externalTag, externalTag, externalTag, externalTag, categoryValue,
-					categoryValue, tagTypeToOperators[categoryValue], []bool{true, true, true}, externalTag, externalTag, externalTag, "", false, notSupportOperator, tableName,
 				})
 			}
 
@@ -1122,7 +1113,6 @@ func GetDynamicMetric(db, table, metric string) (response *common.Result) {
 			metric, metric, metric, metric, metric, metric, "map_item",
 			"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, "", "", "", "", false, []string{}, "",
 		})
-		return
 	}
 	return
 }
