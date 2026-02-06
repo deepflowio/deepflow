@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// LBTargetServerMessageFactory LBTargetServer资源的消息工厂
+type LBTargetServerMessageFactory struct{}
+
+func (f *LBTargetServerMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedLBTargetServers{}
+}
+
+func (f *LBTargetServerMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedLBTargetServer{}
+}
+
+func (f *LBTargetServerMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedLBTargetServers{}
+}
+
+func (f *LBTargetServerMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedLBTargetServerFields{}
+}
 
 type LBTargetServer struct {
 	UpdaterBase[
@@ -32,36 +52,16 @@ type LBTargetServer struct {
 		*diffbase.LBTargetServer,
 		*metadbmodel.LBTargetServer,
 		metadbmodel.LBTargetServer,
-		*message.AddedLBTargetServers,
-		message.AddedLBTargetServers,
-		message.AddNoneAddition,
-		*message.UpdatedLBTargetServer,
-		message.UpdatedLBTargetServer,
-		*message.UpdatedLBTargetServerFields,
-		message.UpdatedLBTargetServerFields,
-		*message.DeletedLBTargetServers,
-		message.DeletedLBTargetServers,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetServer) *LBTargetServer {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, &LBTargetServerMessageFactory{})
+	}
+
 	updater := &LBTargetServer{
-		newUpdaterBase[
-			cloudmodel.LBTargetServer,
-			*diffbase.LBTargetServer,
-			*metadbmodel.LBTargetServer,
-			metadbmodel.LBTargetServer,
-			*message.AddedLBTargetServers,
-			message.AddedLBTargetServers,
-			message.AddNoneAddition,
-			*message.UpdatedLBTargetServer,
-			message.UpdatedLBTargetServer,
-			*message.UpdatedLBTargetServerFields,
-			message.UpdatedLBTargetServerFields,
-			*message.DeletedLBTargetServers,
-			message.DeletedLBTargetServers,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
 			wholeCache,
 			db.NewLBTargetServer().SetMetadata(wholeCache.GetMetadata()),
@@ -69,9 +69,11 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
+
+// 实现 DataGenerator 接口
 
 func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServer) (*metadbmodel.LBTargetServer, bool) {
 	lbID, exists := s.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
@@ -108,7 +110,6 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, cloudItem.Lcuuid,
 		), s.metadata.LogPrefixes)
 	}
-
 	dbItem := &metadbmodel.LBTargetServer{
 		LBID:         lbID,
 		LBListenerID: lbListenerID,
@@ -124,8 +125,8 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 	return dbItem, true
 }
 
-func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, cloudItem *cloudmodel.LBTargetServer) (*message.UpdatedLBTargetServerFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedLBTargetServerFields)
+func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, cloudItem *cloudmodel.LBTargetServer) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := &message.UpdatedLBTargetServerFields{}
 	mapInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP
@@ -139,6 +140,5 @@ func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, c
 		mapInfo["protocol"] = cloudItem.Protocol
 		structInfo.Protocol.Set(diffBase.Protocol, cloudItem.Protocol)
 	}
-
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

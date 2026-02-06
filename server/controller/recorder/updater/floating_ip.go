@@ -25,7 +25,27 @@ import (
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// FloatingIPMessageFactory FloatingIP资源的消息工厂
+type FloatingIPMessageFactory struct{}
+
+func (f *FloatingIPMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedFloatingIPs{}
+}
+
+func (f *FloatingIPMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedFloatingIP{}
+}
+
+func (f *FloatingIPMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedFloatingIPs{}
+}
+
+func (f *FloatingIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedFloatingIPFields{}
+}
 
 type FloatingIP struct {
 	UpdaterBase[
@@ -33,36 +53,16 @@ type FloatingIP struct {
 		*diffbase.FloatingIP,
 		*metadbmodel.FloatingIP,
 		metadbmodel.FloatingIP,
-		*message.AddedFloatingIPs,
-		message.AddedFloatingIPs,
-		message.AddNoneAddition,
-		*message.UpdatedFloatingIP,
-		message.UpdatedFloatingIP,
-		*message.UpdatedFloatingIPFields,
-		message.UpdatedFloatingIPFields,
-		*message.DeletedFloatingIPs,
-		message.DeletedFloatingIPs,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *FloatingIP {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, &FloatingIPMessageFactory{})
+	}
+
 	updater := &FloatingIP{
-		newUpdaterBase[
-			cloudmodel.FloatingIP,
-			*diffbase.FloatingIP,
-			*metadbmodel.FloatingIP,
-			metadbmodel.FloatingIP,
-			*message.AddedFloatingIPs,
-			message.AddedFloatingIPs,
-			message.AddNoneAddition,
-			*message.UpdatedFloatingIP,
-			message.UpdatedFloatingIP,
-			*message.UpdatedFloatingIPFields,
-			message.UpdatedFloatingIPFields,
-			*message.DeletedFloatingIPs,
-			message.DeletedFloatingIPs,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN,
 			wholeCache,
 			db.NewFloatingIP().SetMetadata(wholeCache.GetMetadata()),
@@ -70,9 +70,11 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
+
+// 实现 DataGenerator 接口
 
 func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*metadbmodel.FloatingIP, bool) {
 	networkID, exists := f.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
@@ -118,8 +120,8 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*met
 	return dbItem, true
 }
 
-func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem *cloudmodel.FloatingIP) (*message.UpdatedFloatingIPFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedFloatingIPFields)
+func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem *cloudmodel.FloatingIP) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := &message.UpdatedFloatingIPFields{}
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := f.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)

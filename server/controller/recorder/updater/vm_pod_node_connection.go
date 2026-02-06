@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// VMPodNodeConnectionMessageFactory VMPodNodeConnection资源的消息工厂
+type VMPodNodeConnectionMessageFactory struct{}
+
+func (f *VMPodNodeConnectionMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedVMPodNodeConnections{}
+}
+
+func (f *VMPodNodeConnectionMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedVMPodNodeConnection{}
+}
+
+func (f *VMPodNodeConnectionMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedVMPodNodeConnections{}
+}
+
+func (f *VMPodNodeConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedVMPodNodeConnectionFields{}
+}
 
 type VMPodNodeConnection struct {
 	UpdaterBase[
@@ -32,36 +52,16 @@ type VMPodNodeConnection struct {
 		*diffbase.VMPodNodeConnection,
 		*metadbmodel.VMPodNodeConnection,
 		metadbmodel.VMPodNodeConnection,
-		*message.AddedVMPodNodeConnections,
-		message.AddedVMPodNodeConnections,
-		message.AddNoneAddition,
-		*message.UpdatedVMPodNodeConnection,
-		message.UpdatedVMPodNodeConnection,
-		*message.UpdatedVMPodNodeConnectionFields,
-		message.UpdatedVMPodNodeConnectionFields,
-		*message.DeletedVMPodNodeConnections,
-		message.DeletedVMPodNodeConnections,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPodNodeConnection) *VMPodNodeConnection {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, &VMPodNodeConnectionMessageFactory{})
+	}
+
 	updater := &VMPodNodeConnection{
-		newUpdaterBase[
-			cloudmodel.VMPodNodeConnection,
-			*diffbase.VMPodNodeConnection,
-			*metadbmodel.VMPodNodeConnection,
-			metadbmodel.VMPodNodeConnection,
-			*message.AddedVMPodNodeConnections,
-			message.AddedVMPodNodeConnections,
-			message.AddNoneAddition,
-			*message.UpdatedVMPodNodeConnection,
-			message.UpdatedVMPodNodeConnection,
-			*message.UpdatedVMPodNodeConnectionFields,
-			message.UpdatedVMPodNodeConnectionFields,
-			*message.DeletedVMPodNodeConnections,
-			message.DeletedVMPodNodeConnections,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			wholeCache,
 			db.NewVMPodNodeConnection().SetMetadata(wholeCache.GetMetadata()),
@@ -69,7 +69,7 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
 
@@ -79,10 +79,9 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, cloudItem.Lcuuid,
-		))
+		), c.metadata.LogPrefixes)
 		return nil, false
 	}
-
 	dbItem := &metadbmodel.VMPodNodeConnection{
 		Domain:    c.metadata.GetDomainLcuuid(),
 		SubDomain: cloudItem.SubDomainLcuuid,
@@ -93,7 +92,6 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 	return dbItem, true
 }
 
-// 保留接口
-func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *diffbase.VMPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (*message.UpdatedVMPodNodeConnectionFields, map[string]interface{}, bool) {
+func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *diffbase.VMPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

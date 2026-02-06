@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// AZMessageFactory AZ资源的消息工厂
+type AZMessageFactory struct{}
+
+func (f *AZMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedAZs{}
+}
+
+func (f *AZMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedAZ{}
+}
+
+func (f *AZMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedAZs{}
+}
+
+func (f *AZMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedAZFields{}
+}
 
 type AZ struct {
 	UpdaterBase[
@@ -32,36 +52,16 @@ type AZ struct {
 		*diffbase.AZ,
 		*metadbmodel.AZ,
 		metadbmodel.AZ,
-		*message.AddedAZs,
-		message.AddedAZs,
-		message.AddNoneAddition,
-		*message.UpdatedAZ,
-		message.UpdatedAZ,
-		*message.UpdatedAZFields,
-		message.UpdatedAZFields,
-		*message.DeletedAZs,
-		message.DeletedAZs,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_AZ_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_AZ_EN, &AZMessageFactory{})
+	}
+
 	updater := &AZ{
-		newUpdaterBase[
-			cloudmodel.AZ,
-			*diffbase.AZ,
-			*metadbmodel.AZ,
-			metadbmodel.AZ,
-			*message.AddedAZs,
-			message.AddedAZs,
-			message.AddNoneAddition,
-			*message.UpdatedAZ,
-			message.UpdatedAZ,
-			*message.UpdatedAZFields,
-			message.UpdatedAZFields,
-			*message.DeletedAZs,
-			message.DeletedAZs,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_AZ_EN,
 			wholeCache,
 			db.NewAZ().SetMetadata(wholeCache.GetMetadata()),
@@ -69,9 +69,11 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
+
+// 实现 DataGenerator 接口
 
 func (z *AZ) generateDBItemToAdd(cloudItem *cloudmodel.AZ) (*metadbmodel.AZ, bool) {
 	dbItem := &metadbmodel.AZ{
@@ -84,8 +86,8 @@ func (z *AZ) generateDBItemToAdd(cloudItem *cloudmodel.AZ) (*metadbmodel.AZ, boo
 	return dbItem, true
 }
 
-func (z *AZ) generateUpdateInfo(diffBase *diffbase.AZ, cloudItem *cloudmodel.AZ) (*message.UpdatedAZFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedAZFields)
+func (z *AZ) generateUpdateInfo(diffBase *diffbase.AZ, cloudItem *cloudmodel.AZ) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := &message.UpdatedAZFields{}
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

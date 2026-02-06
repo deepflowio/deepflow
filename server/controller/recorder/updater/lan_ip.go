@@ -26,7 +26,27 @@ import (
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// LANIPMessageFactory LANIP资源的消息工厂
+type LANIPMessageFactory struct{}
+
+func (f *LANIPMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedLANIPs{}
+}
+
+func (f *LANIPMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedLANIP{}
+}
+
+func (f *LANIPMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedLANIPs{}
+}
+
+func (f *LANIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedLANIPFields{}
+}
 
 type LANIP struct {
 	UpdaterBase[
@@ -34,48 +54,29 @@ type LANIP struct {
 		*diffbase.LANIP,
 		*metadbmodel.LANIP,
 		metadbmodel.LANIP,
-		*message.AddedLANIPs,
-		message.AddedLANIPs,
-		message.AddNoneAddition,
-		*message.UpdatedLANIP,
-		message.UpdatedLANIP,
-		*message.UpdatedLANIPFields,
-		message.UpdatedLANIPFields,
-		*message.DeletedLANIPs,
-		message.DeletedLANIPs,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, &LANIPMessageFactory{})
+	}
+
 	updater := &LANIP{
-		newUpdaterBase[
-			cloudmodel.IP,
-			*diffbase.LANIP,
-			*metadbmodel.LANIP,
-			metadbmodel.LANIP,
-			*message.AddedLANIPs,
-			message.AddedLANIPs,
-			message.AddNoneAddition,
-			*message.UpdatedLANIP,
-			message.UpdatedLANIP,
-			*message.UpdatedLANIPFields,
-			message.UpdatedLANIPFields,
-			*message.DeletedLANIPs,
-			message.DeletedLANIPs,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
 			wholeCache,
 			db.NewLANIP().SetMetadata(wholeCache.GetMetadata()),
 			wholeCache.DiffBaseDataSet.LANIPs,
-			nil,
+			[]cloudmodel.IP(nil),
 		),
 	}
 	updater.setDomainToolDataSet(domainToolDataSet)
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
 
+// SetCloudData 设置云端数据
 func (i *LANIP) SetCloudData(cloudData []cloudmodel.IP) {
 	i.cloudData = cloudData
 }
@@ -86,7 +87,7 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.LANI
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
-		))
+		), i.metadata.LogPrefixes)
 		return nil, false
 	}
 	networkID, exists := i.cache.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(cloudItem.VInterfaceLcuuid)
@@ -98,7 +99,7 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.LANI
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
-			))
+			), i.metadata.LogPrefixes)
 			return nil, false
 		}
 	}
@@ -126,7 +127,7 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.LANI
 	if ip == "" {
 		log.Error(ipIsInvalid(
 			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid, cloudItem.IP,
-		))
+		), i.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &metadbmodel.LANIP{
@@ -141,8 +142,8 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.LANI
 	return dbItem, true
 }
 
-func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (*message.UpdatedLANIPFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedLANIPFields)
+func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := &message.UpdatedLANIPFields{}
 	mapInfo := make(map[string]interface{})
 
 	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,

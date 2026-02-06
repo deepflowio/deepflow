@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// PodIngressRuleMessageFactory defines the message factory for PodIngressRule
+type PodIngressRuleMessageFactory struct{}
+
+func (f *PodIngressRuleMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedPodIngressRules{}
+}
+
+func (f *PodIngressRuleMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedPodIngressRule{}
+}
+
+func (f *PodIngressRuleMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedPodIngressRules{}
+}
+
+func (f *PodIngressRuleMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedPodIngressRuleFields{}
+}
 
 type PodIngressRule struct {
 	UpdaterBase[
@@ -32,36 +52,16 @@ type PodIngressRule struct {
 		*diffbase.PodIngressRule,
 		*metadbmodel.PodIngressRule,
 		metadbmodel.PodIngressRule,
-		*message.AddedPodIngressRules,
-		message.AddedPodIngressRules,
-		message.AddNoneAddition,
-		*message.UpdatedPodIngressRule,
-		message.UpdatedPodIngressRule,
-		*message.UpdatedPodIngressRuleFields,
-		message.UpdatedPodIngressRuleFields,
-		*message.DeletedPodIngressRules,
-		message.DeletedPodIngressRules,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngressRule) *PodIngressRule {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, &PodIngressRuleMessageFactory{})
+	}
+
 	updater := &PodIngressRule{
-		newUpdaterBase[
-			cloudmodel.PodIngressRule,
-			*diffbase.PodIngressRule,
-			*metadbmodel.PodIngressRule,
-			metadbmodel.PodIngressRule,
-			*message.AddedPodIngressRules,
-			message.AddedPodIngressRules,
-			message.AddNoneAddition,
-			*message.UpdatedPodIngressRule,
-			message.UpdatedPodIngressRule,
-			*message.UpdatedPodIngressRuleFields,
-			message.UpdatedPodIngressRuleFields,
-			*message.DeletedPodIngressRules,
-			message.DeletedPodIngressRules,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN,
 			wholeCache,
 			db.NewPodIngressRule().SetMetadata(wholeCache.GetMetadata()),
@@ -69,33 +69,34 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
 
-func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRule) (*metadbmodel.PodIngressRule, bool) {
-	podIngressID, exists := r.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
+// Implement DataGenerator interface
+
+func (p *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRule) (*metadbmodel.PodIngressRule, bool) {
+	podIngressID, exists := p.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, cloudItem.Lcuuid,
-		), r.metadata.LogPrefixes)
+		), p.metadata.LogPrefixes)
 		return nil, false
 	}
-
 	dbItem := &metadbmodel.PodIngressRule{
 		Name:         cloudItem.Name,
 		Protocol:     cloudItem.Protocol,
 		Host:         cloudItem.Host,
 		PodIngressID: podIngressID,
 		SubDomain:    cloudItem.SubDomainLcuuid,
-		Domain:       r.metadata.GetDomainLcuuid(),
+		Domain:       p.metadata.GetDomainLcuuid(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
 }
 
 // 保留接口
-func (r *PodIngressRule) generateUpdateInfo(diffBase *diffbase.PodIngressRule, cloudItem *cloudmodel.PodIngressRule) (*message.UpdatedPodIngressRuleFields, map[string]interface{}, bool) {
+func (p *PodIngressRule) generateUpdateInfo(diffBase *diffbase.PodIngressRule, cloudItem *cloudmodel.PodIngressRule) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

@@ -24,44 +24,39 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
 
+// RedisInstanceMessageFactory RedisInstance资源的消息工厂
+type RedisInstanceMessageFactory struct{}
+
+func (f *RedisInstanceMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedRedisInstances{}
+}
+
+func (f *RedisInstanceMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedRedisInstance{}
+}
+
+func (f *RedisInstanceMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedRedisInstances{}
+}
+
+func (f *RedisInstanceMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedRedisInstanceFields{}
+}
+
 type RedisInstance struct {
-	UpdaterBase[
-		cloudmodel.RedisInstance,
-		*diffbase.RedisInstance,
-		*metadbmodel.RedisInstance,
-		metadbmodel.RedisInstance,
-		*message.AddedRedisInstances,
-		message.AddedRedisInstances,
-		message.AddNoneAddition,
-		*message.UpdatedRedisInstance,
-		message.UpdatedRedisInstance,
-		*message.UpdatedRedisInstanceFields,
-		message.UpdatedRedisInstanceFields,
-		*message.DeletedRedisInstances,
-		message.DeletedRedisInstances,
-		message.DeleteNoneAddition]
+	UpdaterBase[cloudmodel.RedisInstance, *diffbase.RedisInstance, *metadbmodel.RedisInstance, metadbmodel.RedisInstance]
 }
 
 func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInstance) *RedisInstance {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, &RedisInstanceMessageFactory{})
+	}
+
 	updater := &RedisInstance{
-		newUpdaterBase[
-			cloudmodel.RedisInstance,
-			*diffbase.RedisInstance,
-			*metadbmodel.RedisInstance,
-			metadbmodel.RedisInstance,
-			*message.AddedRedisInstances,
-			message.AddedRedisInstances,
-			message.AddNoneAddition,
-			*message.UpdatedRedisInstance,
-			message.UpdatedRedisInstance,
-			*message.UpdatedRedisInstanceFields,
-			message.UpdatedRedisInstanceFields,
-			*message.DeletedRedisInstances,
-			message.DeletedRedisInstances,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN,
 			wholeCache,
 			db.NewRedisInstance().SetMetadata(wholeCache.GetMetadata()),
@@ -69,17 +64,19 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
+
+// 实现 DataGenerator 接口
 
 func (r *RedisInstance) generateDBItemToAdd(cloudItem *cloudmodel.RedisInstance) (*metadbmodel.RedisInstance, bool) {
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
-		resourceAForResourceBNotFound(
+		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, cloudItem.Lcuuid,
-		)
+		), r.metadata.LogPrefixes)
 		return nil, false
 	}
 	dbItem := &metadbmodel.RedisInstance{
@@ -99,8 +96,8 @@ func (r *RedisInstance) generateDBItemToAdd(cloudItem *cloudmodel.RedisInstance)
 	return dbItem, true
 }
 
-func (r *RedisInstance) generateUpdateInfo(diffBase *diffbase.RedisInstance, cloudItem *cloudmodel.RedisInstance) (*message.UpdatedRedisInstanceFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedRedisInstanceFields)
+func (r *RedisInstance) generateUpdateInfo(diffBase *diffbase.RedisInstance, cloudItem *cloudmodel.RedisInstance) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := &message.UpdatedRedisInstanceFields{}
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -123,5 +120,6 @@ func (r *RedisInstance) generateUpdateInfo(diffBase *diffbase.RedisInstance, clo
 		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 
+	// 返回接口类型
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

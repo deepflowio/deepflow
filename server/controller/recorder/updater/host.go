@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// HostMessageFactory Host资源的消息工厂
+type HostMessageFactory struct{}
+
+func (f *HostMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedHosts{}
+}
+
+func (f *HostMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedHost{}
+}
+
+func (f *HostMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedHosts{}
+}
+
+func (f *HostMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedHostFields{}
+}
 
 type Host struct {
 	UpdaterBase[
@@ -32,36 +52,16 @@ type Host struct {
 		*diffbase.Host,
 		*metadbmodel.Host,
 		metadbmodel.Host,
-		*message.AddedHosts,
-		message.AddedHosts,
-		message.AddNoneAddition,
-		*message.UpdatedHost,
-		message.UpdatedHost,
-		*message.UpdatedHostFields,
-		message.UpdatedHostFields,
-		*message.DeletedHosts,
-		message.DeletedHosts,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_HOST_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_HOST_EN, &HostMessageFactory{})
+	}
+
 	updater := &Host{
-		newUpdaterBase[
-			cloudmodel.Host,
-			*diffbase.Host,
-			*metadbmodel.Host,
-			metadbmodel.Host,
-			*message.AddedHosts,
-			message.AddedHosts,
-			message.AddNoneAddition,
-			*message.UpdatedHost,
-			message.UpdatedHost,
-			*message.UpdatedHostFields,
-			message.UpdatedHostFields,
-			*message.DeletedHosts,
-			message.DeletedHosts,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 			wholeCache,
 			db.NewHost().SetMetadata(wholeCache.GetMetadata()),
@@ -69,9 +69,11 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
+
+// 实现 DataGenerator 接口
 
 func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*metadbmodel.Host, bool) {
 	dbItem := &metadbmodel.Host{
@@ -95,8 +97,8 @@ func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*metadbmodel.Hos
 	return dbItem, true
 }
 
-func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel.Host) (*message.UpdatedHostFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedHostFields)
+func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel.Host) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := &message.UpdatedHostFields{}
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

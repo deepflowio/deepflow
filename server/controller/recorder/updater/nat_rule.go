@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// NATRuleMessageFactory NATRule资源的消息工厂
+type NATRuleMessageFactory struct{}
+
+func (f *NATRuleMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedNATRules{}
+}
+
+func (f *NATRuleMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedNATRule{}
+}
+
+func (f *NATRuleMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedNATRules{}
+}
+
+func (f *NATRuleMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedNATRuleFields{}
+}
 
 type NATRule struct {
 	UpdaterBase[
@@ -32,36 +52,16 @@ type NATRule struct {
 		*diffbase.NATRule,
 		*metadbmodel.NATRule,
 		metadbmodel.NATRule,
-		*message.AddedNATRules,
-		message.AddedNATRules,
-		message.AddNoneAddition,
-		*message.UpdatedNATRule,
-		message.UpdatedNATRule,
-		*message.UpdatedNATRuleFields,
-		message.UpdatedNATRuleFields,
-		*message.DeletedNATRules,
-		message.DeletedNATRules,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRule {
+	if !hasMessageFactory(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN) {
+		RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, &NATRuleMessageFactory{})
+	}
+
 	updater := &NATRule{
-		newUpdaterBase[
-			cloudmodel.NATRule,
-			*diffbase.NATRule,
-			*metadbmodel.NATRule,
-			metadbmodel.NATRule,
-			*message.AddedNATRules,
-			message.AddedNATRules,
-			message.AddNoneAddition,
-			*message.UpdatedNATRule,
-			message.UpdatedNATRule,
-			*message.UpdatedNATRuleFields,
-			message.UpdatedNATRuleFields,
-			*message.DeletedNATRules,
-			message.DeletedNATRules,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
 			wholeCache,
 			db.NewNATRule().SetMetadata(wholeCache.GetMetadata()),
@@ -69,9 +69,11 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
 	return updater
 }
+
+// 实现 DataGenerator 接口
 
 func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*metadbmodel.NATRule, bool) {
 	var natGatewayID int
@@ -114,6 +116,6 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*metadbmod
 }
 
 // 保留接口
-func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NATRule, cloudItem *cloudmodel.NATRule) (*message.UpdatedNATRuleFields, map[string]interface{}, bool) {
+func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NATRule, cloudItem *cloudmodel.NATRule) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }
