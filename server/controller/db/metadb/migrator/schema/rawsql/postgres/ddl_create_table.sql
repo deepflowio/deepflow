@@ -2523,6 +2523,32 @@ COMMENT ON COLUMN alarm_policy.data_level IS '1s or 1m';
 COMMENT ON COLUMN alarm_policy.agg IS '0-聚合; 1-不聚合';
 COMMENT ON COLUMN alarm_policy.delay IS '0-不延迟; 1-延迟';
 
+CREATE TABLE IF NOT EXISTS silence_policy (
+    id                      SERIAL PRIMARY KEY,
+    team_id                 INTEGER DEFAULT 1,
+    user_id                 INTEGER,
+    name                    CHAR(128) NOT NULL,
+    description             VARCHAR(256) DEFAULT '',
+    type                    TINYINT DEFAULT 0,
+    created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    start_time              TIMESTAMP,
+    end_time                TIMESTAMP,
+    expired_time            TIMESTAMP,
+    cycle_config            TEXT,
+    lcuuid                  CHAR(64)
+);
+TRUNCATE TABLE silence_policy;
+COMMENT ON COLUMN silence_policy.type IS '0-only once 1-duplicate';
+
+CREATE TABLE IF NOT EXISTS alarm_silence (
+    id                       SERIAL PRIMARY KEY,
+    alarm_policy_lcuuid      CHAR(64) NOT NULL,
+    silence_policy_lcuuid    CHAR(64) NOT NULL,
+    UNIQUE (alarm_policy_lcuuid, silence_policy_lcuuid)
+);
+TRUNCATE TABLE alarm_silence;
+
 CREATE TABLE IF NOT EXISTS alarm_event (
     id                      SERIAL PRIMARY KEY,
     status                  VARCHAR(64),
