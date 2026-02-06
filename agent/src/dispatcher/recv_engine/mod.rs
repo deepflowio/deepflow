@@ -76,7 +76,7 @@ impl RecvEngine {
         }
     }
 
-    pub unsafe fn recv(&mut self) -> Result<packet::Packet> {
+    pub unsafe fn recv(&mut self) -> Result<packet::Packet<'_>> {
         match self {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Self::AfPacket(e) => match e.read() {

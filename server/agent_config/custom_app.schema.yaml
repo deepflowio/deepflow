@@ -110,6 +110,66 @@ $defs:
         description@ch: 多个 `特征字符串` (`match_keyword`) 进行 OR 运算。
         items:
           $ref: '#/$defs/character_group'
+      payload_format:
+        type: object
+        title@en: Payload Format
+        title@ch: 负载格式
+        description@en: Configure the payload format of the business protocol, used for field extraction.
+        description@ch: 配置该业务协议的负载格式，用于字段提取。
+        properties:
+          type:
+            type: string
+            enum:
+            - tlv
+            enum@en:
+            - Tag-Length-Value
+            enum@ch:
+            - 标签·长度·值（TLV）
+            title@en: Payload Format Type
+            title@ch: 负载格式类型
+          tlv:
+            type: object
+            title@en: TLV Settings
+            title@ch: TLV 配置
+            properties:
+              header_size:
+                type: integer
+                title@en: Header Size
+                title@ch: 标头大小
+                description@en: The size of the header before the TLV format.
+                description@ch: 配置负载中 TLV 部分之前标头的大小。
+              tag_size:
+                type: integer
+                title@en: Tag Field Size
+                title@ch: 标签字段大小
+                description@en: The size of the tag field of the TLV format.
+                description@ch: 配置 TLV 中标签（tag）字段的大小。
+              length_size:
+                type: integer
+                title@en: Length Field Size
+                title@ch: 长度字段大小
+                description@en: The size of the length field of the TLV format.
+                description@ch: 配置 TLV 中长度（length）字段的大小。
+              length_type:
+                type: string
+                enum:
+                - digits
+                enum@en:
+                - Digits
+                enum@ch:
+                - 数字
+                title@en: Length Type
+                title@ch: 长度类型
+                description@en: |-
+                  The type of the length field of the TLV format.
+
+                  Optional values and their meanings:
+                  - `Digits` (`digits`): The length field is a direct readable (ASCII) decimal number.
+                description@ch: |-
+                  长度（length）字段的类型。
+
+                  可选值：
+                  - `数字`（`digits`）：长度字段为直接可读（ASCII）的十进制数字。
   dictionary:
     type: object
     title@en: Business Field Dictionary
@@ -290,6 +350,7 @@ $defs:
               - payload_json_value
               - payload_xml_value
               - payload_hessian2_value
+              - payload_tlv_value
               - dubbo_header_value
               - dubbo_payload_map_string_value
               - sql_upsert_column
@@ -299,6 +360,7 @@ $defs:
               - Payload JSON Value
               - Payload XML Value
               - Payload Hessian2 Value
+              - Payload TLV Value
               - Dubbo Header Value
               - Dubbo Payload Map String Value
               - SQL Insert and Update Column
@@ -308,6 +370,7 @@ $defs:
               - JSON 内容提取
               - XML 内容提取
               - Hessian2 内容提取
+              - 标签·长度·值（TLV）内容提取
               - Dubbo 头字段提取
               - Dubbo map 内容提取
               - SQL 插入和更新语句列提取
@@ -320,6 +383,10 @@ $defs:
                 - `Payload JSON Value` (`payload_json_value`): Extract field from JSON payload, such as `"key": 1`, `"key": "value"`, or `"key": null`, etc.
                 - `Payload XML Value` (`payload_xml_value`): Extract field from XML payload, for example, `<key attr="xxx">value</key>`.
                 - `Payload Hessian2 Value` (`payload_hessian2_value`): Extract field from the payload encoded with Hessian2.
+                - `Payload TLV Value` (`payload_tlv_value`): Extract field from the payload encoded with TLV format.
+
+                  This type only supports custom protocols, and the format must be defined in the `Payload Format` (`payload_format`) -> `TLV Settings` (`tlv`) of the corresponding `Business Protocol Parsing` (`biz_protocol_policies`).
+
                 - `Dubbo Header Value` (`dubbo_header_value`): Extra field from the Attachments which payload was encoded with Dubbo protocol.
                 - `Dubbo Payload Map String Value` (`dubbo_payload_map_string_value`): Extra field from key-value format which payload was encoded with Dubbo protocol.
                 - `SQL Insert and Update Column` (`sql_upsert_column`): Extract field from SQL insertion columns, e.g., `INSERT INTO table (column1, column2) VALUES (value1, value2)`.
@@ -331,6 +398,10 @@ $defs:
                 - `JSON 内容提取` (`payload_json_value`)：从 Json Payload 中提取字段，形如：`"key": 1`，或者 `"key": "value"`，或者 `"key": None`，等等。
                 - `XML 内容提取` (`payload_xml_value`)：从 XML Payload 中提取字段，形如：`<key attr="xxx">value</key>`。
                 - `Hessian2 内容提取` (`payload_hessian2_value`)：Payload 使用 Hessian2 编码，从中提取字段。
+                - `标签·长度·值（TLV）内容提取` (`payload_tlv_value`)：Payload 使用 TLV 格式编码，从中提取字段。
+
+                  该类型仅支持自定义协议，需要先在相应的 `业务协议解析`（`biz_protocol_policies`）中 `负载格式`（`payload_format`）-> `TLV 配置`（`tlv`）定义格式。
+
                 - `Dubbo 头字段提取` (`dubbo_header_value`)：Payload 使用 Dubbo 协议，从 Dubbo Attachments 中提取字段。
                 - `Dubbo map 内容提取` (`dubbo_payload_map_string_value`)：Payload 使用 Dubbo 协议，且业务报文以 key-value 形式编码，从中提取指定的字段。
                 - `SQL 插入和更新语句列提取` (`sql_upsert_column`)：从 SQL 插入列中提取字段，例如：`INSERT INTO table (column1, column2) VALUES (value1, value2)`。
@@ -348,30 +419,35 @@ $defs:
                   enum:
                   - string
                   - path
+                  - hex
                   enum@en:
                   - String
                   - Path
+                  - Hex
                   enum@ch:
                   - 字符串
                   - 路径
+                  - 十六进制
                   title@en: Match Type
                   title@ch: 匹配类型
                   description@en: |-
                     Match type.
 
-                    When set to `String` (`string`):
+                    When set to `String` (`string`) or `Hex` (`hex`):
                     - For `HTTP URL Field` (`http_url_field`) and `Header Field` (`header_field`), matches the key.
                     - For `SQL Insert and Update Column` (`sql_upsert_column`), matches the SQL insert column name.
                     - For `Payload JSON Value` (`payload_json_value`) and `Payload XML Value` (`payload_xml_value`), matches content in JSON or XML format, returning the first element found after a match.
+                    - For `Payload TLV Value` (`payload_tlv_value`), matches the TLV format tag, and returns the value as the result.
 
                     When set to `Path` (`path`): Only valid for `Payload JSON Value` (`payload_json_value`) and `Payload XML Value` (`payload_xml_value`) types; use syntax like 'aaa.bbb.ccc' for hierarchical extraction.
                   description@ch: |-
                     匹配类型。
 
-                    配置为 `字符串` (`string`) 时：
+                    配置为 `字符串` (`string`) 或 `十六进制` (`hex`) 时：
                     - 对于 `HTTP URL 提取` (`http_url_field`) 和 `头字段提取` (`header_field`) 匹配 key。
                     - 对于 `SQL 插入和更新语句列提取` (`sql_upsert_column`) 匹配 SQL 插入列名。
                     - 对于 `JSON 内容提取` (`payload_json_value`) 和 `XML 内容提取` (`payload_xml_value`) 匹配 JSON 和 XML 格式的内容，并取第一个匹配后的位置的元素作为结果。
+                    - 对于 `标签·长度·值（TLV）内容提取` (`payload_tlv_value`) 匹配 TLV 格式的标签，并取其值作为结果。
 
                     `路径`（`path`）类型只对 `JSON 内容提取` (`payload_json_value`) 和 `XML 内容提取` (`payload_xml_value`) 类型的字段有效，可以用 "aaa.bbb.ccc" 这样的语法按层级提取 XML 和 JSON 格式的内容。
                 keyword:
@@ -779,6 +855,9 @@ $defs:
         - type: Can only be string.
         - ignore_case: Whether to ignore case.
         - skip: Skip the first N matches before extracting.
+      - `Split` (`split`): Splits the value by the separator and outputs the split values. Configuration supported:
+        - separator: Separator.
+        - skip: Skip the first N matches before extracting.
     description@ch: |-
       多个后处理步骤按配置顺序依次执行，每一步的输出作为下一步的输入。
 
@@ -820,6 +899,9 @@ $defs:
         - type：类型，只能为 string。
         - ignore_case：是否忽略大小写。
         - skip：跳过前 N 个匹配结果后再提取。
+      - `分割提取` (`split`): 将值按分隔符分割，并输出分割后的值。支持配置为：
+        - separator：分隔符。
+        - skip：跳过前 N 个匹配结果后再提取。
     required:
     - type
     properties:
@@ -835,6 +917,7 @@ $defs:
         - parse_xml_value
         - parse_key_value
         - parse_dict_value
+        - split
         enum@en:
         - Remap
         - Obfuscate
@@ -845,6 +928,7 @@ $defs:
         - Parse XML Value
         - Parse Key Value
         - Parse Dict Value
+        - Split
         enum@ch:
         - 字典映射
         - 脱敏
@@ -855,6 +939,7 @@ $defs:
         - XML 提取
         - 键值提取
         - 字典提取
+        - 分割提取
         title@en: Post-processing type
         title@ch: 后期处理类型
       settings:

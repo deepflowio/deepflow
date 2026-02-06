@@ -411,7 +411,7 @@ impl L7LogBase {
         }
     }
 
-    fn get_trace_id(&self) -> Field {
+    fn get_trace_id(&self) -> Field<'_> {
         if let Some(v) = self.trace_ids.first() {
             Field::Str(Cow::Borrowed(v.as_str()))
         } else {
