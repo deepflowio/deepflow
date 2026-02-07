@@ -62,6 +62,8 @@ type AlertEventStore struct {
 	TagIntValues     []int64
 	TriggerThreshold string
 	MetricUnit       string
+	CustomTagKeys    []string
+	CustomTagValues  []string
 
 	XTargetUid   string
 	XQueryRegion string
@@ -96,6 +98,8 @@ func AlertEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("tag_int_values", ckdb.ArrayInt64),
 		ckdb.NewColumn("trigger_threshold", ckdb.LowCardinalityString),
 		ckdb.NewColumn("metric_unit", ckdb.LowCardinalityString),
+		ckdb.NewColumn("custom_tag_names", ckdb.ArrayLowCardinalityString),
+		ckdb.NewColumn("custom_tag_values", ckdb.ArrayString),
 
 		ckdb.NewColumn("_target_uid", ckdb.String),
 		ckdb.NewColumn("_query_region", ckdb.LowCardinalityString),
@@ -137,16 +141,21 @@ func (e *AlertEventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 
 	tagStrLen := len(e.TagStrKeys)
 	tagIntLen := len(e.TagIntKeys)
+	customTagLen := len(e.CustomTagKeys)
 	var name, value string
-	for i := 0; i < tagStrLen+tagIntLen; i++ {
+	for i := 0; i < tagStrLen+tagIntLen+customTagLen; i++ {
 		if i < tagStrLen {
 			name = e.TagStrKeys[i]
 			value = e.TagStrValues[i]
 			flowTagInfo.FieldValueType = flow_tag.FieldValueTypeString
-		} else {
+		} else if i < tagStrLen+tagIntLen {
 			name = e.TagIntKeys[i-tagStrLen]
 			value = strconv.FormatInt(e.TagIntValues[i-tagStrLen], 10)
 			flowTagInfo.FieldValueType = flow_tag.FieldValueTypeInt
+		} else {
+			name = e.CustomTagKeys[i-tagStrLen-tagIntLen]
+			value = e.CustomTagValues[i-tagStrLen-tagIntLen]
+			flowTagInfo.FieldValueType = flow_tag.FieldValueTypeString
 		}
 
 		flowTagInfo.FieldName = name
