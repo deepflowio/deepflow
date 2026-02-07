@@ -32,7 +32,7 @@ use crate::common::{enums::IpProtocol, erspan::GRE_PROTO_ERSPAN_III};
 use public::enums::LinuxSllPacketType::Outgoing;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-type JumpModifier = fn(jumpIf: JumpIf, index: usize, total: usize) -> JumpIf;
+type JumpModifier = fn(jump_if: JumpIf, index: usize, total: usize) -> JumpIf;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[derive(Default)]

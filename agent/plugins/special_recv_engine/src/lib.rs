@@ -41,7 +41,7 @@ impl Libpcap {
         unimplemented!();
     }
 
-    pub unsafe fn read(&mut self) -> Result<packet::Packet> {
+    pub unsafe fn read(&mut self) -> Result<packet::Packet<'_>> {
         unimplemented!();
     }
 
@@ -61,7 +61,7 @@ impl Dpdk {
         unimplemented!();
     }
 
-    pub unsafe fn read(&mut self) -> Result<packet::Packet> {
+    pub unsafe fn read(&mut self) -> Result<packet::Packet<'_>> {
         unimplemented!();
     }
 
@@ -77,7 +77,7 @@ impl VhostUser {
         unimplemented!();
     }
 
-    pub unsafe fn read(&mut self) -> Result<packet::Packet> {
+    pub unsafe fn read(&mut self) -> Result<packet::Packet<'_>> {
         unimplemented!();
     }
 
@@ -93,7 +93,7 @@ impl DpdkFromEbpf {
         unimplemented!();
     }
 
-    pub unsafe fn read(&mut self) -> Result<Box<packet::Packet>> {
+    pub unsafe fn read(&mut self) -> Result<Box<packet::Packet<'_>>> {
         unimplemented!();
     }
 

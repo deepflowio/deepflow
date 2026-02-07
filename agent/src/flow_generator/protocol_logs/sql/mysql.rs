@@ -538,11 +538,11 @@ impl MysqlInfo {
         }
     }
 
-    fn get_command(&self) -> Field {
+    fn get_command(&self) -> Field<'_> {
         Field::Str(Cow::Borrowed(self.get_command_str()))
     }
 
-    fn get_trace_id(&self) -> Field {
+    fn get_trace_id(&self) -> Field<'_> {
         if let Some(trace_id) = self.trace_ids.first() {
             return Field::Str(Cow::Borrowed(trace_id));
         }
