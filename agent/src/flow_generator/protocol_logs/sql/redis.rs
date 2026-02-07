@@ -373,7 +373,7 @@ impl From<&RedisInfo> for LogCache {
 #[derive(Default)]
 pub struct RedisLog {
     has_request: bool,
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     obfuscate: bool,
     #[cfg(feature = "enterprise")]
     custom_field_store: Store,
@@ -396,10 +396,6 @@ impl L7ProtocolParserInterface for RedisLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
-
         #[cfg(feature = "enterprise")]
         self.custom_field_store.clear();
         #[cfg(feature = "enterprise")]
@@ -439,11 +435,14 @@ impl L7ProtocolParserInterface for RedisLog {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+        self.perf_stats.clear();
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::RedisInfo(info)))
@@ -460,8 +459,8 @@ impl L7ProtocolParserInterface for RedisLog {
         false
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn set_obfuscate_cache(&mut self, obfuscate_cache: Option<ObfuscateCache>) {
@@ -471,7 +470,7 @@ impl L7ProtocolParserInterface for RedisLog {
 
 impl RedisLog {
     fn reset(&mut self) {
-        self.perf_stats = None;
+        self.perf_stats = vec![];
     }
 
     fn fill_request(&mut self, request: CommandLine, info: &mut RedisInfo) {
@@ -1481,7 +1480,7 @@ mod tests {
         if packets.len() < 2 {
             unreachable!();
         }
-
+        let mut perf_stat = L7PerfStats::default();
         let first_dst_port = packets[0].lookup_key.dst_port;
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {
@@ -1502,9 +1501,12 @@ mod tests {
                         true,
                     ),
                 );
+                for i in redis.perf_stats() {
+                    perf_stat.sequential_merge(&i);
+                }
             }
         }
-        redis.perf_stats.unwrap()
+        perf_stat
     }
 
     fn encode_redis_command(command: &str) -> Vec<u8> {

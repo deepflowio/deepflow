@@ -511,7 +511,7 @@ impl From<&DubboInfo> for LogCache {
 
 #[derive(Default)]
 pub struct DubboLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 
     #[cfg(feature = "enterprise")]
     custom_field_store: Store,
@@ -550,10 +550,7 @@ impl L7ProtocolParserInterface for DubboLog {
         let Some(config) = param.parse_config else {
             return Err(Error::NoParseConfig);
         };
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
-
+        self.perf_stats.clear();
         #[cfg(feature = "enterprise")]
         self.custom_field_store.clear();
         #[cfg(feature = "enterprise")]
@@ -582,7 +579,8 @@ impl L7ProtocolParserInterface for DubboLog {
 
         info.set_is_on_blacklist(config);
 
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if info.msg_type == LogMessageType::Response {
                 if let Some(endpoint) = info.load_endpoint_from_cache(param, info.is_reversed) {
                     info.endpoint = Some(endpoint.to_string());
@@ -590,8 +588,14 @@ impl L7ProtocolParserInterface for DubboLog {
             }
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            match info.resp_status {
+                L7ResponseStatus::ClientError => perf_stat.inc_req_err(),
+                L7ResponseStatus::ServerError => perf_stat.inc_resp_err(),
+                _ => {}
+            }
+            self.perf_stats.push(perf_stat);
         }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::DubboInfo(info)))
@@ -608,8 +612,8 @@ impl L7ProtocolParserInterface for DubboLog {
         false
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 
@@ -992,14 +996,8 @@ impl DubboLog {
     fn set_status(&mut self, status_code: u8, info: &mut DubboInfo) {
         info.resp_status = match status_code {
             20 => L7ResponseStatus::Ok,
-            30 | 40 | 90 => {
-                self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                L7ResponseStatus::ClientError
-            }
-            31 | 50 | 60 | 70 | 80 | 100 => {
-                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                L7ResponseStatus::ServerError
-            }
+            30 | 40 | 90 => L7ResponseStatus::ClientError,
+            31 | 50 | 60 | 70 | 80 | 100 => L7ResponseStatus::ServerError,
             _ => L7ResponseStatus::Ok,
         }
     }
@@ -1477,6 +1475,7 @@ mod tests {
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap));
         let mut packets = capture.collect::<Vec<_>>();
+        let mut perf_stat = L7PerfStats::default();
 
         let config = LogParserConfig {
             l7_log_dynamic: L7LogDynamicConfigBuilder {
@@ -1516,7 +1515,10 @@ mod tests {
             if packet.get_l4_payload().is_some() {
                 let _ = dubbo.parse_payload(packet.get_l4_payload().unwrap(), param);
             }
+            for i in dubbo.perf_stats() {
+                perf_stat.sequential_merge(&i);
+            }
         }
-        dubbo.perf_stats.unwrap()
+        perf_stat
     }
 }
