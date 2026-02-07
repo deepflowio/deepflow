@@ -419,6 +419,18 @@ var ColumnAdd71 = []*ColumnAdds{
 		ColumnType:  ckdb.String,
 	},
 	{
+		Dbs:         []string{"event"},
+		Tables:      []string{"alert_event", "alert_event_local"},
+		ColumnNames: []string{"custom_tag_names"},
+		ColumnType:  ckdb.ArrayLowCardinalityString,
+	},
+	{
+		Dbs:         []string{"event"},
+		Tables:      []string{"alert_event", "alert_event_local"},
+		ColumnNames: []string{"custom_tag_values"},
+		ColumnType:  ckdb.ArrayString,
+	},
+	{
 		Dbs: []string{"flow_metrics"},
 		Tables: []string{
 			"network.1s_local", "network.1s",
