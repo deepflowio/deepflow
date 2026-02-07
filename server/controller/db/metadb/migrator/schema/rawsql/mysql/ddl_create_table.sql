@@ -2412,7 +2412,9 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     auto_service_id_1       INTEGER DEFAULT 0,
     auto_service_type_1     INTEGER DEFAULT 0,
     auto_service_1          VARCHAR(256) DEFAULT '',
-    comb_policy_lcuuids     TEXT
+    comb_policy_lcuuids     TEXT,
+    static_labels           TEXT,
+    dynamic_labels          TEXT
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_policy;
 
