@@ -1057,7 +1057,7 @@ func DeleteSubDomain(lcuuid string, db *metadb.DB, userInfo *httpcommon.UserInfo
 		// db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&metadbmodel.PrometheusTarget{})
 	}
 
-	err = db.Delete(&subDomain).Error
+	err = db.Unscoped().Delete(&subDomain).Error
 	if err != nil {
 		return nil, err
 	}

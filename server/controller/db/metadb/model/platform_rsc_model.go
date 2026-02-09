@@ -134,21 +134,21 @@ type Domain struct {
 // TODO 最终可以与cloud模块命名统一，Domain -> DomainLcuuid
 
 type SubDomain struct {
-	Base         `gorm:"embedded" mapstructure:",squash"`
-	OperatedTime `gorm:"embedded" mapstructure:",squash"`
-	TeamID       int        `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID" mapstructure:"TEAM_ID"`
-	UserID       int        `gorm:"column:user_id;type:int;default:1" json:"USER_ID" mapstructure:"USER_ID"`
-	SyncedAt     *time.Time `gorm:"column:synced_at" json:"SYNCED_AT" mapstructure:"SYNCED_AT"`
-	Domain       string     `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
-	Name         string     `gorm:"column:name;type:varchar(64);default:''" json:"NAME" mapstructure:"NAME"`
-	DisplayName  string     `gorm:"column:display_name;type:varchar(64);default:''" json:"DISPLAY_NAME" mapstructure:"DISPLAY_NAME"`
-	CreateMethod int        `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
-	ClusterID    string     `gorm:"column:cluster_id;type:char(64);default:''" json:"CLUSTER_ID" mapstructure:"CLUSTER_ID"`
-	Config       string     `gorm:"column:config;type:text;default:''" json:"CONFIG" mapstructure:"CONFIG"`
-	ErrorMsg     string     `gorm:"column:error_msg;type:text;default:''" json:"ERROR_MSG" mapstructure:"ERROR_MSG"`
-	Enabled      int        `gorm:"column:enabled;type:int;not null;default:1" json:"ENABLED" mapstructure:"ENABLED"` // 0.false 1.true
-	State        int        `gorm:"column:state;type:int;not null;default:1" json:"STATE" mapstructure:"STATE"`       // 1.normal 2.deleting 3.exception 4.warning 5.no_license
-	Exceptions   int64      `gorm:"column:exceptions;type:int unsigned;default:0" json:"EXCEPTIONS"`
+	Base           `gorm:"embedded" mapstructure:",squash"`
+	SoftDeleteBase `gorm:"embedded" mapstructure:",squash"`
+	TeamID         int        `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID" mapstructure:"TEAM_ID"`
+	UserID         int        `gorm:"column:user_id;type:int;default:1" json:"USER_ID" mapstructure:"USER_ID"`
+	SyncedAt       *time.Time `gorm:"column:synced_at" json:"SYNCED_AT" mapstructure:"SYNCED_AT"`
+	Domain         string     `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN" mapstructure:"DOMAIN"`
+	Name           string     `gorm:"column:name;type:varchar(64);default:''" json:"NAME" mapstructure:"NAME"`
+	DisplayName    string     `gorm:"column:display_name;type:varchar(64);default:''" json:"DISPLAY_NAME" mapstructure:"DISPLAY_NAME"`
+	CreateMethod   int        `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD" mapstructure:"CREATE_METHOD"` // 0.learning 1.user_defined
+	ClusterID      string     `gorm:"column:cluster_id;type:char(64);default:''" json:"CLUSTER_ID" mapstructure:"CLUSTER_ID"`
+	Config         string     `gorm:"column:config;type:text;default:''" json:"CONFIG" mapstructure:"CONFIG"`
+	ErrorMsg       string     `gorm:"column:error_msg;type:text;default:''" json:"ERROR_MSG" mapstructure:"ERROR_MSG"`
+	Enabled        int        `gorm:"column:enabled;type:int;not null;default:1" json:"ENABLED" mapstructure:"ENABLED"` // 0.false 1.true
+	State          int        `gorm:"column:state;type:int;not null;default:1" json:"STATE" mapstructure:"STATE"`       // 1.normal 2.deleting 3.exception 4.warning 5.no_license
+	Exceptions     int64      `gorm:"column:exceptions;type:int unsigned;default:0" json:"EXCEPTIONS"`
 }
 
 type Region struct {
