@@ -2903,6 +2903,7 @@ impl ConfigHandler {
         );
     }
 
+    #[cfg(feature = "enterprise-integration")]
     fn set_vector(handler: &ConfigHandler, components: &mut AgentComponents) {
         components.vector_component.on_config_change(
             handler.candidate_config.user_config.inputs.vector.enabled,
@@ -5345,18 +5346,21 @@ impl ConfigHandler {
             tunning.session_aggregate_max_entries = new_tunning.session_aggregate_max_entries;
         }
 
-        let vector = &mut config.inputs.vector;
-        let new_vector = &mut new_config.user_config.inputs.vector;
-        if vector.enabled != new_vector.enabled || vector.config != new_vector.config {
-            info!(
-                "vector inputs.vector from {:#?} to {:#?}",
-                vector, new_vector
-            );
-            if components.is_some() {
-                callbacks.push(Self::set_vector);
+        #[cfg(feature = "enterprise-integration")]
+        {
+            let vector = &mut config.inputs.vector;
+            let new_vector = &mut new_config.user_config.inputs.vector;
+            if vector.enabled != new_vector.enabled || vector.config != new_vector.config {
+                info!(
+                    "vector inputs.vector from {:#?} to {:#?}",
+                    vector, new_vector
+                );
+                if components.is_some() {
+                    callbacks.push(Self::set_vector);
+                }
+                vector.enabled = new_vector.enabled;
+                vector.config = new_vector.config.clone();
             }
-            vector.enabled = new_vector.enabled;
-            vector.config = new_vector.config.clone();
         }
 
         candidate_config.enabled = new_config.enabled;
