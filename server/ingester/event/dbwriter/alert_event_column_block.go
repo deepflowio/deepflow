@@ -37,6 +37,8 @@ type AlertEventBlock struct {
 	ColTagIntValues     *proto.ColArr[int64]
 	ColTriggerThreshold *proto.ColLowCardinality[string]
 	ColMetricUnit       *proto.ColLowCardinality[string]
+	ColCustomTagNames   *proto.ColArr[string]
+	ColCustomTagValues  *proto.ColArr[string]
 	ColTargetUid        proto.ColStr
 	ColQueryRegion      *proto.ColLowCardinality[string]
 	ColTeamId           proto.ColUInt16
@@ -59,6 +61,8 @@ func (b *AlertEventBlock) Reset() {
 	b.ColTagIntValues.Reset()
 	b.ColTriggerThreshold.Reset()
 	b.ColMetricUnit.Reset()
+	b.ColCustomTagNames.Reset()
+	b.ColCustomTagValues.Reset()
 	b.ColTargetUid.Reset()
 	b.ColQueryRegion.Reset()
 	b.ColTeamId.Reset()
@@ -83,6 +87,8 @@ func (b *AlertEventBlock) ToInput(input proto.Input) proto.Input {
 		proto.InputColumn{Name: ckdb.COLUMN_TRIGGER_THRESHOLD, Data: b.ColTriggerThreshold},
 		proto.InputColumn{Name: ckdb.COLUMN_METRIC_UNIT, Data: b.ColMetricUnit},
 		proto.InputColumn{Name: ckdb.COLUMN__TARGET_UID, Data: &b.ColTargetUid},
+		proto.InputColumn{Name: ckdb.COLUMN_CUSTOM_TAG_NAMES, Data: b.ColCustomTagNames},
+		proto.InputColumn{Name: ckdb.COLUMN_CUSTOM_TAG_VALUES, Data: b.ColCustomTagValues},
 		proto.InputColumn{Name: ckdb.COLUMN__QUERY_REGION, Data: b.ColQueryRegion},
 		proto.InputColumn{Name: ckdb.COLUMN_TEAM_ID, Data: &b.ColTeamId},
 		proto.InputColumn{Name: ckdb.COLUMN_USER_ID, Data: &b.ColUserId},
@@ -97,6 +103,8 @@ func (n *AlertEventStore) NewColumnBlock() ckdb.CKColumnBlock {
 		ColTagStringValues:  new(proto.ColStr).Array(),
 		ColTagIntNames:      new(proto.ColStr).LowCardinality().Array(),
 		ColTagIntValues:     new(proto.ColInt64).Array(),
+		ColCustomTagNames:   new(proto.ColStr).LowCardinality().Array(),
+		ColCustomTagValues:  new(proto.ColStr).Array(),
 		ColTriggerThreshold: new(proto.ColStr).LowCardinality(),
 		ColMetricUnit:       new(proto.ColStr).LowCardinality(),
 	}
@@ -120,6 +128,8 @@ func (n *AlertEventStore) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColTriggerThreshold.Append(n.TriggerThreshold)
 	block.ColMetricUnit.Append(n.MetricUnit)
 	block.ColTargetUid.Append(n.XTargetUid)
+	block.ColCustomTagNames.Append(n.CustomTagKeys)
+	block.ColCustomTagValues.Append(n.CustomTagValues)
 	block.ColQueryRegion.Append(n.XQueryRegion)
 	block.ColTeamId.Append(n.TeamID)
 	block.ColUserId.Append(n.UserId)

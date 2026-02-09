@@ -86,6 +86,8 @@ const (
 	COLUMN_CLOSE_TYPE                 = "close_type"
 	COLUMN_COMPRESSION_ALGO           = "compression_algo"
 	COLUMN_COUNT                      = "count"
+	COLUMN_CUSTOM_TAG_NAMES           = "custom_tag_names"
+	COLUMN_CUSTOM_TAG_VALUES          = "custom_tag_values"
 	COLUMN_DIRECTION_SCORE            = "direction_score"
 	COLUMN_DURATION                   = "duration"
 	COLUMN_ENCODED_SPAN               = "encoded_span"
@@ -432,6 +434,8 @@ var ColumnNames = []string{
 	COLUMN_CLOSE_TYPE,
 	COLUMN_COMPRESSION_ALGO,
 	COLUMN_COUNT,
+	COLUMN_CUSTOM_TAG_NAMES,
+	COLUMN_CUSTOM_TAG_VALUES,
 	COLUMN_DIRECTION_SCORE,
 	COLUMN_DURATION,
 	COLUMN_ENCODED_SPAN,

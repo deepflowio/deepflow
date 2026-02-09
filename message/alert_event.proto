@@ -21,6 +21,8 @@ message AlertEvent {
     optional string trigger_threshold = 15;
     optional string metric_unit = 16;
     optional string metric_value_str = 17;
+    repeated string custom_tag_keys = 18;
+    repeated string custom_tag_values = 19;
 
     optional string _target_uid = 21;
     optional string _query_region = 22;

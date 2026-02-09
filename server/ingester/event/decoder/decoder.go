@@ -466,6 +466,8 @@ func (d *Decoder) writeAlertEvent(event *alert_event.AlertEvent) {
 	s.TagIntKeys = event.GetTagIntKeys()
 	s.TagIntValues = event.GetTagIntValues()
 	s.TriggerThreshold = event.GetTriggerThreshold()
+	s.CustomTagKeys = event.GetCustomTagKeys()
+	s.CustomTagValues = event.GetCustomTagValues()
 	s.MetricUnit = event.GetMetricUnit()
 	s.XTargetUid = event.GetXTargetUid()
 	s.XQueryRegion = event.GetXQueryRegion()
