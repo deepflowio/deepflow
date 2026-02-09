@@ -710,7 +710,7 @@ impl HttpInfo {
         false
     }
 
-    fn get_version(&self) -> Field {
+    fn get_version(&self) -> Field<'_> {
         if self.proto == L7Protocol::Triple {
             return Field::Str(Cow::Borrowed(&self.dubbo_service_version.as_str()));
         }
@@ -730,7 +730,7 @@ impl HttpInfo {
         }
     }
 
-    fn get_method(&self) -> Field {
+    fn get_method(&self) -> Field<'_> {
         Field::Str(Cow::Borrowed(self.method.as_str()))
     }
 
@@ -741,7 +741,7 @@ impl HttpInfo {
         }
     }
 
-    fn get_endpoint(&self) -> Field {
+    fn get_endpoint(&self) -> Field<'_> {
         if self.is_grpc() {
             if self.path.is_empty() {
                 Field::None
@@ -776,7 +776,7 @@ impl HttpInfo {
         }
     }
 
-    fn get_trace_id(&self) -> Field {
+    fn get_trace_id(&self) -> Field<'_> {
         Field::Str(Cow::Borrowed(&self.trace_ids.highest()))
     }
 

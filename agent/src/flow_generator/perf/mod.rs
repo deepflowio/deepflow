@@ -178,7 +178,7 @@ impl L7ProtocolChecker {
         &self,
         l4_protocol: L4Protocol,
         port: u16,
-    ) -> L7ProtocolCheckerIterator {
+    ) -> L7ProtocolCheckerIterator<'_> {
         L7ProtocolCheckerIterator {
             iter: match l4_protocol {
                 L4Protocol::Tcp => self.tcp.iter(),
