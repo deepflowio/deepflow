@@ -32,6 +32,17 @@
 #include <bcc/compat/linux/bpf.h>
 #include "utils.h"
 
+struct task_struct;
+
+#ifndef BPF_FUNC_task_pt_regs
+// Helper ID for bpf_task_pt_regs (introduced in Linux 5.15, GPL-only).
+#define BPF_FUNC_task_pt_regs 175
+#endif
+#ifndef BPF_FUNC_get_current_task_btf
+// Helper ID for bpf_get_current_task_btf (introduced in Linux 5.11).
+#define BPF_FUNC_get_current_task_btf 158
+#endif
+
 /*
  * bpf helpers
  */
@@ -77,6 +88,12 @@ static long
     (void *)16;
 static __u64 __attribute__ ((__unused__)) (*bpf_get_current_task) (void) =
     (void *)35;
+static struct task_struct
+    __attribute__ ((__unused__)) * (*bpf_get_current_task_btf) (void) =
+    (void *)BPF_FUNC_get_current_task_btf;
+static struct pt_regs
+    __attribute__ ((__unused__)) * (*bpf_task_pt_regs) (struct task_struct *task) =
+    (void *)BPF_FUNC_task_pt_regs;
 static long
     __attribute__ ((__unused__)) (*bpf_perf_event_output) (void *ctx, void *map,
 							   __u64 flags,

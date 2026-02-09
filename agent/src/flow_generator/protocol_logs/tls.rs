@@ -480,7 +480,7 @@ impl From<&TlsInfo> for LogCache {
 pub struct TlsLog {
     change_cipher_spec_count: u8,
     is_change_cipher_spec: bool,
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 }
 
 //解析器接口实现
@@ -509,12 +509,13 @@ impl L7ProtocolParserInterface for TlsLog {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             // Triggered by Client Hello and the last Change cipher spec
             if info.cal_tls_rtt {
                 if let Some(stats) = info.perf_stats(param) {
                     info.tls_rtt = stats.rrt_sum;
-                    perf_stats.update_tls_rtt(stats.rrt_sum);
+                    perf_stat.update_tls_rtt(stats.rrt_sum);
                 }
                 info.cal_tls_rtt = false;
             }
@@ -529,8 +530,9 @@ impl L7ProtocolParserInterface for TlsLog {
             // This `perf_stats` is called with info.cal_tls_rtt == false
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::TlsInfo(info)))
@@ -543,8 +545,8 @@ impl L7ProtocolParserInterface for TlsLog {
         L7Protocol::TLS
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 
@@ -552,10 +554,6 @@ impl TlsLog {
     const CHNAGE_CIPHER_SPEC_LIMIT: u8 = 2;
 
     fn parse(&mut self, payload: &[u8], info: &mut TlsInfo, param: &ParseParam) -> Result<()> {
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
-
         let mut tls_headers = vec![];
         let mut offset = 0;
         while offset + TlsHeader::HEADER_LEN <= payload.len() {

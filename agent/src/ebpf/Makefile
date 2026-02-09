@@ -155,7 +155,8 @@ SOCKET_TRACE_ELFS := user/socket_trace_bpf_common.c \
 	user/socket_trace_bpf_kprobe.c
 
 PERF_PROFILER_ELFS := user/perf_profiler_bpf_common.c \
-	user/perf_profiler_bpf_5_2_plus.c
+	user/perf_profiler_bpf_5_2_plus.c \
+	user/perf_profiler_bpf_5_15_plus.c
 
 ELFFILES := $(SOCKET_TRACE_ELFS) $(PERF_PROFILER_ELFS) $(AF_PACKET_FANOUT_ELFS) $(TCP_OPTION_TRACING_ELFS)
 
@@ -206,6 +207,10 @@ user/perf_profiler_bpf_common.c: tools/bintobuffer kernel/perf_profiler.bpf.c
 user/perf_profiler_bpf_5_2_plus.c: tools/bintobuffer kernel/perf_profiler.bpf.c
 	$(call check_clang)
 	$(call compile_perf_profiler_elf,5_2_plus,LINUX_VER_5_2_PLUS=1)
+
+user/perf_profiler_bpf_5_15_plus.c: tools/bintobuffer kernel/perf_profiler.bpf.c
+	$(call check_clang)
+	$(call compile_perf_profiler_elf,5_15_plus,LINUX_VER_5_15_PLUS=1)
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 	$(call msg,MKDIR,$@)

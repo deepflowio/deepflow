@@ -367,7 +367,7 @@ impl L7ProtocolParserInterface for Iso8583Log {
                         info.rrt = rrt_us;
                         perf_stat.rrt_count += 1;
                         perf_stat.rrt_sum += rrt_us;
-                        perf_stat.rrt_max = perf_stats.rrt_max.max(rrt_us as u32);
+                        perf_stat.rrt_max = perf_stat.rrt_max.max(rrt_us as u32);
                     }
                 }
                 self.perf_stats.push(perf_stat);

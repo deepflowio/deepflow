@@ -402,7 +402,7 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
         false
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
         std::mem::take(&mut self.perf_stats)
     }
 }

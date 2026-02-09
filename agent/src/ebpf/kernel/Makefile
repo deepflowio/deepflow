@@ -42,6 +42,8 @@ ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's
 
 ifeq ($(LINUX_VER_3_10_0),1)
 	EXTRA_EBPF_CLAGS = -DLINUX_VER_3_10_0
+else ifeq ($(LINUX_VER_5_15_PLUS),1)
+	EXTRA_EBPF_CLAGS = -DLINUX_VER_5_2_PLUS -DLINUX_VER_5_15_PLUS
 else ifeq ($(LINUX_VER_5_2_PLUS),1)
 	EXTRA_EBPF_CLAGS = -DLINUX_VER_5_2_PLUS
 else ifeq ($(LINUX_VER_KYLIN),1)
@@ -97,4 +99,3 @@ clean:
 	@rm $(TAEGET_KERN_ELF) $(TARGET) ${TAEGET_KERN_ELF:.elf=.ll} *.S *.objdump -rf
 
 .PHONY: all clean
-
