@@ -171,7 +171,9 @@ typedef struct {
     unwind_entry_t entries[UNWIND_ENTRIES_PER_SHARD];
 } unwind_entry_shard_t;
 
-#if defined(DF_ENTERPRISE)
+/**
+ * Thread Specific Data info for accessing per-thread PyThreadState.
+ */
 typedef struct {
     /**
      * Offset from thread pointer base (TPBASE) to TSD storage
@@ -187,27 +189,13 @@ typedef struct {
     uint8_t indirect;
 } tsd_info_t;
 
+#if defined(DF_ENTERPRISE)
 typedef struct {
-    /**
-     * Address of autoTLSkey variable in Python runtime
-     */
     uint64_t auto_tls_key_addr;
-    /**
-     * Python version encoded as 0xMMmm (e.g., 0x030A for 3.10)
-     */
     uint16_t version;
-    /**
-     * Thread Specific Data info for multi-threading support
-     */
     tsd_info_t tsd_info;
-    /**
-     * ID for looking up python_offsets in the offsets map
-     */
     uint8_t offsets_id;
-    /**
-     * Padding for alignment
-     */
-    uint8_t _padding[5];
+    uint8_t padding[5];
 } python_unwind_info_t;
 #endif
 
@@ -721,6 +709,11 @@ extern void python_unwind_table_unload(python_unwind_table_t *table, uint32_t pi
 
 int32_t read_offset_of_stack_in_task_struct(void);
 
+/**
+ * C-callable function to read TPBASE offset
+ */
+int64_t read_tpbase_offset(void);
+
 #if defined(DF_ENTERPRISE)
 extern char *resolve_php_frame(uint32_t pid,
                                uint64_t zend_function_ptr,
@@ -741,12 +734,6 @@ void rust_log_wrapper(LogLevel level,
                       const char *_function_name,
                       const char *file_path,
                       int line_number);
-
-/**
- * Read TPBASE offset from kernel functions
- * Returns the offset of fsbase/tpidr in task_struct, or -1 on failure
- */
-int64_t read_tpbase_offset(void);
 
 int rustc_demangle(const char *mangled, char *out, size_t out_size);
 

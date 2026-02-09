@@ -386,8 +386,21 @@ fn extract_tpbase_offset_from_btf() -> Result<u64> {
 
     #[cfg(target_arch = "aarch64")]
     {
-        // For ARM64: task_struct.thread.uw.tp_value
-        // Default offset for common kernel configurations
+        // Try parsing /sys/kernel/btf/vmlinux for ARM64
+        match parse_btf_for_tpbase() {
+            Ok(offset) => {
+                debug!(
+                    "Extracted TPBASE offset {} ({:#x}) from BTF",
+                    offset, offset
+                );
+                return Ok(offset);
+            }
+            Err(e) => {
+                debug!("BTF parsing failed: {}", e);
+            }
+        }
+
+        // Fallback to hardcoded defaults based on common kernel configurations
         get_default_tpbase_offset()
     }
 
@@ -400,7 +413,7 @@ fn extract_tpbase_offset_from_btf() -> Result<u64> {
 }
 
 /// Parse BTF information from /sys/kernel/btf/vmlinux to get TPBASE offset
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 fn parse_btf_for_tpbase() -> Result<u64> {
     use std::fs::File;
     use std::io::Read;
@@ -419,8 +432,11 @@ fn parse_btf_for_tpbase() -> Result<u64> {
     parse_btf_task_struct_fsbase(&btf_data)
 }
 
-/// Parse BTF data to find task_struct.thread.fsbase offset
-#[cfg(target_arch = "x86_64")]
+/// Parse BTF task_struct to find fsbase/tp_value offset
+///
+/// On x86_64: finds task_struct.thread.fsbase
+/// On ARM64: finds task_struct.thread.uw.tp_value
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 fn parse_btf_task_struct_fsbase(btf_data: &[u8]) -> Result<u64> {
     // BTF header structure (from include/uapi/linux/btf.h)
     // struct btf_header {
@@ -469,13 +485,34 @@ fn parse_btf_task_struct_fsbase(btf_data: &[u8]) -> Result<u64> {
     let task_struct_id = find_btf_struct_by_name(type_section, str_section, "task_struct")?;
 
     // Find thread member in task_struct
-    let thread_offset =
-        find_btf_member_offset(type_section, str_section, task_struct_id, "thread")?;
+    let thread_info = find_btf_member_info(type_section, str_section, task_struct_id, "thread")?;
+    let thread_offset = thread_info.offset;
+    let thread_type_id = thread_info.type_id;
 
-    // Find thread_struct type and fsbase offset within it
-    let thread_type_id = find_btf_member_type(type_section, str_section, task_struct_id, "thread")?;
-    let fsbase_offset =
-        find_btf_member_offset(type_section, str_section, thread_type_id, "fsbase")?;
+    // Architecture-specific: x86_64 uses fsbase, ARM64 uses uw.tp_value
+    let fsbase_offset = {
+        #[cfg(target_arch = "x86_64")]
+        {
+            find_btf_member_offset(type_section, str_section, thread_type_id, "fsbase")?
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            // ARM64: thread_struct.uw.tp_value
+            let uw_info = find_btf_member_info(type_section, str_section, thread_type_id, "uw")?;
+            let uw_offset = uw_info.offset;
+            let uw_type_id = uw_info.type_id;
+            let tp_value_offset =
+                find_btf_member_offset(type_section, str_section, uw_type_id, "tp_value")?;
+            uw_offset + tp_value_offset
+        }
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        {
+            return Err(Error::Msg(
+                "TPBASE BTF parsing not supported for this architecture".to_string(),
+            ));
+        }
+    };
 
     let total_offset = thread_offset + fsbase_offset;
 
@@ -491,13 +528,13 @@ fn parse_btf_task_struct_fsbase(btf_data: &[u8]) -> Result<u64> {
 }
 
 /// BTF type kinds
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 const BTF_KIND_STRUCT: u32 = 4;
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 const BTF_KIND_UNION: u32 = 5;
 
 /// Calculate extra size for a BTF type based on its kind and vlen
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 fn btf_type_extra_size(kind: u32, vlen: u32) -> usize {
     match kind {
         1 => 4,                        // BTF_KIND_INT
@@ -523,7 +560,7 @@ fn btf_type_extra_size(kind: u32, vlen: u32) -> usize {
 }
 
 /// Find BTF struct type ID by name
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 fn find_btf_struct_by_name(type_section: &[u8], str_section: &[u8], name: &str) -> Result<u32> {
     // BTF type format:
     // struct btf_type {
@@ -575,7 +612,7 @@ fn find_btf_struct_by_name(type_section: &[u8], str_section: &[u8], name: &str) 
 }
 
 /// BTF member info containing both offset and type ID
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 struct BtfMemberInfo {
     /// Offset in bytes from the start of the struct
     offset: u64,
@@ -585,7 +622,7 @@ struct BtfMemberInfo {
 
 /// Find both offset and type ID of a member in a BTF struct.
 /// This is the unified implementation that extracts all member info at once.
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 fn find_btf_member_info(
     type_section: &[u8],
     str_section: &[u8],
@@ -659,7 +696,7 @@ fn find_btf_member_info(
 }
 
 /// Find offset of a member in a BTF struct
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 fn find_btf_member_offset(
     type_section: &[u8],
     str_section: &[u8],
@@ -669,19 +706,8 @@ fn find_btf_member_offset(
     find_btf_member_info(type_section, str_section, struct_id, member_name).map(|info| info.offset)
 }
 
-/// Find type ID of a member in a BTF struct
-#[cfg(target_arch = "x86_64")]
-fn find_btf_member_type(
-    type_section: &[u8],
-    str_section: &[u8],
-    struct_id: u32,
-    member_name: &str,
-) -> Result<u32> {
-    find_btf_member_info(type_section, str_section, struct_id, member_name).map(|info| info.type_id)
-}
-
 /// Get null-terminated string from BTF string section
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 fn get_btf_string(str_section: &[u8], offset: usize) -> &str {
     if offset >= str_section.len() {
         return "";

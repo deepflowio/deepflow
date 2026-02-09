@@ -143,8 +143,11 @@ pub struct LuaRuntimeInfo {
 #[cfg(feature = "enterprise")]
 #[repr(C)]
 pub struct PythonUnwindInfo {
-    pub thread_state_address: u64,
+    pub auto_tls_key_addr: u64,
+    pub version: u16,
+    pub tsd_info: TSDInfo,
     pub offsets_id: u8,
+    pub _padding: [u8; 5],
 }
 
 #[cfg(feature = "enterprise")]
