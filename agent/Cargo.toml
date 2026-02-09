@@ -71,8 +71,8 @@ http2 = { path = "plugins/http2" }
 humantime = "2.1"
 humantime-serde = "1.0"
 hyper = { version = "0.14", features = ["full"] }
-integration_skywalking = { path = "plugins/integration_skywalking" }
-integration_vector = { path = "plugins/integration_vector" }
+integration_skywalking = { path = "plugins/integration_skywalking", optional = true }
+integration_vector = { path = "plugins/integration_vector", optional = true }
 ipnet = "2.4.0"
 ipnetwork = "0.18.0"
 lazy_static = "1.5.0"
@@ -180,6 +180,7 @@ walkdir = "2"
 [features]
 default = ["libtrace"]
 enterprise = ["dep:enterprise-utils", "dep:pcap-parser"]
+enterprise-integration = ["dep:integration_skywalking", "dep:integration_vector"]
 extended_observability = ["libtrace"]
 dylib_pcap = []
 libtrace = []
