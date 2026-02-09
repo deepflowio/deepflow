@@ -163,7 +163,7 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
 pub fn get_policy_parser(s: String) -> CustomPolicyLog {
     CustomPolicyLog {
         proto_str: s.clone(),
-        perf_stats: None,
+        perf_stats: vec![],
         parser: CustomPolicyParser::default(),
     }
 }
