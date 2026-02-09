@@ -143,7 +143,10 @@ impl L7ProtocolParserInterface for CustomPolicyLog {
             &mut self.store,
             &info,
             param.direction.into(),
-            Source::Payload(PayloadType::JSON | PayloadType::XML, payload),
+            Source::Payload(
+                PayloadType::JSON | PayloadType::XML | PayloadType::TLV,
+                payload,
+            ),
         );
 
         let mut n_ops = 0;
