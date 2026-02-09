@@ -1224,7 +1224,7 @@ impl LogParserConfig {
         &self,
         protocol: L7ProtocolEnum,
         param: &ParseParam,
-    ) -> Option<PolicySlice> {
+    ) -> Option<PolicySlice<'_>> {
         self.custom_app
             .custom_field_policies
             .as_ref()
@@ -2322,7 +2322,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                         None
                     },
                     custom_field_policies: if let Some(config) = conf.custom_app.config.as_ref() {
-                        Some(CustomFieldPolicy::new(&config.biz_field))
+                        Some(CustomFieldPolicy::new(config))
                     } else {
                         None
                     },

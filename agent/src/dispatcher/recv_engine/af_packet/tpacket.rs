@@ -332,7 +332,7 @@ impl Tpacket {
 
     // The data referenced in the packet points to Shared memory. The life cycle
     // of the packet cannot exceed the next call to the read function.
-    pub unsafe fn read(&mut self) -> Option<Packet> {
+    pub unsafe fn read(&mut self) -> Option<Packet<'_>> {
         if self.current.is_none()
             || !self.header_next_needed
             || !self.current.as_mut().unwrap().next()
