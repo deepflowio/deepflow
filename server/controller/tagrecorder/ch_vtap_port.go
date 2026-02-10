@@ -23,8 +23,8 @@ import (
 	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadb "github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/service/vtap"
 	"github.com/deepflowio/deepflow/server/controller/model"
@@ -33,7 +33,7 @@ import (
 const vTapPortNameLength = 256
 
 type ChVTapPort struct {
-	UpdaterComponent[mysqlmodel.ChVTapPort, VtapPortKey]
+	UpdaterComponent[metadbmodel.ChVTapPort, VtapPortKey]
 }
 
 type DeviceInfo struct {
@@ -46,33 +46,33 @@ type DeviceInfo struct {
 
 func NewChVTapPort() *ChVTapPort {
 	updater := &ChVTapPort{
-		newUpdaterComponent[mysqlmodel.ChVTapPort, VtapPortKey](
+		newUpdaterComponent[metadbmodel.ChVTapPort, VtapPortKey](
 			RESOURCE_TYPE_CH_VTAP_PORT,
 		),
 	}
 	updater.updaterDG = updater
 	return updater
 }
-func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysqlmodel.ChVTapPort, bool) {
-	var vTaps []mysqlmodel.VTap
+func (v *ChVTapPort) generateNewData(db *metadb.DB) (map[VtapPortKey]metadbmodel.ChVTapPort, bool) {
+	var vTaps []metadbmodel.VTap
 	err := db.Where("type = ?", common.VTAP_TYPE_DEDICATED).Unscoped().Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
-	var hosts []mysqlmodel.Host
+	var hosts []metadbmodel.Host
 	err = db.Where("htype = ?", common.HOST_HTYPE_GATEWAY).Unscoped().Find(&hosts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
-	var vInterfaces []mysqlmodel.VInterface
+	var vInterfaces []metadbmodel.VInterface
 	err = db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_HOST).Unscoped().Find(&vInterfaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
 	}
-	var chDevices []mysqlmodel.ChDevice
+	var chDevices []metadbmodel.ChDevice
 	err = db.Unscoped().Find(&chDevices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
@@ -87,7 +87,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysqlmodel.C
 		log.Error(errors.New("unable to get resource vtap-port"), db.LogPrefixORGID)
 		return nil, false
 	}
-	keyToItem := make(map[VtapPortKey]mysqlmodel.ChVTapPort)
+	keyToItem := make(map[VtapPortKey]metadbmodel.ChVTapPort)
 	if len(vtapVIFs) == 0 {
 		log.Info("no data in get vtap-port response", db.LogPrefixORGID)
 		return keyToItem, true
@@ -172,7 +172,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysqlmodel.C
 			log.Debugf("update: %+v", vTapPort, db.LogPrefixORGID)
 		} else {
 			if data.VTapID != 0 || tapPort != 0 {
-				keyToItem[tapMacKey] = mysqlmodel.ChVTapPort{
+				keyToItem[tapMacKey] = metadbmodel.ChVTapPort{
 					VTapID:      data.VTapID,
 					TapPort:     tapPort,
 					MacType:     CH_VTAP_PORT_TYPE_TAP_MAC,
@@ -235,7 +235,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysqlmodel.C
 				keyToItem[macKey] = vTapPort
 				log.Debugf("update: %+v", vTapPort, db.LogPrefixORGID)
 			} else {
-				keyToItem[macKey] = mysqlmodel.ChVTapPort{
+				keyToItem[macKey] = metadbmodel.ChVTapPort{
 					VTapID:      data.VTapID,
 					TapPort:     macPort,
 					MacType:     CH_VTAP_PORT_TYPE_TAP_MAC,
@@ -289,7 +289,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysqlmodel.C
 			}
 			vTapPort.TeamID = VTapIDToTeamID[vTapID]
 		} else if vTapID != 0 {
-			keyToItem[key] = mysqlmodel.ChVTapPort{
+			keyToItem[key] = metadbmodel.ChVTapPort{
 				VTapID:     vTapID,
 				TapPort:    0,
 				MacType:    0,
@@ -328,7 +328,7 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysqlmodel.C
 					}
 					if vTap.Region != "" && vTap.Region == host.Region {
 						key := VtapPortKey{VtapID: vTap.ID, TapPort: tapPort}
-						keyToItem[key] = mysqlmodel.ChVTapPort{
+						keyToItem[key] = metadbmodel.ChVTapPort{
 							VTapID:     vTap.ID,
 							TapPort:    tapPort,
 							Name:       vInterface.Name + " " + host.Name,
@@ -349,34 +349,34 @@ func (v *ChVTapPort) generateNewData(db *mysql.DB) (map[VtapPortKey]mysqlmodel.C
 	return keyToItem, true
 }
 
-func (v *ChVTapPort) generateVtapDeviceInfo(db *mysql.DB) (map[int]DeviceInfo, bool) {
+func (v *ChVTapPort) generateVtapDeviceInfo(db *metadb.DB) (map[int]DeviceInfo, bool) {
 	vTapIDToDeviceInfo := make(map[int]DeviceInfo)
 
-	var hostChDevices []mysqlmodel.ChDevice
+	var hostChDevices []metadbmodel.ChDevice
 	err := db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_HOST).Unscoped().Find(&hostChDevices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return vTapIDToDeviceInfo, false
 	}
-	var vmChDevices []mysqlmodel.ChDevice
+	var vmChDevices []metadbmodel.ChDevice
 	err = db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_VM).Unscoped().Find(&vmChDevices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return vTapIDToDeviceInfo, false
 	}
-	var podNodeChDevices []mysqlmodel.ChDevice
+	var podNodeChDevices []metadbmodel.ChDevice
 	err = db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_POD_NODE).Unscoped().Find(&podNodeChDevices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return vTapIDToDeviceInfo, false
 	}
-	var podChDevices []mysqlmodel.ChDevice
+	var podChDevices []metadbmodel.ChDevice
 	err = db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_POD).Unscoped().Find(&podChDevices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
 		return vTapIDToDeviceInfo, false
 	}
-	var vTaps []mysqlmodel.VTap
+	var vTaps []metadbmodel.VTap
 	err = db.Unscoped().Select("launch_server_id", "id", "type").Find(&vTaps).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err), db.LogPrefixORGID)
@@ -449,11 +449,11 @@ func (v *ChVTapPort) generateVtapDeviceInfo(db *mysql.DB) (map[int]DeviceInfo, b
 	return vTapIDToDeviceInfo, true
 }
 
-func (v *ChVTapPort) generateKey(dbItem mysqlmodel.ChVTapPort) VtapPortKey {
+func (v *ChVTapPort) generateKey(dbItem metadbmodel.ChVTapPort) VtapPortKey {
 	return VtapPortKey{VtapID: dbItem.VTapID, TapPort: dbItem.TapPort}
 }
 
-func (v *ChVTapPort) generateUpdateInfo(oldItem, newItem mysqlmodel.ChVTapPort) (map[string]interface{}, bool) {
+func (v *ChVTapPort) generateUpdateInfo(oldItem, newItem metadbmodel.ChVTapPort) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if oldItem.Name != newItem.Name {
 		updateInfo["name"] = newItem.Name
@@ -498,7 +498,7 @@ func (v *ChVTapPort) generateUpdateInfo(oldItem, newItem mysqlmodel.ChVTapPort) 
 }
 
 // sortVTapPortJoinedNames sorts the joined names of vtap ports, sets sorted name to ChVTapPort and returns the name slice
-func sortVTapPortJoinedNames(vtapPort *mysqlmodel.ChVTapPort) []string {
+func sortVTapPortJoinedNames(vtapPort *metadbmodel.ChVTapPort) []string {
 	nameSlice := strings.Split(vtapPort.Name, ", ")
 	sort.Strings(nameSlice)
 	vtapPort.Name = strings.Join(nameSlice, ", ")
