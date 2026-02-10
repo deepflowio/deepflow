@@ -15,11 +15,12 @@
  */
 
 use std::{
+    ffi::CStr,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     ptr,
 };
 
-use log::{debug, warn};
+use log::{debug, trace, warn};
 use pcap;
 use regex::Regex;
 use windows::Win32::{
@@ -27,8 +28,8 @@ use windows::Win32::{
     NetworkManagement::IpHelper::{
         GetAdaptersAddresses, GetBestInterfaceEx, GetBestRoute2, IfOperStatusUp,
         ResolveIpNetEntry2, AF_INET, AF_INET6, AF_UNSPEC, GAA_FLAG_INCLUDE_ALL_INTERFACES,
-        IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_ADDRESSES_LH_0, IP_ADAPTER_ADDRESSES_LH_0_0,
-        MIB_IPFORWARD_ROW2, MIB_IPNET_ROW2,
+        GAA_FLAG_INCLUDE_PREFIX, IP_ADAPTER_ADDRESSES_LH, IP_ADAPTER_ADDRESSES_LH_0,
+        IP_ADAPTER_ADDRESSES_LH_0_0, MIB_IPFORWARD_ROW2, MIB_IPNET_ROW2,
     },
     Networking::WinSock::{
         IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6,
@@ -100,7 +101,7 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
         )));
     }
 
-    let link = get_interface_by_index(route.oif_index)?;
+    let link = get_interface_by_index_from_pcap(route.oif_index)?;
 
     let mac_addr = MacAddr(
         ipnet_row
@@ -124,7 +125,74 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
     })
 }
 
-pub fn get_interface_by_index(if_index: u32) -> Result<Link> {
+pub fn get_interface_by_index_from_win32(if_index: u32) -> Result<Link> {
+    let family = AF_UNSPEC as u32;
+    let flags = GAA_FLAG_INCLUDE_PREFIX;
+    let mut buffer_len: u32 = 0;
+
+    unsafe {
+        let result = GetAdaptersAddresses(
+            family,
+            flags,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            &mut buffer_len,
+        );
+
+        if result != 111 {
+            return Err(Error::Windows(format!(
+                "Get buffer len by GetAdaptersAddresses failed error code {}",
+                result
+            )));
+        }
+    }
+
+    let mut buffer = vec![0u8; buffer_len as usize];
+    let adapter_addresses = buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH;
+
+    unsafe {
+        let result = GetAdaptersAddresses(
+            family,
+            flags,
+            ptr::null_mut(),
+            adapter_addresses,
+            &mut buffer_len,
+        );
+        if result != 0 {
+            return Err(Error::Windows(format!(
+                "Get adapter addresses by GetAdaptersAddresses failed error code {}",
+                result
+            )));
+        }
+    }
+
+    let mut current_adapter = adapter_addresses;
+    while !current_adapter.is_null() {
+        let mac_address = unsafe {
+            let adapter_ref = &*current_adapter;
+            if if_index != adapter_ref.Anonymous1.Anonymous.IfIndex {
+                current_adapter = adapter_ref.Next;
+                continue;
+            }
+            if adapter_ref.PhysicalAddressLength == 6 {
+                std::slice::from_raw_parts(
+                    adapter_ref.PhysicalAddress.as_ptr(),
+                    adapter_ref.PhysicalAddressLength as usize,
+                )
+            } else {
+                &[0, 0, 0, 0, 0, 0]
+            }
+        };
+        let mut link = Link::default();
+        link.if_index = if_index;
+        link.mac_addr = MacAddr::try_from(mac_address).unwrap_or_default();
+        return Ok(link);
+    }
+
+    Err(Error::Windows(format!("Not found if_index {}", if_index)))
+}
+
+fn get_interface_by_index_from_pcap(if_index: u32) -> Result<Link> {
     let adapters = get_pcap_interfaces()?;
     debug!("adapters: {:?}, if_index: {}", adapters.clone(), if_index);
     adapters
@@ -194,7 +262,8 @@ pub fn links_by_name_regex<S: AsRef<str>>(regex: S) -> Result<Vec<Link>> {
 
 pub fn get_route_src_ip_and_mac(dest_addr: &IpAddr) -> Result<(IpAddr, MacAddr)> {
     route_get(*dest_addr).and_then(|r| {
-        get_interface_by_index(r.oif_index).map(|link| (r.pref_src.unwrap(), link.mac_addr))
+        get_interface_by_index_from_win32(r.oif_index)
+            .map(|link| (r.pref_src.unwrap(), link.mac_addr))
     })
 }
 
