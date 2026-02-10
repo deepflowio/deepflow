@@ -51,6 +51,7 @@ func NewChVTapPort() *ChVTapPort {
 		),
 	}
 	updater.updaterDG = updater
+	updater.dbOperator.setUpdateMode(UpdateByCondition)
 	return updater
 }
 func (v *ChVTapPort) generateNewData(db *metadb.DB) (map[VtapPortKey]metadbmodel.ChVTapPort, bool) {
