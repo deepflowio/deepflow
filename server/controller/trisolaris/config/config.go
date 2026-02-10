@@ -94,9 +94,9 @@ func (c *Config) Convert() {
 		c.NodeIP = nodeIP
 	}
 
-	if c.Push.DelayMax < 1 || c.Push.DelayMax > 10 {
-		c.Push.DelayMax = 0
+	if c.Push.DelayMax != 0 && (c.Push.DelayMax < 1 || c.Push.DelayMax > 10) {
 		log.Errorf("invalid config push:delay-max (%d), min: 1 , max: 10", c.Push.DelayMax)
+		c.Push.DelayMax = 0
 	}
 }
 
