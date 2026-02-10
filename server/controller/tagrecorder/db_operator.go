@@ -20,20 +20,35 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
-	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadb "github.com/deepflowio/deepflow/server/controller/db/metadb"
+)
+
+// UpdateMode 定义更新时的对象定位策略
+type UpdateMode int
+
+const (
+	// UpdateByPrimaryKey 通过模型主键定位更新对象
+	// 示例: db.Model(&user).Updates("name", "new")
+	UpdateByPrimaryKey UpdateMode = iota
+
+	// UpdateByCondition 通过 WHERE 条件定位更新对象
+	// 示例: db.Where("status = ?", 1).Updates("status", 2)
+	UpdateByCondition
 )
 
 type operator[MT MySQLChModel, KT ChModelKey] interface {
-	batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT, *mysql.DB) error, db *mysql.DB) error
-	add(keys []KT, dbItems []MT, db *mysql.DB) error
-	update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *mysql.DB) error
-	delete(keys []KT, dbItems []MT, db *mysql.DB) error
+	batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT, *metadb.DB) error, db *metadb.DB) error
+	add(keys []KT, dbItems []MT, db *metadb.DB) error
+	update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *metadb.DB) error
+	delete(keys []KT, dbItems []MT, db *metadb.DB) error
 	setConfig(config.ControllerConfig)
+	setUpdateMode(UpdateMode)
 }
 
 type operatorComponent[MT MySQLChModel, KT ChModelKey] struct {
 	cfg              config.ControllerConfig
 	resourceTypeName string
+	updateMode       UpdateMode
 }
 
 func newOperator[MT MySQLChModel, KT ChModelKey](resourceTypeName string) *operatorComponent[MT, KT] {
@@ -46,7 +61,11 @@ func (b *operatorComponent[MT, KT]) setConfig(cfg config.ControllerConfig) {
 	b.cfg = cfg
 }
 
-func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT, *mysql.DB) error, db *mysql.DB) error {
+func (b *operatorComponent[MT, KT]) setUpdateMode(mode UpdateMode) {
+	b.updateMode = mode
+}
+
+func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc func([]KT, []MT, *metadb.DB) error, db *metadb.DB) error {
 	count := len(items)
 	offset := b.cfg.TagRecorderCfg.MySQLBatchSize
 	var pages int
@@ -69,7 +88,7 @@ func (b *operatorComponent[MT, KT]) batchPage(keys []KT, items []MT, operateFunc
 	return nil
 }
 
-func (b *operatorComponent[MT, KT]) add(keys []KT, dbItems []MT, db *mysql.DB) error {
+func (b *operatorComponent[MT, KT]) add(keys []KT, dbItems []MT, db *metadb.DB) error {
 	err := db.Clauses(clause.OnConflict{
 		UpdateAll: true,
 	}).Create(&dbItems).Error
@@ -81,8 +100,14 @@ func (b *operatorComponent[MT, KT]) add(keys []KT, dbItems []MT, db *mysql.DB) e
 	return nil
 }
 
-func (b *operatorComponent[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *mysql.DB) error {
-	err := db.Model(&oldDBItem).Updates(updateInfo).Error
+func (b *operatorComponent[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT, db *metadb.DB) error {
+	query := db.Model(&oldDBItem)
+	if b.updateMode == UpdateByCondition {
+		if converter, ok := any(key).(KeyConverter); ok {
+			query = query.Where(converter.Map())
+		}
+	}
+	err := query.Updates(updateInfo).Error
 	if err != nil {
 		log.Errorf("update %s (key: %+v value: %+v) failed: %s", b.resourceTypeName, key, oldDBItem, err.Error(), db.LogPrefixORGID)
 		return err
@@ -91,7 +116,7 @@ func (b *operatorComponent[MT, KT]) update(oldDBItem MT, updateInfo map[string]i
 	return nil
 }
 
-func (b *operatorComponent[MT, KT]) delete(keys []KT, dbItems []MT, db *mysql.DB) error {
+func (b *operatorComponent[MT, KT]) delete(keys []KT, dbItems []MT, db *metadb.DB) error {
 	err := db.Delete(&dbItems).Error
 	if err != nil {
 		log.Errorf("delete %s (keys: %+v values: %+v) failed: %s", b.resourceTypeName, keys, dbItems, err.Error(), db.LogPrefixORGID)
