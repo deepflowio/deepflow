@@ -3549,6 +3549,27 @@ impl ConfigHandler {
             restart_agent = !first_run;
         }
 
+        let sock_ops = &mut ebpf.socket.sock_ops;
+        let new_sock_ops = &mut new_ebpf.socket.sock_ops;
+        if sock_ops.tcp_option_trace.enabled != new_sock_ops.tcp_option_trace.enabled {
+            info!(
+                "Update inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled from {:?} to {:?}.",
+                sock_ops.tcp_option_trace.enabled, new_sock_ops.tcp_option_trace.enabled
+            );
+            sock_ops.tcp_option_trace.enabled = new_sock_ops.tcp_option_trace.enabled;
+        }
+        if sock_ops.tcp_option_trace.sampling_window_bytes
+            != new_sock_ops.tcp_option_trace.sampling_window_bytes
+        {
+            info!(
+                "Update inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes from {:?} to {:?}.",
+                sock_ops.tcp_option_trace.sampling_window_bytes,
+                new_sock_ops.tcp_option_trace.sampling_window_bytes
+            );
+            sock_ops.tcp_option_trace.sampling_window_bytes =
+                new_sock_ops.tcp_option_trace.sampling_window_bytes;
+        }
+
         let uprobe = &mut ebpf.socket.uprobe;
         let new_uprobe = &mut new_ebpf.socket.uprobe;
         if uprobe.tls.enabled != new_uprobe.tls.enabled {
