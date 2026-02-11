@@ -26,7 +26,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// PodGroupMessageFactory defines the message factory for PodGroup
+type PodGroupMessageFactory struct{}
+
+func (f *PodGroupMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedPodGroups{}
+}
+
+func (f *PodGroupMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedPodGroup{}
+}
+
+func (f *PodGroupMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedPodGroups{}
+}
+
+func (f *PodGroupMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedPodGroupFields{}
+}
 
 type PodGroup struct {
 	UpdaterBase[
@@ -34,36 +54,12 @@ type PodGroup struct {
 		*diffbase.PodGroup,
 		*metadbmodel.PodGroup,
 		metadbmodel.PodGroup,
-		*message.AddedPodGroups,
-		message.AddedPodGroups,
-		message.AddNoneAddition,
-		*message.UpdatedPodGroup,
-		message.UpdatedPodGroup,
-		*message.UpdatedPodGroupFields,
-		message.UpdatedPodGroupFields,
-		*message.DeletedPodGroups,
-		message.DeletedPodGroups,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodGroup {
 	updater := &PodGroup{
-		newUpdaterBase[
-			cloudmodel.PodGroup,
-			*diffbase.PodGroup,
-			*metadbmodel.PodGroup,
-			metadbmodel.PodGroup,
-			*message.AddedPodGroups,
-			message.AddedPodGroups,
-			message.AddNoneAddition,
-			*message.UpdatedPodGroup,
-			message.UpdatedPodGroup,
-			*message.UpdatedPodGroupFields,
-			message.UpdatedPodGroupFields,
-			*message.DeletedPodGroups,
-			message.DeletedPodGroups,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN,
 			wholeCache,
 			db.NewPodGroup().SetMetadata(wholeCache.GetMetadata()),
@@ -71,11 +67,17 @@ func NewPodGroup(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroup) *PodG
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &PodGroupMessageFactory{})
+	}
+
 	updater.toLoggable = true
 	return updater
 }
 
+// Implement DataGenerator interface
 func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*metadbmodel.PodGroup, bool) {
 	podNamespaceID, exists := p.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
@@ -126,7 +128,7 @@ func (p *PodGroup) generateDBItemToAdd(cloudItem *cloudmodel.PodGroup) (*metadbm
 	return dbItem, true
 }
 
-func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cloudmodel.PodGroup) (*message.UpdatedPodGroupFields, map[string]interface{}, bool) {
+func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cloudmodel.PodGroup) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedPodGroupFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
@@ -142,7 +144,6 @@ func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cl
 		mapInfo["pod_num"] = cloudItem.PodNum
 		structInfo.PodNum.Set(diffBase.PodNum, cloudItem.PodNum)
 	}
-
 	if diffBase.Label != cloudItem.Label {
 		mapInfo["label"] = cloudItem.Label
 		structInfo.Label.Set(diffBase.Label, cloudItem.Label)
@@ -191,5 +192,6 @@ func (p *PodGroup) generateUpdateInfo(diffBase *diffbase.PodGroup, cloudItem *cl
 	} else {
 		structInfo.Spec.Set(diffBase.Spec, diffBase.Spec) // set for resource event, because it publish combined config of metadata and spec
 	}
+
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

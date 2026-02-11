@@ -28,7 +28,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// VInterfaceMessageFactory VInterface资源的消息工厂
+type VInterfaceMessageFactory struct{}
+
+func (f *VInterfaceMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedVInterfaces{}
+}
+
+func (f *VInterfaceMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedVInterface{}
+}
+
+func (f *VInterfaceMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedVInterfaces{}
+}
+
+func (f *VInterfaceMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedVInterfaceFields{}
+}
 
 type VInterface struct {
 	UpdaterBase[
@@ -36,36 +56,12 @@ type VInterface struct {
 		*diffbase.VInterface,
 		*metadbmodel.VInterface,
 		metadbmodel.VInterface,
-		*message.AddedVInterfaces,
-		message.AddedVInterfaces,
-		message.AddNoneAddition,
-		*message.UpdatedVInterface,
-		message.UpdatedVInterface,
-		*message.UpdatedVInterfaceFields,
-		message.UpdatedVInterfaceFields,
-		*message.DeletedVInterfaces,
-		message.DeletedVInterfaces,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, domainToolDataSet *tool.DataSet) *VInterface {
 	updater := &VInterface{
-		newUpdaterBase[
-			cloudmodel.VInterface,
-			*diffbase.VInterface,
-			*metadbmodel.VInterface,
-			metadbmodel.VInterface,
-			*message.AddedVInterfaces,
-			message.AddedVInterfaces,
-			message.AddNoneAddition,
-			*message.UpdatedVInterface,
-			message.UpdatedVInterface,
-			*message.UpdatedVInterfaceFields,
-			message.UpdatedVInterfaceFields,
-			*message.DeletedVInterfaces,
-			message.DeletedVInterfaces,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
 			wholeCache,
 			db.NewVInterface().SetMetadata(wholeCache.GetMetadata()),
@@ -73,8 +69,13 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 			cloudData,
 		),
 	}
+	updater.setDataGenerator(updater)
 	updater.setDomainToolDataSet(domainToolDataSet)
-	updater.dataGenerator = updater
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &VInterfaceMessageFactory{})
+	}
+
 	return updater
 }
 
@@ -126,7 +127,6 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*met
 			return nil, false
 		}
 	}
-
 	dbItem := &metadbmodel.VInterface{
 		Name:       cloudItem.Name,
 		Type:       cloudItem.Type,
@@ -148,7 +148,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*met
 	return dbItem, true
 }
 
-func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem *cloudmodel.VInterface) (*message.UpdatedVInterfaceFields, map[string]interface{}, bool) {
+func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem *cloudmodel.VInterface) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedVInterfaceFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.NetworkLcuuid != cloudItem.NetworkLcuuid {
@@ -179,7 +179,7 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 			log.Errorf(resourceAForResourceBNotFound(
 				common.VIF_DEVICE_TYPE_TO_RESOURCE_TYPE[cloudItem.DeviceType], cloudItem.DeviceLcuuid,
 				common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid,
-			))
+			), i.metadata.LogPrefixes)
 			return nil, nil, false
 		}
 		mapInfo["deviceid"] = deviceID

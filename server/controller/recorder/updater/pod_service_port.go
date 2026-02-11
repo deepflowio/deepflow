@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// PodServicePortMessageFactory defines the message factory for PodServicePort
+type PodServicePortMessageFactory struct{}
+
+func (f *PodServicePortMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedPodServicePorts{}
+}
+
+func (f *PodServicePortMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedPodServicePort{}
+}
+
+func (f *PodServicePortMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedPodServicePorts{}
+}
+
+func (f *PodServicePortMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedPodServicePortFields{}
+}
 
 type PodServicePort struct {
 	UpdaterBase[
@@ -32,36 +52,12 @@ type PodServicePort struct {
 		*diffbase.PodServicePort,
 		*metadbmodel.PodServicePort,
 		metadbmodel.PodServicePort,
-		*message.AddedPodServicePorts,
-		message.AddedPodServicePorts,
-		message.AddNoneAddition,
-		*message.UpdatedPodServicePort,
-		message.UpdatedPodServicePort,
-		*message.UpdatedPodServicePortFields,
-		message.UpdatedPodServicePortFields,
-		*message.DeletedPodServicePorts,
-		message.DeletedPodServicePorts,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServicePort) *PodServicePort {
 	updater := &PodServicePort{
-		newUpdaterBase[
-			cloudmodel.PodServicePort,
-			*diffbase.PodServicePort,
-			*metadbmodel.PodServicePort,
-			metadbmodel.PodServicePort,
-			*message.AddedPodServicePorts,
-			message.AddedPodServicePorts,
-			message.AddNoneAddition,
-			*message.UpdatedPodServicePort,
-			message.UpdatedPodServicePort,
-			*message.UpdatedPodServicePortFields,
-			message.UpdatedPodServicePortFields,
-			*message.DeletedPodServicePorts,
-			message.DeletedPodServicePorts,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
 			wholeCache,
 			db.NewPodServicePort().SetMetadata(wholeCache.GetMetadata()),
@@ -69,10 +65,16 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &PodServicePortMessageFactory{})
+	}
+
 	return updater
 }
 
+// Implement DataGenerator interface
 func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePort) (*metadbmodel.PodServicePort, bool) {
 	podServiceID, exists := p.cache.ToolDataSet.GetPodServiceIDByLcuuid(cloudItem.PodServiceLcuuid)
 	if !exists {
@@ -82,7 +84,6 @@ func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePor
 		), p.metadata.LogPrefixes)
 		return nil, false
 	}
-
 	dbItem := &metadbmodel.PodServicePort{
 		Name:         cloudItem.Name,
 		Protocol:     cloudItem.Protocol,
@@ -97,7 +98,7 @@ func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePor
 	return dbItem, true
 }
 
-func (p *PodServicePort) generateUpdateInfo(diffBase *diffbase.PodServicePort, cloudItem *cloudmodel.PodServicePort) (*message.UpdatedPodServicePortFields, map[string]interface{}, bool) {
+func (p *PodServicePort) generateUpdateInfo(diffBase *diffbase.PodServicePort, cloudItem *cloudmodel.PodServicePort) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedPodServicePortFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

@@ -59,6 +59,7 @@ pub mod l7 {
                         const JSON = 0x01;
                         const XML = 0x02;
                         const HESSIAN2 = 0x04;
+                        const TLV = 0x08;
                     }
                 }
 
@@ -92,14 +93,14 @@ pub mod l7 {
             #[derive(Clone, Default, Debug, PartialEq)]
             pub struct CustomFieldPolicy;
             impl CustomFieldPolicy {
-                pub fn new(_: &super::config::CustomField) -> Self {
+                pub fn new(_: &super::config::CustomApp) -> Self {
                     unimplemented!()
                 }
                 pub fn select(
                     &self,
                     _: public::l7_protocol::L7ProtocolEnum,
                     _: u16,
-                ) -> Option<PolicySlice> {
+                ) -> Option<PolicySlice<'_>> {
                     None
                 }
                 pub fn counters(
@@ -181,7 +182,7 @@ pub mod l7 {
                 pub fn new(_: &[super::config::CustomProtocolConfig]) -> Self {
                     unimplemented!()
                 }
-                pub fn select(&self, _: u16) -> Option<PolicySlice> {
+                pub fn select(&self, _: u16) -> Option<PolicySlice<'_>> {
                     unimplemented!()
                 }
             }

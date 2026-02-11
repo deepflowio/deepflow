@@ -1113,7 +1113,7 @@ impl<'a> MetaPacket<'a> {
         };
 
         let mut packet = MetaPacket::default();
-        let timestamp = Timestamp::from_micros(data.timestamp);
+        let timestamp = Timestamp::from_nanos(data.timestamp);
 
         packet.lookup_key = LookupKey {
             timestamp,

@@ -746,7 +746,6 @@ func deleteDomain(domain *metadbmodel.Domain, db *metadb.DB, userInfo *httpcommo
 	db.Unscoped().Where("vl2id IN ?", networkIDs).Delete(&metadbmodel.Subnet{})
 	db.Unscoped().Where(map[string]interface{}{"domain": lcuuid}).Delete(&metadbmodel.Network{})
 	db.Unscoped().Where(map[string]interface{}{"domain": lcuuid}).Delete(&metadbmodel.VPC{})
-	db.Unscoped().Where(map[string]interface{}{"domain": lcuuid}).Delete(&metadbmodel.SubDomain{})
 	db.Unscoped().Where(map[string]interface{}{"domain": lcuuid}).Delete(&metadbmodel.AZ{})
 
 	clusterIDs := []string{}
@@ -767,6 +766,7 @@ func deleteDomain(domain *metadbmodel.Domain, db *metadb.DB, userInfo *httpcommo
 	}
 
 	db.Delete(&domain)
+	db.Unscoped().Where(map[string]interface{}{"domain": lcuuid}).Delete(&metadbmodel.SubDomain{})
 
 	// pub to tagrecorder
 	metadata := message.NewMetadata(message.MetadataDB(db), message.MetadataDomain(*domain))
@@ -1057,7 +1057,7 @@ func DeleteSubDomain(lcuuid string, db *metadb.DB, userInfo *httpcommon.UserInfo
 		// db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&metadbmodel.PrometheusTarget{})
 	}
 
-	err = db.Delete(&subDomain).Error
+	err = db.Unscoped().Delete(&subDomain).Error
 	if err != nil {
 		return nil, err
 	}

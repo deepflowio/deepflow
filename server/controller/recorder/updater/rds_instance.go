@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// RDSInstanceMessageFactory defines the message factory for RDSInstance
+type RDSInstanceMessageFactory struct{}
+
+func (f *RDSInstanceMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedRDSInstances{}
+}
+
+func (f *RDSInstanceMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedRDSInstance{}
+}
+
+func (f *RDSInstanceMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedRDSInstances{}
+}
+
+func (f *RDSInstanceMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedRDSInstanceFields{}
+}
 
 type RDSInstance struct {
 	UpdaterBase[
@@ -32,36 +52,12 @@ type RDSInstance struct {
 		*diffbase.RDSInstance,
 		*metadbmodel.RDSInstance,
 		metadbmodel.RDSInstance,
-		*message.AddedRDSInstances,
-		message.AddedRDSInstances,
-		message.AddNoneAddition,
-		*message.UpdatedRDSInstance,
-		message.UpdatedRDSInstance,
-		*message.UpdatedRDSInstanceFields,
-		message.UpdatedRDSInstanceFields,
-		*message.DeletedRDSInstances,
-		message.DeletedRDSInstances,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance) *RDSInstance {
 	updater := &RDSInstance{
-		newUpdaterBase[
-			cloudmodel.RDSInstance,
-			*diffbase.RDSInstance,
-			*metadbmodel.RDSInstance,
-			metadbmodel.RDSInstance,
-			*message.AddedRDSInstances,
-			message.AddedRDSInstances,
-			message.AddNoneAddition,
-			*message.UpdatedRDSInstance,
-			message.UpdatedRDSInstance,
-			*message.UpdatedRDSInstanceFields,
-			message.UpdatedRDSInstanceFields,
-			*message.DeletedRDSInstances,
-			message.DeletedRDSInstances,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			wholeCache,
 			db.NewRDSInstance().SetMetadata(wholeCache.GetMetadata()),
@@ -69,10 +65,16 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &RDSInstanceMessageFactory{})
+	}
+
 	return updater
 }
 
+// Implement DataGenerator interface
 func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*metadbmodel.RDSInstance, bool) {
 	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
@@ -100,7 +102,7 @@ func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*m
 	return dbItem, true
 }
 
-func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudItem *cloudmodel.RDSInstance) (*message.UpdatedRDSInstanceFields, map[string]interface{}, bool) {
+func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudItem *cloudmodel.RDSInstance) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedRDSInstanceFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

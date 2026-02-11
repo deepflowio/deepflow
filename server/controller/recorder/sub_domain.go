@@ -59,10 +59,10 @@ func (s *subDomains) CloseStatsd() {
 	}
 }
 
-func (s *subDomains) RefreshAll(cloudData map[string]cloudmodel.SubDomainResource) error {
+func (s *subDomains) RefreshAll(cloudSubDomainResources map[string]cloudmodel.SubDomainResource) error {
 	// 遍历 cloud 中的 subdomain 资源，与缓存中的 subdomain 资源对比，根据对比结果增删改
 	var err error
-	for lcuuid, resource := range cloudData {
+	for lcuuid, resource := range cloudSubDomainResources {
 		sd, ok := s.refreshers[lcuuid]
 		if !ok {
 			sd, err = s.newRefresher(lcuuid)
@@ -75,18 +75,21 @@ func (s *subDomains) RefreshAll(cloudData map[string]cloudmodel.SubDomainResourc
 	}
 
 	// 遍历 subdomain 字典，删除 cloud 未返回的 subdomain 资源
-	for _, sd := range s.refreshers {
-		if _, ok := cloudData[sd.metadata.GetSubDomainLcuuid()]; !ok {
+	for lcuuid, sd := range s.refreshers {
+		if _, ok := cloudSubDomainResources[lcuuid]; !ok {
+			log.Info("sub_domain will be deleted", sd.metadata.LogPrefixes)
 			sd.clear()
+			delete(s.refreshers, lcuuid)
+			delete(s.cacheMng.SubDomainCacheMap, lcuuid)
 		}
 	}
 	return nil
 }
 
-func (s *subDomains) RefreshOne(cloudData map[string]cloudmodel.SubDomainResource) error {
+func (s *subDomains) RefreshOne(cloudSubDomainResources map[string]cloudmodel.SubDomainResource) error {
 	// 遍历 cloud 中的 subdomain 资源，与缓存中的 subdomain 资源对比，根据对比结果增删改
 	var err error
-	for lcuuid, resource := range cloudData {
+	for lcuuid, resource := range cloudSubDomainResources {
 		sd, ok := s.refreshers[lcuuid]
 		if !ok {
 			sd, err = s.newRefresher(lcuuid)
@@ -162,22 +165,35 @@ func (s *subDomain) refresh(cloudData cloudmodel.SubDomainResource) {
 	// TODO refactor
 	// for process
 	s.cache.RefreshVTaps()
-
-	subDomainUpdatersInUpdateOrder := s.getUpdatersInOrder(cloudData)
-	s.executeUpdaters(subDomainUpdatersInUpdateOrder)
-	s.notifyOnResourceChanged(subDomainUpdatersInUpdateOrder)
-	s.pubsub.PublishChange(s.msgMetadata)
-
+	s.refreshResource(&cloudData)
 	s.updateSyncedAt(s.metadata.GetSubDomainLcuuid(), cloudData.SyncAt)
 
 	log.Info("sub_domain sync refresh completed", s.metadata.LogPrefixes)
 }
 
 func (s *subDomain) clear() {
+	log.Info("sub_domain is waiting for refresh signal to clear resources", s.metadata.LogPrefixes)
+	<-s.cache.RefreshSignal
+	s.cache.IncrementSequence()
+	s.cache.SetLogLevel(logging.INFO, cache.RefreshSignalCallerSubDomain)
+
 	log.Info("sub_domain clean refresh started", s.metadata.LogPrefixes)
-	subDomainUpdatersInUpdateOrder := s.getUpdatersInOrder(cloudmodel.SubDomainResource{})
-	s.executeUpdaters(subDomainUpdatersInUpdateOrder)
+	s.refreshResource(nil)
 	log.Info("sub_domain clean refresh completed", s.metadata.LogPrefixes)
+
+	s.cache.ResetRefreshSignal(cache.RefreshSignalCallerSubDomain)
+}
+
+func (s *subDomain) refreshResource(cloudData *cloudmodel.SubDomainResource) {
+	onlyHandleDelete := false
+	if cloudData == nil {
+		onlyHandleDelete = true
+		cloudData = &cloudmodel.SubDomainResource{}
+	}
+	subDomainUpdatersInUpdateOrder := s.getUpdatersInOrder(*cloudData)
+	s.executeUpdaters(subDomainUpdatersInUpdateOrder, onlyHandleDelete)
+	s.notifyOnResourceChanged(subDomainUpdatersInUpdateOrder)
+	s.pubsub.PublishChange(s.msgMetadata)
 }
 
 func (s *subDomain) shouldRefresh(lcuuid string, cloudData cloudmodel.SubDomainResource) error {
@@ -241,11 +257,20 @@ func (s *subDomain) getUpdatersInOrder(cloudData cloudmodel.SubDomainResource) [
 	}
 }
 
-func (r *subDomain) executeUpdaters(updatersInUpdateOrder []updater.ResourceUpdater) {
+func (r *subDomain) executeUpdaters(updatersInUpdateOrder []updater.ResourceUpdater, onlyHandleDelete bool) {
+	if !onlyHandleDelete {
+		r.handleAddAndUpdate(updatersInUpdateOrder)
+	}
+	r.handleDelete(updatersInUpdateOrder)
+}
+
+func (r *subDomain) handleAddAndUpdate(updatersInUpdateOrder []updater.ResourceUpdater) {
 	for _, updater := range updatersInUpdateOrder {
 		updater.HandleAddAndUpdate()
 	}
+}
 
+func (r *subDomain) handleDelete(updatersInUpdateOrder []updater.ResourceUpdater) {
 	// 删除操作的顺序，是创建的逆序
 	// 特殊资源：VMPodNodeConnection虽然是末序创建，但需要末序删除，序号-1；
 	// 原因：避免数据量大时，此数据删除后，云主机、容器节点还在，导致采集器类型变化

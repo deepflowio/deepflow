@@ -338,7 +338,7 @@ impl DubboInfo {
         }
     }
 
-    fn get_trace_id(&self) -> Field {
+    fn get_trace_id(&self) -> Field<'_> {
         Field::Str(Cow::Borrowed(&self.trace_ids.highest()))
     }
 

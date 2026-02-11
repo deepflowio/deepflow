@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// PodIngressRuleBackendMessageFactory defines the message factory for PodIngressRuleBackend
+type PodIngressRuleBackendMessageFactory struct{}
+
+func (f *PodIngressRuleBackendMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedPodIngressRuleBackends{}
+}
+
+func (f *PodIngressRuleBackendMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedPodIngressRuleBackend{}
+}
+
+func (f *PodIngressRuleBackendMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedPodIngressRuleBackends{}
+}
+
+func (f *PodIngressRuleBackendMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedPodIngressRuleBackendFields{}
+}
 
 type PodIngressRuleBackend struct {
 	UpdaterBase[
@@ -32,36 +52,12 @@ type PodIngressRuleBackend struct {
 		*diffbase.PodIngressRuleBackend,
 		*metadbmodel.PodIngressRuleBackend,
 		metadbmodel.PodIngressRuleBackend,
-		*message.AddedPodIngressRuleBackends,
-		message.AddedPodIngressRuleBackends,
-		message.AddNoneAddition,
-		*message.UpdatedPodIngressRuleBackend,
-		message.UpdatedPodIngressRuleBackend,
-		*message.UpdatedPodIngressRuleBackendFields,
-		message.UpdatedPodIngressRuleBackendFields,
-		*message.DeletedPodIngressRuleBackends,
-		message.DeletedPodIngressRuleBackends,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewPodIngressRuleBackend(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngressRuleBackend) *PodIngressRuleBackend {
 	updater := &PodIngressRuleBackend{
-		newUpdaterBase[
-			cloudmodel.PodIngressRuleBackend,
-			*diffbase.PodIngressRuleBackend,
-			*metadbmodel.PodIngressRuleBackend,
-			metadbmodel.PodIngressRuleBackend,
-			*message.AddedPodIngressRuleBackends,
-			message.AddedPodIngressRuleBackends,
-			message.AddNoneAddition,
-			*message.UpdatedPodIngressRuleBackend,
-			message.UpdatedPodIngressRuleBackend,
-			*message.UpdatedPodIngressRuleBackendFields,
-			message.UpdatedPodIngressRuleBackendFields,
-			*message.DeletedPodIngressRuleBackends,
-			message.DeletedPodIngressRuleBackends,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
 			wholeCache,
 			db.NewPodIngressRuleBackend().SetMetadata(wholeCache.GetMetadata()),
@@ -69,10 +65,16 @@ func NewPodIngressRuleBackend(wholeCache *cache.Cache, cloudData []cloudmodel.Po
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &PodIngressRuleBackendMessageFactory{})
+	}
+
 	return updater
 }
 
+// Implement DataGenerator interface
 func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRuleBackend) (*metadbmodel.PodIngressRuleBackend, bool) {
 	podIngressRuleID, exists := b.cache.ToolDataSet.GetPodIngressRuleIDByLcuuid(cloudItem.PodIngressRuleLcuuid)
 	if !exists {
@@ -98,7 +100,6 @@ func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIng
 		), b.metadata.LogPrefixes)
 		return nil, false
 	}
-
 	dbItem := &metadbmodel.PodIngressRuleBackend{
 		Path:             cloudItem.Path,
 		Port:             cloudItem.Port,
@@ -113,6 +114,6 @@ func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIng
 }
 
 // 保留接口
-func (b *PodIngressRuleBackend) generateUpdateInfo(diffBase *diffbase.PodIngressRuleBackend, cloudItem *cloudmodel.PodIngressRuleBackend) (*message.UpdatedPodIngressRuleBackendFields, map[string]interface{}, bool) {
+func (b *PodIngressRuleBackend) generateUpdateInfo(diffBase *diffbase.PodIngressRuleBackend, cloudItem *cloudmodel.PodIngressRuleBackend) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

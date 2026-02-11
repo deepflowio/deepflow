@@ -39,7 +39,7 @@ impl<K: Hash + Eq, V> Lru<K, V> {
         }
     }
 
-    pub fn iter(&self) -> lru::Iter<K, V> {
+    pub fn iter(&self) -> lru::Iter<'_, K, V> {
         self.cache.iter()
     }
 

@@ -171,7 +171,7 @@ impl ProcEvent {
         let raw_data = slice::from_raw_parts(data.cap_data as *const u8, data.cap_len as usize);
 
         let mut event_data: EventData = EventData::OtherEvent;
-        let start_time = data.timestamp * 1000; // The unit of data.timestamp is microsecond, and the unit of start_time is nanosecond
+        let start_time = data.timestamp; // The unit of start_time is nanosecond
         let mut end_time = 0;
         match event_type {
             EventType::IoEvent => {

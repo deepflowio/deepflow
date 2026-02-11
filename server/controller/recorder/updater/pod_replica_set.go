@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// PodReplicaSetMessageFactory defines the message factory for PodReplicaSet
+type PodReplicaSetMessageFactory struct{}
+
+func (f *PodReplicaSetMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedPodReplicaSets{}
+}
+
+func (f *PodReplicaSetMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedPodReplicaSet{}
+}
+
+func (f *PodReplicaSetMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedPodReplicaSets{}
+}
+
+func (f *PodReplicaSetMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedPodReplicaSetFields{}
+}
 
 type PodReplicaSet struct {
 	UpdaterBase[
@@ -32,36 +52,12 @@ type PodReplicaSet struct {
 		*diffbase.PodReplicaSet,
 		*metadbmodel.PodReplicaSet,
 		metadbmodel.PodReplicaSet,
-		*message.AddedPodReplicaSets,
-		message.AddedPodReplicaSets,
-		message.AddNoneAddition,
-		*message.UpdatedPodReplicaSet,
-		message.UpdatedPodReplicaSet,
-		*message.UpdatedPodReplicaSetFields,
-		message.UpdatedPodReplicaSetFields,
-		*message.DeletedPodReplicaSets,
-		message.DeletedPodReplicaSets,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplicaSet) *PodReplicaSet {
 	updater := &PodReplicaSet{
-		newUpdaterBase[
-			cloudmodel.PodReplicaSet,
-			*diffbase.PodReplicaSet,
-			*metadbmodel.PodReplicaSet,
-			metadbmodel.PodReplicaSet,
-			*message.AddedPodReplicaSets,
-			message.AddedPodReplicaSets,
-			message.AddNoneAddition,
-			*message.UpdatedPodReplicaSet,
-			message.UpdatedPodReplicaSet,
-			*message.UpdatedPodReplicaSetFields,
-			message.UpdatedPodReplicaSetFields,
-			*message.DeletedPodReplicaSets,
-			message.DeletedPodReplicaSets,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN,
 			wholeCache,
 			db.NewPodReplicaSet().SetMetadata(wholeCache.GetMetadata()),
@@ -69,10 +65,16 @@ func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplica
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &PodReplicaSetMessageFactory{})
+	}
+
 	return updater
 }
 
+// Implement DataGenerator interface
 func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet) (*metadbmodel.PodReplicaSet, bool) {
 	podNamespaceID, exists := r.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
@@ -114,7 +116,7 @@ func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet)
 	return dbItem, true
 }
 
-func (r *PodReplicaSet) generateUpdateInfo(diffBase *diffbase.PodReplicaSet, cloudItem *cloudmodel.PodReplicaSet) (*message.UpdatedPodReplicaSetFields, map[string]interface{}, bool) {
+func (r *PodReplicaSet) generateUpdateInfo(diffBase *diffbase.PodReplicaSet, cloudItem *cloudmodel.PodReplicaSet) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedPodReplicaSetFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
@@ -129,10 +131,6 @@ func (r *PodReplicaSet) generateUpdateInfo(diffBase *diffbase.PodReplicaSet, clo
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	// if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-	// 	mapInfo["az"] = cloudItem.AZLcuuid
-	// 	structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
-	// }
 	if diffBase.Label != cloudItem.Label {
 		mapInfo["label"] = cloudItem.Label
 		structInfo.Label.Set(diffBase.Label, cloudItem.Label)

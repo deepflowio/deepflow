@@ -36,7 +36,6 @@ use dns_lookup::lookup_host;
 use flexi_logger::{
     colored_opt_format, writers::LogWriter, Age, Cleanup, Criterion, FileSpec, Logger, Naming,
 };
-use integration_vector::vector_component::VectorComponent;
 use log::{debug, error, info, warn};
 use num_enum::{FromPrimitive, IntoPrimitive};
 use tokio::runtime::{Builder, Runtime};
@@ -116,7 +115,10 @@ use crate::{
     utils::environment::{IN_CONTAINER, K8S_WATCH_POLICY},
 };
 
+#[cfg(feature = "enterprise-integration")]
 use integration_skywalking::SkyWalkingExtra;
+#[cfg(feature = "enterprise-integration")]
+use integration_vector::vector_component::VectorComponent;
 use packet_sequence_block::BoxedPacketSequenceBlock;
 use pcap_assembler::{BoxedPcapBatch, PcapAssembler};
 
@@ -1806,6 +1808,7 @@ pub struct AgentComponents {
     #[cfg(feature = "libtrace")]
     pub proc_event_uniform_sender: UniformSenderThread<crate::common::proc_event::BoxedProcEvents>,
     pub application_log_uniform_sender: UniformSenderThread<ApplicationLog>,
+    #[cfg(feature = "enterprise-integration")]
     pub skywalking_uniform_sender: UniformSenderThread<SkyWalkingExtra>,
     pub datadog_uniform_sender: UniformSenderThread<Datadog>,
     pub exception_handler: ExceptionHandler,
@@ -1821,6 +1824,7 @@ pub struct AgentComponents {
     pub policy_getter: PolicyGetter,
     pub npb_bandwidth_watcher: Box<Arc<NpbBandwidthWatcher>>,
     pub npb_arp_table: Arc<NpbArpTable>,
+    #[cfg(feature = "enterprise-integration")]
     pub vector_component: VectorComponent,
     pub is_ce_version: bool, // Determine whether the current version is a ce version, CE-AGENT always set pcap-assembler disabled
     pub tap_interfaces: Vec<Link>,
@@ -2124,7 +2128,8 @@ impl AgentComponents {
         agent_mode: RunningMode,
         runtime: Arc<Runtime>,
         sender_leaky_bucket: Arc<LeakyBucket>,
-        ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
+        // only used in vector component
+        #[allow(unused)] ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
@@ -2771,37 +2776,41 @@ impl AgentComponents {
             sender_leaky_bucket.clone(),
         );
 
-        let skywalking_queue_name = "1-skywalking-to-sender";
-        let (skywalking_sender, skywalking_receiver, counter) = queue::bounded_with_debug(
-            user_config
-                .processors
-                .flow_log
-                .tunning
-                .flow_aggregator_queue_size,
-            skywalking_queue_name,
-            &queue_debugger,
-        );
-        stats_collector.register_countable(
-            &QueueStats {
-                module: skywalking_queue_name,
-                ..Default::default()
-            },
-            Countable::Owned(Box::new(counter)),
-        );
-        let skywalking_uniform_sender = UniformSenderThread::new(
-            skywalking_queue_name,
-            Arc::new(skywalking_receiver),
-            config_handler.sender(),
-            stats_collector.clone(),
-            exception_handler.clone(),
-            None,
-            if candidate_config.metric_server.compressed {
-                SenderEncoder::Zstd
-            } else {
-                SenderEncoder::Raw
-            },
-            sender_leaky_bucket.clone(),
-        );
+        #[cfg(feature = "enterprise-integration")]
+        let (skywalking_sender, skywalking_uniform_sender) = {
+            let skywalking_queue_name = "1-skywalking-to-sender";
+            let (skywalking_sender, skywalking_receiver, counter) = queue::bounded_with_debug(
+                user_config
+                    .processors
+                    .flow_log
+                    .tunning
+                    .flow_aggregator_queue_size,
+                skywalking_queue_name,
+                &queue_debugger,
+            );
+            stats_collector.register_countable(
+                &QueueStats {
+                    module: skywalking_queue_name,
+                    ..Default::default()
+                },
+                Countable::Owned(Box::new(counter)),
+            );
+            let skywalking_uniform_sender = UniformSenderThread::new(
+                skywalking_queue_name,
+                Arc::new(skywalking_receiver),
+                config_handler.sender(),
+                stats_collector.clone(),
+                exception_handler.clone(),
+                None,
+                if candidate_config.metric_server.compressed {
+                    SenderEncoder::Zstd
+                } else {
+                    SenderEncoder::Raw
+                },
+                sender_leaky_bucket.clone(),
+            );
+            (skywalking_sender, skywalking_uniform_sender)
+        };
 
         let datadog_queue_name = "1-datadog-to-sender";
         let (datadog_sender, datadog_receiver, counter) = queue::bounded_with_debug(
@@ -3099,6 +3108,7 @@ impl AgentComponents {
             telegraf_sender,
             profile_sender,
             application_log_sender,
+            #[cfg(feature = "enterprise-integration")]
             skywalking_sender,
             datadog_sender,
             candidate_config.metric_server.port,
@@ -3154,6 +3164,7 @@ impl AgentComponents {
             &stats::NoTagModule("npb_bandwidth_watcher"),
             Countable::Ref(Arc::downgrade(&npb_bandwidth_watcher_counter) as Weak<dyn RefCountable>),
         );
+        #[cfg(feature = "enterprise-integration")]
         let vector_component = VectorComponent::new(
             user_config.inputs.vector.enabled,
             user_config.inputs.vector.config.clone(),
@@ -3193,6 +3204,7 @@ impl AgentComponents {
             #[cfg(feature = "libtrace")]
             proc_event_uniform_sender,
             application_log_uniform_sender,
+            #[cfg(feature = "enterprise-integration")]
             skywalking_uniform_sender,
             datadog_uniform_sender,
             capture_mode: candidate_config.capture_mode,
@@ -3211,6 +3223,7 @@ impl AgentComponents {
             policy_getter,
             npb_bandwidth_watcher,
             npb_arp_table,
+            #[cfg(feature = "enterprise-integration")]
             vector_component,
             runtime,
             dispatcher_components,
@@ -3285,6 +3298,7 @@ impl AgentComponents {
             #[cfg(feature = "libtrace")]
             self.proc_event_uniform_sender.start();
             self.application_log_uniform_sender.start();
+            #[cfg(feature = "enterprise-integration")]
             self.skywalking_uniform_sender.start();
             self.datadog_uniform_sender.start();
             if self.config.metric_server.enabled {
@@ -3295,6 +3309,7 @@ impl AgentComponents {
 
         self.npb_bandwidth_watcher.start();
         self.npb_arp_table.start();
+        #[cfg(feature = "enterprise-integration")]
         self.vector_component.start();
         #[cfg(any(target_os = "linux", target_os = "android"))]
         self.process_listener.start();
@@ -3361,6 +3376,7 @@ impl AgentComponents {
         if let Some(h) = self.application_log_uniform_sender.notify_stop() {
             join_handles.push(h);
         }
+        #[cfg(feature = "enterprise-integration")]
         if let Some(h) = self.skywalking_uniform_sender.notify_stop() {
             join_handles.push(h);
         }
@@ -3386,6 +3402,7 @@ impl AgentComponents {
         if let Some(h) = self.process_listener.notify_stop() {
             join_handles.push(h);
         }
+        #[cfg(feature = "enterprise-integration")]
         if let Some(h) = self.vector_component.notify_stop() {
             join_handles.push(h);
         }

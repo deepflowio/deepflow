@@ -26,8 +26,28 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 	"github.com/deepflowio/deepflow/server/controller/recorder/statsd"
 )
+
+// PodMessageFactory defines the message factory for Pod
+type PodMessageFactory struct{}
+
+func (f *PodMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedPods{}
+}
+
+func (f *PodMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedPod{}
+}
+
+func (f *PodMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedPods{}
+}
+
+func (f *PodMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedPodFields{}
+}
 
 type Pod struct {
 	UpdaterBase[
@@ -35,36 +55,12 @@ type Pod struct {
 		*diffbase.Pod,
 		*metadbmodel.Pod,
 		metadbmodel.Pod,
-		*message.AddedPods,
-		message.AddedPods,
-		message.AddNoneAddition,
-		*message.UpdatedPod,
-		message.UpdatedPod,
-		*message.UpdatedPodFields,
-		message.UpdatedPodFields,
-		*message.DeletedPods,
-		message.DeletedPods,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 	updater := &Pod{
-		newUpdaterBase[
-			cloudmodel.Pod,
-			*diffbase.Pod,
-			*metadbmodel.Pod,
-			metadbmodel.Pod,
-			*message.AddedPods,
-			message.AddedPods,
-			message.AddNoneAddition,
-			*message.UpdatedPod,
-			message.UpdatedPod,
-			*message.UpdatedPodFields,
-			message.UpdatedPodFields,
-			*message.DeletedPods,
-			message.DeletedPods,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_POD_EN,
 			wholeCache,
 			db.NewPod().SetMetadata(wholeCache.GetMetadata()),
@@ -72,10 +68,16 @@ func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &PodMessageFactory{})
+	}
+
 	return updater
 }
 
+// Implement DataGenerator interface
 func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*metadbmodel.Pod, bool) {
 	vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if !exists {
@@ -117,6 +119,7 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*metadbmodel.Pod, 
 				ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.PodServiceLcuuid,
 				ctrlrcommon.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
 			), p.metadata.LogPrefixes)
+			return nil, false
 		}
 	}
 	var podReplicaSetID int
@@ -159,12 +162,12 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*metadbmodel.Pod, 
 	return dbItem, true
 }
 
-func (m *Pod) recordStatsd(cloudItem *cloudmodel.Pod) {
+func (p *Pod) recordStatsd(cloudItem *cloudmodel.Pod) {
 	syncDelay := time.Since(cloudItem.CreatedAt).Seconds()
-	m.statsd.GetMonitor(statsd.TagTypePodSyncDelay).Fill(int(syncDelay))
+	p.statsd.GetMonitor(statsd.TagTypePodSyncDelay).Fill(int(syncDelay))
 }
 
-func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.Pod) (*message.UpdatedPodFields, map[string]interface{}, bool) {
+func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.Pod) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedPodFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {

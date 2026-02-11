@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// PodIngressMessageFactory defines the message factory for PodIngress
+type PodIngressMessageFactory struct{}
+
+func (f *PodIngressMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedPodIngresses{}
+}
+
+func (f *PodIngressMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedPodIngress{}
+}
+
+func (f *PodIngressMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedPodIngresses{}
+}
+
+func (f *PodIngressMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedPodIngressFields{}
+}
 
 type PodIngress struct {
 	UpdaterBase[
@@ -32,36 +52,12 @@ type PodIngress struct {
 		*diffbase.PodIngress,
 		*metadbmodel.PodIngress,
 		metadbmodel.PodIngress,
-		*message.AddedPodIngresses,
-		message.AddedPodIngresses,
-		message.AddNoneAddition,
-		*message.UpdatedPodIngress,
-		message.UpdatedPodIngress,
-		*message.UpdatedPodIngressFields,
-		message.UpdatedPodIngressFields,
-		*message.DeletedPodIngresses,
-		message.DeletedPodIngresses,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *PodIngress {
 	updater := &PodIngress{
-		newUpdaterBase[
-			cloudmodel.PodIngress,
-			*diffbase.PodIngress,
-			*metadbmodel.PodIngress,
-			metadbmodel.PodIngress,
-			*message.AddedPodIngresses,
-			message.AddedPodIngresses,
-			message.AddNoneAddition,
-			*message.UpdatedPodIngress,
-			message.UpdatedPodIngress,
-			*message.UpdatedPodIngressFields,
-			message.UpdatedPodIngressFields,
-			*message.DeletedPodIngresses,
-			message.DeletedPodIngresses,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN,
 			wholeCache,
 			db.NewPodIngress().SetMetadata(wholeCache.GetMetadata()),
@@ -69,10 +65,16 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &PodIngressMessageFactory{})
+	}
+
 	return updater
 }
 
+// Implement DataGenerator interface
 func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*metadbmodel.PodIngress, bool) {
 	podNamespaceID, exists := i.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
 	if !exists {
@@ -103,7 +105,7 @@ func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*met
 	return dbItem, true
 }
 
-func (i *PodIngress) generateUpdateInfo(diffBase *diffbase.PodIngress, cloudItem *cloudmodel.PodIngress) (*message.UpdatedPodIngressFields, map[string]interface{}, bool) {
+func (i *PodIngress) generateUpdateInfo(diffBase *diffbase.PodIngress, cloudItem *cloudmodel.PodIngress) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedPodIngressFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
@@ -114,10 +116,6 @@ func (i *PodIngress) generateUpdateInfo(diffBase *diffbase.PodIngress, cloudItem
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	// if diffBase.AZLcuuid != cloudItem.AZLcuuid {
-	// 	mapInfo["az"] = cloudItem.AZLcuuid
-	// 	structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
-	// }
 
 	return structInfo, mapInfo, len(mapInfo) > 0
 }

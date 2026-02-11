@@ -24,44 +24,39 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
 
+// RoutingTableMessageFactory RoutingTable资源的消息工厂
+type RoutingTableMessageFactory struct{}
+
+func (f *RoutingTableMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedRoutingTables{}
+}
+
+func (f *RoutingTableMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedRoutingTable{}
+}
+
+func (f *RoutingTableMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedRoutingTables{}
+}
+
+func (f *RoutingTableMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedRoutingTableFields{}
+}
+
 type RoutingTable struct {
-	UpdaterBase[
-		cloudmodel.RoutingTable,
+	UpdaterBase[cloudmodel.RoutingTable,
 		*diffbase.RoutingTable,
 		*metadbmodel.RoutingTable,
 		metadbmodel.RoutingTable,
-		*message.AddedRoutingTables,
-		message.AddedRoutingTables,
-		message.AddNoneAddition,
-		*message.UpdatedRoutingTable,
-		message.UpdatedRoutingTable,
-		*message.UpdatedRoutingTableFields,
-		message.UpdatedRoutingTableFields,
-		*message.DeletedRoutingTables,
-		message.DeletedRoutingTables,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTable) *RoutingTable {
 	updater := &RoutingTable{
-		newUpdaterBase[
-			cloudmodel.RoutingTable,
-			*diffbase.RoutingTable,
-			*metadbmodel.RoutingTable,
-			metadbmodel.RoutingTable,
-			*message.AddedRoutingTables,
-			message.AddedRoutingTables,
-			message.AddNoneAddition,
-			*message.UpdatedRoutingTable,
-			message.UpdatedRoutingTable,
-			*message.UpdatedRoutingTableFields,
-			message.UpdatedRoutingTableFields,
-			*message.DeletedRoutingTables,
-			message.DeletedRoutingTables,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
 			wholeCache,
 			db.NewRoutingTable().SetMetadata(wholeCache.GetMetadata()),
@@ -69,7 +64,12 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &RoutingTableMessageFactory{})
+	}
+
 	return updater
 }
 
@@ -93,7 +93,7 @@ func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (
 	return dbItem, true
 }
 
-func (t *RoutingTable) generateUpdateInfo(diffBase *diffbase.RoutingTable, cloudItem *cloudmodel.RoutingTable) (*message.UpdatedRoutingTableFields, map[string]interface{}, bool) {
+func (t *RoutingTable) generateUpdateInfo(diffBase *diffbase.RoutingTable, cloudItem *cloudmodel.RoutingTable) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedRoutingTableFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Destination != cloudItem.Destination {

@@ -25,7 +25,27 @@ import (
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// CENMessageFactory CEN资源的消息工厂
+type CENMessageFactory struct{}
+
+func (f *CENMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedCENs{}
+}
+
+func (f *CENMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedCEN{}
+}
+
+func (f *CENMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedCENs{}
+}
+
+func (f *CENMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedCENFields{}
+}
 
 type CEN struct {
 	UpdaterBase[
@@ -33,36 +53,12 @@ type CEN struct {
 		*diffbase.CEN,
 		*metadbmodel.CEN,
 		metadbmodel.CEN,
-		*message.AddedCENs,
-		message.AddedCENs,
-		message.AddNoneAddition,
-		*message.UpdatedCEN,
-		message.UpdatedCEN,
-		*message.UpdatedCENFields,
-		message.UpdatedCENFields,
-		*message.DeletedCENs,
-		message.DeletedCENs,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 	updater := &CEN{
-		newUpdaterBase[
-			cloudmodel.CEN,
-			*diffbase.CEN,
-			*metadbmodel.CEN,
-			metadbmodel.CEN,
-			*message.AddedCENs,
-			message.AddedCENs,
-			message.AddNoneAddition,
-			*message.UpdatedCEN,
-			message.UpdatedCEN,
-			*message.UpdatedCENFields,
-			message.UpdatedCENFields,
-			*message.DeletedCENs,
-			message.DeletedCENs,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
 			wholeCache,
 			db.NewCEN().SetMetadata(wholeCache.GetMetadata()),
@@ -70,7 +66,12 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &CENMessageFactory{})
+	}
+
 	return updater
 }
 
@@ -97,7 +98,7 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*metadbmodel.CEN, 
 	return dbItem, true
 }
 
-func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (*message.UpdatedCENFields, map[string]interface{}, bool) {
+func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedCENFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

@@ -2312,6 +2312,27 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		),
 	}
 
+	tagResourceMap["custom_tag"] = map[string]*Tag{
+		"default": NewTag(
+			"toJSONString(CAST((custom_tag_names, custom_tag_values), 'Map(String, String)'))",
+			"",
+			"",
+			"",
+			"",
+		),
+	}
+
+	tagResourceMap["custom_tag."] = map[string]*Tag{
+		"default": NewTag(
+			// null indicates the absence of this key
+			"if(indexOf(custom_tag_names,'%s') != 0, custom_tag_values[indexOf(custom_tag_names,'%s')], NULL)",
+			"indexOf(custom_tag_names,'%s') != 0",
+			"custom_tag_values[indexOf(custom_tag_names,'%s')] %s %v",
+			"%s(custom_tag_values[indexOf(custom_tag_names,'%s')],%v)",
+			"",
+		),
+	}
+
 	tagResourceMap["tag_int"] = map[string]*Tag{
 		"default": NewTag(
 			"toJSONString(CAST((tag_int_names, tag_int_values), 'Map(String, Int64)'))",
