@@ -3825,8 +3825,6 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 		type = "req";
 	else if (sd->msg_type == MSG_RESPONSE)
 		type = "res";
-	else if (sd->msg_type == MSG_RESPONSE)
-		type = "res";
 	else
 		type = "unknown";
 
