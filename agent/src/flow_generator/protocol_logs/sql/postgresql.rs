@@ -513,7 +513,7 @@ mod test {
         config::handler::LogParserConfig,
         flow_generator::protocol_logs::PostgreInfo,
         flow_generator::{protocol_logs::PostgresqlLog, L7_RRT_CACHE_CAPACITY},
-        utils::test::Capture,
+        utils::test_utils::Capture,
     };
 
     const FILE_DIR: &str = "resources/test/flow_generator/postgre";

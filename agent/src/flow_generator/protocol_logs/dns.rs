@@ -538,16 +538,24 @@ impl DnsLog {
 // test log parse
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-    use std::rc::Rc;
-    use std::{cell::RefCell, fs};
-
     use super::*;
 
+    use std::{cell::RefCell, collections::HashMap, fs, path::Path, rc::Rc, time::Duration};
+
+    use public::{buffer::BatchedBox, proto::agent::AgentType};
+
     use crate::{
-        common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
-        flow_generator::L7_RRT_CACHE_CAPACITY,
-        utils::test::Capture,
+        common::{
+            flow::{L7Stats, PacketDirection},
+            l7_protocol_log::L7PerfCache,
+            MetaPacket,
+        },
+        config::{
+            config::{TagFilterOperator, UserConfig},
+            handler::{BlacklistTrie, FlowConfig, LogParserConfig, ModuleConfig},
+        },
+        flow_generator::{flow_map, L7_RRT_CACHE_CAPACITY},
+        utils::test_utils::{load_packets, FlowMapTesterBuilder},
     };
 
     const FILE_DIR: &str = "resources/test/flow_generator/dns";
@@ -563,9 +571,8 @@ mod tests {
     }
 
     fn run(name: &str, parser_config: Option<&LogParserConfig>) -> String {
-        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name));
+        let mut packets = load_packets(Path::new(FILE_DIR).join(name));
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
-        let mut packets = capture.collect::<Vec<_>>();
         if packets.is_empty() {
             return "".to_string();
         }
@@ -704,7 +711,7 @@ mod tests {
         for item in expected.iter() {
             assert_eq!(
                 item.1,
-                run_perf(item.0)
+                run_perf(item.0, None)
                     .iter()
                     .fold(L7PerfStats::default(), |mut s, i| {
                         s.sequential_merge(&i);
@@ -746,19 +753,18 @@ mod tests {
         for item in expected_multi.iter() {
             assert_eq!(
                 item.1,
-                run_perf(item.0),
+                run_perf(item.0, None),
                 "parse multi pcap {} unexcepted",
                 item.0
             );
         }
     }
 
-    fn run_perf(pcap: &str) -> Vec<L7PerfStats> {
+    fn run_perf(pcap: &str, parser_config: Option<&LogParserConfig>) -> Vec<L7PerfStats> {
         let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
         let mut dns = DnsLog::default();
 
-        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap));
-        let mut packets = capture.collect::<Vec<_>>();
+        let mut packets = load_packets(Path::new(FILE_DIR).join(pcap));
         if packets.len() < 2 {
             unreachable!()
         }
@@ -773,18 +779,20 @@ mod tests {
             let Some(payload) = packet.get_l4_payload() else {
                 continue;
             };
-            let _ = dns.parse_payload(
-                payload,
-                &ParseParam::new(
-                    &*packet,
-                    Some(rrt_cache.clone()),
-                    Default::default(),
-                    #[cfg(any(target_os = "linux", target_os = "android"))]
-                    Default::default(),
-                    true,
-                    true,
-                ),
+            let param = &mut ParseParam::new(
+                packet as &MetaPacket,
+                Some(rrt_cache.clone()),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
             );
+            param.set_captured_byte(payload.len());
+            if let Some(config) = parser_config {
+                param.set_log_parser_config(config);
+            }
+            let _ = dns.parse_payload(payload, param);
 
             perf_stats.append(&mut dns.perf_stats());
         }
@@ -807,5 +815,59 @@ mod tests {
 
         let mut dns = DnsLog::default();
         let _ = dns.parse_payload(&[0, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &pp);
+    }
+
+    #[test]
+    fn perf_with_blacklist() {
+        let module_config = ModuleConfig {
+            flow: FlowConfig {
+                agent_type: AgentType::TtProcess,
+                ..(&UserConfig::default()).into()
+            },
+            log_parser: LogParserConfig {
+                l7_log_blacklist_trie: HashMap::from([(
+                    L7Protocol::DNS,
+                    BlacklistTrie::new(vec![TagFilterOperator {
+                        field_name: "request_resource".to_string(),
+                        operator: "equal".to_string(),
+                        value: "nacos.deepflow-otel-spring-demo.svc.cluster.local".to_string(),
+                    }])
+                    .unwrap(),
+                )]),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut tester = FlowMapTesterBuilder::with_config(module_config.flow.clone()).build();
+        let mut packets = load_packets(Path::new(FILE_DIR).join("udp-from-same-socket.log"));
+        tester
+            .flow_map
+            .reset_start_time(packets[0].lookup_key.timestamp.into());
+
+        let config = flow_map::Config {
+            flow: &module_config.flow,
+            log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            ebpf: None,
+        };
+        for packet in packets.iter_mut() {
+            tester.flow_map.inject_meta_packet(&config, packet);
+        }
+        let last_timestamp =
+            packets.last().unwrap().lookup_key.timestamp + Duration::from_secs(600);
+        tester
+            .flow_map
+            .inject_flush_ticker(&config, last_timestamp.into());
+
+        let output = tester.l7_stats_output.take().unwrap();
+        mem::drop(tester);
+
+        let perf_stats: Vec<BatchedBox<L7Stats>> =
+            output.map(|l7_stats| l7_stats.clone()).collect();
+        assert!(!perf_stats.is_empty());
+        assert!(perf_stats
+            .iter()
+            .all(|l7_stats| l7_stats.stats == L7PerfStats::default()));
     }
 }

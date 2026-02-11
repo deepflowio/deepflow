@@ -949,12 +949,22 @@ impl BlacklistTrieNode {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Default, Eq, PartialEq)]
 pub struct BlacklistTrie {
+    config: Vec<TagFilterOperator>,
+
     pub endpoint: BlacklistTrieNode,
     pub request_type: BlacklistTrieNode,
     pub request_domain: BlacklistTrieNode,
     pub request_resource: BlacklistTrieNode,
+}
+
+impl fmt::Debug for BlacklistTrie {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BlacklistTrie")
+            .field("config", &self.config)
+            .finish_non_exhaustive()
+    }
 }
 
 impl BlacklistTrie {
@@ -968,7 +978,7 @@ impl BlacklistTrie {
     const EQUAL: &'static str = "equal";
     const PREFIX: &'static str = "prefix";
 
-    pub fn new(blacklists: &Vec<TagFilterOperator>) -> Option<BlacklistTrie> {
+    pub fn new(blacklists: Vec<TagFilterOperator>) -> Option<BlacklistTrie> {
         if blacklists.is_empty() {
             return None;
         }
@@ -977,6 +987,7 @@ impl BlacklistTrie {
         for i in blacklists.iter() {
             b.insert(i);
         }
+        b.config = blacklists;
         Some(b)
     }
 
@@ -1135,7 +1146,6 @@ pub struct LogParserConfig {
     pub http_endpoint_disabled: bool,
     pub http_endpoint_trie: HttpEndpointTrie,
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
-    pub l7_log_blacklist: HashMap<String, Vec<TagFilterOperator>>,
     pub l7_log_blacklist_trie: HashMap<L7Protocol, BlacklistTrie>,
     pub unconcerned_dns_nxdomain_trie: DomainNameTrie,
     pub mysql_decompress_payload: bool,
@@ -1155,7 +1165,6 @@ impl Default for LogParserConfig {
             http_endpoint_disabled: false,
             http_endpoint_trie: HttpEndpointTrie::new(),
             obfuscate_enabled_protocols: L7ProtocolBitmap::default(),
-            l7_log_blacklist: HashMap::new(),
             l7_log_blacklist_trie: HashMap::new(),
             unconcerned_dns_nxdomain_trie: DomainNameTrie::default(),
             mysql_decompress_payload: true,
@@ -1199,7 +1208,7 @@ impl fmt::Debug for LogParserConfig {
                     })
                     .collect::<Vec<_>>(),
             )
-            .field("l7_log_blacklist_trie", &self.l7_log_blacklist)
+            .field("l7_log_blacklist_trie", &self.l7_log_blacklist_trie)
             .field(
                 "unconcerned_dns_nxdomain_trie",
                 &self.unconcerned_dns_nxdomain_trie,
@@ -2280,7 +2289,6 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                         .obfuscate_protocols
                         .as_slice(),
                 ),
-                l7_log_blacklist: conf.processors.request_log.filters.tag_filters.clone(),
                 l7_log_blacklist_trie: {
                     let mut blacklist_trie = HashMap::new();
                     for (k, v) in conf.processors.request_log.filters.tag_filters.iter() {
@@ -2289,7 +2297,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                             warn!("Unsupported l7_protocol: {:?}", k);
                             continue;
                         }
-                        if let Some(t) = BlacklistTrie::new(v) {
+                        if let Some(t) = BlacklistTrie::new(v.clone()) {
                             blacklist_trie.insert(l7_protocol, t);
                         }
                     }

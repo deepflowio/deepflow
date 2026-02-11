@@ -368,7 +368,7 @@ mod tests {
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
         config::handler::{L7LogDynamicConfigBuilder, LogParserConfig, TraceType},
         flow_generator::L7_RRT_CACHE_CAPACITY,
-        utils::test::Capture,
+        utils::test_utils::Capture,
     };
 
     const FILE_DIR: &str = "resources/test/flow_generator/brpc";

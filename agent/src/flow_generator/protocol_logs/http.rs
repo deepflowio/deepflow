@@ -2504,7 +2504,7 @@ mod tests {
             HttpEndpoint, HttpEndpointMatchRule, HttpEndpointTrie,
         },
         flow_generator::L7_RRT_CACHE_CAPACITY,
-        utils::test::Capture,
+        utils::test_utils::Capture,
     };
 
     const FILE_DIR: &str = "resources/test/flow_generator/http";
@@ -3122,7 +3122,7 @@ mod tests {
         let blacklist_config = LogParserConfig {
             l7_log_blacklist_trie: HashMap::from([(
                 L7Protocol::Http1,
-                BlacklistTrie::new(&vec![TagFilterOperator {
+                BlacklistTrie::new(vec![TagFilterOperator {
                     field_name: "endpoint".to_string(),
                     operator: "prefix".to_string(),
                     value: "/query".to_string(),

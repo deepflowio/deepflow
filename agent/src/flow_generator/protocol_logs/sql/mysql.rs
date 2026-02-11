@@ -1679,7 +1679,7 @@ mod tests {
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache},
         config::handler::{L7LogDynamicConfigBuilder, TraceType},
         flow_generator::{protocol_logs::PrioStrings, L7_RRT_CACHE_CAPACITY},
-        utils::test::Capture,
+        utils::test_utils::Capture,
     };
 
     const FILE_DIR: &str = "resources/test/flow_generator/mysql";

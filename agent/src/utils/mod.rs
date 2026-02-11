@@ -31,7 +31,8 @@ pub(crate) mod pid_file;
 
 pub use public::bytes;
 
-pub mod test;
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_utils;
 
 use std::thread;
 use std::time::Duration;

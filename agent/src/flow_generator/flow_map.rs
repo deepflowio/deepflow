@@ -2542,6 +2542,12 @@ impl FlowMap {
         c.slots.swap(slots, Ordering::Relaxed);
         c.slot_max_depth.fetch_max(max_depth, Ordering::Relaxed);
     }
+
+    #[cfg(test)]
+    pub fn reset_start_time(&mut self, d: Duration) {
+        self.start_time = d;
+        self.start_time_in_unit = (d.as_nanos() / TIME_UNIT.as_nanos()) as u64;
+    }
 }
 
 #[rustfmt::skip]
@@ -2789,19 +2795,12 @@ mod tests {
 
     use crate::{
         common::{enums::EthernetType, flow::CloseType, tap_port::TapPort},
-        utils::test::Capture,
+        utils::test_utils::Capture,
     };
     use npb_pcap_policy::{DirectionType, NpbAction, NpbTunnelType, PolicyData, TapSide};
     use public::utils::net::MacAddr;
 
     const DEFAULT_DURATION: Duration = Duration::from_millis(10);
-
-    impl FlowMap {
-        fn reset_start_time(&mut self, d: Duration) {
-            self.start_time = d;
-            self.start_time_in_unit = (d.as_nanos() / TIME_UNIT.as_nanos()) as u64;
-        }
-    }
 
     #[test]
     fn syn_rst() {

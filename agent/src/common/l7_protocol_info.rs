@@ -280,7 +280,7 @@ where
             // If the first log is a request and on blacklist, we still need to put it in cache to handle the response,
             // but it's stats will not be counted.
             //
-            // If the first log is a response, it's perf stats will not be counted here.
+            // If the first log is a response, its perf stats will not be counted here.
             // We need to know whether its corresponding request is on blacklist before accounting.
             let ret = if cur_info.msg_type == LogMessageType::Request && !cur_info.on_blacklist {
                 timeout_counter.in_cache[index] += 1;

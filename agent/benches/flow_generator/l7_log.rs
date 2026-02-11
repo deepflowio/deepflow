@@ -27,7 +27,7 @@ use deepflow_agent::{
     _benchmark_session_peer_seq_no_assert as benchmark_session_peer_seq_no_assert,
     _meta_flow_perf_update as meta_flow_perf_update,
     common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
-    utils::test::Capture,
+    utils::test_utils::Capture,
     HttpLog,
 };
 

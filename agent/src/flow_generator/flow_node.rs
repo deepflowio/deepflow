@@ -414,7 +414,7 @@ mod tests {
 
     use super::{FlowNode, PacketSegmentationReassembly};
     use crate::common::{decapsulate::TunnelType, MetaPacket, TapPort};
-    use crate::utils::test::Capture;
+    use crate::utils::test_utils::Capture;
 
     #[test]
     fn test_packet_segmentation_reassembly() {

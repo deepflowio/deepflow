@@ -184,6 +184,8 @@ enterprise-integration = ["dep:integration_skywalking", "dep:integration_vector"
 extended_observability = ["libtrace"]
 dylib_pcap = []
 libtrace = []
+# `test-utils` feature is only used in test cases, DO NOT use in production code
+test-utils = []
 
 [[bench]]
 name = "common"
@@ -192,6 +194,7 @@ harness = false
 [[bench]]
 name = "flow_generator"
 harness = false
+required-features = ["test-utils"]
 
 [[bench]]
 name = "utils"
@@ -204,6 +207,10 @@ harness = false
 [[bench]]
 name = "labeler"
 harness = false
+
+[[example]]
+name = "parse_http_v1"
+required-features = ["test-utils"]
 
 [profile.release]
 panic = 'abort'

@@ -337,6 +337,7 @@ pub struct LogCache {
     pub time: u64,
     pub resp_status: L7ResponseStatus,
 
+    // if `on_blacklist` is true, this `LogCache` should be ignored when calculating perf stats
     pub on_blacklist: bool,
 
     // set merged to true when req and resp merge once
@@ -362,6 +363,9 @@ impl LogCache {
 
 impl From<&LogCache> for L7PerfStats {
     fn from(cache: &LogCache) -> Self {
+        if cache.on_blacklist {
+            return L7PerfStats::default();
+        }
         let (request_count, response_count) = match cache.multi_merge_info.as_ref() {
             Some(info) => (
                 if info.req_end { 1 } else { 0 },

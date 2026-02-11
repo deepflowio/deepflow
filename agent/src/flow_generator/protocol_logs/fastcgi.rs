@@ -671,7 +671,7 @@ mod test {
     use crate::common::l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface, ParseParam};
     use crate::flow_generator::protocol_logs::fastcgi::FastCGILog;
     use crate::flow_generator::protocol_logs::L7ResponseStatus;
-    use crate::{flow_generator::L7_RRT_CACHE_CAPACITY, utils::test::Capture};
+    use crate::{flow_generator::L7_RRT_CACHE_CAPACITY, utils::test_utils::Capture};
 
     use super::FastCGIInfo;
 

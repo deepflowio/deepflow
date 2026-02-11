@@ -1184,7 +1184,7 @@ mod tests {
     use crate::{
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache, MetaPacket},
         flow_generator::L7_RRT_CACHE_CAPACITY,
-        utils::test::{Capture, WrappedDebugStruct},
+        utils::test_utils::{Capture, WrappedDebugStruct},
     };
 
     const FILE_DIR: &str = "resources/test/flow_generator/amqp";

@@ -684,7 +684,7 @@ mod test {
             },
             L7_RRT_CACHE_CAPACITY,
         },
-        utils::test::Capture,
+        utils::test_utils::Capture,
     };
 
     use super::{decode_new_rpc_trace_context, SofaRpcLog};
