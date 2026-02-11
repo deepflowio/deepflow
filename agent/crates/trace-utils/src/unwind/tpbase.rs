@@ -179,18 +179,20 @@ fn read_kernel_code(addr: u64, size: usize) -> Result<Vec<u8>> {
 fn read_kernel_code_from_kcore(file: &mut File, addr: u64, size: usize) -> Result<Vec<u8>> {
     use object::{elf, read::elf::FileHeader, Endianness};
 
-    // Read the ELF header and program headers first.
-    // Note: /proc/kcore is a virtual file representing kernel memory as an ELF core dump.
-    // The ELF header starts at offset 0 and is always present (typically 64 bytes for ELF64).
-    // The program headers follow immediately after and are also always present.
-    // A 4096-byte initial read is sufficient for the header area since:
-    // - ELF64 header is 64 bytes
-    // - Each program header is 56 bytes, and typical kernels have < 70 segments
-    // - Total header area rarely exceeds 4KB
-    // EOF will not occur here as /proc/kcore always provides this data when readable.
+    // Read the ELF header and program headers from /proc/kcore.
+    // We attempt to read 4096 bytes which is usually enough for the ELF64 header (64 bytes)
+    // plus program headers (56 bytes each). If the initial read is insufficient (e.g., many
+    // memory segments), the code below will resize and re-read as needed.
     file.seek(SeekFrom::Start(0))?;
     let mut header_data = vec![0u8; 4096];
-    file.read_exact(&mut header_data)?;
+    let n = file.read(&mut header_data)?;
+    if n < 64 {
+        return Err(Error::Msg(format!(
+            "Failed to read kcore ELF header: only got {} bytes",
+            n
+        )));
+    }
+    header_data.truncate(n);
 
     // Parse header to get program header info
     let (endian, phoff, phnum, phentsize) = {

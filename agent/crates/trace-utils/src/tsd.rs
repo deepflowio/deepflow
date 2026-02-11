@@ -17,7 +17,7 @@
 /// Thread Specific Data info for accessing per-thread PyThreadState.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
-pub struct TSDInfo {
+pub struct TsdInfo {
     /// Offset from thread pointer base (TPBASE) to TSD storage
     pub offset: i16,
     /// TSD key multiplier (glibc=16, musl=8)

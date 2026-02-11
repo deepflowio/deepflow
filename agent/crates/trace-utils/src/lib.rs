@@ -30,7 +30,7 @@ use std::io::Write;
 use log::info;
 
 // Crate internal modules
-pub use tsd::TSDInfo;
+pub use tsd::TsdInfo;
 use unwind::UnwindTable;
 
 // ============================================================================
@@ -145,7 +145,7 @@ pub struct LuaRuntimeInfo {
 pub struct PythonUnwindInfo {
     pub auto_tls_key_addr: u64,
     pub version: u16,
-    pub tsd_info: TSDInfo,
+    pub tsd_info: TsdInfo,
     pub offsets_id: u8,
     pub _padding: [u8; 5],
 }
