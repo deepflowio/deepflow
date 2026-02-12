@@ -14,17 +14,22 @@ import (
 // {{.PublicName}} defines cache data structure.
 type {{.PublicName}} struct {
 {{- range .Fields}}
+{{- if not .IsExtension}}
 {{- if .Comment}}
 	{{.CamelName}} {{.Type}} // {{.Comment}}
 {{- else}}
 	{{.CamelName}} {{.Type}}
 {{- end}}
 {{- end}}
+{{- end}}
+{{- if .HasStructExtension}}
+	{{.PublicName}}Ext
+{{- end}}
 }
 
 func (t *{{.PublicName}}) IsValid() bool {
 {{- range .Fields}}
-{{- if .IsValidationField}}
+{{- if .ForValidation}}
 	return t.{{.CamelName}} != ""
 {{- end}}
 {{- end}}
@@ -36,7 +41,7 @@ func (t *{{$.PublicName}}) {{.PublicCamelName}}() {{.Type}} {
 }
 {{- end}}
 {{- range .Fields}}
-{{- if .HasSetter}}
+{{- if .ForMutation}}
 
 func (t *{{$.PublicName}}) Set{{.PublicCamelName}}({{.CamelName}} {{.Type}}) {
 	t.{{.CamelName}} = {{.CamelName}}
@@ -44,7 +49,7 @@ func (t *{{$.PublicName}}) Set{{.PublicCamelName}}({{.CamelName}} {{.Type}}) {
 {{- end}}
 {{- end}}
 {{- range .Fields}}
-{{- if .IsPlural}}
+{{- if .IsCollection}}
 
 func (t *{{$.PublicName}}) {{.PublicCamelName}}ToSlice() []int {
 	return t.{{.CamelName}}.ToSlice()
@@ -62,25 +67,19 @@ func (t *{{$.PublicName}}) RemovePodGroupID(id int) {
 
 func (t *{{.PublicName}}) reset(dbItem *metadbmodel.{{.OrmName}}, tool *Tool) {
 {{- range .Fields}}
-{{- if and (not .HasSetter) (not .IsPlural) (not .IsCustom)}}
+{{- if and (not .ForMutation) (not .IsCollection) (not .IsExtension)}}
 {{- if .Ref}}
-	t.{{.CamelName}} = tool.{{.Ref}}().GetByLcuuid(dbItem.{{.OrmName}}).Id()
+	t.{{.CamelName}} = tool.{{.Ref.Resource}}().{{.Ref.LookupMethod}}(dbItem.{{.OrmName}}).{{.Ref.TargetField}}()
 {{- else}}
 	t.{{.CamelName}} = dbItem.{{.OrmName}}
 {{- end}}
 {{- end}}
 {{- end}}
-{{- if .HasCustom}}
-	t.resetCustom(dbItem, tool)
-{{- else}}
-{{- range .Fields}}
-{{- if .IsCustom}}
-	t.{{.CamelName}} = dbItem.{{.OrmName}}
-{{- end}}
-{{- end}}
+{{- if .HasStructExtension}}
+	t.resetExt(dbItem, tool)
 {{- end}}
 {{- range .Fields}}
-{{- if .IsPlural}}
+{{- if .IsCollection}}
 	t.{{.CamelName}} = mapset.NewSet[int]()
 {{- end}}
 {{- end}}

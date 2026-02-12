@@ -6,7 +6,7 @@ cache_tool:
   - name: lcuuid
     orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
     orm_name: ID
     type: int
@@ -25,7 +25,10 @@ cache_tool:
   - name: region_id
     orm_name: Region
     type: int
-    ref: Region
+    ref:
+      resource: Region
+      lookup_method: GetByLcuuid
+      target_field: Id
   - name: network_id
     orm_name: NetworkID
     type: int
@@ -39,8 +42,8 @@ cache_tool:
     orm_name: DeviceID
     type: int
   - name: device_name
-    orm_name: DeviceName
     type: string
-    is_custom: true
-  has_extension: true
-  collection_extension: true
+    is_extension: true
+  extensions:
+    - collection
+    - struct

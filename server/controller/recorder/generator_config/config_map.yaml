@@ -6,7 +6,7 @@ cache_tool:
   - name: lcuuid
     orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
     orm_name: ID
     type: int
@@ -16,6 +16,5 @@ cache_tool:
   - name: pod_group_ids
     orm_name: PodGroupIDs
     type: mapset.Set[int]
-    is_plural: true
+    is_collection: true
     comment: 'data source: pod_group_config_map_connection'
-  has_mapset: true

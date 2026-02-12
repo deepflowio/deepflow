@@ -6,7 +6,7 @@ cache_tool:
   - name: lcuuid
     orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
     orm_name: ID
     type: int
@@ -16,5 +16,5 @@ cache_tool:
   - name: vinterface_id
     orm_name: VInterfaceID
     type: int
-  has_extension: true
-  collection_extension: true
+  extensions:
+    - collection

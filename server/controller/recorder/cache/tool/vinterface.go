@@ -20,7 +20,7 @@ type Vinterface struct {
 	vpcId      int
 	deviceType int
 	deviceId   int
-	deviceName string
+	VinterfaceExt
 }
 
 func (t *Vinterface) IsValid() bool {
@@ -87,7 +87,7 @@ func (t *Vinterface) reset(dbItem *metadbmodel.VInterface, tool *Tool) {
 	t.vpcId = dbItem.VPCID
 	t.deviceType = dbItem.DeviceType
 	t.deviceId = dbItem.DeviceID
-	t.resetCustom(dbItem, tool)
+	t.resetExt(dbItem, tool)
 }
 
 func NewVinterfaceCollection(t *Tool) *VinterfaceCollection {

@@ -30,36 +30,46 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type Field struct {
-	Name              string `yaml:"name"`
-	OrmName           string `yaml:"orm_name"`
-	Type              string `yaml:"type"`
-	IsValidationField bool   `yaml:"is_validation_field"`
-	Ref               string `yaml:"ref"`
-	HasSetter         bool   `yaml:"has_setter"`
-	HasCustom         bool   `yaml:"has_custom"`
-	IsCustom          bool   `yaml:"is_custom"`
-	IsPlural          bool   `yaml:"is_plural"`
-	Comment           string `yaml:"comment"`
-	CamelName         string
-	PublicCamelName   string
+type RefConfig struct {
+	Resource     string `yaml:"resource"`
+	LookupMethod string `yaml:"lookup_method"`
+	TargetField  string `yaml:"target_field"`
 }
 
+type Field struct {
+	Name         string     `yaml:"name"`
+	OrmName      string     `yaml:"orm_name"`
+	Type         string     `yaml:"type"`
+	ForValidation bool      `yaml:"for_validation"`
+	ForIndex     bool       `yaml:"for_index"`
+	ForMutation  bool       `yaml:"for_mutation"`
+	IsExtension  bool       `yaml:"is_extension"`
+	IsCollection bool       `yaml:"is_collection"`
+	Ref          *RefConfig `yaml:"ref"`
+	Comment      string     `yaml:"comment"`
+	CamelName       string
+	PublicCamelName string
+}
+
+// KeyField 运行时从 fields 中 for_index=true 的字段推导生成
 type KeyField struct {
-	Name            string `yaml:"name"`
-	Type            string `yaml:"type"`
+	Name            string
+	Type            string
 	CamelName       string
 	PublicCamelName string
 }
 
 type CacheToolConfig struct {
-	Enabled             bool       `yaml:"enabled"`
-	Fields              []Field    `yaml:"fields"`
-	KeyFields           []KeyField `yaml:"key_fields"`
-	HasExtension        bool       `yaml:"has_extension"`
-	CollectionExtension bool       `yaml:"collection_extension"`
-	HasMapset           bool       `yaml:"has_mapset"`
-	HasCustom           bool       `yaml:"has_custom"`
+	Enabled    bool     `yaml:"enabled"`
+	Fields     []Field  `yaml:"fields"`
+	Extensions []string `yaml:"extensions"`
+
+	// 以下字段均在运行时从配置推导，不从 YAML 读取
+	KeyFields           []KeyField
+	HasStructExtension  bool
+	CollectionExtension bool
+	HasMapset           bool
+	HasExtensionField   bool
 
 	// 扩展内容（运行时填充）
 	ExtensionImports string
@@ -105,8 +115,8 @@ func NewCacheToolGenerator(configFile string) (*CacheToolGenerator, error) {
 	// 处理字段
 	generator.processFields()
 
-	// 检查是否有自定义字段
-	generator.cacheConfig.HasCustomField()
+	// 从字段和 extensions 推导运行时标志
+	generator.deriveFlags()
 
 	// 处理扩展文件
 	generator.loadExtensions()
@@ -143,10 +153,36 @@ func (g *CacheToolGenerator) processFields() {
 		g.cacheConfig.Fields[i].CamelName = toCamel(g.cacheConfig.Fields[i].Name, false)
 		g.cacheConfig.Fields[i].PublicCamelName = toCamel(g.cacheConfig.Fields[i].Name, true)
 	}
+}
 
-	for i := range g.cacheConfig.KeyFields {
-		g.cacheConfig.KeyFields[i].CamelName = toCamel(g.cacheConfig.KeyFields[i].Name, false)
-		g.cacheConfig.KeyFields[i].PublicCamelName = toCamel(g.cacheConfig.KeyFields[i].Name, true)
+// deriveFlags 从 fields 和 extensions 配置推导运行时标志
+func (g *CacheToolGenerator) deriveFlags() {
+	// 从 extensions 列表推导 HasStructExtension 和 CollectionExtension
+	for _, ext := range g.cacheConfig.Extensions {
+		switch ext {
+		case "struct":
+			g.cacheConfig.HasStructExtension = true
+		case "collection":
+			g.cacheConfig.CollectionExtension = true
+		}
+	}
+
+	// 从 fields 推导 KeyFields、HasMapset、HasExtensionField
+	for _, f := range g.cacheConfig.Fields {
+		if f.ForIndex {
+			g.cacheConfig.KeyFields = append(g.cacheConfig.KeyFields, KeyField{
+				Name:            f.Name,
+				Type:            f.Type,
+				CamelName:       f.CamelName,
+				PublicCamelName: f.PublicCamelName,
+			})
+		}
+		if f.IsCollection {
+			g.cacheConfig.HasMapset = true
+		}
+		if f.IsExtension {
+			g.cacheConfig.HasExtensionField = true
+		}
 	}
 }
 
@@ -270,10 +306,10 @@ func (g *CacheToolGenerator) Generate() error {
 		OrmName             string
 		Fields              []Field
 		KeyFields           []KeyField
-		HasExtension        bool
+		HasStructExtension  bool
 		CollectionExtension bool
 		HasMapset           bool
-		HasCustom           bool
+		HasExtensionField   bool
 		ExtensionImports    string
 		ExtensionFields     string
 	}{
@@ -282,10 +318,10 @@ func (g *CacheToolGenerator) Generate() error {
 		OrmName:             g.config.OrmName,
 		Fields:              g.cacheConfig.Fields,
 		KeyFields:           g.cacheConfig.KeyFields,
-		HasExtension:        g.cacheConfig.HasExtension,
+		HasStructExtension:  g.cacheConfig.HasStructExtension,
 		CollectionExtension: g.cacheConfig.CollectionExtension,
 		HasMapset:           g.cacheConfig.HasMapset,
-		HasCustom:           g.cacheConfig.HasCustom,
+		HasExtensionField:   g.cacheConfig.HasExtensionField,
 		ExtensionImports:    g.cacheConfig.ExtensionImports,
 		ExtensionFields:     g.cacheConfig.ExtensionFields,
 	}
@@ -321,16 +357,6 @@ func (g *CacheToolGenerator) Generate() error {
 
 	fmt.Printf("Generated code for %s in %s\n", g.config.Name, outputFile)
 	return nil
-}
-
-// HasCustomField 检查 CacheToolConfig 中是否有自定义字段
-func (c *CacheToolConfig) HasCustomField() {
-	for _, f := range c.Fields {
-		if f.IsCustom {
-			c.HasCustom = true
-			return
-		}
-	}
 }
 
 // 工具函数

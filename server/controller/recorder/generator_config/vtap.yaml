@@ -9,7 +9,7 @@ cache_tool:
   - name: lcuuid
     orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: name
     orm_name: Name
     type: string

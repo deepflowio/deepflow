@@ -9,39 +9,34 @@
 ## 2. 配置字段说明
 ### 顶层字段
 - `name`：资源名称，使用 small_snake_case（例如 `pod_node`、`az`）。用于生成文件名，资源类型标识；使用统一标准转化为 PascalCase（例如 `PodNode`、`Az`），作为公有结构体及接口名称。
-- `orm_name`：资源的 ORM 对象名称。用于生成 db 相关的代码，如 `metadbmodel.PodNode`、`metadbmodel.AZ`。
+- `orm_name`：资源的 ORM 对象名称，需要与 ORM 定义保持一致。用于生成 db 相关的代码，如 `metadbmodel.PodNode`、`metadbmodel.AZ`。
 - `cache_tool`：recorder 中的 cache/tool 模块。
 
 ### cache_tool 字段
 - `enabled`：是否启用该模块的代码生成。
 - `fields`：该资源 cache 结构体字段列表。
-- `key_fields`：索引字段列表（可选）。用于生成 `GetByX`/`GetOrLoadByX` 这类方法。
-- `has_extension`：是否支持结构体扩展（对应手动实现的 `<name>_ext.go`）。
-- `collection_extension`：是否支持集合扩展（对应 `<PublicName>CollectionExt`）。
-- `has_mapset`：是否启用 `mapset` 支持（用于 plural 字段）。
-- `has_custom`：生成器运行时填充，表示是否存在 `is_custom: true` 字段，通常不在配置中手动设置。
+- `extensions`：扩展字段列表（可选）可选 `collection` 或 `struct`。
+  - `collection`：集合包含扩展定义 `<PublicName>CollectionExt`，需要在 `<name>_ext.go` 中手动实现。
+  - `struct`：结构体包含扩展定义 `<PublicName>Ext`，需要在 `<name>_ext.go` 中手动实现。
 
 ### fields 字段项
-- `name`：字段名，使用 lowerCamelCase（例如 `regionID`）。用于生成私有结构体字段名。
-- `public_name`：字段的公开方法名，使用 PascalCase（例如 `RegionID`）。用于生成公有结构体字段名与方法名。
+- `name`：字段名，使用 small_snake_case（例如 `region_id`、`vpc_id`）。用于使用统一标准转换为私有（例如 `regionId`、`vpcId`）或公有（例如 `RegionId`、`VpcId`）结构体及接口名称。
+- `orm_name`：资源的 ORM 对象字段名称，需要与 ORM 定义保持一致。用于生成 db 相关的代码，大部分情况下是对 cache 结构体字段的映射，如 `dbItem.RegionID`、`dbItem.VPCID`。
 - `type`：Go 类型（如 `int`、`string`）。
-- `is_validation_field`：是否作为 `IsValid()` 的校验字段。
-- `ref`：引用的资源类型（如 `Region`、`AZ`），会生成从工具中取 ID 的逻辑。
-- `db_field_name`：数据库字段名（若与 `public_name` 不一致时使用）。
-- `has_setter`：是否生成 setter 方法（`SetX`）。
-- `has_custom`：历史兼容字段，通常不建议使用。
-- `is_custom`：是否为自定义字段；自定义字段不会走默认 `reset` 赋值逻辑。
-- `is_plural`：是否为集合字段；启用后会生成 `ToSlice`/`Add`/`Remove` 相关方法，并需要 `has_mapset`。
+- `for_validation`：是否作为 `IsValid()` 的校验字段。
+- `for_index`：是否作为索引字段（生成 `GetByX`/`GetOrLoadByX` 方法）。
+- `for_mutation`：是否生成 setter 方法（`SetX`）。
+- `is_extension`：是否为扩展字段；在扩展文件中手动实现。
+- `is_collection`：是否为集合字段；启用后会生成 `ToSlice`/`Add`/`Remove` 相关方法。
+- `ref`：外键引用配置，用于将 ORM 字段值转换为关联资源的指定字段值。
+  - `resource`：引用的资源类型，对应 `tool` 中的获取方法（如 `Region` 对应 `tool.Region()`）。
+  - `lookup_method`：在引用资源中查找目标对象的方法名（如 `GetByLcuuid`）。
+  - `target_field`：返回对象中要获取的字段名（如 `Id`）。
 - `comment`：字段注释。
-
-### key_fields 字段项
-- `name`：索引字段名。
-- `public_name`：索引字段公开名称。
-- `type`：Go 类型。
 
 ## 3. 其他说明
 ### 扩展文件
-当 `has_extension: true` 或 `collection_extension: true` 时，可在同级目录放置扩展文件：
+当 `extensions` 不为空时，可在同级目录放置扩展文件：
 - `<name>_ext.go`：结构体扩展字段与额外 import。
 - `<PublicName>CollectionExt`：集合扩展实现。
 
@@ -49,25 +44,26 @@
 
 ### 命名约定
 - `name` 与 YAML 文件名保持一致（例如 `pod_node.yaml` 对应 `name: pod_node`）。
-- `public_name` 使用 UpperCamelCase。
-- `ref` 与资源公开名称一致（例如 `Region`、`AZ`）。
+- `ref.resource` 与资源公开名称一致（例如 `Region`、`Az`）。
 
 ### 示例
 ```yaml
 name: pod_node
-public_name: PodNode
+orm_name: PodNode
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
-    is_validation_field: true
-  - name: regionID
-    public_name: RegionID
+    for_validation: true
+  - name: region_id
+    orm_name: Region
     type: int
-    ref: Region
-    db_field_name: Region
+    ref:
+      resource: Region
+      lookup_method: GetByLcuuid
+      target_field: Id
 ```
 
 如需新增资源：

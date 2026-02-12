@@ -21,7 +21,11 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func (item *Vinterface) resetCustom(dbItem *metadbmodel.VInterface, tool *Tool) {
+type VinterfaceExt struct {
+	deviceName string
+}
+
+func (item *Vinterface) resetExt(dbItem *metadbmodel.VInterface, tool *Tool) {
 	// Handle deviceName custom logic
 	switch dbItem.DeviceType {
 	case ctrlrcommon.VIF_DEVICE_TYPE_HOST:

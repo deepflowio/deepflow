@@ -6,7 +6,7 @@ cache_tool:
   - name: lcuuid
     orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
     orm_name: ID
     type: int
@@ -16,11 +16,17 @@ cache_tool:
   - name: region_id
     orm_name: Region
     type: int
-    ref: Region
+    ref:
+      resource: Region
+      lookup_method: GetByLcuuid
+      target_field: Id
   - name: az_id
     orm_name: AZ
     type: int
-    ref: Az
+    ref:
+      resource: Az
+      lookup_method: GetByLcuuid
+      target_field: Id
   - name: pod_group_id
     orm_name: PodGroupID
     type: int
