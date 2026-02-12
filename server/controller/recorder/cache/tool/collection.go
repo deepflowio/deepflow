@@ -28,7 +28,7 @@ const (
 
 // CacheItem defines cache object must implement the interface
 type CacheItem[D DBItem] interface {
-	ID() int
+	Id() int
 	Lcuuid() string
 	IsValid() bool // check whether the item is valid
 
@@ -192,7 +192,7 @@ func (oc *collection[T, D]) GetOrLoadByLcuuid(lcuuid string) T {
 
 // GetByID returns the item by ID.
 // If not found, returns the zero value of T.T can be checked whether it is valid by IsValid() method.
-func (oc *collection[T, D]) GetByID(id int) T {
+func (oc *collection[T, D]) GetById(id int) T {
 	empty := oc.cacheItemFactory()
 	if id == 0 {
 		return empty
@@ -205,7 +205,7 @@ func (oc *collection[T, D]) GetByID(id int) T {
 
 // GetOrLoadByID first tries to get the item from the cache, if it is not in the cache,
 // it queries from the database, adds it to the cache and returns it.
-func (oc *collection[T, D]) GetOrLoadByID(id int) T {
+func (oc *collection[T, D]) GetOrLoadById(id int) T {
 	empty := oc.cacheItemFactory()
 	if id == 0 {
 		return empty
@@ -218,7 +218,7 @@ func (oc *collection[T, D]) GetOrLoadByID(id int) T {
 		log.Warningf("dbItemFactory is nil, cannot load %s (id: %d) from db", oc.resourceType, id)
 		return empty
 	}
-	log.Warning(collectionNotFoundByID(oc.resourceType, id), oc.tool.metadata.LogPrefixes)
+	log.Warning(collectionNotFoundById(oc.resourceType, id), oc.tool.metadata.LogPrefixes)
 
 	dbItem := oc.dbItemFactory()
 	result := oc.tool.metadata.GetDB().Where("id = ?", id).First(dbItem)

@@ -20,30 +20,30 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-type LANIPCollectionExt struct {
-	vInterfaceIDToItems map[int][]*LANIP // 一对多映射
+type LanIpCollectionExt struct {
+	vInterfaceIDToItems map[int][]*LanIp // 一对多映射
 }
 
-func (c *LANIPCollection) resetExt() {
-	c.vInterfaceIDToItems = make(map[int][]*LANIP)
+func (c *LanIpCollection) resetExt() {
+	c.vInterfaceIDToItems = make(map[int][]*LanIp)
 }
 
-// GetByVInterfaceID returns all LANIP items with the specified vInterfaceID
-func (c *LANIPCollection) GetByVInterfaceID(vInterfaceID int) []*LANIP {
+// GetByVInterfaceID returns all LanIp items with the specified vInterfaceID
+func (c *LanIpCollection) GetByVInterfaceID(vInterfaceID int) []*LanIp {
 	return c.vInterfaceIDToItems[vInterfaceID]
 }
 
 // OnAfterAdd implements CollectionExtender interface for one-to-many mapping
-func (c *LANIPCollection) OnAfterAdd(item *LANIP, dbItem *metadbmodel.LANIP) {
-	c.vInterfaceIDToItems[item.VInterfaceID()] = append(c.vInterfaceIDToItems[item.VInterfaceID()], item)
+func (c *LanIpCollection) OnAfterAdd(item *LanIp, dbItem *metadbmodel.LANIP) {
+	c.vInterfaceIDToItems[item.VinterfaceId()] = append(c.vInterfaceIDToItems[item.VinterfaceId()], item)
 }
 
 // OnAfterUpdate implements CollectionExtender interface
-func (c *LANIPCollection) OnAfterUpdate(item *LANIP, dbItem *metadbmodel.LANIP) {
+func (c *LanIpCollection) OnAfterUpdate(item *LanIp, dbItem *metadbmodel.LANIP) {
 	// Remove from old mapping if vInterfaceID changed
 	for vInterfaceID, items := range c.vInterfaceIDToItems {
 		for i, lanipItem := range items {
-			if lanipItem == item && vInterfaceID != item.VInterfaceID() {
+			if lanipItem == item && vInterfaceID != item.VinterfaceId() {
 				// Remove from old vInterfaceID group
 				c.vInterfaceIDToItems[vInterfaceID] = append(items[:i], items[i+1:]...)
 				break
@@ -52,7 +52,7 @@ func (c *LANIPCollection) OnAfterUpdate(item *LANIP, dbItem *metadbmodel.LANIP) 
 	}
 
 	// Add to new mapping
-	newVInterfaceID := item.VInterfaceID()
+	newVInterfaceID := item.VinterfaceId()
 	found := false
 	for _, existingItem := range c.vInterfaceIDToItems[newVInterfaceID] {
 		if existingItem == item {
@@ -66,12 +66,12 @@ func (c *LANIPCollection) OnAfterUpdate(item *LANIP, dbItem *metadbmodel.LANIP) 
 }
 
 // OnAfterDelete implements CollectionExtender interface
-func (c *LANIPCollection) OnAfterDelete(item *LANIP, dbItem *metadbmodel.LANIP) {
-	vInterfaceID := item.VInterfaceID()
+func (c *LanIpCollection) OnAfterDelete(item *LanIp, dbItem *metadbmodel.LANIP) {
+	vInterfaceID := item.VinterfaceId()
 	items := c.vInterfaceIDToItems[vInterfaceID]
 
 	for i, lanipItem := range items {
-		if lanipItem.ID() == item.ID() {
+		if lanipItem.Id() == item.Id() {
 			c.vInterfaceIDToItems[vInterfaceID] = append(items[:i], items[i+1:]...)
 			break
 		}

@@ -21,31 +21,31 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-func (item *VInterface) resetCustom(dbItem *metadbmodel.VInterface, tool *Tool) {
+func (item *Vinterface) resetCustom(dbItem *metadbmodel.VInterface, tool *Tool) {
 	// Handle deviceName custom logic
 	switch dbItem.DeviceType {
 	case ctrlrcommon.VIF_DEVICE_TYPE_HOST:
-		item.deviceName = tool.Host().GetByID(dbItem.DeviceID).Name()
+		item.deviceName = tool.Host().GetById(dbItem.DeviceID).Name()
 	case ctrlrcommon.VIF_DEVICE_TYPE_VM:
-		item.deviceName = tool.VM().GetByID(dbItem.DeviceID).Name()
+		item.deviceName = tool.Vm().GetById(dbItem.DeviceID).Name()
 	case ctrlrcommon.VIF_DEVICE_TYPE_VROUTER:
-		item.deviceName = tool.VRouter().GetByID(dbItem.DeviceID).Name()
+		item.deviceName = tool.Vrouter().GetById(dbItem.DeviceID).Name()
 	case ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT:
-		item.deviceName = tool.DHCPPort().GetByID(dbItem.DeviceID).Name()
+		item.deviceName = tool.DhcpPort().GetById(dbItem.DeviceID).Name()
 	case ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY:
-		item.deviceName = tool.NATGateway().GetByID(dbItem.DeviceID).Name()
+		item.deviceName = tool.NatGateway().GetById(dbItem.DeviceID).Name()
 	case ctrlrcommon.VIF_DEVICE_TYPE_LB:
-		item.deviceName = tool.LB().GetByID(dbItem.DeviceID).Name()
+		item.deviceName = tool.Lb().GetById(dbItem.DeviceID).Name()
 	case ctrlrcommon.VIF_DEVICE_TYPE_RDS_INSTANCE:
-		item.deviceName = tool.RDSInstance().GetByID(dbItem.DeviceID).Name()
+		item.deviceName = tool.RdsInstance().GetById(dbItem.DeviceID).Name()
 	case ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE:
-		item.deviceName = tool.RedisInstance().GetByID(dbItem.DeviceID).Name()
+		item.deviceName = tool.RedisInstance().GetById(dbItem.DeviceID).Name()
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE:
-		item.deviceName = tool.PodNode().GetByID(dbItem.DeviceID).Name()
+		item.deviceName = tool.PodNode().GetById(dbItem.DeviceID).Name()
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE:
-		item.deviceName = tool.PodService().GetByID(dbItem.DeviceID).Name()
+		item.deviceName = tool.PodService().GetById(dbItem.DeviceID).Name()
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD:
-		item.deviceName = tool.Pod().GetByID(dbItem.DeviceID).Name()
+		item.deviceName = tool.Pod().GetById(dbItem.DeviceID).Name()
 	}
 }
 
@@ -54,22 +54,22 @@ type deviceKey struct {
 	id    int
 }
 
-type VInterfaceCollectionExt struct {
-	deviceKeyToItems map[deviceKey][]*VInterface
+type VinterfaceCollectionExt struct {
+	deviceKeyToItems map[deviceKey][]*Vinterface
 }
 
-func (ext *VInterfaceCollection) resetExt() {
-	ext.deviceKeyToItems = make(map[deviceKey][]*VInterface)
+func (ext *VinterfaceCollection) resetExt() {
+	ext.deviceKeyToItems = make(map[deviceKey][]*Vinterface)
 }
 
-func (ext *VInterfaceCollection) GetByDeviceKey(deviceType, deviceID int) []*VInterface {
+func (ext *VinterfaceCollection) GetByDeviceKey(deviceType, deviceID int) []*Vinterface {
 	return ext.deviceKeyToItems[deviceKey{
 		dType: deviceType,
 		id:    deviceID,
 	}]
 }
 
-func (ext *VInterfaceCollection) OnAfterAdd(item *VInterface, dbItem *metadbmodel.VInterface) {
+func (ext *VinterfaceCollection) OnAfterAdd(item *Vinterface, dbItem *metadbmodel.VInterface) {
 	dk := deviceKey{
 		dType: dbItem.DeviceType,
 		id:    dbItem.DeviceID,
@@ -77,18 +77,18 @@ func (ext *VInterfaceCollection) OnAfterAdd(item *VInterface, dbItem *metadbmode
 	ext.deviceKeyToItems[dk] = append(ext.deviceKeyToItems[dk], item)
 }
 
-func (ext *VInterfaceCollection) OnAfterUpdate(item *VInterface, dbItem *metadbmodel.VInterface) {
+func (ext *VinterfaceCollection) OnAfterUpdate(item *Vinterface, dbItem *metadbmodel.VInterface) {
 	// For connection tables, update is usually just add/delete operations
 	// No special logic needed for update
 }
 
-func (ext *VInterfaceCollection) OnAfterDelete(item *VInterface, dbItem *metadbmodel.VInterface) {
+func (ext *VinterfaceCollection) OnAfterDelete(item *Vinterface, dbItem *metadbmodel.VInterface) {
 	dk := deviceKey{
 		dType: dbItem.DeviceType,
 		id:    dbItem.DeviceID,
 	}
 	for i, v := range ext.deviceKeyToItems[dk] {
-		if v.ID() == dbItem.ID {
+		if v.Id() == dbItem.ID {
 			ext.deviceKeyToItems[dk] = append(ext.deviceKeyToItems[dk][:i], ext.deviceKeyToItems[dk][i+1:]...)
 			break
 		}

@@ -1,15 +1,15 @@
 name: pod_ingress_rule
-public_name: PodIngressRule
+orm_name: PodIngressRule
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
     is_validation_field: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string

@@ -1,18 +1,18 @@
 name: lb_listener
-public_name: LBListener
+orm_name: LBListener
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
     is_validation_field: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: lbID
-    public_name: LBID
+  - name: lb_id
+    orm_name: LBID
     type: int

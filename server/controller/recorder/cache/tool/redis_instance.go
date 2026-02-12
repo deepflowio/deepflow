@@ -12,9 +12,9 @@ type RedisInstance struct {
 	lcuuid   string
 	id       int
 	name     string
-	regionID int
-	azID     int
-	vpcID    int
+	regionId int
+	azId     int
+	vpcId    int
 }
 
 func (t *RedisInstance) IsValid() bool {
@@ -25,7 +25,7 @@ func (t *RedisInstance) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *RedisInstance) ID() int {
+func (t *RedisInstance) Id() int {
 	return t.id
 }
 
@@ -33,25 +33,25 @@ func (t *RedisInstance) Name() string {
 	return t.name
 }
 
-func (t *RedisInstance) RegionID() int {
-	return t.regionID
+func (t *RedisInstance) RegionId() int {
+	return t.regionId
 }
 
-func (t *RedisInstance) AZID() int {
-	return t.azID
+func (t *RedisInstance) AzId() int {
+	return t.azId
 }
 
-func (t *RedisInstance) VPCID() int {
-	return t.vpcID
+func (t *RedisInstance) VpcId() int {
+	return t.vpcId
 }
 
 func (t *RedisInstance) reset(dbItem *metadbmodel.RedisInstance, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.vpcID = dbItem.VPCID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.vpcId = dbItem.VPCID
 }
 
 func NewRedisInstanceCollection(t *Tool) *RedisInstanceCollection {

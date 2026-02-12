@@ -1,21 +1,21 @@
 name: vtap
-public_name: VTap
+orm_name: VTap
 cache_tool:
   enabled: true
   fields:
-    - name: id
-      public_name: ID
-      type: int
-    - name: lcuuid
-      public_name: Lcuuid
-      type: string
-      is_validation_field: true
-    - name: name
-      public_name: Name
-      type: string
-    - name: aType
-      public_name: Type
-      type: int
-    - name: launchServerID
-      public_name: LaunchServerID
-      type: int
+  - name: id
+    orm_name: ID
+    type: int
+  - name: lcuuid
+    orm_name: Lcuuid
+    type: string
+    is_validation_field: true
+  - name: name
+    orm_name: Name
+    type: string
+  - name: a_type
+    orm_name: Type
+    type: int
+  - name: launch_server_id
+    orm_name: LaunchServerID
+    type: int

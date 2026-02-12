@@ -32,11 +32,10 @@ import (
 
 type Field struct {
 	Name              string `yaml:"name"`
-	PublicName        string `yaml:"public_name"`
+	OrmName           string `yaml:"orm_name"`
 	Type              string `yaml:"type"`
 	IsValidationField bool   `yaml:"is_validation_field"`
 	Ref               string `yaml:"ref"`
-	DbFieldName       string `yaml:"db_field_name"`
 	HasSetter         bool   `yaml:"has_setter"`
 	HasCustom         bool   `yaml:"has_custom"`
 	IsCustom          bool   `yaml:"is_custom"`
@@ -48,7 +47,6 @@ type Field struct {
 
 type KeyField struct {
 	Name            string `yaml:"name"`
-	PublicName      string `yaml:"public_name"`
 	Type            string `yaml:"type"`
 	CamelName       string
 	PublicCamelName string
@@ -69,9 +67,11 @@ type CacheToolConfig struct {
 }
 
 type Config struct {
-	Name       string          `yaml:"name"`
-	PublicName string          `yaml:"public_name"`
-	CacheTool  CacheToolConfig `yaml:"cache_tool"`
+	Name      string          `yaml:"name"`
+	OrmName   string          `yaml:"orm_name"`
+	CacheTool CacheToolConfig `yaml:"cache_tool"`
+
+	PublicName string // 运行时生成
 }
 
 // CacheToolGenerator 聚合 cache_tool 代码生成器的所有方法
@@ -126,6 +126,13 @@ func (g *CacheToolGenerator) adaptConfig() error {
 		return fmt.Errorf("cache_tool is not enabled in configuration")
 	}
 
+	// 自动从 snake_case Name 生成 UpperCamelCase PublicName
+	g.config.PublicName = toCamel(g.config.Name, true)
+
+	if g.config.OrmName == "" {
+		return fmt.Errorf("orm_name is required in configuration")
+	}
+
 	g.cacheConfig = g.config.CacheTool
 	return nil
 }
@@ -134,16 +141,12 @@ func (g *CacheToolGenerator) adaptConfig() error {
 func (g *CacheToolGenerator) processFields() {
 	for i := range g.cacheConfig.Fields {
 		g.cacheConfig.Fields[i].CamelName = toCamel(g.cacheConfig.Fields[i].Name, false)
-		if g.cacheConfig.Fields[i].PublicName != "" {
-			g.cacheConfig.Fields[i].PublicCamelName = g.cacheConfig.Fields[i].PublicName
-		} else {
-			g.cacheConfig.Fields[i].PublicCamelName = toCamel(g.cacheConfig.Fields[i].Name, true)
-		}
+		g.cacheConfig.Fields[i].PublicCamelName = toCamel(g.cacheConfig.Fields[i].Name, true)
 	}
 
 	for i := range g.cacheConfig.KeyFields {
 		g.cacheConfig.KeyFields[i].CamelName = toCamel(g.cacheConfig.KeyFields[i].Name, false)
-		g.cacheConfig.KeyFields[i].PublicCamelName = g.cacheConfig.KeyFields[i].PublicName
+		g.cacheConfig.KeyFields[i].PublicCamelName = toCamel(g.cacheConfig.KeyFields[i].Name, true)
 	}
 }
 
@@ -264,6 +267,7 @@ func (g *CacheToolGenerator) Generate() error {
 	templateData := struct {
 		Name                string
 		PublicName          string
+		OrmName             string
 		Fields              []Field
 		KeyFields           []KeyField
 		HasExtension        bool
@@ -275,6 +279,7 @@ func (g *CacheToolGenerator) Generate() error {
 	}{
 		Name:                g.config.Name,
 		PublicName:          g.config.PublicName,
+		OrmName:             g.config.OrmName,
 		Fields:              g.cacheConfig.Fields,
 		KeyFields:           g.cacheConfig.KeyFields,
 		HasExtension:        g.cacheConfig.HasExtension,

@@ -1,35 +1,35 @@
 name: process
-public_name: Process
+orm_name: Process
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
     is_validation_field: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: deviceType
-    public_name: DeviceType
+  - name: device_type
+    orm_name: DeviceType
     type: int
-  - name: deviceID
-    public_name: DeviceID
+  - name: device_id
+    orm_name: DeviceID
     type: int
-  - name: podGroupID
-    public_name: PodGroupID
+  - name: pod_group_id
+    orm_name: PodGroupID
     type: int
-  - name: podNodeID
-    public_name: PodNodeID
+  - name: pod_node_id
+    orm_name: PodNodeID
     type: int
-  - name: vmID
-    public_name: VMID
+  - name: vm_id
+    orm_name: VMID
     type: int
-  - name: vpcID
-    public_name: VPCID
+  - name: vpc_id
+    orm_name: VPCID
     type: int
   has_extension: true
   collection_extension: true

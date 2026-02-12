@@ -1,20 +1,20 @@
 name: config_map
-public_name: ConfigMap
+orm_name: ConfigMap
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
     is_validation_field: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: podGroupIDs
-    public_name: PodGroupIDs
+  - name: pod_group_ids
+    orm_name: PodGroupIDs
     type: mapset.Set[int]
     is_plural: true
     comment: 'data source: pod_group_config_map_connection'

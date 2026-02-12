@@ -1,28 +1,26 @@
 name: pod_namespace
-public_name: PodNamespace
+orm_name: PodNamespace
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
     is_validation_field: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: regionID
-    public_name: RegionID
+  - name: region_id
+    orm_name: Region
     type: int
     ref: Region
-    db_field_name: Region
-  - name: azID
-    public_name: AZID
+  - name: az_id
+    orm_name: AZ
     type: int
-    ref: AZ
-    db_field_name: AZ
-  - name: podClusterID
-    public_name: PodClusterID
+    ref: Az
+  - name: pod_cluster_id
+    orm_name: PodClusterID
     type: int

@@ -1,34 +1,32 @@
 name: pod_replica_set
-public_name: PodReplicaSet
+orm_name: PodReplicaSet
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
     is_validation_field: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: regionID
-    public_name: RegionID
+  - name: region_id
+    orm_name: Region
     type: int
     ref: Region
-    db_field_name: Region
-  - name: azID
-    public_name: AZID
+  - name: az_id
+    orm_name: AZ
     type: int
-    ref: AZ
-    db_field_name: AZ
-  - name: podGroupID
-    public_name: PodGroupID
+    ref: Az
+  - name: pod_group_id
+    orm_name: PodGroupID
     type: int
-  - name: podNamespaceID
-    public_name: PodNamespaceID
+  - name: pod_namespace_id
+    orm_name: PodNamespaceID
     type: int
-  - name: podClusterID
-    public_name: PodClusterID
+  - name: pod_cluster_id
+    orm_name: PodClusterID
     type: int

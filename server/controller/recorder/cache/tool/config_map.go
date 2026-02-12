@@ -14,7 +14,7 @@ type ConfigMap struct {
 	lcuuid      string
 	id          int
 	name        string
-	podGroupIDs mapset.Set[int] // data source: pod_group_config_map_connection
+	podGroupIds mapset.Set[int] // data source: pod_group_config_map_connection
 }
 
 func (t *ConfigMap) IsValid() bool {
@@ -25,7 +25,7 @@ func (t *ConfigMap) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *ConfigMap) ID() int {
+func (t *ConfigMap) Id() int {
 	return t.id
 }
 
@@ -33,27 +33,27 @@ func (t *ConfigMap) Name() string {
 	return t.name
 }
 
-func (t *ConfigMap) PodGroupIDs() mapset.Set[int] {
-	return t.podGroupIDs
+func (t *ConfigMap) PodGroupIds() mapset.Set[int] {
+	return t.podGroupIds
 }
 
-func (t *ConfigMap) PodGroupIDsToSlice() []int {
-	return t.podGroupIDs.ToSlice()
+func (t *ConfigMap) PodGroupIdsToSlice() []int {
+	return t.podGroupIds.ToSlice()
 }
 
 func (t *ConfigMap) AddPodGroupID(id int) {
-	t.podGroupIDs.Add(id)
+	t.podGroupIds.Add(id)
 }
 
 func (t *ConfigMap) RemovePodGroupID(id int) {
-	t.podGroupIDs.Remove(id)
+	t.podGroupIds.Remove(id)
 }
 
 func (t *ConfigMap) reset(dbItem *metadbmodel.ConfigMap, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.podGroupIDs = mapset.NewSet[int]()
+	t.podGroupIds = mapset.NewSet[int]()
 }
 
 func NewConfigMapCollection(t *Tool) *ConfigMapCollection {

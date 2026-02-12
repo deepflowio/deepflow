@@ -12,9 +12,9 @@ type PodNamespace struct {
 	lcuuid       string
 	id           int
 	name         string
-	regionID     int
-	azID         int
-	podClusterID int
+	regionId     int
+	azId         int
+	podClusterId int
 }
 
 func (t *PodNamespace) IsValid() bool {
@@ -25,7 +25,7 @@ func (t *PodNamespace) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *PodNamespace) ID() int {
+func (t *PodNamespace) Id() int {
 	return t.id
 }
 
@@ -33,25 +33,25 @@ func (t *PodNamespace) Name() string {
 	return t.name
 }
 
-func (t *PodNamespace) RegionID() int {
-	return t.regionID
+func (t *PodNamespace) RegionId() int {
+	return t.regionId
 }
 
-func (t *PodNamespace) AZID() int {
-	return t.azID
+func (t *PodNamespace) AzId() int {
+	return t.azId
 }
 
-func (t *PodNamespace) PodClusterID() int {
-	return t.podClusterID
+func (t *PodNamespace) PodClusterId() int {
+	return t.podClusterId
 }
 
 func (t *PodNamespace) reset(dbItem *metadbmodel.PodNamespace, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.podClusterID = dbItem.PodClusterID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.podClusterId = dbItem.PodClusterID
 }
 
 func NewPodNamespaceCollection(t *Tool) *PodNamespaceCollection {

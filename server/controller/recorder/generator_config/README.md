@@ -8,15 +8,15 @@
 
 ## 2. 配置字段说明
 ### 顶层字段
-- `name`：资源名称，使用 small_snake_case（例如 `pod_node`）。用于生成文件名与资源类型标识。
-- `public_name`：资源公开名称，使用 PascalCase（例如 `PodNode`）。用于生成公有结构体与方法名称。
-- `cache_tool`：cache tool 配置块。
+- `name`：资源名称，使用 small_snake_case（例如 `pod_node`、`az`）。用于生成文件名，资源类型标识；使用统一标准转化为 PascalCase（例如 `PodNode`、`Az`），作为公有结构体及接口名称。
+- `orm_name`：资源的 ORM 对象名称。用于生成 db 相关的代码，如 `metadbmodel.PodNode`、`metadbmodel.AZ`。
+- `cache_tool`：recorder 中的 cache/tool 模块。
 
 ### cache_tool 字段
-- `enabled`：是否启用该资源的代码生成。
-- `fields`：资源字段列表。
+- `enabled`：是否启用该模块的代码生成。
+- `fields`：该资源 cache 结构体字段列表。
 - `key_fields`：索引字段列表（可选）。用于生成 `GetByX`/`GetOrLoadByX` 这类方法。
-- `has_extension`：是否支持结构体扩展（对应 `<name>_ext.go`）。
+- `has_extension`：是否支持结构体扩展（对应手动实现的 `<name>_ext.go`）。
 - `collection_extension`：是否支持集合扩展（对应 `<PublicName>CollectionExt`）。
 - `has_mapset`：是否启用 `mapset` 支持（用于 plural 字段）。
 - `has_custom`：生成器运行时填充，表示是否存在 `is_custom: true` 字段，通常不在配置中手动设置。

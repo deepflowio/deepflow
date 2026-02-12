@@ -7,86 +7,86 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// VM defines cache data structure.
-type VM struct {
+// Vm defines cache data structure.
+type Vm struct {
 	lcuuid    string
 	id        int
 	name      string
-	regionID  int
-	azID      int
-	vpcID     int
-	hostID    int
-	networkID int
-	podNodeID int
+	regionId  int
+	azId      int
+	vpcId     int
+	hostId    int
+	networkId int
+	podNodeId int
 }
 
-func (t *VM) IsValid() bool {
+func (t *Vm) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *VM) Lcuuid() string {
+func (t *Vm) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *VM) ID() int {
+func (t *Vm) Id() int {
 	return t.id
 }
 
-func (t *VM) Name() string {
+func (t *Vm) Name() string {
 	return t.name
 }
 
-func (t *VM) RegionID() int {
-	return t.regionID
+func (t *Vm) RegionId() int {
+	return t.regionId
 }
 
-func (t *VM) AZID() int {
-	return t.azID
+func (t *Vm) AzId() int {
+	return t.azId
 }
 
-func (t *VM) VPCID() int {
-	return t.vpcID
+func (t *Vm) VpcId() int {
+	return t.vpcId
 }
 
-func (t *VM) HostID() int {
-	return t.hostID
+func (t *Vm) HostId() int {
+	return t.hostId
 }
 
-func (t *VM) NetworkID() int {
-	return t.networkID
+func (t *Vm) NetworkId() int {
+	return t.networkId
 }
 
-func (t *VM) PodNodeID() int {
-	return t.podNodeID
+func (t *Vm) PodNodeId() int {
+	return t.podNodeId
 }
 
-func (t *VM) SetPodNodeID(podNodeID int) {
-	t.podNodeID = podNodeID
+func (t *Vm) SetPodNodeId(podNodeId int) {
+	t.podNodeId = podNodeId
 }
 
-func (t *VM) reset(dbItem *metadbmodel.VM, tool *Tool) {
+func (t *Vm) reset(dbItem *metadbmodel.VM, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.vpcID = dbItem.VPCID
-	t.hostID = dbItem.HostID
-	t.networkID = dbItem.NetworkID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.vpcId = dbItem.VPCID
+	t.hostId = dbItem.HostID
+	t.networkId = dbItem.NetworkID
 }
 
-func NewVMCollection(t *Tool) *VMCollection {
-	c := new(VMCollection)
-	c.collection = newCollectionBuilder[*VM]().
+func NewVmCollection(t *Tool) *VmCollection {
+	c := new(VmCollection)
+	c.collection = newCollectionBuilder[*Vm]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_VM_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.VM { return new(metadbmodel.VM) }).
-		withCacheItemFactory(func() *VM { return new(VM) }).
+		withCacheItemFactory(func() *Vm { return new(Vm) }).
 		build()
 	return c
 }
 
-// VMCollection defines a collection that maps individual fields to the VM cache data structure.
-type VMCollection struct {
-	collection[*VM, *metadbmodel.VM]
+// VmCollection defines a collection that maps individual fields to the Vm cache data structure.
+type VmCollection struct {
+	collection[*Vm, *metadbmodel.VM]
 }

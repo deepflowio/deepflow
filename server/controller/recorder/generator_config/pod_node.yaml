@@ -1,39 +1,36 @@
 name: pod_node
-public_name: PodNode
+orm_name: PodNode
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
     is_validation_field: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
-  - name: domainLcuuid
-    public_name: DomainLcuuid
+  - name: domain_lcuuid
+    orm_name: Domain
     type: string
-    db_field_name: Domain
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: regionID
-    public_name: RegionID
+  - name: region_id
+    orm_name: Region
     type: int
     ref: Region
-    db_field_name: Region
-  - name: azID
-    public_name: AZID
+  - name: az_id
+    orm_name: AZ
     type: int
-    ref: AZ
-    db_field_name: AZ
-  - name: vpcID
-    public_name: VPCID
+    ref: Az
+  - name: vpc_id
+    orm_name: VPCID
     type: int
-  - name: podClusterID
-    public_name: PodClusterID
+  - name: pod_cluster_id
+    orm_name: PodClusterID
     type: int
-  - name: vmID
-    public_name: VMID
+  - name: vm_id
+    orm_name: VMID
     type: int
     has_setter: true

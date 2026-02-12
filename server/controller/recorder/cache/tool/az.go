@@ -7,47 +7,47 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// AZ defines cache data structure.
-type AZ struct {
+// Az defines cache data structure.
+type Az struct {
 	lcuuid string
 	id     int
 	name   string
 }
 
-func (t *AZ) IsValid() bool {
+func (t *Az) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *AZ) Lcuuid() string {
+func (t *Az) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *AZ) ID() int {
+func (t *Az) Id() int {
 	return t.id
 }
 
-func (t *AZ) Name() string {
+func (t *Az) Name() string {
 	return t.name
 }
 
-func (t *AZ) reset(dbItem *metadbmodel.AZ, tool *Tool) {
+func (t *Az) reset(dbItem *metadbmodel.AZ, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
 }
 
-func NewAZCollection(t *Tool) *AZCollection {
-	c := new(AZCollection)
-	c.collection = newCollectionBuilder[*AZ]().
+func NewAzCollection(t *Tool) *AzCollection {
+	c := new(AzCollection)
+	c.collection = newCollectionBuilder[*Az]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_AZ_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.AZ { return new(metadbmodel.AZ) }).
-		withCacheItemFactory(func() *AZ { return new(AZ) }).
+		withCacheItemFactory(func() *Az { return new(Az) }).
 		build()
 	return c
 }
 
-// AZCollection defines a collection that maps individual fields to the AZ cache data structure.
-type AZCollection struct {
-	collection[*AZ, *metadbmodel.AZ]
+// AzCollection defines a collection that maps individual fields to the Az cache data structure.
+type AzCollection struct {
+	collection[*Az, *metadbmodel.AZ]
 }

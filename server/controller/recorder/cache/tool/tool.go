@@ -30,29 +30,29 @@ type Tool struct {
 
 	// Clouds
 	region *RegionCollection
-	az     *AZCollection
+	az     *AzCollection
 
 	// Computes
 	host *HostCollection
-	vm   *VMCollection
+	vm   *VmCollection
 
 	// Networks
-	vpc        *VPCCollection
+	vpc        *VpcCollection
 	network    *NetworkCollection
 	subnet     *SubnetCollection
-	vRouter    *VRouterCollection
-	dhcpPort   *DHCPPortCollection
-	vInterface *VInterfaceCollection
-	lanIP      *LANIPCollection
-	wanIP      *WANIPCollection
+	vrouter    *VrouterCollection	
+	dhcpPort   *DhcpPortCollection
+	vinterface *VinterfaceCollection
+	lanIP      *LanIpCollection
+	wanIP      *WanIpCollection
 
 	// Network services
-	natGateway *NATGatewayCollection
-	lb         *LBCollection
-	lbListener *LBListenerCollection
+	natGateway *NatGatewayCollection
+	lb         *LbCollection
+	lbListener *LbListenerCollection
 
 	// Storage services
-	rdsInstance   *RDSInstanceCollection
+	rdsInstance   *RdsInstanceCollection				
 	redisInstance *RedisInstanceCollection
 
 	// Kubernetes
@@ -67,11 +67,11 @@ type Tool struct {
 	pod                         *PodCollection
 	configMap                   *ConfigMapCollection
 	podGroupConfigMapConnection *PodGroupConfigMapConnectionCollection
-	vmPodNodeConnection         *VMPodNodeConnectionCollection
+	vmPodNodeConnection         *VmPodNodeConnectionCollection
 
 	// Processes
 	process *ProcessCollection
-	agent   *VTapCollection
+	agent   *VtapCollection
 }
 
 func NewTool(md *rcommon.Metadata) *Tool {
@@ -81,29 +81,29 @@ func NewTool(md *rcommon.Metadata) *Tool {
 
 	// Clouds
 	t.region = NewRegionCollection(t)
-	t.az = NewAZCollection(t)
+	t.az = NewAzCollection(t)
 
 	// Computes
 	t.host = NewHostCollection(t)
-	t.vm = NewVMCollection(t)
+	t.vm = NewVmCollection(t)
 
 	// Networks
-	t.vpc = NewVPCCollection(t)
+	t.vpc = NewVpcCollection(t)
 	t.network = NewNetworkCollection(t)
 	t.subnet = NewSubnetCollection(t)
-	t.vRouter = NewVRouterCollection(t)
-	t.dhcpPort = NewDHCPPortCollection(t)
-	t.vInterface = NewVInterfaceCollection(t)
-	t.lanIP = NewLANIPCollection(t)
-	t.wanIP = NewWANIPCollection(t)
+	t.vrouter = NewVrouterCollection(t)
+	t.dhcpPort = NewDhcpPortCollection(t)
+	t.vinterface = NewVinterfaceCollection(t)
+	t.lanIP = NewLanIpCollection(t)
+	t.wanIP = NewWanIpCollection(t)	
 
 	// Network services
-	t.natGateway = NewNATGatewayCollection(t)
-	t.lb = NewLBCollection(t)
-	t.lbListener = NewLBListenerCollection(t)
+	t.natGateway = NewNatGatewayCollection(t)
+	t.lb = NewLbCollection(t)
+	t.lbListener = NewLbListenerCollection(t)
 
 	// Storage services
-	t.rdsInstance = NewRDSInstanceCollection(t)
+	t.rdsInstance = NewRdsInstanceCollection(t)		
 	t.redisInstance = NewRedisInstanceCollection(t)
 
 	// Kubernetes
@@ -120,9 +120,9 @@ func NewTool(md *rcommon.Metadata) *Tool {
 	t.podGroupConfigMapConnection = NewPodGroupConfigMapConnectionCollection(t)
 
 	// Processes
-	t.vmPodNodeConnection = NewVMPodNodeConnectionCollection(t)
+	t.vmPodNodeConnection = NewVmPodNodeConnectionCollection(t)
 	t.process = NewProcessCollection(t)
-	t.agent = NewVTapCollection(t)
+	t.agent = NewVtapCollection(t)		
 
 	return t
 }
@@ -135,27 +135,27 @@ func (t *Tool) SetSequence(sequence int) {
 
 // Clouds
 func (t Tool) Region() *RegionCollection { return t.region }
-func (t Tool) AZ() *AZCollection         { return t.az }
+func (t Tool) Az() *AzCollection                 { return t.az }
 
 // Computes
 func (t Tool) Host() *HostCollection             { return t.host }
-func (t Tool) VM() *VMCollection                 { return t.vm } // Networks
-func (t Tool) VPC() *VPCCollection               { return t.vpc }
+func (t Tool) Vm() *VmCollection                 { return t.vm } // Networks
+func (t Tool) Vpc() *VpcCollection               { return t.vpc }
 func (t Tool) Network() *NetworkCollection       { return t.network }
 func (t Tool) Subnet() *SubnetCollection         { return t.subnet }
-func (t Tool) VRouter() *VRouterCollection       { return t.vRouter }
-func (t Tool) DHCPPort() *DHCPPortCollection     { return t.dhcpPort }
-func (t Tool) VInterface() *VInterfaceCollection { return t.vInterface }
-func (t Tool) LANIP() *LANIPCollection           { return t.lanIP }
-func (t Tool) WANIP() *WANIPCollection           { return t.wanIP }
+func (t Tool) Vrouter() *VrouterCollection       { return t.vrouter }
+func (t Tool) DhcpPort() *DhcpPortCollection     { return t.dhcpPort }
+func (t Tool) Vinterface() *VinterfaceCollection { return t.vinterface }
+func (t Tool) LanIP() *LanIpCollection           { return t.lanIP }
+func (t Tool) WanIP() *WanIpCollection           { return t.wanIP }
 
 // Network services
-func (t Tool) NATGateway() *NATGatewayCollection { return t.natGateway }
-func (t Tool) LB() *LBCollection                 { return t.lb }
-func (t Tool) LBListener() *LBListenerCollection { return t.lbListener }
+func (t Tool) NatGateway() *NatGatewayCollection { return t.natGateway }
+func (t Tool) Lb() *LbCollection                 { return t.lb }
+func (t Tool) LbListener() *LbListenerCollection { return t.lbListener }
 
 // Storage services
-func (t Tool) RDSInstance() *RDSInstanceCollection     { return t.rdsInstance }
+func (t Tool) RdsInstance() *RdsInstanceCollection     { return t.rdsInstance }	
 func (t Tool) RedisInstance() *RedisInstanceCollection { return t.redisInstance }
 
 // Kubernetes
@@ -172,35 +172,35 @@ func (t Tool) ConfigMap() *ConfigMapCollection           { return t.configMap }
 func (t Tool) PodGroupConfigMapConnection() *PodGroupConfigMapConnectionCollection {
 	return t.podGroupConfigMapConnection
 }
-func (t Tool) VMPodNodeConnection() *VMPodNodeConnectionCollection { return t.vmPodNodeConnection }
+func (t Tool) VmPodNodeConnection() *VmPodNodeConnectionCollection { return t.vmPodNodeConnection }
 
 // Processes
 func (t Tool) Process() *ProcessCollection { return t.process }
-func (t Tool) Agent() *VTapCollection      { return t.agent }
+func (t Tool) Agent() *VtapCollection      { return t.agent }
 
 func (t Tool) GetDeviceVPCIDByLcuuid(deviceType int, deviceLcuuid string) (int, bool) {
 	var vpcID int
 	switch deviceType {
 	case ctrlrcommon.VIF_DEVICE_TYPE_VM:
-		vpcID = t.VM().GetByLcuuid(deviceLcuuid).VPCID()
+		vpcID = t.Vm().GetByLcuuid(deviceLcuuid).VpcId()
 	case ctrlrcommon.VIF_DEVICE_TYPE_VROUTER:
-		vpcID = t.VRouter().GetByLcuuid(deviceLcuuid).VPCID()
+		vpcID = t.Vrouter().GetByLcuuid(deviceLcuuid).VpcId()
 	case ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT:
-		vpcID = t.DHCPPort().GetByLcuuid(deviceLcuuid).VPCID()
+		vpcID = t.DhcpPort().GetByLcuuid(deviceLcuuid).VpcId()	
 	case ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY:
-		vpcID = t.NATGateway().GetByLcuuid(deviceLcuuid).VPCID()
+		vpcID = t.NatGateway().GetByLcuuid(deviceLcuuid).VpcId()
 	case ctrlrcommon.VIF_DEVICE_TYPE_LB:
-		vpcID = t.LB().GetByLcuuid(deviceLcuuid).VPCID()
+		vpcID = t.Lb().GetByLcuuid(deviceLcuuid).VpcId()
 	case ctrlrcommon.VIF_DEVICE_TYPE_RDS_INSTANCE:
-		vpcID = t.RDSInstance().GetByLcuuid(deviceLcuuid).VPCID()
+		vpcID = t.RdsInstance().GetByLcuuid(deviceLcuuid).VpcId()
 	case ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE:
-		vpcID = t.RedisInstance().GetByLcuuid(deviceLcuuid).VPCID()
+		vpcID = t.RedisInstance().GetByLcuuid(deviceLcuuid).VpcId()
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE:
-		vpcID = t.PodNode().GetByLcuuid(deviceLcuuid).VPCID()
+		vpcID = t.PodNode().GetByLcuuid(deviceLcuuid).VpcId()
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE:
-		vpcID = t.PodService().GetByLcuuid(deviceLcuuid).VPCID()
+		vpcID = t.PodService().GetByLcuuid(deviceLcuuid).VpcId()
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD:
-		vpcID = t.Pod().GetByLcuuid(deviceLcuuid).VPCID()
+		vpcID = t.Pod().GetByLcuuid(deviceLcuuid).VpcId()
 	default:
 		log.Errorf("device type %d not supported", deviceType, t.metadata.LogPrefixes)
 		return 0, false
@@ -213,25 +213,25 @@ func (t Tool) GetDeviceIDByLcuuid(deviceType int, deviceLcuuid string) (int, boo
 	var id int
 	switch deviceType {
 	case ctrlrcommon.VIF_DEVICE_TYPE_VM:
-		id = t.VM().GetByLcuuid(deviceLcuuid).ID()
+		id = t.Vm().GetByLcuuid(deviceLcuuid).Id()
 	case ctrlrcommon.VIF_DEVICE_TYPE_VROUTER:
-		id = t.VRouter().GetByLcuuid(deviceLcuuid).ID()
+		id = t.Vrouter().GetByLcuuid(deviceLcuuid).Id()
 	case ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT:
-		id = t.DHCPPort().GetByLcuuid(deviceLcuuid).ID()
+		id = t.DhcpPort().GetByLcuuid(deviceLcuuid).Id()	
 	case ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY:
-		id = t.NATGateway().GetByLcuuid(deviceLcuuid).ID()
+		id = t.NatGateway().GetByLcuuid(deviceLcuuid).Id()
 	case ctrlrcommon.VIF_DEVICE_TYPE_LB:
-		id = t.LB().GetByLcuuid(deviceLcuuid).ID()
+		id = t.Lb().GetByLcuuid(deviceLcuuid).Id()
 	case ctrlrcommon.VIF_DEVICE_TYPE_RDS_INSTANCE:
-		id = t.RDSInstance().GetByLcuuid(deviceLcuuid).ID()
+		id = t.RdsInstance().GetByLcuuid(deviceLcuuid).Id()
 	case ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE:
-		id = t.RedisInstance().GetByLcuuid(deviceLcuuid).ID()
+		id = t.RedisInstance().GetByLcuuid(deviceLcuuid).Id()
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE:
-		id = t.PodNode().GetByLcuuid(deviceLcuuid).ID()
+		id = t.PodNode().GetByLcuuid(deviceLcuuid).Id()
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE:
-		id = t.PodService().GetByLcuuid(deviceLcuuid).ID()
+		id = t.PodService().GetByLcuuid(deviceLcuuid).Id()
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD:
-		id = t.Pod().GetByLcuuid(deviceLcuuid).ID()
+		id = t.Pod().GetByLcuuid(deviceLcuuid).Id()
 	default:
 		log.Errorf("device type %d not supported", deviceType, t.metadata.LogPrefixes)
 		return 0, false
@@ -244,25 +244,25 @@ func (t Tool) GetDeviceLcuuidByID(deviceType int, deviceID int) (string, bool) {
 	var lcuuid string
 	switch deviceType {
 	case ctrlrcommon.VIF_DEVICE_TYPE_VM:
-		lcuuid = t.VM().GetByID(deviceID).Lcuuid()
+		lcuuid = t.Vm().GetById(deviceID).Lcuuid()
 	case ctrlrcommon.VIF_DEVICE_TYPE_VROUTER:
-		lcuuid = t.VRouter().GetByID(deviceID).Lcuuid()
+		lcuuid = t.Vrouter().GetById(deviceID).Lcuuid()
 	case ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT:
-		lcuuid = t.DHCPPort().GetByID(deviceID).Lcuuid()
+		lcuuid = t.DhcpPort().GetById(deviceID).Lcuuid()
 	case ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY:
-		lcuuid = t.NATGateway().GetByID(deviceID).Lcuuid()
+		lcuuid = t.NatGateway().GetById(deviceID).Lcuuid()
 	case ctrlrcommon.VIF_DEVICE_TYPE_LB:
-		lcuuid = t.LB().GetByID(deviceID).Lcuuid()
+		lcuuid = t.Lb().GetById(deviceID).Lcuuid()
 	case ctrlrcommon.VIF_DEVICE_TYPE_RDS_INSTANCE:
-		lcuuid = t.RDSInstance().GetByID(deviceID).Lcuuid()
+		lcuuid = t.RdsInstance().GetById(deviceID).Lcuuid()
 	case ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE:
-		lcuuid = t.RedisInstance().GetByID(deviceID).Lcuuid()
+		lcuuid = t.RedisInstance().GetById(deviceID).Lcuuid()
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE:
-		lcuuid = t.PodNode().GetByID(deviceID).Lcuuid()
+		lcuuid = t.PodNode().GetById(deviceID).Lcuuid()
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE:
-		lcuuid = t.PodService().GetByID(deviceID).Lcuuid()
+		lcuuid = t.PodService().GetById(deviceID).Lcuuid()
 	case ctrlrcommon.VIF_DEVICE_TYPE_POD:
-		lcuuid = t.Pod().GetByID(deviceID).Lcuuid()
+		lcuuid = t.Pod().GetById(deviceID).Lcuuid()
 	default:
 		log.Errorf("device type %d not supported", deviceType, t.metadata.LogPrefixes)
 		return "", false
@@ -275,11 +275,11 @@ func (t Tool) GetProcessDeviceTypeAndID(containterID string, agentID int) (devic
 	pod := t.Pod().GetByContainerID(containterID)
 	if pod.IsValid() {
 		deviceType = ctrlrcommon.VIF_DEVICE_TYPE_POD
-		deviceID = pod.ID()
+		deviceID = pod.Id()
 		return
 	}
-	agent := t.Agent().GetByID(agentID)
-	deviceType = ctrlrcommon.VTAP_TYPE_TO_DEVICE_TYPE[agent.Type()]
-	deviceID = agent.LaunchServerID()
+	agent := t.Agent().GetById(agentID)
+	deviceType = ctrlrcommon.VTAP_TYPE_TO_DEVICE_TYPE[agent.AType()]
+	deviceID = agent.LaunchServerId()
 	return
 }
