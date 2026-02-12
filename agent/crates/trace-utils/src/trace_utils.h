@@ -63,6 +63,18 @@ typedef struct {
 } lua_runtime_info_t;
 
 typedef struct {
+    uint64_t liblua_start;
+    uint64_t liblua_end;
+    uint64_t exe_start;
+    uint64_t exe_end;
+    uint8_t lib_path[LUA_RUNTIME_PATH_LEN];
+    uint8_t exe_path[LUA_RUNTIME_PATH_LEN];
+    uint8_t has_lib;
+    uint8_t has_exe;
+    uint8_t reserved[6];
+} LuaProcessLayout;
+
+typedef struct {
     uint32_t id;
     uint16_t entry_start;
     uint16_t entry_end;
@@ -333,6 +345,8 @@ char *lua_format_folded_stack_trace(void *tracer,
                                     bool new_cache,
                                     void *info_p,
                                     const char *err_tag);
+
+int32_t lua_get_process_layout(uint32_t pid, LuaProcessLayout *out);
 
 void lua_set_map_fds(int32_t lang_flags_fd,
                      int32_t unwind_info_fd,

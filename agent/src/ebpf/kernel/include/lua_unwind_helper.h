@@ -79,6 +79,7 @@ struct lua_state_cache_t {
 	__u64 states[LUA_STATE_STACK_DEPTH];
 	__u8 depth;
 	__u8 pad[7];
+	__u64 retained_L;
 };
 
 enum func_type {

@@ -17,7 +17,7 @@
 use std::{
     collections::HashMap,
     ffi::CStr,
-    fs::File,
+    fs::{self, File},
     io::Read,
     mem::{self, MaybeUninit},
     ptr, slice, str,
@@ -44,6 +44,20 @@ pub struct LuaRuntimeInfo {
     pub version: [u8; LUA_RUNTIME_VERSION_LEN], // e.g. "5.4", "5.3", "2.1"
     pub detection_method: [u8; LUA_RUNTIME_DETECT_METHOD_LEN],
     pub path: [u8; LUA_RUNTIME_PATH_LEN],
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct LuaProcessLayout {
+    pub liblua_start: u64,
+    pub liblua_end: u64,
+    pub exe_start: u64,
+    pub exe_end: u64,
+    pub lib_path: [u8; LUA_RUNTIME_PATH_LEN],
+    pub exe_path: [u8; LUA_RUNTIME_PATH_LEN],
+    pub has_lib: u8,
+    pub has_exe: u8,
+    pub reserved: [u8; 6],
 }
 
 fn trim_nul(bytes: &[u8]) -> &[u8] {
@@ -110,6 +124,114 @@ pub unsafe extern "C" fn lua_detect(pid: u32, out: *mut LuaRuntimeInfo) -> i32 {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn lua_get_process_layout(pid: u32, out: *mut LuaProcessLayout) -> i32 {
+    if pid == 0 || out.is_null() {
+        return -1;
+    }
+
+    let Some(runtime) = detect_runtime_cached(pid) else {
+        return -1;
+    };
+
+    let areas = match get_memory_mappings(pid) {
+        Ok(v) => v,
+        Err(_) => return -1,
+    };
+
+    let exe_target = fs::read_link(format!("/proc/{pid}/exe"))
+        .ok()
+        .and_then(|p| p.to_str().map(|s| s.to_owned()));
+
+    let runtime_path = runtime.path_str().trim();
+    let runtime_inner_path = strip_proc_root_prefix(pid, runtime_path);
+
+    let mut best_exe_idx: Option<usize> = None;
+    let mut best_exe_prio: u8 = 0;
+    let mut best_lib_idx: Option<usize> = None;
+    let mut best_lib_prio: u8 = 0;
+
+    for (idx, area) in areas.iter().enumerate() {
+        if area.mx_start == 0 || area.path.is_empty() || area.path.starts_with('[') {
+            continue;
+        }
+
+        let path = area.path.as_str();
+        let fname = path.rsplit('/').next().unwrap_or(path);
+        let is_so = path.contains(".so");
+
+        let exe_prio = if exe_target.as_deref() == Some(path) {
+            3
+        } else if runtime_inner_path == path && !is_so {
+            2
+        } else if fname.starts_with("lua") && !is_so {
+            1
+        } else {
+            0
+        };
+        if exe_prio > best_exe_prio {
+            best_exe_prio = exe_prio;
+            best_exe_idx = Some(idx);
+        }
+
+        let lib_prio = if runtime_inner_path == path && is_so {
+            4
+        } else if runtime.kind == 2 && fname.starts_with("libluajit") && is_so {
+            3
+        } else if runtime.kind == 2 && fname.starts_with("luajit") && is_so {
+            2
+        } else if runtime.kind != 2
+            && fname.starts_with("liblua")
+            && !path.contains("luajit")
+            && is_so
+        {
+            3
+        } else {
+            0
+        };
+        if lib_prio > best_lib_prio {
+            best_lib_prio = lib_prio;
+            best_lib_idx = Some(idx);
+        }
+    }
+
+    let mut layout = LuaProcessLayout {
+        liblua_start: 0,
+        liblua_end: 0,
+        exe_start: 0,
+        exe_end: 0,
+        lib_path: [0; LUA_RUNTIME_PATH_LEN],
+        exe_path: [0; LUA_RUNTIME_PATH_LEN],
+        has_lib: 0,
+        has_exe: 0,
+        reserved: [0; 6],
+    };
+
+    if let Some(idx) = best_lib_idx {
+        let area = &areas[idx];
+        layout.liblua_start = area.mx_start;
+        layout.liblua_end = area.m_end;
+        let full = to_proc_root_path(pid, &area.path);
+        copy_into(&mut layout.lib_path, full.as_bytes());
+        layout.has_lib = 1;
+    }
+
+    if let Some(idx) = best_exe_idx {
+        let area = &areas[idx];
+        layout.exe_start = area.mx_start;
+        layout.exe_end = area.m_end;
+        let full = to_proc_root_path(pid, &area.path);
+        copy_into(&mut layout.exe_path, full.as_bytes());
+        layout.has_exe = 1;
+    } else if !runtime_path.is_empty() {
+        copy_into(&mut layout.exe_path, runtime_path.as_bytes());
+        layout.has_exe = 1;
+    }
+
+    *out = layout;
+    0
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn merge_lua_stacks(
     trace_str: *mut c_void,
     len: usize,
@@ -145,9 +267,31 @@ pub unsafe extern "C" fn merge_lua_stacks(
         return write_combined_output(trace_str, len, user.as_bytes());
     }
 
-    let lua_frames: Vec<&str> = lua.split(';').filter(|s| !s.is_empty()).collect();
-    let mut lua_idx = 0usize;
+    fn is_unknown_placeholder(frame: &str) -> bool {
+        frame.starts_with("[unknown") || frame.starts_with("[unkown")
+    }
 
+    fn strip_known_prefix(frame: &str) -> &str {
+        // Keep this intentionally small and conservative: these prefixes are
+        // emitted by the symbolizer and don't carry call-graph meaning.
+        for prefix in ["[k] ", "[l] ", "[p] ", "[t] "] {
+            if let Some(rest) = frame.strip_prefix(prefix) {
+                return rest;
+            }
+        }
+        frame
+    }
+
+    let lua_frames: Vec<&str> = lua.split(';').filter(|s| !s.is_empty()).collect();
+    let user_frames: Vec<&str> = user.split(';').filter(|s| !s.is_empty()).collect();
+
+    // Strategy #1 (existing): replace native stack placeholders ("[unknown ...]") with
+    // decoded Lua frames, then append any leftover Lua frames.
+    //
+    // This works well when the native stack has unresolved placeholders at the Lua/C
+    // boundary (common for the uprobe-based path).
+    let mut lua_idx = 0usize;
+    let mut replaced = 0usize;
     let mut merged: Vec<u8> = Vec::with_capacity(len);
     let mut first = true;
 
@@ -157,14 +301,14 @@ pub unsafe extern "C" fn merge_lua_stacks(
     // reflects the native frames, while the interpreter unwind reconstructs the Lua frames.
     // Merging walks the native stack in order and substitutes each Lua VM placeholder with
     // the decoded interpreter frame, preserving any surrounding C frames.
-    for frame in user.split(';').filter(|s| !s.is_empty()) {
-        let should_replace = frame.starts_with("[unknown") || frame.starts_with("[unkown");
-        if should_replace && lua_idx < lua_frames.len() {
+    for frame in &user_frames {
+        if is_unknown_placeholder(frame) && lua_idx < lua_frames.len() {
             if !first {
                 merged.push(b';');
             }
             merged.extend_from_slice(lua_frames[lua_idx].as_bytes());
             lua_idx += 1;
+            replaced += 1;
             first = false;
             continue;
         }
@@ -174,6 +318,70 @@ pub unsafe extern "C" fn merge_lua_stacks(
         }
         merged.extend_from_slice(frame.as_bytes());
         first = false;
+    }
+
+    // Strategy #2: if we didn't replace anything, try to *insert*
+    // Lua interpreter frames before the leaf-most matching C frame.
+    //
+    // This is important for the register-bootstrap path, where the native stack
+    // is often fully symbolized (no "[unknown ...]" placeholders), and the old
+    // logic would append all Lua frames at the end (wrong ordering and duplicates).
+    if replaced == 0 && lua_idx == 0 {
+        // Pick an anchor from the interpreter stack that can plausibly appear
+        // in the native stack (a resolved C function name).
+        let anchor = lua_frames.iter().rev().find(|f| {
+            let f = f.trim();
+            !f.is_empty()
+                && !f.starts_with("L:")
+                && !is_unknown_placeholder(f)
+                && !f.starts_with("C:0x")
+                && !f.starts_with("builtin#")
+        });
+
+        if let Some(anchor) = anchor {
+            let anchor_norm = strip_known_prefix(anchor);
+            let anchor_pos = user_frames
+                .iter()
+                .rposition(|f| strip_known_prefix(f) == anchor_norm);
+
+            if let Some(anchor_pos) = anchor_pos {
+                let mut out: Vec<u8> = Vec::with_capacity(len);
+                let mut first = true;
+
+                for (idx, frame) in user_frames.iter().enumerate() {
+                    if idx == anchor_pos {
+                        // Insert Lua frames before the matched native C frame.
+                        // If the interpreter stack ends with the same anchor, drop it
+                        // to avoid duplicating that C frame.
+                        let drop_tail_anchor = match lua_frames.last() {
+                            Some(last) => strip_known_prefix(last) == anchor_norm,
+                            None => false,
+                        };
+                        let insert_end = if drop_tail_anchor {
+                            lua_frames.len().saturating_sub(1)
+                        } else {
+                            lua_frames.len()
+                        };
+
+                        for lf in lua_frames.iter().take(insert_end) {
+                            if !first {
+                                out.push(b';');
+                            }
+                            out.extend_from_slice(lf.as_bytes());
+                            first = false;
+                        }
+                    }
+
+                    if !first {
+                        out.push(b';');
+                    }
+                    out.extend_from_slice(frame.as_bytes());
+                    first = false;
+                }
+
+                return write_combined_output(trace_str, len, &out);
+            }
+        }
     }
 
     while lua_idx < lua_frames.len() {
@@ -186,6 +394,26 @@ pub unsafe extern "C" fn merge_lua_stacks(
     }
 
     write_combined_output(trace_str, len, &merged)
+}
+
+fn strip_proc_root_prefix<'a>(pid: u32, path: &'a str) -> &'a str {
+    let prefix = format!("/proc/{pid}/root");
+    match path.strip_prefix(&prefix) {
+        Some("") => "/",
+        Some(rest) => rest,
+        None => path,
+    }
+}
+
+fn to_proc_root_path(pid: u32, path: &str) -> String {
+    let prefix = format!("/proc/{pid}/root");
+    if path.starts_with(&prefix) {
+        path.to_owned()
+    } else if path.starts_with('/') {
+        format!("{prefix}{path}")
+    } else {
+        format!("{prefix}/{path}")
+    }
 }
 
 const TAG_BITS: u64 = 2;
@@ -585,10 +813,11 @@ unsafe fn lua_decode_first_line(pid: u32, proto: u64, layout: &LayoutState) -> O
         LayoutState::Lua(ofs) => {
             let mut line = 0i32;
             match read_value(pid, proto + ofs.off_proto_linedefined as u64, &mut line) {
-                Some(()) if line > 0 => Some(line as u32),
+                // Lua uses 0 for the main chunk (and can legitimately return 0 here).
+                Some(()) if line >= 0 => Some(line as u32),
                 Some(()) => {
                     trace!(
-                        "lua_decode_firstline: Lua proto line <= 0 (pid={pid}, proto=0x{proto:016x}, value={line})"
+                        "lua_decode_firstline: Lua proto line < 0 (pid={pid}, proto=0x{proto:016x}, value={line})"
                     );
                     None
                 }
@@ -603,10 +832,10 @@ unsafe fn lua_decode_first_line(pid: u32, proto: u64, layout: &LayoutState) -> O
         LayoutState::LuaJit(ofs) => {
             let mut line = 0i32;
             match read_value(pid, proto + ofs.off_gcproto_firstline as u64, &mut line) {
-                Some(()) if line > 0 => Some(line as u32),
+                Some(()) if line >= 0 => Some(line as u32),
                 Some(()) => {
                     trace!(
-                        "lua_decode_firstline: LuaJIT proto line <= 0 (pid={pid}, proto=0x{proto:016x}, value={line})"
+                        "lua_decode_firstline: LuaJIT proto line < 0 (pid={pid}, proto=0x{proto:016x}, value={line})"
                     );
                     None
                 }
@@ -1375,7 +1604,10 @@ fn detect_runtime_uncached(pid: u32) -> Option<LuaRuntimeInfo> {
         (1u32, "5.2", "Pure Lua 5.2")
     } else if best_path.contains("liblua5.1") || best_path.ends_with("/lua5.1") {
         (1u32, "5.1", "Pure Lua 5.1")
-    } else if best_path.ends_with("/lua") || best_path.ends_with("/lua.bin") || best_path.ends_with("/lua.exe") {
+    } else if best_path.ends_with("/lua")
+        || best_path.ends_with("/lua.bin")
+        || best_path.ends_with("/lua.exe")
+    {
         match scan_lua_version_string(&full_path) {
             Some(v) => (1u32, v, "Pure Lua (from binary string scan)"),
             None => (1u32, "", "Pure Lua (unknown version)"),
@@ -1407,11 +1639,7 @@ fn scan_lua_version_string(path: &str) -> Option<&'static str> {
         (b"Lua 5.1", "5.1"),
     ];
 
-    let max_needle = NEEDLES
-        .iter()
-        .map(|(n, _)| n.len())
-        .max()
-        .unwrap_or(0);
+    let max_needle = NEEDLES.iter().map(|(n, _)| n.len()).max().unwrap_or(0);
     if max_needle == 0 {
         return None;
     }

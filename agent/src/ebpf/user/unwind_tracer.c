@@ -57,6 +57,7 @@ static python_unwind_table_t *g_python_unwind_table = NULL;
 
 static pthread_mutex_t g_lua_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
 static lua_unwind_table_t *g_lua_unwind_table = NULL;
+static int g_lua_text_region_fd = -1;
 static void lua_queue_existing_processes(struct bpf_tracer *tracer);
 
 static struct symbol lua_symbols[] = {
@@ -311,12 +312,18 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
     int lua_unwind_info_fd = bpf_table_get_fd(tracer, MAP_LUA_UNWIND_INFO_NAME);
     int lua_offsets_fd = bpf_table_get_fd(tracer, MAP_LUA_OFFSETS_NAME);
     int luajit_offsets_fd = bpf_table_get_fd(tracer, MAP_LUAJIT_OFFSETS_NAME);
+    int lua_text_region_fd = bpf_table_get_fd(tracer, MAP_LUA_TEXT_REGION_NAME);
 
     if (lua_lang_fd < 0 || lua_unwind_info_fd < 0 || lua_offsets_fd < 0 || luajit_offsets_fd < 0) {
         ebpf_warning("Failed to get lua profiling map fds (lang:%d unwind:%d lua_ofs:%d lj_ofs:%d)\n",
                      lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
         return -1;
     }
+
+    if (lua_text_region_fd < 0) {
+        ebpf_warning("Failed to get lua text region map fd (name:%s)\n", MAP_LUA_TEXT_REGION_NAME);
+    }
+    g_lua_text_region_fd = lua_text_region_fd;
 
     lua_unwind_table_t *lua_table =
         lua_unwind_table_create(lua_lang_fd, lua_unwind_info_fd, lua_offsets_fd, luajit_offsets_fd);
@@ -382,6 +389,7 @@ out:
 
 static void lua_parse_and_register(int pid, struct tracer_probes_conf *conf) {
     lua_runtime_info_t info = {0};
+    LuaProcessLayout layout = {0};
     char path[sizeof(info.path)] = {0};
     int n = 0;
 
@@ -412,9 +420,57 @@ static void lua_parse_and_register(int pid, struct tracer_probes_conf *conf) {
     memcpy(path, info.path, len);
     path[len] = '\0';
 
-    n = add_probe_sym_to_tracer_probes(pid, path, conf, lua_symbols, NELEMS(lua_symbols));
+    if (lua_get_process_layout((uint32_t)pid, &layout) != 0) {
+        memset(&layout, 0, sizeof(layout));
+    }
+
+    // Update liblua/exe text mapping range for fallback L recovery.
+    if (g_lua_text_region_fd >= 0 && (layout.has_exe || layout.has_lib)) {
+        struct lua_text_region_t {
+            uint64_t liblua_start;
+            uint64_t liblua_end;
+            uint64_t exe_start;
+            uint64_t exe_end;
+        } region = {
+            .liblua_start = layout.liblua_start,
+            .liblua_end = layout.liblua_end,
+            .exe_start = layout.exe_start,
+            .exe_end = layout.exe_end,
+        };
+
+        uint32_t key = (uint32_t)pid;
+        if (bpf_update_elem(g_lua_text_region_fd, &key, &region, BPF_ANY) == 0) {
+            ebpf_debug(
+                "A lua text region: pid:%d liblua=[0x%lx,0x%lx) exe=[0x%lx,0x%lx) lib:%s exe:%s\n",
+                pid,
+                (unsigned long)region.liblua_start,
+                (unsigned long)region.liblua_end,
+                (unsigned long)region.exe_start,
+                (unsigned long)region.exe_end,
+                layout.has_lib ? (const char *)layout.lib_path : "(none)",
+                layout.has_exe ? (const char *)layout.exe_path : "(none)");
+        } else {
+            ebpf_warning("Failed to update lua text region map: pid:%d err:%s\n",
+                         pid, strerror(errno));
+        }
+    }
+
+    // Lua symbols may reside in the executable or liblua/luajit .so.
+    // Keep the attach order aligned with python_parse_and_register() for readability.
+    const char *exe_path = (layout.has_exe && layout.exe_path[0] != '\0')
+                           ? (const char *)layout.exe_path : path;
+    n = add_probe_sym_to_tracer_probes(pid, exe_path, conf, lua_symbols, NELEMS(lua_symbols));
     if (n > 0) {
-        ebpf_info("A lua %d uprobe, pid:%d, path:%s\n", n, pid, path);
+        ebpf_info("lua uprobe, pid:%d, path:%s\n", pid, exe_path);
+        return;
+    }
+
+    if (layout.has_lib && layout.lib_path[0] != '\0') {
+        const char *lib_path = (const char *)layout.lib_path;
+        n = add_probe_sym_to_tracer_probes(pid, lib_path, conf, lua_symbols, NELEMS(lua_symbols));
+        if (n > 0) {
+            ebpf_info("lua uprobe, pid:%d, path:%s\n", pid, lib_path);
+        }
     }
 }
 
@@ -654,6 +710,11 @@ void unwind_process_exit(int pid) {
     pthread_mutex_lock(&tracer->mutex_probes_lock);
     clear_lua_probes_by_pid(tracer, pid);
     pthread_mutex_unlock(&tracer->mutex_probes_lock);
+
+    if (g_lua_text_region_fd >= 0) {
+        uint32_t key = (uint32_t)pid;
+        (void)bpf_delete_elem(g_lua_text_region_fd, &key);
+    }
 
     pthread_mutex_lock(&g_php_unwind_table_lock);
     if (g_php_unwind_table) {
