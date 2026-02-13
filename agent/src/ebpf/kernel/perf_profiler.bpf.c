@@ -482,16 +482,58 @@ int lua_validate_L_ptr(void *L, const lua_ofs *o)
 	if (bpf_probe_read_user(&ci, sizeof(ci), (char *)L + o->off_l_ci) != 0) {
 		return 0;
 	}
-	return ci != NULL;
+	if (!ci) {
+		return 0;
+	}
+
+	void *ci_func = NULL;
+	if (bpf_probe_read_user(&ci_func, sizeof(ci_func),
+				(char *)ci + o->off_ci_func) != 0) {
+		return 0;
+	}
+	if (!ci_func) {
+		return 0;
+	}
+
+	__u32 tt = 0;
+	if (bpf_probe_read_user(&tt, sizeof(tt),
+				(char *)ci_func + o->off_tvalue_tt) != 0) {
+		return 0;
+	}
+
+	return 1;
 }
 
 static inline __attribute__ ((always_inline))
 void *lua_try_recover_L_from_regs(struct pt_regs *regs, const lua_ofs *o)
 {
-#if defined(__aarch64__)
-	// On aarch64, lua_State* is typically passed in x20
-	return (void *)(unsigned long)regs->regs[20];
-#endif
+	/*
+	 * x20 for Lua5.4, x21 for Lua5.3, x19 for Lua5.2, x23 for Lua5.1
+	 */
+	
+	__u64 raw = regs->regs[19];
+	void *candidate = (void *)(unsigned long)raw;
+	if (lua_validate_L_ptr(candidate, o)) {
+		return candidate;
+	}
+
+	raw = regs->regs[20];
+	candidate = (void *)(unsigned long)raw;
+	if (lua_validate_L_ptr(candidate, o)) {
+		return candidate;
+	}
+
+	raw = regs->regs[21];
+	candidate = (void *)(unsigned long)raw;
+	if (lua_validate_L_ptr(candidate, o)) {
+		return candidate;
+	}
+
+	raw = regs->regs[23];
+	candidate = (void *)(unsigned long)raw;
+	if (lua_validate_L_ptr(candidate, o)) {
+		return candidate;
+	}
 	return NULL;
 }
 #endif

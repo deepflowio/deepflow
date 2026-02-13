@@ -282,7 +282,16 @@ pub unsafe extern "C" fn merge_lua_stacks(
         frame
     }
 
-    let lua_frames: Vec<&str> = lua.split(';').filter(|s| !s.is_empty()).collect();
+    let lua_frames_raw: Vec<&str> = lua.split(';').filter(|s| !s.is_empty()).collect();
+    let lua_frames: &[&str] = match lua_frames_raw
+        .iter()
+        .position(|f| f.trim_start().starts_with("L:"))
+    {
+        // Drop root-native frames (e.g. pmain/docall) in general once
+        // logical Lua frames are present.
+        Some(idx) => &lua_frames_raw[idx..],
+        None => &lua_frames_raw[..],
+    };
     let user_frames: Vec<&str> = user.split(';').filter(|s| !s.is_empty()).collect();
 
     // Strategy #1 (existing): replace native stack placeholders ("[unknown ...]") with
@@ -329,14 +338,21 @@ pub unsafe extern "C" fn merge_lua_stacks(
     if replaced == 0 && lua_idx == 0 {
         // Pick an anchor from the interpreter stack that can plausibly appear
         // in the native stack (a resolved C function name).
-        let anchor = lua_frames.iter().rev().find(|f| {
-            let f = f.trim();
-            !f.is_empty()
-                && !f.starts_with("L:")
-                && !is_unknown_placeholder(f)
-                && !f.starts_with("C:0x")
-                && !f.starts_with("builtin#")
-        });
+        let mut anchor: Option<&str> = None;
+        for f in lua_frames_raw.iter().rev() {
+            let raw = f.trim();
+            if raw.starts_with("L:") {
+                break;
+            }
+            if !raw.is_empty()
+                && !is_unknown_placeholder(raw)
+                && !raw.starts_with("C:0x")
+                && !raw.starts_with("builtin#")
+            {
+                anchor = Some(*f);
+                break;
+            }
+        }
 
         if let Some(anchor) = anchor {
             let anchor_norm = strip_known_prefix(anchor);
@@ -382,6 +398,18 @@ pub unsafe extern "C" fn merge_lua_stacks(
                 return write_combined_output(trace_str, len, &out);
             }
         }
+
+        // No reliable anchor found: append only logical Lua frames (L:...)
+        // when available, to avoid re-inserting root native wrappers
+        // like `pmain` from interpreter stack reconstruction.
+        for lf in lua_frames {
+            if !first {
+                merged.push(b';');
+            }
+            merged.extend_from_slice(lf.as_bytes());
+            first = false;
+        }
+        return write_combined_output(trace_str, len, &merged);
     }
 
     while lua_idx < lua_frames.len() {
