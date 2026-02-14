@@ -129,10 +129,11 @@ impl EbpfDataDump {
 
     unsafe fn meta_packet(lines: &str) -> IResult<&str, MetaPacket<'static>> {
         use nom::{
+            branch::alt,
             bytes::complete::{is_not, tag, take_until},
             character::complete::{char, digit1, hex_digit1, space0, space1},
             multi::{count, many0},
-            sequence::{delimited, pair, preceded, separated_pair, tuple},
+            sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
         };
 
         let mut data = MaybeUninit::<ebpf::SK_BPF_DATA>::zeroed().assume_init();
@@ -274,8 +275,14 @@ impl EbpfDataDump {
             .unwrap();
         data.cap_timestamp = parsed.timestamp_nanos_opt().unwrap() as u64;
 
-        let raw_data: Vec<&str> =
-            many0(delimited(space0, hex_digit1, take_until(" ")))(raw_data)?.1;
+        let raw_data: Vec<&str> = many0(preceded(
+            space0,
+            alt((
+                terminated(hex_digit1, delimited(char('('), is_not(")"), char(')'))),
+                hex_digit1,
+            )),
+        ))(raw_data)?
+        .1;
         let raw_data = raw_data
             .into_iter()
             .map(|b| u8::from_str_radix(b, 16).unwrap())
@@ -368,12 +375,6 @@ pub struct FlowMapTester {
     pub l7_stats_output: Option<Receiver<BatchedBox<L7Stats>>>,
     pub app_proto_log_output: Option<Receiver<AppProto>>,
     pub packet_sequence_output: Option<Receiver<Box<packet_sequence_block::PacketSequenceBlock>>>,
-}
-
-impl Drop for FlowMapTester {
-    fn drop(&mut self) {
-        println!("dropping FlowMapTester");
-    }
 }
 
 pub struct FlowMapTesterBuilder {
