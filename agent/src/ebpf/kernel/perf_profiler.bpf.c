@@ -160,6 +160,8 @@ typedef struct {
 
 	void *py_frame_ptr;
 	__u8 py_offsets_id;
+	__u16 py_version;            // Python version encoded as 0xMMmm (e.g. 3.11 -> 0x030B)
+	__u64 py_none_struct_addr;   // _Py_NoneStruct address (0 if < 3.13)
 
 	void *lua_L_ptr;
 	__u8  lua_is_jit;       // 0: Lua 5.x, 1: LuaJIT
@@ -206,6 +208,8 @@ void reset_unwind_state(unwind_state_t * state)
 
 	state->py_frame_ptr = NULL;
 	state->py_offsets_id = 0;
+	state->py_version = 0;
+	state->py_none_struct_addr = 0;
 	state->luajit_frame = NULL;
 	state->luajit_bot = NULL;
 	state->luajit_skip_depth = 0;

@@ -148,6 +148,7 @@ pub struct PythonUnwindInfo {
     pub tsd_info: TsdInfo,
     pub offsets_id: u8,
     pub _padding: [u8; 5],
+    pub none_struct_addr: u64, // _Py_NoneStruct address for Python 3.13+, 0 otherwise
 }
 
 #[cfg(feature = "enterprise")]
