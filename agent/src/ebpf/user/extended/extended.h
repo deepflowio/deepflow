@@ -110,40 +110,80 @@ int print_extra_pkt_info(bool datadump_enable, const char *pkt_data, int len,
 			 char *buf, int buf_len, u8 direction);
 
 /**
- * @brief **extended_resolve_frame()** Resolve a custom/interpreter frame
- * @param pid Process ID
- * @param addr Frame address/ID
- * @param frame_type Frame type identifier
- * @param extra_a Extra data A from stack map
- * @param extra_b Extra data B from stack map
- * @return Resolved symbol string (must be freed) or NULL
+ * @brief Structured interpreter symbol info for per-frame extraction.
+ * Matches the Rust CSymbolInfo layout (#[repr(C)]).
  */
-char *extended_resolve_frame(int pid, u64 addr, u8 frame_type, u64 extra_a, u64 extra_b);
+#ifndef INTERP_SYMBOL_INFO_DEFINED
+#define INTERP_SYMBOL_INFO_DEFINED
+typedef struct {
+	u32 frame_type;		// FRAME_TYPE_PHP/V8/LUA/PYTHON
+	char *function_name;	// allocated via clib_mem_alloc
+	char *class_name;	// allocated via clib_mem_alloc (or NULL)
+	u32 lineno;
+	char *file_name;	// allocated via clib_mem_alloc (or NULL)
+	u32 sub_type;		// language-specific sub-type
+	u8 is_jit;		// 1 = JIT-compiled frame
+	u64 raw_addr;		// original address
+	u8 resolve_failed;	// 1 = resolution failed
+} interp_symbol_info_t;
+#endif
 
 /**
- * @brief **extended_merge_stacks()** Merge interpreter and user stacks
- * @param dst Destination buffer
- * @param len Buffer length
- * @param i_trace Interpreter stack string
- * @param u_trace User stack string
+ * @brief **extended_extract_interpreter_frames()** Extract structured interpreter frames
  * @param pid Process ID
- * @return Bytes written
+ * @param frame_types Array of frame types from BPF map
+ * @param addrs Array of frame addresses
+ * @param extra_data_a Array of extra data A values
+ * @param extra_data_b Array of extra data B values
+ * @param frame_count Number of frames in arrays
+ * @param tracer BPF tracer handle (for Lua)
+ * @param new_cache Whether this is a new cache entry (for Lua)
+ * @param info_p Process info pointer (for Lua)
+ * @param out_frames Output array of interp_symbol_info_t (caller-allocated)
+ * @param max_out Maximum output frames
+ * @return Number of frames written to out_frames
  */
-int extended_merge_stacks(char *dst, int len, const char *i_trace, const char *u_trace, int pid);
+int extended_extract_interpreter_frames(int pid,
+                                        const u8 *frame_types,
+                                        const u64 *addrs,
+                                        const u64 *extra_data_a,
+                                        const u64 *extra_data_b,
+                                        int frame_count,
+                                        void *tracer,
+                                        bool new_cache,
+                                        void *info_p,
+                                        interp_symbol_info_t *out_frames,
+                                        int max_out);
 
 /**
- * @brief **extended_format_lua_stack()** Format Lua interpreter stack frames
+ * @brief **extended_free_interp_frames()** Free memory owned by interp_symbol_info_t array
+ * @param frames Array of interp_symbol_info_t
+ * @param count Number of entries
+ */
+void extended_free_interp_frames(interp_symbol_info_t *frames, int count);
+
+/**
+ * @brief **extended_extract_structured_frames()** High-level extraction for a stack trace
+ *
+ * Reads user and interpreter BPF stack maps, extracts structured interpreter
+ * frame symbols via per-symbol cache + extract functions.
+ *
  * @param tracer BPF tracer handle
- * @param pid Process ID
- * @param stack_id Interpreter stack ID from BPF map
- * @param stack_map_name Name of the stack map
- * @param h Stack string hash table
- * @param new_cache Whether to create new cache entry
+ * @param tgid Process ID (for cache lookup and process type detection)
+ * @param user_stack_id User stack ID from BPF map (-1 if none)
+ * @param interp_stack_id Interpreter stack ID from BPF map (-1 if none)
+ * @param custom_stack_map_name Name of the custom stack map
+ * @param new_cache Whether cache entry is new
  * @param info_p Process info pointer
- * @return Formatted stack string (caller must free) or NULL
+ * @param out_frames Caller-allocated output array
+ * @param max_out Maximum output frame count
+ * @return Number of frames written to out_frames
  */
-char *extended_format_lua_stack(void *tracer, int pid, int stack_id,
-                                const char *stack_map_name, void *h,
-                                bool new_cache, void *info_p);
+int extended_extract_structured_frames(void *tracer, int tgid,
+                                       int user_stack_id, int interp_stack_id,
+                                       const char *custom_stack_map_name,
+                                       bool new_cache, void *info_p,
+                                       interp_symbol_info_t *out_frames,
+                                       int max_out);
 
 #endif /* DF_EXTENDED_H */

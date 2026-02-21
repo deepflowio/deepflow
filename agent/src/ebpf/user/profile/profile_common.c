@@ -40,7 +40,6 @@
 #include "../load.h"
 #include "../../kernel/include/perf_profiler.h"
 #include "../perf_reader.h"
-#include "../bihash_8_8.h"
 #include "stringifier.h"
 #include "../table.h"
 #include <regex.h>
@@ -48,7 +47,6 @@
 #include "java/jvm_symbol_collect.h"
 #include "profile_common.h"
 #include "../proc.h"
-#include "stringifier.h"
 
 #define UNKNOWN_JAVA_SYMBOL_STR "Unknown"
 
@@ -438,13 +436,12 @@ print_profiler_status(struct profiler_context *ctx,
 		   "stackmap_clear_failed_count\t%lu\n"
 		   "ransfer_count:\t%lu iter_count:\t%lu\nall"
 		   "oc_b:\t%lu bytes free_b:\t%lu bytes use:\t%lu bytes\n"
-		   "stack_str_hash.hit_count %lu\nstack_trace_msg_hash hit %lu\n",
+		   "stack_trace_msg_hash hit %lu\n",
 		   ctx->tag, atomic64_read(&t->recv), atomic64_read(&t->lost),
 		   ctx->perf_buf_lost_a_count, ctx->perf_buf_lost_b_count,
 		   ctx->stack_trace_err, ctx->stackmap_clear_failed_count,
 		   ctx->transfer_count, iter_count,
 		   alloc_b, free_b, alloc_b - free_b,
-		   ctx->stack_str_hash.hit_hash_count,
 		   ctx->msg_hash.hit_hash_count);
 }
 
@@ -468,8 +465,19 @@ static int push_and_free_msg_kvp_cb(stack_trace_msg_hash_kv * kv, void *arg)
 		if (likely(ctx->profiler_stop == 0))
 			r = fun(ctx->callback_ctx, 0, msg);
 
-		if (!(r & TRACER_CALLBACK_FLAG_KEEP_DATA))
+		if (!(r & TRACER_CALLBACK_FLAG_KEEP_DATA)) {
+			/* Free structured interpreter frames if present */
+			if (msg->interp_frame_count > 0
+			    && msg->interp_frames_ptr != 0) {
+				interp_symbol_info_t *frames =
+				    (interp_symbol_info_t *)
+				    msg->interp_frames_ptr;
+				extended_free_interp_frames(
+				    frames, msg->interp_frame_count);
+				clib_mem_free(frames);
+			}
 			clib_mem_free((void *)msg);
+		}
 
 		msg_kv->msg_ptr = 0;
 	}
@@ -869,7 +877,6 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 				   struct bpf_tracer *t,
 				   stack_map_t *stack_map,
 				   stack_map_t *custom_stack_map,
-				   stack_str_hash_t * stack_str_hash,
 				   stack_trace_msg_hash_t * msg_hash,
 				   u32 * count, bool use_a_map)
 {
@@ -1056,7 +1063,7 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 		char *trace_str =
 		    resolve_and_gen_stack_trace_str(t, v,
 		                    stack_map->name, custom_stack_map->name,
-						    stack_str_hash, matched,
+						    matched,
 						    process_name, info_p,
 						    ctx->type ==
 						    PROFILER_TYPE_MEMORY);
@@ -1136,6 +1143,38 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 
 			msg->data_len = strlen((char *)msg->data);
 			clib_mem_free(trace_str);
+
+			/*
+			 * Extract structured interpreter frames (PHP/V8/Lua)
+			 * for server-side symbolization. The weak symbol default
+			 * returns 0 in open-source builds.
+			 */
+			if (matched && ctx->type != PROFILER_TYPE_MEMORY) {
+				interp_symbol_info_t interp_buf[128];
+				int interp_count =
+				    extended_extract_structured_frames(
+					t, v->tgid,
+					v->userstack, v->intpstack,
+					custom_stack_map->name,
+					matched, info_p,
+					interp_buf, 128);
+				if (interp_count > 0) {
+					size_t fsz = interp_count *
+					    sizeof(interp_symbol_info_t);
+					interp_symbol_info_t *fc =
+					    clib_mem_alloc_aligned(
+						"interp_frames", fsz, 0, NULL);
+					if (fc) {
+						memcpy(fc, interp_buf, fsz);
+						msg->interp_frame_count =
+						    interp_count;
+						msg->interp_frames_ptr =
+						    pointer_to_uword(fc);
+						msg->raw_interpreter_data = 1;
+					}
+				}
+			}
+
 			kv.msg_ptr = pointer_to_uword(msg);
 
 			if (stack_trace_msg_hash_add_del(msg_hash,
@@ -1191,25 +1230,6 @@ void process_bpf_stacktraces(struct profiler_context *ctx, struct bpf_tracer *t)
 	u64 sample_cnt_val = 0;
 
 	/*
-	 * Why use g_stack_str_hash?
-	 *
-	 * When the stringizer encounters a stack-ID for the first time in
-	 * the stack trace table, it clears it. If a stack-ID is reused by
-	 * different stack trace keys, the stringizer returns its memoized
-	 * stack trace string. Since stack IDs are unstable between profile
-	 * iterations, we create and destroy the stringizer in each profile
-	 * iteration.
-	 */
-	if (unlikely(ctx->stack_str_hash.buckets == NULL)) {
-		if (init_stack_str_hash
-		    (&ctx->stack_str_hash, "profile_stack_str")) {
-			ebpf_warning("%sinit_stack_str_hash() failed.\n",
-				     ctx->tag);
-			return;
-		}
-	}
-
-	/*
 	 * During each transmission iteration, we have a hashmap structure in
 	 * place for the following purposes:
 	 *
@@ -1250,7 +1270,7 @@ void process_bpf_stacktraces(struct profiler_context *ctx, struct bpf_tracer *t)
 		 * data aggregation will be blocked if there is no data.
 		 */
 		aggregate_stack_traces(ctx, t, stack_map, custom_stack_map,
-				       &ctx->stack_str_hash, &ctx->msg_hash,
+				       &ctx->msg_hash,
 				       &count, using_map_set_a);
 
 		/*
@@ -1283,9 +1303,6 @@ release_iter:
 			    sample_count_idx, &sample_cnt_val);
 
 	//print_profiler_status(ctx, t, count);
-
-	/* free all elems */
-	clean_stack_strs(&ctx->stack_str_hash);
 
 	/* Push messages and free stack_trace_msg_hash */
 	push_and_release_stack_trace_msg(ctx, &ctx->msg_hash, false);
