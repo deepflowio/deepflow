@@ -3,7 +3,7 @@ on:
     branches:
       - main
       - v6.[1-9]
-      - v7.[1-9]
+      - v7.[0-9]
       - 'feature-**'
     paths:
       - 'agent/**'
