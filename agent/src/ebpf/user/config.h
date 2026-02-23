@@ -94,6 +94,7 @@
 #define MAP_LUA_OFFSETS_NAME            "__lua_offsets_map"
 #define MAP_LUAJIT_OFFSETS_NAME         "__luajit_offsets_map"
 #define MAP_LUA_TSTATE_NAME             "__lua_tstate_map"
+#define MAP_LUA_TEXT_REGION_NAME        "__lua_text_region_map"
 
 #define MAP_CP_PROGS_JMP_KP_NAME             "__cp_progs_jmp_kp_map"
 #define PROG_OFFCPU_DWARF_UNWIND_FOR_KP      "df_KP_offcpu_dwarf_unwind"

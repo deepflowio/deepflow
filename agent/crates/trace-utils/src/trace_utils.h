@@ -135,6 +135,20 @@ typedef struct {
 } lua_runtime_info_t;
 #endif
 
+#if defined(DF_ENTERPRISE)
+typedef struct {
+    uint64_t liblua_start;
+    uint64_t liblua_end;
+    uint64_t exe_start;
+    uint64_t exe_end;
+    uint8_t lib_path[LUA_RUNTIME_PATH_LEN];
+    uint8_t exe_path[LUA_RUNTIME_PATH_LEN];
+    uint8_t has_lib;
+    uint8_t has_exe;
+    uint8_t reserved[6];
+} lua_process_layout_t;
+#endif
+
 typedef struct {
     uint32_t id;
     uint16_t entry_start;
@@ -605,6 +619,10 @@ extern bool is_v8_process(uint32_t pid);
 
 #if defined(DF_ENTERPRISE)
 extern int32_t lua_detect(uint32_t pid, lua_runtime_info_t *out);
+#endif
+
+#if defined(DF_ENTERPRISE)
+extern int32_t lua_get_process_layout(uint32_t pid, lua_process_layout_t *out);
 #endif
 
 #if defined(DF_ENTERPRISE)

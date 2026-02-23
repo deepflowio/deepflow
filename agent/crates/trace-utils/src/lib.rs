@@ -142,6 +142,21 @@ pub struct LuaRuntimeInfo {
 
 #[cfg(feature = "enterprise")]
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct LuaProcessLayout {
+    pub liblua_start: u64,
+    pub liblua_end: u64,
+    pub exe_start: u64,
+    pub exe_end: u64,
+    pub lib_path: [u8; LUA_RUNTIME_PATH_LEN],
+    pub exe_path: [u8; LUA_RUNTIME_PATH_LEN],
+    pub has_lib: u8,
+    pub has_exe: u8,
+    pub reserved: [u8; 6],
+}
+
+#[cfg(feature = "enterprise")]
+#[repr(C)]
 pub struct PythonUnwindInfo {
     pub auto_tls_key_addr: u64,
     pub version: u16,
@@ -589,6 +604,7 @@ extern "C" {
         lua_offsets_fd: i32,
         luajit_offsets_fd: i32,
     );
+    pub fn lua_get_process_layout(pid: u32, out: *mut LuaProcessLayout) -> i32;
 
     pub fn lua_unwind_table_create(
         lang_flags_fd: i32,
