@@ -59,6 +59,7 @@ include = [
   "ProcessShardList",
   "UnwindEntryShard",
   "LuaRuntimeInfo",
+  "LuaProcessLayout",
   "PythonUnwindInfo",
   "PythonOffsets",
   "PythonUnwindTable",
@@ -108,6 +109,7 @@ PythonOffsets = "python_offsets_t"
 PythonUnwindInfo = "python_unwind_info_t"
 PythonUnwindTable = "python_unwind_table_t"
 LuaRuntimeInfo = "lua_runtime_info_t"
+LuaProcessLayout = "lua_process_layout_t"
 LuaUnwindInfo = "lua_unwind_info_t"
 LuaUnwindTable = "lua_unwind_table_t"
 LuaOfs = "lua_ofs"
