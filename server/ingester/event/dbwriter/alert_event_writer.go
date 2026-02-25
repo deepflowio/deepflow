@@ -136,9 +136,6 @@ func (e *AlertEventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 	cache.Fields = cache.Fields[:0]
 	cache.FieldValues = cache.FieldValues[:0]
 
-	// tags
-	flowTagInfo.FieldType = flow_tag.FieldTag
-
 	tagStrLen := len(e.TagStrKeys)
 	tagIntLen := len(e.TagIntKeys)
 	customTagLen := len(e.CustomTagKeys)
@@ -148,14 +145,17 @@ func (e *AlertEventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 			name = e.TagStrKeys[i]
 			value = e.TagStrValues[i]
 			flowTagInfo.FieldValueType = flow_tag.FieldValueTypeString
+			flowTagInfo.FieldType = flow_tag.FieldTag
 		} else if i < tagStrLen+tagIntLen {
 			name = e.TagIntKeys[i-tagStrLen]
 			value = strconv.FormatInt(e.TagIntValues[i-tagStrLen], 10)
 			flowTagInfo.FieldValueType = flow_tag.FieldValueTypeInt
+			flowTagInfo.FieldType = flow_tag.FieldTag
 		} else {
 			name = e.CustomTagKeys[i-tagStrLen-tagIntLen]
 			value = e.CustomTagValues[i-tagStrLen-tagIntLen]
 			flowTagInfo.FieldValueType = flow_tag.FieldValueTypeString
+			flowTagInfo.FieldType = flow_tag.FieldCustomTag
 		}
 
 		flowTagInfo.FieldName = name

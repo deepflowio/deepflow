@@ -50,6 +50,7 @@ type FieldType uint8
 const (
 	FieldTag FieldType = iota
 	FieldMetrics
+	FieldCustomTag
 )
 
 func (t FieldType) String() string {
@@ -58,6 +59,8 @@ func (t FieldType) String() string {
 		return "tag"
 	case FieldMetrics:
 		return "metrics"
+	case FieldCustomTag:
+		return "custom_tag"
 	default:
 		return "invalid field type"
 	}
@@ -132,7 +135,7 @@ func (t *FlowTag) Columns() []*ckdb.Column {
 		ckdb.NewColumn("table", ckdb.LowCardinalityString),
 		ckdb.NewColumn("vpc_id", ckdb.Int32),
 		ckdb.NewColumn("pod_ns_id", ckdb.UInt16),
-		ckdb.NewColumn("field_type", ckdb.LowCardinalityString).SetComment("value: tag, metrics"),
+		ckdb.NewColumn("field_type", ckdb.LowCardinalityString).SetComment("value: tag, custom_tag, metrics"),
 		ckdb.NewColumn("field_name", ckdb.LowCardinalityString),
 		ckdb.NewColumn("field_value_type", ckdb.LowCardinalityString).SetComment("value: string, float, int"),
 		ckdb.NewColumn("team_id", ckdb.UInt16),
