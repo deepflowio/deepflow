@@ -991,7 +991,7 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		} else if table == "" {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, whereSql, limit)
 		} else if table == "alert_event" {
-			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table, field_value_type FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name, table, field_value_type ORDER BY tag_name ASC LIMIT %s", db, table, whereSql, limit)
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table, field_type FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type in ('tag', 'custom_tag') AND (%s) GROUP BY tag_name, table, field_type ORDER BY tag_name ASC LIMIT %s", db, table, whereSql, limit)
 		} else {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, whereSql, limit)
 		}
@@ -1001,7 +1001,7 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		} else if table == "" {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, limit)
 		} else if table == "alert_event" {
-			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table, field_value_type FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name, table, field_value_type ORDER BY tag_name ASC LIMIT %s", db, table, limit)
+			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table, field_type FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type in ('tag', 'custom_tag') GROUP BY tag_name, table, field_type ORDER BY tag_name ASC LIMIT %s", db, table, limit)
 		} else {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, limit)
 		}
@@ -1026,9 +1026,12 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 		} else if table == "alert_event" {
 			externalTag := tagName.(string)
 			var categoryValue string
-			// fieltValueType := _tagName.([]interface{})[2]
-			if strings.HasPrefix(externalTag, "cloud.tag.") || strings.HasPrefix(externalTag, "k8s.label.") || strings.HasPrefix(externalTag, "os.app.") || strings.HasPrefix(externalTag, "k8s.annotation.") || strings.HasPrefix(externalTag, "k8s.env.") || strings.HasPrefix(externalTag, "custom_tag.") {
+			fieldType := _tagName.([]interface{})[2]
+			if strings.HasPrefix(externalTag, "cloud.tag.") || strings.HasPrefix(externalTag, "k8s.label.") || strings.HasPrefix(externalTag, "os.app.") || strings.HasPrefix(externalTag, "k8s.annotation.") || strings.HasPrefix(externalTag, "k8s.env.") || fieldType == "custom_tag" {
 				categoryValue = "Custom Tag"
+				if fieldType == "custom_tag" {
+					externalTag = "custom_tag." + externalTag
+				}
 				response.Values = append(response.Values, []interface{}{
 					externalTag, externalTag, externalTag, externalTag, externalTag, externalTag, "map_item",
 					categoryValue, tagTypeToOperators["string"], []bool{true, true, true}, externalTag, externalTag, externalTag, "", false, notSupportOperator, tableName,
