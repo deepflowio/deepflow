@@ -915,10 +915,11 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 				} else if strings.HasPrefix(tagName, "custom_tag.") {
 					tagItem, ok = tag.GetTag("custom_tag.", db, table, "default")
+					tagNameNoPrefix := strings.TrimPrefix(tagName, "custom_tag.")
 					if strings.Contains(op, "match") {
-						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, tagName, t.Value)
+						filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, op, tagNameNoPrefix, t.Value)
 					} else {
-						filter = fmt.Sprintf(tagItem.WhereTranslator, tagName, op, t.Value)
+						filter = fmt.Sprintf(tagItem.WhereTranslator, tagNameNoPrefix, op, t.Value)
 					}
 				} else {
 					switch strings.Trim(t.Tag, "`") {
