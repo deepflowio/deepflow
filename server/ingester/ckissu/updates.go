@@ -403,14 +403,32 @@ var ColumnAdd71 = []*ColumnAdds{
 	{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
-		ColumnNames: []string{"biz_code", "biz_scenario"},
+		ColumnNames: []string{"biz_code", "biz_scenario", "biz_response_code"},
 		ColumnType:  ckdb.String,
+	},
+	{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"biz_protocol"},
+		ColumnType:  ckdb.LowCardinalityString,
 	},
 	{
 		Dbs:         []string{"event"},
 		Tables:      []string{"alert_event", "alert_event_local"},
 		ColumnNames: []string{"trigger_threshold", "metric_unit", "metric_value_str"},
 		ColumnType:  ckdb.String,
+	},
+	{
+		Dbs:         []string{"event"},
+		Tables:      []string{"alert_event", "alert_event_local"},
+		ColumnNames: []string{"custom_tag_names"},
+		ColumnType:  ckdb.ArrayLowCardinalityString,
+	},
+	{
+		Dbs:         []string{"event"},
+		Tables:      []string{"alert_event", "alert_event_local"},
+		ColumnNames: []string{"custom_tag_values"},
+		ColumnType:  ckdb.ArrayString,
 	},
 	{
 		Dbs: []string{"flow_metrics"},
@@ -464,7 +482,7 @@ var IndexAdd71 = []*IndexAdds{
 	{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log_local"},
-		ColumnNames: []string{"biz_code", "biz_scenario"},
+		ColumnNames: []string{"biz_code", "biz_scenario", "biz_response_code", "biz_protocol"},
 		IndexType:   ckdb.IndexBloomfilter,
 	},
 }

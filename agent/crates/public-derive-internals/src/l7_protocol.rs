@@ -88,6 +88,9 @@ pub trait L7Log: L7LogAttribute {
     fn get_biz_scenario(&self) -> Field<'_>;
     fn set_biz_scenario(&mut self, setter: FieldSetter<'_>);
 
+    fn get_biz_response_code(&self) -> Field<'_>;
+    fn set_biz_response_code(&mut self, setter: FieldSetter<'_>);
+
     fn get(&self, tag: NativeTag) -> Field<'_> {
         match tag {
             NativeTag::Version => self.get_version(),
@@ -109,6 +112,7 @@ pub trait L7Log: L7LogAttribute {
             NativeTag::BizType => self.get_biz_type(),
             NativeTag::BizCode => self.get_biz_code(),
             NativeTag::BizScenario => self.get_biz_scenario(),
+            NativeTag::BizResponseCode => self.get_biz_response_code(),
         }
     }
 
@@ -138,6 +142,7 @@ pub trait L7Log: L7LogAttribute {
             NativeTag::BizType => self.set_biz_type(setter),
             NativeTag::BizCode => self.set_biz_code(setter),
             NativeTag::BizScenario => self.set_biz_scenario(setter),
+            NativeTag::BizResponseCode => self.set_biz_response_code(setter),
         }
     }
 }
@@ -299,4 +304,5 @@ pub enum NativeTag {
     BizType,
     BizCode,
     BizScenario,
+    BizResponseCode,
 }

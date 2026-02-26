@@ -39,6 +39,8 @@ use super::{
     value_is_default, AppProtoHead, L7ResponseStatus, PrioField,
 };
 
+#[cfg(feature = "libtrace")]
+use crate::utils::bytes::read_u32_le;
 use crate::{
     common::{
         ebpf::EbpfType,
@@ -56,7 +58,7 @@ use crate::{
         set_captured_byte, L7ProtoRawDataType, BASE_FIELD_PRIORITY, PLUGIN_FIELD_PRIORITY,
     },
     plugin::CustomInfo,
-    utils::bytes::{read_u32_be, read_u32_le},
+    utils::bytes::read_u32_be,
 };
 
 cfg_if::cfg_if! {
@@ -325,6 +327,8 @@ pub struct HttpInfo {
     biz_code: String,
     #[serde(skip_serializing_if = "value_is_default")]
     biz_scenario: String,
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_response_code: String,
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
@@ -445,16 +449,6 @@ impl HttpInfo {
             || self.msg_type == LogMessageType::Other
     }
 
-    // when response_code is overwritten, put it into the attributes.
-    fn response_code_to_attribute(&mut self) {
-        if let Some(code) = self.status_code {
-            self.attributes.push(KeyVal {
-                key: SYS_RESPONSE_CODE_ATTR.to_string(),
-                val: code.to_string(),
-            });
-        }
-    }
-
     pub fn merge_custom_to_http(&mut self, custom: CustomInfo, dir: PacketDirection) {
         if dir == PacketDirection::ClientToServer {
             if let Ok(v) = Version::try_from(custom.req.version.as_str()) {
@@ -484,7 +478,6 @@ impl HttpInfo {
 
         if dir == PacketDirection::ServerToClient {
             if let Some(code) = custom.resp.code {
-                self.response_code_to_attribute();
                 self.status_code = Some(code as u16);
             }
 
@@ -539,6 +532,9 @@ impl HttpInfo {
         }
         if let Some(biz_scenario) = custom.biz_scenario {
             self.biz_scenario = biz_scenario;
+        }
+        if let Some(biz_response_code) = custom.biz_response_code {
+            self.biz_response_code = biz_response_code;
         }
 
         if let Some(is_async) = custom.is_async {
@@ -634,6 +630,7 @@ impl HttpInfo {
         super::swap_if!(self, dubbo_service_version, is_empty, other);
         super::swap_if!(self, biz_code, is_empty, other);
         super::swap_if!(self, biz_scenario, is_empty, other);
+        super::swap_if!(self, biz_response_code, is_empty, other);
 
         let other_trace_ids = mem::take(&mut other.trace_ids);
         self.trace_ids.merge(other_trace_ids);
@@ -713,7 +710,7 @@ impl HttpInfo {
         false
     }
 
-    fn get_version(&self) -> Field {
+    fn get_version(&self) -> Field<'_> {
         if self.proto == L7Protocol::Triple {
             return Field::Str(Cow::Borrowed(&self.dubbo_service_version.as_str()));
         }
@@ -733,7 +730,7 @@ impl HttpInfo {
         }
     }
 
-    fn get_method(&self) -> Field {
+    fn get_method(&self) -> Field<'_> {
         Field::Str(Cow::Borrowed(self.method.as_str()))
     }
 
@@ -744,7 +741,7 @@ impl HttpInfo {
         }
     }
 
-    fn get_endpoint(&self) -> Field {
+    fn get_endpoint(&self) -> Field<'_> {
         if self.is_grpc() {
             if self.path.is_empty() {
                 Field::None
@@ -779,7 +776,7 @@ impl HttpInfo {
         }
     }
 
-    fn get_trace_id(&self) -> Field {
+    fn get_trace_id(&self) -> Field<'_> {
         Field::Str(Cow::Borrowed(&self.trace_ids.highest()))
     }
 
@@ -932,6 +929,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             flags: flags.bits(),
             biz_code: f.biz_code,
             biz_scenario: f.biz_scenario,
+            biz_response_code: f.biz_response_code,
             ..Default::default()
         }
     }
@@ -961,7 +959,7 @@ impl From<&HttpInfo> for LogCache {
 #[derive(Default)]
 pub struct HttpLog {
     proto: L7Protocol,
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     http2_req_decoder: Option<Decoder<'static>>,
     http2_resp_decoder: Option<Decoder<'static>>,
 
@@ -977,9 +975,6 @@ impl L7ProtocolParserInterface for HttpLog {
 
         let mut info = HttpInfo::default();
 
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
         // http2 有两个版本, 现在可以直接通过proto区分解析哪个版本的协议.
         match self.proto {
             L7Protocol::Http1 => self.http1_check_protocol(payload),
@@ -991,6 +986,7 @@ impl L7ProtocolParserInterface for HttpLog {
                     self.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
                 }
                 match param.ebpf_type {
+                    #[cfg(feature = "libtrace")]
                     EbpfType::GoHttp2Uprobe
                     | EbpfType::GoHttp2UprobeData
                     | EbpfType::UnixSocket => {
@@ -1041,9 +1037,7 @@ impl L7ProtocolParserInterface for HttpLog {
             return Err(Error::NoParseConfig);
         };
 
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
+        self.perf_stats.clear();
 
         #[cfg(feature = "enterprise")]
         self.custom_field_store.clear();
@@ -1104,6 +1098,7 @@ impl L7ProtocolParserInterface for HttpLog {
                     };
 
                     let ret = match param.ebpf_type {
+                        #[cfg(feature = "libtrace")]
                         EbpfType::GoHttp2Uprobe => self.parse_http2_go_uprobe(
                             &config.l7_log_dynamic,
                             &payload[offset..],
@@ -1189,14 +1184,14 @@ impl L7ProtocolParserInterface for HttpLog {
             },
             _ => unreachable!(),
         };
-        new_log.perf_stats = self.perf_stats.take();
+        new_log.perf_stats = self.perf_stats();
         new_log.http2_req_decoder = self.http2_req_decoder.take();
         new_log.http2_resp_decoder = self.http2_resp_decoder.take();
         *self = new_log;
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 
@@ -1314,7 +1309,7 @@ impl HttpLog {
         }
 
         #[cfg(feature = "enterprise")]
-        self.merge_custom_fields(custom_policies, l7_payload, info);
+        self.merge_custom_fields(custom_policies, payload, l7_payload, info);
 
         // In uprobe mode, headers are reported in a way different from other modes:
         // one payload contains one header.
@@ -1326,7 +1321,8 @@ impl HttpLog {
 
         info.is_on_blacklist = info.check_on_blacklist(config);
 
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if info.msg_type == LogMessageType::Response {
                 if let Some(endpoint) = info.load_endpoint_from_cache(param, info.is_reversed) {
                     info.endpoint = Some(endpoint.to_string());
@@ -1334,8 +1330,9 @@ impl HttpLog {
             }
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
     }
 
@@ -1405,6 +1402,7 @@ impl HttpLog {
     // +---------------------------------------------------------------+
     // |                          value (valueLength,变长)           ...|
     // +---------------------------------------------------------------+
+    #[cfg(feature = "libtrace")]
     pub fn check_http2_go_uprobe(
         &mut self,
         config: &L7LogDynamicConfig,
@@ -1486,6 +1484,7 @@ impl HttpLog {
         }
     }
 
+    #[cfg(feature = "libtrace")]
     pub fn parse_http2_go_uprobe(
         &mut self,
         config: &L7LogDynamicConfig,
@@ -1622,10 +1621,7 @@ impl HttpLog {
             }
         }
 
-        #[cfg(target_os = "linux")]
-        let l7_payload = headers.remaining_buf().trim_ascii_start();
-        #[cfg(target_os = "windows")]
-        let l7_payload = Self::trim_ascii_start(headers.remaining_buf());
+        let l7_payload = V1Structure::new(payload).body;
 
         set_captured_byte!(info, param);
         // 当解析完所有Header仍未找到Content-Length，则认为该字段值为0
@@ -2131,12 +2127,15 @@ impl HttpLog {
     fn merge_custom_fields(
         &mut self,
         policies: Option<PolicySlice>,
+        payload: &[u8],
         l7_payload: Option<&[u8]>,
         info: &mut HttpInfo,
     ) {
         let Some(policies) = policies else {
             return;
         };
+
+        let mut headers: Option<&[u8]> = None;
 
         for op in self.custom_field_store.drain_with(policies, &*info) {
             match &op.op {
@@ -2171,6 +2170,15 @@ impl HttpLog {
                         key: key.to_string(),
                         val: *value,
                     });
+                }
+                Op::SaveHeader(key) => {
+                    let header = headers.get_or_insert_with(|| V1Structure::new(payload).headers);
+                    if !header.is_empty() {
+                        info.attributes.push(KeyVal {
+                            key: key.to_string(),
+                            val: String::from_utf8_lossy(header).to_string(),
+                        });
+                    }
                 }
                 Op::SavePayload(key) => {
                     if let Some(l7_payload) = l7_payload {
@@ -2383,12 +2391,6 @@ pub fn get_http_resp_info(line_info: &str) -> Result<(Version, u16)> {
 
 pub struct V1HeaderIterator<'a>(&'a [u8]);
 
-impl<'a> V1HeaderIterator<'a> {
-    pub fn remaining_buf(&self) -> &'a [u8] {
-        self.0
-    }
-}
-
 impl<'a> Iterator for V1HeaderIterator<'a> {
     type Item = &'a str;
 
@@ -2417,6 +2419,38 @@ impl<'a> Iterator for V1HeaderIterator<'a> {
 
 pub fn parse_v1_headers(payload: &[u8]) -> V1HeaderIterator<'_> {
     V1HeaderIterator(payload)
+}
+
+struct V1Structure<'a> {
+    first_line: &'a [u8],
+    headers: &'a [u8],
+    body: &'a [u8],
+}
+
+impl<'a> V1Structure<'a> {
+    pub fn new(payload: &'a [u8]) -> Self {
+        let Some(end) = payload.windows(2).position(|w| w == b"\r\n") else {
+            return Self {
+                first_line: payload,
+                headers: &[],
+                body: &[],
+            };
+        };
+        let first_line = &payload[..end];
+        let payload = &payload[end + 2..];
+        match payload.windows(4).position(|w| w == b"\r\n\r\n") {
+            None => Self {
+                first_line,
+                headers: payload,
+                body: &[],
+            },
+            Some(end) => Self {
+                first_line,
+                headers: &payload[..end + 2], // include one "\r\n"
+                body: &payload[end + 4..],
+            },
+        }
+    }
 }
 
 pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
@@ -2451,33 +2485,27 @@ pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{
-        config::TagFilterOperator,
-        handler::{BlacklistTrie, L7LogDynamicConfigBuilder, LogParserConfig, TraceType},
-        HttpEndpoint, HttpEndpointMatchRule, HttpEndpointTrie,
-    };
-    use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
-    use crate::utils::test::Capture;
-    use crate::{
-        common::{
-            l7_protocol_log::{EbpfParam, L7PerfCache},
-            MetaPacket,
-        },
-        config::{config::Iso8583ParseConfig, OracleConfig},
-    };
-
-    use std::cell::RefCell;
-    use std::collections::HashSet;
-    use std::fmt;
-    use std::fs;
-    use std::mem::size_of;
-    use std::net::{IpAddr, Ipv4Addr};
-    use std::path::Path;
-    use std::rc::Rc;
-    use std::slice::from_raw_parts;
-    use std::time::Duration;
-
     use super::*;
+
+    #[cfg(feature = "libtrace")]
+    use std::net::{IpAddr, Ipv4Addr};
+    use std::{cell::RefCell, collections::HashSet, fmt, fs, path::Path, rc::Rc, time::Duration};
+
+    #[cfg(feature = "libtrace")]
+    use crate::config::{
+        config::{Iso8583ParseConfig, WebSphereMqParseConfig},
+        OracleConfig,
+    };
+    use crate::{
+        common::{l7_protocol_log::L7PerfCache, MetaPacket},
+        config::{
+            config::TagFilterOperator,
+            handler::{BlacklistTrie, L7LogDynamicConfigBuilder, LogParserConfig, TraceType},
+            HttpEndpoint, HttpEndpointMatchRule, HttpEndpointTrie,
+        },
+        flow_generator::L7_RRT_CACHE_CAPACITY,
+        utils::test_utils::Capture,
+    };
 
     const FILE_DIR: &str = "resources/test/flow_generator/http";
 
@@ -2569,7 +2597,7 @@ mod tests {
             span_set.insert(TraceType::Sw8.as_str());
             let param = &mut ParseParam::new(
                 packet as &MetaPacket,
-                log_cache.clone(),
+                Some(log_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
@@ -2722,6 +2750,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "libtrace")]
     #[test]
     fn test_go_uprobe() {
         #[derive(Debug)]
@@ -2735,7 +2764,10 @@ mod tests {
             fn to_bytes(self, key: &str, val: &str) -> Vec<u8> {
                 let hdr_p;
                 unsafe {
-                    hdr_p = from_raw_parts(&self as *const Self as *const u8, size_of::<Self>());
+                    hdr_p = std::slice::from_raw_parts(
+                        &self as *const Self as *const u8,
+                        std::mem::size_of::<Self>(),
+                    );
                 }
                 return [hdr_p, key.as_bytes(), val.as_bytes()].concat();
             }
@@ -2750,7 +2782,7 @@ mod tests {
             flow_id: 0,
             direction: PacketDirection::ClientToServer,
             ebpf_type: EbpfType::GoHttp2Uprobe,
-            ebpf_param: Some(EbpfParam {
+            ebpf_param: Some(crate::common::l7_protocol_log::EbpfParam {
                 is_tls: false,
                 is_req_end: false,
                 is_resp_end: false,
@@ -2762,7 +2794,7 @@ mod tests {
             parse_perf: true,
             parse_log: true,
             parse_config: Some(&conf),
-            l7_perf_cache: Rc::new(RefCell::new(L7PerfCache::new(1))),
+            l7_perf_cache: Some(Rc::new(RefCell::new(L7PerfCache::new(1)))),
             wasm_vm: Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             so_func: Default::default(),
@@ -2772,6 +2804,7 @@ mod tests {
             captured_byte: 1000,
             oracle_parse_conf: OracleConfig::default(),
             iso8583_parse_conf: Iso8583ParseConfig::default(),
+            web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
             icmp_data: None,
         };
 
@@ -2903,7 +2936,9 @@ mod tests {
         let packet = MetaPacket::empty();
         let mut param = ParseParam::new(
             &packet,
-            Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY))),
+            Some(Rc::new(RefCell::new(L7PerfCache::new(
+                L7_RRT_CACHE_CAPACITY,
+            )))),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),
@@ -2976,25 +3011,43 @@ mod tests {
 
         assert_eq!(
             expected[0].1,
-            run_perf(expected[0].0, HttpLog::new_v1()),
+            run_perf(expected[0].0, HttpLog::new_v1()).iter().fold(
+                L7PerfStats::default(),
+                |mut s, i| {
+                    s.sequential_merge(&i);
+                    s
+                }
+            ),
             "parse pcap {} unexcepted",
             expected[0].0
         );
         assert_eq!(
             expected[1].1,
-            run_perf(expected[1].0, HttpLog::new_v2(false)),
+            run_perf(expected[1].0, HttpLog::new_v2(false)).iter().fold(
+                L7PerfStats::default(),
+                |mut s, i| {
+                    s.sequential_merge(&i);
+                    s
+                }
+            ),
             "parse pcap {} unexcepted",
             expected[1].0
         );
         assert_eq!(
             expected[2].1,
-            run_perf(expected[2].0, HttpLog::new_v2(true)),
+            run_perf(expected[2].0, HttpLog::new_v2(true)).iter().fold(
+                L7PerfStats::default(),
+                |mut s, i| {
+                    s.sequential_merge(&i);
+                    s
+                }
+            ),
             "parse pcap {} unexcepted",
             expected[2].0
         );
     }
 
-    fn run_perf(pcap: &str, mut http: HttpLog) -> L7PerfStats {
+    fn run_perf(pcap: &str, mut http: HttpLog) -> Vec<L7PerfStats> {
         let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap));
@@ -3007,7 +3060,7 @@ mod tests {
         if http.protocol() == L7Protocol::Http2 || http.protocol() == L7Protocol::Grpc {
             http.set_header_decoder(config.l7_log_dynamic.expected_headers_set.clone());
         }
-
+        let mut perf_stats = vec![];
         for packet in packets.iter_mut() {
             if packet.lookup_key.dst_port == first_dst_port {
                 packet.lookup_key.direction = PacketDirection::ClientToServer;
@@ -3017,7 +3070,7 @@ mod tests {
             if packet.get_l4_payload().is_some() {
                 let param = &mut ParseParam::new(
                     &*packet,
-                    rrt_cache.clone(),
+                    Some(rrt_cache.clone()),
                     Default::default(),
                     #[cfg(any(target_os = "linux", target_os = "android"))]
                     Default::default(),
@@ -3027,8 +3080,9 @@ mod tests {
                 param.set_log_parser_config(&config);
                 let _ = http.parse_payload(packet.get_l4_payload().unwrap(), param);
             }
+            perf_stats.append(&mut http.perf_stats());
         }
-        http.perf_stats.unwrap()
+        perf_stats
     }
 
     #[test]
@@ -3036,13 +3090,14 @@ mod tests {
         fn execute_case(config: &LogParserConfig, packets: &[MetaPacket]) -> L7PerfStats {
             let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(100)));
             let mut http = HttpLog::new_v1();
+            let mut perf_stat = L7PerfStats::default();
             for packet in packets {
                 let Some(payload) = packet.get_l4_payload() else {
                     continue;
                 };
                 let param = &mut ParseParam::new(
                     &*packet,
-                    rrt_cache.clone(),
+                    Some(rrt_cache.clone()),
                     Default::default(),
                     #[cfg(any(target_os = "linux", target_os = "android"))]
                     Default::default(),
@@ -3051,8 +3106,11 @@ mod tests {
                 );
                 param.set_log_parser_config(&config);
                 let _ = http.parse_payload(payload, param);
+                for i in http.perf_stats() {
+                    perf_stat.sequential_merge(&i);
+                }
             }
-            http.perf_stats.unwrap()
+            perf_stat
         }
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join("httpv1.pcap"));
@@ -3064,7 +3122,7 @@ mod tests {
         let blacklist_config = LogParserConfig {
             l7_log_blacklist_trie: HashMap::from([(
                 L7Protocol::Http1,
-                BlacklistTrie::new(&vec![TagFilterOperator {
+                BlacklistTrie::new(vec![TagFilterOperator {
                     field_name: "endpoint".to_string(),
                     operator: "prefix".to_string(),
                     value: "/query".to_string(),
@@ -3283,7 +3341,9 @@ mod tests {
         let packet = MetaPacket::empty();
         let mut param = ParseParam::new(
             &packet,
-            Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY))),
+            Some(Rc::new(RefCell::new(L7PerfCache::new(
+                L7_RRT_CACHE_CAPACITY,
+            )))),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),

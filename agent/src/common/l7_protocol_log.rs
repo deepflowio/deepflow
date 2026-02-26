@@ -34,7 +34,7 @@ use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
 use crate::common::meta_packet::{IcmpData, ProtocolData};
-use crate::config::config::Iso8583ParseConfig;
+use crate::config::config::{Iso8583ParseConfig, WebSphereMqParseConfig};
 use crate::config::handler::LogParserConfig;
 use crate::config::OracleConfig;
 use crate::flow_generator::flow_map::FlowMapCounter;
@@ -307,11 +307,12 @@ pub trait L7ProtocolParserInterface {
     fn reset(&mut self) {}
 
     // return perf data
-    fn perf_stats(&mut self) -> Option<L7PerfStats>;
+    fn perf_stats(&mut self) -> Vec<L7PerfStats>;
 
     fn set_obfuscate_cache(&mut self, _: Option<ObfuscateCache>) {}
 }
 
+#[cfg(feature = "libtrace")]
 #[derive(Clone, Debug)]
 pub struct EbpfParam<'a> {
     pub is_tls: bool,
@@ -336,6 +337,7 @@ pub struct LogCache {
     pub time: u64,
     pub resp_status: L7ResponseStatus,
 
+    // if `on_blacklist` is true, this `LogCache` should be ignored when calculating perf stats
     pub on_blacklist: bool,
 
     // set merged to true when req and resp merge once
@@ -361,6 +363,9 @@ impl LogCache {
 
 impl From<&LogCache> for L7PerfStats {
     fn from(cache: &LogCache) -> Self {
+        if cache.on_blacklist {
+            return L7PerfStats::default();
+        }
         let (request_count, response_count) = match cache.multi_merge_info.as_ref() {
             Some(info) => (
                 if info.req_end { 1 } else { 0 },
@@ -654,6 +659,7 @@ pub struct ParseParam<'a> {
     // ebpf_type 不为 EBPF_TYPE_NONE 会有值
     // ===================================
     // not None when payload from ebpf
+    #[cfg(feature = "libtrace")]
     pub ebpf_param: Option<EbpfParam<'a>>,
     // calculate from cap_seq, req and correspond resp may have same packet seq, non ebpf always 0
     pub packet_start_seq: u64,
@@ -664,7 +670,7 @@ pub struct ParseParam<'a> {
 
     pub parse_config: Option<&'a LogParserConfig>,
 
-    pub l7_perf_cache: Rc<RefCell<L7PerfCache>>,
+    pub l7_perf_cache: Option<Rc<RefCell<L7PerfCache>>>,
 
     // plugins
     pub wasm_vm: Rc<RefCell<Option<WasmVm>>>,
@@ -682,6 +688,7 @@ pub struct ParseParam<'a> {
 
     pub oracle_parse_conf: OracleConfig,
     pub iso8583_parse_conf: Iso8583ParseConfig,
+    pub web_sphere_mq_parse_conf: WebSphereMqParseConfig,
 }
 
 impl<'a> fmt::Debug for ParseParam<'a> {
@@ -695,9 +702,10 @@ impl<'a> fmt::Debug for ParseParam<'a> {
             .field("flow_id", &self.flow_id)
             .field("icmp_data", &self.icmp_data)
             .field("direction", &self.direction)
-            .field("ebpf_type", &self.ebpf_type)
-            .field("ebpf_param", &self.ebpf_param)
-            .field("packet_start_seq", &self.packet_start_seq)
+            .field("ebpf_type", &self.ebpf_type);
+        #[cfg(feature = "libtrace")]
+        ds.field("ebpf_param", &self.ebpf_param);
+        ds.field("packet_start_seq", &self.packet_start_seq)
             .field("packet_end_seq", &self.packet_end_seq)
             .field("time", &self.time)
             .field("parse_perf", &self.parse_perf)
@@ -711,6 +719,7 @@ impl<'a> fmt::Debug for ParseParam<'a> {
             .field("captured_byte", &self.captured_byte)
             .field("oracle_parse_conf", &self.oracle_parse_conf)
             .field("iso8583_parse_conf", &self.iso8583_parse_conf)
+            .field("web_sphere_mq_parse_conf", &self.web_sphere_mq_parse_conf)
             .finish()
     }
 }
@@ -722,7 +731,7 @@ impl<'a> ParseParam<'a> {
 
     pub fn new(
         packet: &'a MetaPacket<'a>,
-        cache: Rc<RefCell<L7PerfCache>>,
+        cache: Option<Rc<RefCell<L7PerfCache>>>,
         wasm_vm: Rc<RefCell<Option<WasmVm>>>,
         #[cfg(any(target_os = "linux", target_os = "android"))] so_func: Rc<
             RefCell<Option<Vec<SoPluginFunc>>>,
@@ -730,7 +739,7 @@ impl<'a> ParseParam<'a> {
         parse_perf: bool,
         parse_log: bool,
     ) -> Self {
-        let mut param = Self {
+        Self {
             l4_protocol: packet.lookup_key.proto,
             ip_src: packet.lookup_key.src_ip,
             ip_dst: packet.lookup_key.dst_ip,
@@ -747,7 +756,20 @@ impl<'a> ParseParam<'a> {
             ebpf_type: packet.ebpf_type,
             packet_start_seq: packet.cap_start_seq,
             packet_end_seq: packet.cap_end_seq,
-            ebpf_param: None,
+            #[cfg(feature = "libtrace")]
+            ebpf_param: if packet.ebpf_type != EbpfType::None {
+                Some(EbpfParam {
+                    is_tls: packet.is_tls(),
+                    is_req_end: packet.is_request_end,
+                    is_resp_end: packet.is_response_end,
+                    #[cfg(unix)]
+                    process_kname: std::str::from_utf8(&packet.process_kname[..]).unwrap_or(""),
+                    #[cfg(windows)]
+                    process_kname: "",
+                })
+            } else {
+                None
+            },
             time: packet.lookup_key.timestamp.as_micros() as u64,
             parse_perf,
             parse_log,
@@ -769,25 +791,14 @@ impl<'a> ParseParam<'a> {
 
             oracle_parse_conf: OracleConfig::default(),
             iso8583_parse_conf: Iso8583ParseConfig::default(),
-        };
-        if packet.ebpf_type != EbpfType::None {
-            param.ebpf_param = Some(EbpfParam {
-                is_tls: packet.is_tls(),
-                is_req_end: packet.is_request_end,
-                is_resp_end: packet.is_response_end,
-                #[cfg(any(target_os = "linux", target_os = "android"))]
-                process_kname: std::str::from_utf8(&packet.process_kname[..]).unwrap_or(""),
-                #[cfg(target_os = "windows")]
-                process_kname: "",
-            });
+            web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
         }
-
-        param
     }
 }
 
 impl<'a> ParseParam<'a> {
     pub fn is_tls(&self) -> bool {
+        #[cfg(feature = "libtrace")]
         if let Some(ebpf_param) = self.ebpf_param.as_ref() {
             return ebpf_param.is_tls;
         }
@@ -820,6 +831,30 @@ impl<'a> ParseParam<'a> {
 
     pub fn set_iso8583_conf(&mut self, conf: &Iso8583ParseConfig) {
         self.iso8583_parse_conf = conf.clone();
+    }
+
+    pub fn set_web_sphere_mq_conf(&mut self, conf: &WebSphereMqParseConfig) {
+        self.web_sphere_mq_parse_conf = conf.clone();
+    }
+
+    pub fn reversed(&self) -> Self {
+        Self {
+            ip_src: self.ip_dst,
+            ip_dst: self.ip_src,
+            port_src: self.port_dst,
+            port_dst: self.port_src,
+            direction: self.direction.reversed(),
+            #[cfg(feature = "libtrace")]
+            ebpf_param: self.ebpf_param.clone(),
+            l7_perf_cache: self.l7_perf_cache.clone(),
+            wasm_vm: self.wasm_vm.clone(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            so_func: self.so_func.clone(),
+            stats_counter: self.stats_counter.clone(),
+            iso8583_parse_conf: self.iso8583_parse_conf.clone(),
+            web_sphere_mq_parse_conf: self.web_sphere_mq_parse_conf.clone(),
+            ..*self
+        }
     }
 }
 
@@ -880,11 +915,11 @@ impl L7ProtocolChecker for L7ProtocolBitmap {
     }
 }
 
-impl From<&[String]> for L7ProtocolBitmap {
-    fn from(vs: &[String]) -> Self {
+impl<T: AsRef<str>> From<&[T]> for L7ProtocolBitmap {
+    fn from(vs: &[T]) -> Self {
         let mut bitmap = L7ProtocolBitmap(0);
         for v in vs.iter() {
-            if let Ok(p) = L7ProtocolParser::try_from(v.as_str()) {
+            if let Ok(p) = L7ProtocolParser::try_from(v.as_ref()) {
                 bitmap.set_enabled(p.protocol());
             }
         }

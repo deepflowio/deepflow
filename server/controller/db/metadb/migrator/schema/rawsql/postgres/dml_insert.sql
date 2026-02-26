@@ -87,8 +87,8 @@ INSERT INTO region (id, name, lcuuid) VALUES (1, '系统默认', 'ffffffff-ffff-
 INSERT INTO az (id, name, lcuuid, region, domain) VALUES (1, '系统默认', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
 INSERT INTO vl2 (state, name, net_type, isp, lcuuid, domain) 
 VALUES (0, 'PublicNetwork', 3, 7, 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
-INSERT INTO tap_type(name, value, vlan, description, lcuuid) 
-VALUES ('云网络', 3, 768, '', gen_random_uuid());
+INSERT INTO tap_type(name, value, vlan, lcuuid) 
+VALUES ('云网络', 3, 768, gen_random_uuid());
 
 INSERT INTO ch_device (devicetype, deviceid, name, icon_id, team_id, domain_id, sub_domain_id) VALUES (63999, 63999, 'Internet', -1, 0, 0, 0);
 INSERT INTO ch_device (devicetype, deviceid, icon_id, team_id, domain_id, sub_domain_id) VALUES (64000, 64000, -10, 0, 0, 0);

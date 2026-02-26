@@ -33,6 +33,7 @@ use public_derive::L7Log;
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
+#[l7_log(biz_response_code.skip = "true")]
 struct DuplicatedFields {
     #[l7_log(endpoint)]
     endpoint: String,

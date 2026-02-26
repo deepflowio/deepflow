@@ -313,8 +313,48 @@ pub struct SK_BPF_DATA {
     pub syscall_trace_id_call: u64,
 
     /* data info */
-    pub timestamp: u64, // cap_data获取的时间戳（从1970.1.1开始到数据捕获时的时间间隔，精度为纳秒）
-    pub direction: u8,  // 数据的收发方向，值是 SOCK_DIR_SND/SOCK_DIR_RCV
+
+    /*
+     * Semantic timestamp of the data (Event / Logical Time).
+     *
+     * Represents the time point to which this event logically belongs,
+     * which is not necessarily the time when the data was actually captured.
+     *
+     * Timestamp selection rules by system call type:
+     *   - Socket send–type system calls:
+     *     Uses the system call entry time to ensure that the send event
+     *     is ordered before the corresponding packets captured later via
+     *     af_packet.
+     *   - File I/O system calls:
+     *     Uses the system call entry time, representing when the I/O
+     *     operation started. The operation duration is expressed separately.
+     *   - Socket recv–type system calls:
+     *     Uses the system call exit time, indicating when received data
+     *     becomes visible to user space.
+     *
+     * Note:
+     * Data is always captured at system call exit, but this field may
+     * refer to the entry time, which can cause timestamp rollback.
+     */
+    pub timestamp: u64, /* ns since Unix epoch */
+
+    /*
+     * Capture timestamp of the data (Capture / Processing Time).
+     *
+     * Indicates the actual time when this data was captured and reported
+     * by the eBPF tracer. This timestamp always corresponds to the
+     * system call exit time.
+     *
+     * This field reflects the true observation order and is typically
+     * monotonically increasing within a single CPU or trace stream.
+     *
+     * This timestamp should be preferred for:
+     *   - Time windowing and aggregation
+     *   - Event ordering and deduplication
+     *   - Latency and performance analysis
+     */
+    pub cap_timestamp: u64, /* ns since Unix epoch */
+    pub direction: u8,      // 数据的收发方向，值是 SOCK_DIR_SND/SOCK_DIR_RCV
 
     /*
      * 说明：
@@ -795,6 +835,7 @@ extern "C" {
     pub fn disable_fentry();
     pub fn enable_fentry();
     pub fn set_virtual_file_collect(enabled: bool) -> c_int;
+
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_observability")] {
             pub fn enable_offcpu_profiler() -> c_int;
@@ -886,6 +927,20 @@ extern "C" {
                */
                pub fn set_socket_fanout_ebpf(socket: c_int, group_id: c_int) -> c_int;
                pub fn envoy_trace_start() -> c_int;
+
+               /**
+                * @brief Enable or disable the TCP option tracing feature.
+                *
+                * When enabled, the tcp_option_tracing eBPF program is loaded and attached
+                * to the root cgroup to insert custom TCP options while processing
+                * sockops callbacks. Disabling this feature detaches the program and
+                * releases associated resources.
+                *
+                * @param enabled Set to `true` to enable the feature or `false` to disable.
+                * @return 0 on success, non-zero on error.
+                */
+                pub fn set_tcp_option_tracing_enabled(enabled: bool) -> c_int;
+                pub fn set_tcp_option_tracing_sample_window(bytes: c_uint) -> c_int;
         }
     }
 }

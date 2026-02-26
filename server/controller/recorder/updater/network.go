@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// NetworkMessageFactory Network资源的消息工厂
+type NetworkMessageFactory struct{}
+
+func (f *NetworkMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedNetworks{}
+}
+
+func (f *NetworkMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedNetwork{}
+}
+
+func (f *NetworkMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedNetworks{}
+}
+
+func (f *NetworkMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedNetworkFields{}
+}
 
 type Network struct {
 	UpdaterBase[
@@ -32,36 +52,12 @@ type Network struct {
 		*diffbase.Network,
 		*metadbmodel.Network,
 		metadbmodel.Network,
-		*message.AddedNetworks,
-		message.AddedNetworks,
-		message.AddNoneAddition,
-		*message.UpdatedNetwork,
-		message.UpdatedNetwork,
-		*message.UpdatedNetworkFields,
-		message.UpdatedNetworkFields,
-		*message.DeletedNetworks,
-		message.DeletedNetworks,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Network {
 	updater := &Network{
-		newUpdaterBase[
-			cloudmodel.Network,
-			*diffbase.Network,
-			*metadbmodel.Network,
-			metadbmodel.Network,
-			*message.AddedNetworks,
-			message.AddedNetworks,
-			message.AddNoneAddition,
-			*message.UpdatedNetwork,
-			message.UpdatedNetwork,
-			*message.UpdatedNetworkFields,
-			message.UpdatedNetworkFields,
-			*message.DeletedNetworks,
-			message.DeletedNetworks,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN,
 			wholeCache,
 			db.NewNetwork().SetMetadata(wholeCache.GetMetadata()),
@@ -69,7 +65,12 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &NetworkMessageFactory{})
+	}
+
 	return updater
 }
 
@@ -100,7 +101,7 @@ func (n *Network) generateDBItemToAdd(cloudItem *cloudmodel.Network) (*metadbmod
 	return dbItem, true
 }
 
-func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *cloudmodel.Network) (*message.UpdatedNetworkFields, map[string]interface{}, bool) {
+func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *cloudmodel.Network) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedNetworkFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {

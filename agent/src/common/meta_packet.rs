@@ -20,22 +20,21 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(unix, feature = "libtrace"))]
 use std::{error::Error, net::Ipv6Addr, ptr};
 
 use bitflags::bitflags;
+use pcap::Linktype;
 use pnet::packet::{
     icmp::{IcmpType, IcmpTypes},
     icmpv6::{Icmpv6Type, Icmpv6Types},
     tcp::{TcpOptionNumber, TcpOptionNumbers},
 };
 
-use super::ebpf::EbpfType;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use super::enums::CaptureNetworkType;
 use super::{
     consts::*,
     decapsulate::TunnelInfo,
+    ebpf::EbpfType,
     endpoint::EndpointDataPov,
     enums::{EthernetType, HeaderType, IpProtocol, TcpFlags},
     flow::{L7Protocol, PacketDirection, SignalSource},
@@ -44,7 +43,7 @@ use super::{
 };
 
 use crate::error;
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(unix, feature = "libtrace"))]
 use crate::{
     common::ebpf::{GO_HTTP2_UPROBE, GO_HTTP2_UPROBE_DATA},
     ebpf::{
@@ -101,6 +100,14 @@ impl<'a> RawPacket<'a> {
         }
     }
 
+    pub fn into_owned(self) -> RawPacket<'static> {
+        match self {
+            Self::Borrowed(b) => RawPacket::OwnedVec(b.to_vec()),
+            Self::Owned(o) => RawPacket::OwnedVec(o.to_vec()),
+            Self::OwnedVec(v) => RawPacket::OwnedVec(v),
+        }
+    }
+
     pub fn append(&mut self, payload: &[u8]) {
         match self {
             Self::OwnedVec(v) => v.extend_from_slice(payload),
@@ -149,22 +156,16 @@ bitflags! {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-#[derive(PartialEq, Clone, Debug)]
+#[cfg(all(unix, feature = "libtrace"))]
+#[derive(PartialEq, Clone, Debug, Default)]
 pub enum SegmentFlags {
+    #[default]
     None,
     Start,
     Seg,
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
-impl Default for SegmentFlags {
-    fn default() -> Self {
-        SegmentFlags::None
-    }
-}
-
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(all(unix, feature = "libtrace"))]
 impl From<u8> for SegmentFlags {
     fn from(value: u8) -> Self {
         match value {
@@ -249,7 +250,7 @@ pub struct MetaPacket<'a> {
     pub is_request_end: bool,
     pub is_response_end: bool,
     pub ebpf_flags: ApplicationFlags,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     pub segment_flags: SegmentFlags,
 
     pub process_id: u32,
@@ -258,7 +259,7 @@ pub struct MetaPacket<'a> {
     pub thread_id: u32,
     pub coroutine_id: u64,
     pub syscall_trace_id: u64,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     pub process_kname: [u8; PACKET_KNAME_MAX_PADDING], // kernel process name
     // for PcapAssembler
     pub flow_id: u64, // PCAP and L7 Log
@@ -1084,7 +1085,7 @@ impl<'a> MetaPacket<'a> {
         self.cap_end_seq = packet.cap_start_seq;
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     #[inline]
     pub unsafe fn from_ebpf(data: &mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
         let (local_ip, remote_ip) = if data.tuple.addr_len == 4 {
@@ -1112,7 +1113,7 @@ impl<'a> MetaPacket<'a> {
         };
 
         let mut packet = MetaPacket::default();
-        let timestamp = Timestamp::from_micros(data.timestamp);
+        let timestamp = Timestamp::from_nanos(data.timestamp);
 
         packet.lookup_key = LookupKey {
             timestamp,
@@ -1128,7 +1129,7 @@ impl<'a> MetaPacket<'a> {
             l2_end_0: data.direction == SOCK_DIR_SND,
             l2_end_1: data.direction == SOCK_DIR_RCV,
             proto: IpProtocol::try_from(data.tuple.protocol)?,
-            tap_type: CaptureNetworkType::Cloud,
+            tap_type: super::enums::CaptureNetworkType::Cloud,
             ..Default::default()
         };
 
@@ -1193,7 +1194,7 @@ impl<'a> MetaPacket<'a> {
         return Ok(packet);
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     #[inline]
     fn parse_direction(msg_type: u8) -> PacketDirection {
         match msg_type {
@@ -1241,7 +1242,7 @@ impl<'a> MetaPacket<'a> {
             (self.lookup_key.dst_ip, self.lookup_key.dst_port),
         );
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         if self.signal_source == SignalSource::EBPF
             && (self.process_kname[..12]).eq(b"redis-server")
         {
@@ -1329,6 +1330,14 @@ impl<'a> MetaPacket<'a> {
             }
         }
     }
+
+    pub fn into_owned(mut self) -> MetaPacket<'static> {
+        let raw = match self.raw.take() {
+            Some(raw) => Some(raw.into_owned()),
+            None => None,
+        };
+        MetaPacket { raw, ..self }
+    }
 }
 
 impl<'a> Iterator for MetaPacket<'a> {
@@ -1414,8 +1423,14 @@ impl CacheItem for MetaPacket<'static> {
         self.l7_protocol_from_ebpf
     }
 
+    #[cfg(feature = "libtrace")]
     fn is_segment_start(&self) -> bool {
         self.segment_flags == SegmentFlags::Start
+    }
+
+    #[cfg(not(feature = "libtrace"))]
+    fn is_segment_start(&self) -> bool {
+        false
     }
 }
 
@@ -1482,6 +1497,76 @@ pub enum ProtocolData {
 impl Default for ProtocolData {
     fn default() -> Self {
         Self::TcpHeader(MetaPacketTcpHeader::default())
+    }
+}
+
+// used in remote exec pcap replay and unit tests
+pub struct PcapData<'a> {
+    pub link_type: pcap::Linktype,
+    pub timestamp: Duration,
+    pub data: &'a [u8],
+}
+
+impl<'a> TryFrom<PcapData<'a>> for MetaPacket<'a> {
+    type Error = error::Error;
+
+    fn try_from(packet: PcapData<'a>) -> Result<Self, Self::Error> {
+        match packet.link_type {
+            Linktype::ETHERNET => {
+                let mut meta = MetaPacket::empty();
+                meta.update(packet.data, true, true, packet.timestamp, 0)?;
+                return Ok(meta);
+            }
+            _ => (),
+        }
+
+        // hack other link types (sll/sll2) because MetaPacket cannot parse them (yet)
+
+        // change SLL header to look like ethernet header just before L3 header
+        let mut data = match packet.link_type {
+            // 2 bytes longer than ethernet header
+            Linktype::LINUX_SLL => (&packet.data[2..]).to_vec(),
+            Linktype::LINUX_SLL2 => {
+                // 6 bytes longer, and L3 type is in first 2 bytes
+                let mut data = (&packet.data[6..]).to_vec();
+                data[12..14].copy_from_slice(&packet.data[0..2]);
+                data
+            }
+            _ => {
+                return Err(error::Error::ParsePacketFailed(format!(
+                    "unsupported link type: {:?}",
+                    packet.link_type
+                )))
+            }
+        };
+
+        let mut meta = MetaPacket::empty();
+        meta.update(&data[..], true, true, packet.timestamp, 0)?;
+
+        let src_ip = meta.lookup_key.src_ip;
+        let dst_ip = meta.lookup_key.dst_ip;
+        // fake mac with ip
+        (&mut data[0..12]).fill(0);
+        match dst_ip {
+            IpAddr::V4(ip) => {
+                data[0..4].copy_from_slice(&ip.octets());
+            }
+            IpAddr::V6(ip) => {
+                data[0..6].copy_from_slice(&ip.octets()[0..6]);
+            }
+        }
+        match src_ip {
+            IpAddr::V4(ip) => {
+                data[6..10].copy_from_slice(&ip.octets());
+            }
+            IpAddr::V6(ip) => {
+                data[6..12].copy_from_slice(&ip.octets()[0..6]);
+            }
+        }
+
+        let mut meta = MetaPacket::empty();
+        meta.update(data, true, true, packet.timestamp, 0)?;
+        Ok(meta)
     }
 }
 

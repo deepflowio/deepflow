@@ -77,7 +77,7 @@ func (e *RemoteExecute) RemoteExecute(stream api.Synchronizer_RemoteExecuteServe
 	go e.receiveAndHandle(ctx, stream)
 
 	<-ctx.cmdMngInitDoneChan
-	log.Infof("agent(key: %s) cmd manager init done", ctx.key)
+	log.Infof("[REMOTE_EXEC] agent(key: %s) cmd manager init done", ctx.key)
 
 	return e.waitAndSend(ctx, stream)
 }
@@ -90,7 +90,7 @@ func (e *RemoteExecute) receiveAndHandle(
 		if r := recover(); r != nil {
 			e.handlePanic(ctx)
 		}
-		log.Infof("agent(key: %s) remote exec stream receive goroutine done", ctx.key)
+		log.Infof("[REMOTE_EXEC] agent(key: %s) remote exec stream receive goroutine done", ctx.key)
 		ctx.wg.Done()
 	}()
 
@@ -117,18 +117,18 @@ func (e *RemoteExecute) receiveAndHandle(
 			e.resetTimer(ctx, agentInactivityTimer)
 
 			if resp == nil {
-				log.Infof("agent received null response: %s", resp.String())
+				log.Infof("[REMOTE_EXEC] agent received null response: %s", resp.String())
 				return
 			}
 			if resp.AgentId == nil {
-				log.Warningf("agent received null agent id: %s", resp.String())
+				log.Warningf("[REMOTE_EXEC] agent received null agent id: %s", resp.String())
 				return
 			}
 
 			e.initCtx(ctx, resp)
 
 			if !ctx.cmdMng.IsValid() {
-				log.Errorf("agent(key: %s) cmd manager not found", ctx.key)
+				log.Errorf("[REMOTE_EXEC] agent(key: %s) cmd manager not found", ctx.key)
 				continue
 			}
 
@@ -140,7 +140,7 @@ func (e *RemoteExecute) receiveAndHandle(
 			}
 
 			if err != nil {
-				log.Errorf("agent(key: %s) received strem error: %s", ctx.key, err.Error())
+				log.Errorf("[REMOTE_EXEC] agent(key: %s) received strem error: %s", ctx.key, err.Error())
 				continue
 			}
 
@@ -150,32 +150,35 @@ func (e *RemoteExecute) receiveAndHandle(
 }
 
 func (e *RemoteExecute) initCtx(ctx *remoteExecContext, resp *api.RemoteExecResponse) {
-	log.Debugf("agent command response: %s", resp.String())
+	log.Debugf("[REMOTE_EXEC] agent command response: %s", resp.String())
 	ctx.key = resp.AgentId.GetIp() + "-" + resp.AgentId.GetMac()
 
 	if !ctx.isFirstRecv {
 		ctx.isFirstRecv = true
-		log.Infof("agent(key: %s) called me for the first time", ctx.key)
+		log.Infof("[REMOTE_EXEC] agent(key: %s) called me for the first time", ctx.key)
 	}
 
 	if ctx.cmdMng == nil {
-		log.Infof("agent(key: %s) cmd manager not found, new one manager", ctx.key)
+		log.Infof("[REMOTE_EXEC] agent(key: %s) cmd manager not found, new one manager", ctx.key)
 		ctx.cmdMng = service.NewAgentCMDManagerIfNotExist(ctx.key, uint64(1))
+		log.Infof("[REMOTE_EXEC] agent(key: %s) cmd manager created, sending init done signal", ctx.key)
 		ctx.cmdMngInitDoneChan <- struct{}{}
+		log.Infof("[REMOTE_EXEC] agent(key: %s) cmd manager init done signal sent successfully", ctx.key)
 	} else {
+		log.Infof("[REMOTE_EXEC] agent(key: %s) cmd manager already exists, reusing existing", ctx.key)
 		ctx.cmdMng = service.GetAgentCMDManager(ctx.key)
 	}
 }
 
 func (e *RemoteExecute) handleResponse(ctx *remoteExecContext, resp *api.RemoteExecResponse) {
 	if resp.RequestId == nil {
-		log.Errorf("agent(key: %s) responsed null request id", ctx.key)
+		log.Errorf("[REMOTE_EXEC] agent(key: %s) responsed null request id", ctx.key)
 		return
 	}
 
 	cmdRespMng := ctx.cmdMng.GetRespManager(*resp.RequestId)
 	if !cmdRespMng.IsValid() {
-		log.Errorf("agent(key: %s, request id: %v) response manager not found", ctx.key, resp.RequestId)
+		log.Errorf("[REMOTE_EXEC] agent(key: %s, request id: %v) response manager not found", ctx.key, resp.RequestId)
 		return
 	}
 
@@ -183,7 +186,7 @@ func (e *RemoteExecute) handleResponse(ctx *remoteExecContext, resp *api.RemoteE
 
 	switch {
 	case resp.Errmsg != nil:
-		log.Errorf("agent(key: %s, request id: %v) run command error: %s", ctx.key, *resp.RequestId, *resp.Errmsg)
+		log.Errorf("[REMOTE_EXEC] agent(key: %s, request id: %v) run command error: %s", ctx.key, *resp.RequestId, *resp.Errmsg)
 		cmdRespMng.SetErrorMessage(*resp.Errmsg)
 
 		result := resp.CommandResult
@@ -208,7 +211,7 @@ func (e *RemoteExecute) handleResponse(ctx *remoteExecContext, resp *api.RemoteE
 		cmdRespMng.GetRemoteCommandsDoneChan <- struct{}{}
 		return
 	default:
-		log.Infof("agent(key: %s, request id: %v) responsed default", ctx.key, *resp.RequestId)
+		log.Infof("[REMOTE_EXEC] agent(key: %s, request id: %v) responsed default", ctx.key, *resp.RequestId)
 		result := resp.CommandResult
 		if result == nil {
 			return
@@ -227,26 +230,35 @@ func (e *RemoteExecute) waitAndSend(
 	ctx *remoteExecContext,
 	stream api.Synchronizer_RemoteExecuteServer,
 ) error {
+	log.Infof("[REMOTE_EXEC] agent(key: %s) waitAndSend started, entering request waiting loop", ctx.key)
+
+	// Log RequestChan buffer status
+	log.Infof("[REMOTE_EXEC] agent(key: %s) RequestChan buffer length: %d, capacity: %d",
+		ctx.key, len(ctx.cmdMng.RequestChan), cap(ctx.cmdMng.RequestChan))
+
 	for {
 		if !ctx.cmdMng.IsValid() {
-			err := fmt.Errorf("agent(key: %s) cmd manager is invalid", ctx.key)
+			err := fmt.Errorf("[REMOTE_EXEC] agent(key: %s) cmd manager is invalid", ctx.key)
 			log.Error(err)
 			return err
 		}
 
+		log.Debugf("[REMOTE_EXEC] agent(key: %s) waiting for requests in select loop", ctx.key)
+
 		select {
 		case <-ctx.streamCtx.Done():
-			log.Infof("agent(key: %s) stream context done, err: %v", ctx.key, ctx.streamCtx.Err())
+			log.Infof("[REMOTE_EXEC] agent(key: %s) stream context done, err: %v", ctx.key, ctx.streamCtx.Err())
 			return ctx.streamCtx.Err()
 		case err := <-ctx.streamHandleErrChan:
 			log.Error(err)
 			return err
 		case req, ok := <-ctx.cmdMng.RequestChan:
 			if !ok {
-				err := fmt.Errorf("agent(key: %s) cmd manager request channel has been closed", ctx.key)
+				err := fmt.Errorf("[REMOTE_EXEC] agent(key: %s) cmd manager request channel has been closed", ctx.key)
 				log.Error(err)
 				return err
 			}
+			log.Infof("[REMOTE_EXEC] agent(key: %s) received request from RequestChan, request_id: %v", ctx.key, req.RequestId)
 			if err := e.sendRequest(ctx, stream, req); err != nil {
 				return err
 			}
@@ -257,35 +269,35 @@ func (e *RemoteExecute) waitAndSend(
 func (e *RemoteExecute) handlePanic(ctx *remoteExecContext) {
 	buf := make([]byte, 2048)
 	n := runtime.Stack(buf, false)
-	err := fmt.Errorf("agent(key: %s) recovered in RemoteExecute: %s", ctx.key, buf[:n])
+	err := fmt.Errorf("[REMOTE_EXEC] agent(key: %s) recovered in RemoteExecute: %s", ctx.key, buf[:n])
 	log.Error(err.Error())
 	// Send error to errChan in a non-blocking way to prevent deadlock
 	select {
 	case ctx.streamHandleErrChan <- err:
 	default:
-		log.Errorf("agent(key: %s) error channel is full, could not send panic error", ctx.key)
+		log.Errorf("[REMOTE_EXEC] agent(key: %s) error channel is full, could not send panic error", ctx.key)
 	}
 }
 
 func (e *RemoteExecute) handleAgentInactivityTimeout(ctx *remoteExecContext) {
-	err := fmt.Errorf("no message received for %vs, closing connection for agent(key: %s)",
+	err := fmt.Errorf("[REMOTE_EXEC] no message received for %vs, closing connection for agent(key: %s)",
 		agentInactivityTimeout.Seconds(), ctx.key)
 	log.Error(err.Error())
 	// Send error to errChan in a non-blocking way to prevent deadlock
 	select {
 	case ctx.streamHandleErrChan <- err:
 	default:
-		log.Errorf("agent(key: %s) error channel is full, could not send timeout error", ctx.key)
+		log.Errorf("[REMOTE_EXEC] agent(key: %s) error channel is full, could not send timeout error", ctx.key)
 	}
 }
 
 func (e *RemoteExecute) handleStreamEOF(ctx *remoteExecContext, err error) {
-	log.Errorf("agent(key: %s) command stream error: %v", ctx.key, err)
+	log.Errorf("[REMOTE_EXEC] agent(key: %s) command stream error: %v", ctx.key, err)
 	// Send error to errChan in a non-blocking way to prevent deadlock
 	select {
 	case ctx.streamHandleErrChan <- err:
 	default:
-		log.Warningf("agent(key: %s) error channel is full, dropping error: %v", ctx.key, err)
+		log.Warningf("[REMOTE_EXEC] agent(key: %s) error channel is full, dropping error: %v", ctx.key, err)
 	}
 }
 
@@ -296,7 +308,7 @@ func (e *RemoteExecute) resetTimer(ctx *remoteExecContext, timer *time.Timer) {
 		select {
 		case <-timer.C:
 		default:
-			log.Debugf("agent(key: %s) timer channel was already drained, this is normal", ctx.key)
+			log.Debugf("[REMOTE_EXEC] agent(key: %s) timer channel was already drained, this is normal", ctx.key)
 		}
 	}
 	timer.Reset(agentInactivityTimeout)
@@ -314,15 +326,15 @@ func (e *RemoteExecute) needLogHeartbeat(ctx *remoteExecContext) bool {
 func (e *RemoteExecute) logHeartbeat(ctx *remoteExecContext, resp *api.RemoteExecResponse) {
 	ctx.heartbeatCount++
 	if e.needLogHeartbeat(ctx) {
-		log.Infof("agent(key: %s) heartbeat count: %d", ctx.key, ctx.heartbeatCount)
-		log.Infof("agent(key: %s) heartbeat command response: %s", ctx.key, resp.String())
+		log.Infof("[REMOTE_EXEC] agent(key: %s) heartbeat count: %d", ctx.key, ctx.heartbeatCount)
+		log.Infof("[REMOTE_EXEC] agent(key: %s) heartbeat command response: %s", ctx.key, resp.String())
 	}
 }
 
 func (e *RemoteExecute) sendRequest(ctx *remoteExecContext, stream api.Synchronizer_RemoteExecuteServer, req *api.RemoteExecRequest) error {
 	e.logRequest(ctx, req)
 	if err := stream.Send(req); err != nil {
-		log.Errorf("server failed to send request to agent(key: %s) , req: %#v, err: %v", ctx.key, req, err)
+		log.Errorf("[REMOTE_EXEC] server failed to send request to agent(key: %s) , req: %#v, err: %v", ctx.key, req, err)
 		return err
 	}
 	return nil
@@ -330,7 +342,7 @@ func (e *RemoteExecute) sendRequest(ctx *remoteExecContext, stream api.Synchroni
 
 func (e *RemoteExecute) logResponse(resp *api.RemoteExecResponse, key string) {
 	b, _ := json.Marshal(resp)
-	log.Infof("agent(key: %s) response: %s", key, string(b))
+	log.Infof("[REMOTE_EXEC] agent(key: %s) response: %s", key, string(b))
 }
 
 func (e *RemoteExecute) logRequest(ctx *remoteExecContext, req *api.RemoteExecRequest) {
@@ -338,5 +350,5 @@ func (e *RemoteExecute) logRequest(ctx *remoteExecContext, req *api.RemoteExecRe
 		return
 	}
 	b, _ := json.Marshal(req)
-	log.Infof("request to agent(key: %s): %s", ctx.key, string(b))
+	log.Infof("[REMOTE_EXEC] request to agent(key: %s): %s", ctx.key, string(b))
 }

@@ -31,9 +31,12 @@ use crate::{
         flow::PacketDirection,
         l7_protocol_info::L7ProtocolInfo,
         l7_protocol_log::L7ProtocolParserInterface,
-        l7_protocol_log::{EbpfParam, L7PerfCache, ParseParam},
+        l7_protocol_log::{L7PerfCache, ParseParam},
     },
-    config::{config::Iso8583ParseConfig, OracleConfig},
+    config::{
+        config::{Iso8583ParseConfig, WebSphereMqParseConfig},
+        OracleConfig,
+    },
     flow_generator::protocol_logs::{
         pb_adapter::KeyVal,
         plugin::shared_obj::{get_so_parser, SoLog},
@@ -65,7 +68,8 @@ fn get_req_param<'a>(
         flow_id: 1234567,
         direction: PacketDirection::ClientToServer,
         ebpf_type: EbpfType::TracePoint,
-        ebpf_param: Some(EbpfParam {
+        #[cfg(feature = "libtrace")]
+        ebpf_param: Some(crate::common::l7_protocol_log::EbpfParam {
             is_tls: false,
             is_req_end: false,
             is_resp_end: false,
@@ -77,7 +81,7 @@ fn get_req_param<'a>(
         parse_log: true,
         parse_perf: true,
         parse_config: None,
-        l7_perf_cache: rrt_cache.clone(),
+        l7_perf_cache: Some(rrt_cache.clone()),
         wasm_vm: Default::default(),
         so_func: plugin,
         stats_counter: None,
@@ -86,6 +90,7 @@ fn get_req_param<'a>(
         captured_byte: 0,
         oracle_parse_conf: OracleConfig::default(),
         iso8583_parse_conf: Iso8583ParseConfig::default(),
+        web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
         icmp_data: None,
     }
 }
@@ -103,8 +108,8 @@ fn get_resp_param<'a>(
         flow_id: 1234567,
         direction: PacketDirection::ServerToClient,
         ebpf_type: EbpfType::TracePoint,
-
-        ebpf_param: Some(EbpfParam {
+        #[cfg(feature = "libtrace")]
+        ebpf_param: Some(crate::common::l7_protocol_log::EbpfParam {
             is_tls: false,
             is_req_end: false,
             is_resp_end: false,
@@ -116,7 +121,7 @@ fn get_resp_param<'a>(
         parse_perf: true,
         parse_log: true,
         parse_config: None,
-        l7_perf_cache: rrt_cache.clone(),
+        l7_perf_cache: Some(rrt_cache.clone()),
         wasm_vm: Default::default(),
         so_func: plugin,
         stats_counter: None,
@@ -125,6 +130,7 @@ fn get_resp_param<'a>(
         captured_byte: 0,
         oracle_parse_conf: OracleConfig::default(),
         iso8583_parse_conf: Iso8583ParseConfig::default(),
+        web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
         icmp_data: None,
     }
 }
@@ -228,7 +234,7 @@ fn test_parse() {
         unreachable!()
     }
 
-    let stat = p.perf_stats().unwrap();
+    let stat = p.perf_stats().remove(0);
     assert_eq!(stat.request_count, 1);
     assert_eq!(stat.response_count, 1);
     assert_eq!(stat.rrt_count, 1);

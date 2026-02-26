@@ -77,7 +77,13 @@ func (r *WholeSubDomain) OnAnyChanged(md *message.Metadata) {
 				log.Infof("pod group ids: %v connected to config map (id: %d)", podGroupIDs, event.ConfigMapID, md.LogPrefixes)
 			}
 			for _, podGroupID := range podGroupIDs {
+				gtype, ok := md.GetToolDataSet().GetPodGroupTypeByID(podGroupID)
+				if !ok {
+					log.Errorf("get pod group (id: %d) type failed", podGroupID, md.LogPrefixes)
+				}
+				event.PodGroupType = uint8(common.RESOURCE_POD_GROUP_TYPE_MAP[gtype])
 				event.PodGroupID = uint32(podGroupID)
+				event.InstanceType = uint32(common.VIF_DEVICE_TYPE_POD) // 此处如此赋值原因同 RESOURCE_EVENT_TYPE_MODIFY 类型变更事件
 				r.convertAndEnqueue(md, item.ResourceLcuuid, event)
 			}
 		}

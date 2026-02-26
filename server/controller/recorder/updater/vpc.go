@@ -25,7 +25,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// VPCMessageFactory VPC资源的消息工厂
+type VPCMessageFactory struct{}
+
+func (f *VPCMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedVPCs{}
+}
+
+func (f *VPCMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedVPC{}
+}
+
+func (f *VPCMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedVPCs{}
+}
+
+func (f *VPCMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedVPCFields{}
+}
 
 type VPC struct {
 	UpdaterBase[
@@ -33,36 +53,12 @@ type VPC struct {
 		*diffbase.VPC,
 		*metadbmodel.VPC,
 		metadbmodel.VPC,
-		*message.AddedVPCs,
-		message.AddedVPCs,
-		message.AddNoneAddition,
-		*message.UpdatedVPC,
-		message.UpdatedVPC,
-		*message.UpdatedVPCFields,
-		message.UpdatedVPCFields,
-		*message.DeletedVPCs,
-		message.DeletedVPCs,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 	updater := &VPC{
-		newUpdaterBase[
-			cloudmodel.VPC,
-			*diffbase.VPC,
-			*metadbmodel.VPC,
-			metadbmodel.VPC,
-			*message.AddedVPCs,
-			message.AddedVPCs,
-			message.AddNoneAddition,
-			*message.UpdatedVPC,
-			message.UpdatedVPC,
-			*message.UpdatedVPCFields,
-			message.UpdatedVPCFields,
-			*message.DeletedVPCs,
-			message.DeletedVPCs,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			wholeCache,
 			db.NewVPC().SetMetadata(wholeCache.GetMetadata()),
@@ -70,7 +66,12 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &VPCMessageFactory{})
+	}
+
 	return updater
 }
 
@@ -93,7 +94,7 @@ func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*metadbmodel.VPC, 
 	return dbItem, true
 }
 
-func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.VPC) (*message.UpdatedVPCFields, map[string]interface{}, bool) {
+func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.VPC) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedVPCFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

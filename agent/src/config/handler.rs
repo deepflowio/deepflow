@@ -14,15 +14,19 @@
  * limitations under the License.
  */
 
-use std::borrow::Cow;
-use std::cmp::{max, min};
-use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
-use std::{fmt, u32};
+use std::{
+    borrow::Cow,
+    cmp::{max, min},
+    collections::{HashMap, HashSet},
+    fmt,
+    hash::{Hash, Hasher},
+    iter,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    path::PathBuf,
+    str,
+    sync::Arc,
+    time::Duration,
+};
 
 use arc_swap::{access::Map, ArcSwap};
 use base64::{prelude::BASE64_STANDARD, Engine};
@@ -52,13 +56,15 @@ use super::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
         HttpEndpointMatchRule, Iso8583ParseConfig, OracleConfig, PcapStream, PortConfig,
         ProcessorsFlowLogTunning, RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts,
-        UserConfig, GRPC_BUFFER_SIZE_MIN,
+        UserConfig, WebSphereMqParseConfig, GRPC_BUFFER_SIZE_MIN,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
 use crate::config::InferenceWhitelist;
 use crate::flow_generator::protocol_logs::decode_new_rpc_trace_context_with_type;
 use crate::rpc::Session;
+#[cfg(all(unix, feature = "libtrace"))]
+use crate::utils::environment::{get_ctrl_ip_and_mac, is_tt_workload};
 use crate::{
     common::{
         decapsulate::TunnelTypeBitmap, enums::CaptureNetworkType,
@@ -77,11 +83,7 @@ use crate::{
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::{
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
-    ebpf::CAP_LEN_MAX,
-    utils::environment::{
-        get_container_resource_limits, get_ctrl_ip_and_mac, is_tt_workload,
-        set_container_resource_limit,
-    },
+    utils::environment::{get_container_resource_limits, set_container_resource_limit},
 };
 #[cfg(target_os = "linux")]
 use crate::{
@@ -522,6 +524,7 @@ pub struct FlowConfig {
 
     pub oracle_parse_conf: OracleConfig,
     pub iso8583_parse_conf: Iso8583ParseConfig,
+    pub web_sphere_mq_parse_conf: WebSphereMqParseConfig,
 
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
     pub server_ports: Vec<u16>,
@@ -719,6 +722,15 @@ impl From<&UserConfig> for FlowConfig {
                     false,
                 )
                 .unwrap(),
+            },
+            web_sphere_mq_parse_conf: WebSphereMqParseConfig {
+                parse_xml_enabled: conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .protocol_special_config
+                    .web_sphere_mq
+                    .parse_xml_enabled,
             },
             obfuscate_enabled_protocols: L7ProtocolBitmap::from(
                 conf.processors
@@ -937,12 +949,22 @@ impl BlacklistTrieNode {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Default, Eq, PartialEq)]
 pub struct BlacklistTrie {
+    config: Vec<TagFilterOperator>,
+
     pub endpoint: BlacklistTrieNode,
     pub request_type: BlacklistTrieNode,
     pub request_domain: BlacklistTrieNode,
     pub request_resource: BlacklistTrieNode,
+}
+
+impl fmt::Debug for BlacklistTrie {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BlacklistTrie")
+            .field("config", &self.config)
+            .finish_non_exhaustive()
+    }
 }
 
 impl BlacklistTrie {
@@ -956,7 +978,7 @@ impl BlacklistTrie {
     const EQUAL: &'static str = "equal";
     const PREFIX: &'static str = "prefix";
 
-    pub fn new(blacklists: &Vec<TagFilterOperator>) -> Option<BlacklistTrie> {
+    pub fn new(blacklists: Vec<TagFilterOperator>) -> Option<BlacklistTrie> {
         if blacklists.is_empty() {
             return None;
         }
@@ -965,6 +987,7 @@ impl BlacklistTrie {
         for i in blacklists.iter() {
             b.insert(i);
         }
+        b.config = blacklists;
         Some(b)
     }
 
@@ -1006,53 +1029,88 @@ impl BlacklistTrie {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct DnsNxdomainTrieNode {
-    children: HashMap<char, Box<DnsNxdomainTrieNode>>,
+struct DomainNameTrieNode {
+    children: HashMap<String, DomainNameTrieNode>,
     unconcerned: bool,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct DnsNxdomainTrie {
-    root: DnsNxdomainTrieNode,
+impl DomainNameTrieNode {
+    pub fn insert(&mut self, segments: &mut iter::Rev<str::Split<'_, char>>) {
+        match segments.next() {
+            None => self.unconcerned = true,
+            Some(seg) => {
+                let child = self
+                    .children
+                    .entry(seg.to_string())
+                    .or_insert_with(|| DomainNameTrieNode::default());
+                child.insert(segments);
+            }
+        }
+    }
+
+    pub fn search(&self, segments: &mut iter::Rev<str::Split<'_, char>>) -> bool {
+        if self.unconcerned {
+            return true;
+        }
+        match segments.next() {
+            None => self.unconcerned,
+            Some(seg) => self
+                .children
+                .get(seg)
+                .map(|child| child.search(segments))
+                .unwrap_or(false),
+        }
+    }
 }
 
-impl DnsNxdomainTrie {
-    pub fn insert(&mut self, rule: &String) {
-        let mut node = &mut self.root;
-        // the reversal is because what is matched is the suffix of the domain name
-        for ch in rule.chars().rev() {
-            node = node
-                .children
-                .entry(ch)
-                .or_insert_with(|| Box::new(DnsNxdomainTrieNode::default()));
+#[derive(Clone, Default)]
+pub struct DomainNameTrie {
+    entries: HashSet<String>,
+    root: DomainNameTrieNode,
+}
+
+impl fmt::Debug for DomainNameTrie {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DomainNameTrie")
+            .field("entries", &self.entries)
+            .finish_non_exhaustive()
+    }
+}
+
+impl PartialEq for DomainNameTrie {
+    fn eq(&self, other: &Self) -> bool {
+        self.entries == other.entries
+    }
+}
+
+impl Eq for DomainNameTrie {}
+
+impl DomainNameTrie {
+    const SEP: char = '.';
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn insert(&mut self, rule: &str) {
+        if self.entries.contains(rule) {
+            return;
         }
-        node.unconcerned = true;
+        self.entries.insert(rule.to_string());
+        let mut segments = rule.split(Self::SEP).rev();
+        self.root.insert(&mut segments);
     }
 
     pub fn is_unconcerned(&self, input: &str) -> bool {
         if input.is_empty() {
             return false;
         }
-        let mut node = &self.root;
-        // the reversal is because what is matched is the suffix of the domain name
-        for c in input.chars().rev() {
-            match node.children.get(&c) {
-                Some(child) => {
-                    if child.unconcerned {
-                        return true;
-                    }
-                    node = child.as_ref();
-                }
-                None => {
-                    break;
-                }
-            }
-        }
-        false
+        let mut segments = input.split(Self::SEP).rev();
+        self.root.search(&mut segments)
     }
 }
 
-impl From<&Vec<String>> for DnsNxdomainTrie {
+impl From<&Vec<String>> for DomainNameTrie {
     fn from(v: &Vec<String>) -> Self {
         let mut t = Self::default();
         v.iter().for_each(|r| t.insert(r));
@@ -1088,10 +1146,8 @@ pub struct LogParserConfig {
     pub http_endpoint_disabled: bool,
     pub http_endpoint_trie: HttpEndpointTrie,
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
-    pub l7_log_blacklist: HashMap<String, Vec<TagFilterOperator>>,
     pub l7_log_blacklist_trie: HashMap<L7Protocol, BlacklistTrie>,
-    pub unconcerned_dns_nxdomain_response_suffixes: Vec<String>,
-    pub unconcerned_dns_nxdomain_trie: DnsNxdomainTrie,
+    pub unconcerned_dns_nxdomain_trie: DomainNameTrie,
     pub mysql_decompress_payload: bool,
     pub custom_app: CustomAppConfig,
 }
@@ -1109,10 +1165,8 @@ impl Default for LogParserConfig {
             http_endpoint_disabled: false,
             http_endpoint_trie: HttpEndpointTrie::new(),
             obfuscate_enabled_protocols: L7ProtocolBitmap::default(),
-            l7_log_blacklist: HashMap::new(),
             l7_log_blacklist_trie: HashMap::new(),
-            unconcerned_dns_nxdomain_response_suffixes: vec![],
-            unconcerned_dns_nxdomain_trie: DnsNxdomainTrie::default(),
+            unconcerned_dns_nxdomain_trie: DomainNameTrie::default(),
             mysql_decompress_payload: true,
             custom_app: CustomAppConfig::default(),
         }
@@ -1154,10 +1208,10 @@ impl fmt::Debug for LogParserConfig {
                     })
                     .collect::<Vec<_>>(),
             )
-            .field("l7_log_blacklist_trie", &self.l7_log_blacklist)
+            .field("l7_log_blacklist_trie", &self.l7_log_blacklist_trie)
             .field(
                 "unconcerned_dns_nxdomain_trie",
-                &self.unconcerned_dns_nxdomain_response_suffixes,
+                &self.unconcerned_dns_nxdomain_trie,
             )
             .field("mysql_decompress_payload", &self.mysql_decompress_payload)
             .field("custom_app", &self.custom_app)
@@ -1179,7 +1233,7 @@ impl LogParserConfig {
         &self,
         protocol: L7ProtocolEnum,
         param: &ParseParam,
-    ) -> Option<PolicySlice> {
+    ) -> Option<PolicySlice<'_>> {
         self.custom_app
             .custom_field_policies
             .as_ref()
@@ -1314,6 +1368,7 @@ pub enum TraceType {
     XTingyun(String),
     CloudWise,
     Customize(String),
+    B3,
 }
 
 // The value here must be lower case
@@ -1326,6 +1381,7 @@ const TRACE_TYPE_SW8: &str = "sw8";
 const TRACE_TYPE_TRACE_PARENT: &str = "traceparent";
 const TRACE_TYPE_X_TINGYUN: &str = "x-tingyun";
 const TRACE_TYPE_CLOUD_WISE: &str = "cloudwise";
+const TRACE_TYPE_B3: &str = "b3";
 
 const TRACE_TYPE_CLOUD_WISE_UPPER: &str = "CLOUDWISE";
 
@@ -1354,6 +1410,7 @@ impl From<&str> for TraceType {
             SOFA_NEW_RPC_TRACE_CTX_KEY => TraceType::NewRpcTraceContext,
             TRACE_TYPE_X_TINGYUN => TraceType::XTingyun(sub_tag),
             TRACE_TYPE_CLOUD_WISE => TraceType::CloudWise,
+            TRACE_TYPE_B3 => TraceType::B3,
             _ if tag.len() > 0 => TraceType::Customize(tag),
             _ => TraceType::Disabled,
         }
@@ -1376,6 +1433,7 @@ impl TraceType {
             TraceType::XTingyun(_) => context.eq_ignore_ascii_case(TRACE_TYPE_X_TINGYUN),
             TraceType::CloudWise => context.eq_ignore_ascii_case(TRACE_TYPE_CLOUD_WISE),
             TraceType::Customize(tag) => context.eq_ignore_ascii_case(&tag),
+            TraceType::B3 => context.eq_ignore_ascii_case(TRACE_TYPE_B3),
             _ => false,
         }
     }
@@ -1393,6 +1451,7 @@ impl TraceType {
             TraceType::XTingyun(_) => TRACE_TYPE_X_TINGYUN,
             TraceType::CloudWise => TRACE_TYPE_CLOUD_WISE_UPPER,
             TraceType::Customize(tag) => &tag,
+            TraceType::B3 => TRACE_TYPE_B3,
             _ => "",
         }
     }
@@ -1488,6 +1547,20 @@ impl TraceType {
         cloud_platform::cloudwise::decode_trace_id(value)
     }
 
+    // B3 Trace Format:
+    // b3: TRACEID-SPANID-1
+    // b3: 4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-1
+    fn decode_b3(value: &str, id_type: u8) -> Option<&str> {
+        let mut segs = value.split("-");
+        if id_type == Self::TRACE_ID {
+            segs.nth(0)
+        } else if id_type == Self::SPAN_ID {
+            segs.nth(1)
+        } else {
+            unreachable!()
+        }
+    }
+
     fn decode_id<'a, 'b>(&'b self, value: &'a str, id_type: u8) -> Option<Cow<'a, str>> {
         let value = value.trim();
         match self {
@@ -1506,6 +1579,7 @@ impl TraceType {
             }
             TraceType::XTingyun(sub_tag) => Self::decode_tingyun(value, sub_tag),
             TraceType::CloudWise => Self::decode_cloud_wise(value).map(|s| s.into()),
+            TraceType::B3 => Self::decode_b3(value, id_type).map(|s| s.into()),
         }
     }
 
@@ -1828,7 +1902,7 @@ pub struct ModuleConfig {
     pub handler: HandlerConfig,
     pub log: LogConfig,
     pub synchronizer: SynchronizerConfig,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     pub ebpf: EbpfConfig,
     pub agent_type: AgentType,
     pub metric_server: MetricServerConfig,
@@ -2215,7 +2289,6 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                         .obfuscate_protocols
                         .as_slice(),
                 ),
-                l7_log_blacklist: conf.processors.request_log.filters.tag_filters.clone(),
                 l7_log_blacklist_trie: {
                     let mut blacklist_trie = HashMap::new();
                     for (k, v) in conf.processors.request_log.filters.tag_filters.iter() {
@@ -2224,19 +2297,13 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                             warn!("Unsupported l7_protocol: {:?}", k);
                             continue;
                         }
-                        if let Some(t) = BlacklistTrie::new(v) {
+                        if let Some(t) = BlacklistTrie::new(v.clone()) {
                             blacklist_trie.insert(l7_protocol, t);
                         }
                     }
                     blacklist_trie
                 },
-                unconcerned_dns_nxdomain_response_suffixes: conf
-                    .processors
-                    .request_log
-                    .filters
-                    .unconcerned_dns_nxdomain_response_suffixes
-                    .clone(),
-                unconcerned_dns_nxdomain_trie: DnsNxdomainTrie::from(
+                unconcerned_dns_nxdomain_trie: DomainNameTrie::from(
                     &conf
                         .processors
                         .request_log
@@ -2263,7 +2330,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                         None
                     },
                     custom_field_policies: if let Some(config) = conf.custom_app.config.as_ref() {
-                        Some(CustomFieldPolicy::new(&config.biz_field))
+                        Some(CustomFieldPolicy::new(config))
                     } else {
                         None
                     },
@@ -2297,13 +2364,13 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 },
                 host: conf.global.self_monitoring.hostname.clone(),
             },
-            #[cfg(any(target_os = "linux", target_os = "android"))]
+            #[cfg(all(unix, feature = "libtrace"))]
             ebpf: EbpfConfig {
                 collector_enabled: conf.outputs.flow_metrics.enabled,
                 l7_metrics_enabled: conf.outputs.flow_metrics.filters.apm_metrics,
                 agent_id: conf.global.common.agent_id as u16,
                 epc_id: conf.global.common.vpc_id,
-                l7_log_packet_size: CAP_LEN_MAX
+                l7_log_packet_size: crate::ebpf::CAP_LEN_MAX
                     .min(conf.processors.request_log.tunning.payload_truncation as usize),
                 l7_log_tap_types: generate_tap_types_array(
                     &conf.outputs.flow_log.filters.l7_capture_network_types,
@@ -2515,7 +2582,7 @@ impl ConfigHandler {
         )
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(all(unix, feature = "libtrace"))]
     pub fn ebpf(&self) -> EbpfAccess {
         Map::new(self.current_config.clone(), |config| -> &EbpfConfig {
             &config.ebpf
@@ -2799,7 +2866,7 @@ impl ConfigHandler {
         }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "libtrace"))]
     fn set_ebpf(handler: &ConfigHandler, components: &mut AgentComponents) {
         if let Some(d) = components.ebpf_dispatcher_component.as_mut() {
             d.ebpf_collector
@@ -2844,6 +2911,7 @@ impl ConfigHandler {
         );
     }
 
+    #[cfg(feature = "enterprise-integration")]
     fn set_vector(handler: &ConfigHandler, components: &mut AgentComponents) {
         components.vector_component.on_config_change(
             handler.candidate_config.user_config.inputs.vector.enabled,
@@ -2919,7 +2987,7 @@ impl ConfigHandler {
         let mut dispatcher_need_reload_config = candidate_config.flow != new_config.flow;
         dispatcher_need_reload_config |= candidate_config.log_parser != new_config.log_parser;
         dispatcher_need_reload_config |= candidate_config.collector != new_config.collector;
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         {
             dispatcher_need_reload_config |= candidate_config.ebpf != new_config.ebpf;
         }
@@ -2929,7 +2997,7 @@ impl ConfigHandler {
                 for dispatcher in c.dispatcher_components.iter() {
                     dispatcher.dispatcher_listener.notify_reload_config();
                 }
-                #[cfg(any(target_os = "linux", target_os = "android"))]
+                #[cfg(all(unix, feature = "libtrace"))]
                 if let Some(d) = c.ebpf_dispatcher_component.as_ref() {
                     d.ebpf_collector.notify_reload_config();
                 }
@@ -3458,7 +3526,7 @@ impl ConfigHandler {
         // The hot-update configuration items in ebpf.network are handled within the set_ebpf() callback.
         let network = &mut ebpf.network;
         let new_network = &mut new_ebpf.network;
-        
+
         if network.nic_opt_enabled != new_network.nic_opt_enabled {
             info!(
                 "Update inputs.ebpf.network.nic_opt_enabled from {:?} to {:?}.",
@@ -3466,7 +3534,7 @@ impl ConfigHandler {
             );
             network.nic_opt_enabled = new_network.nic_opt_enabled;
         }
-        
+
         if network.nic_optimize != new_network.nic_optimize {
             info!(
                 "Update inputs.ebpf.network.nic_optimize from {:?} to {:?}.",
@@ -3508,6 +3576,27 @@ impl ConfigHandler {
             );
             kprobe.whitelist.ports = new_kprobe.whitelist.ports.clone();
             restart_agent = !first_run;
+        }
+
+        let sock_ops = &mut ebpf.socket.sock_ops;
+        let new_sock_ops = &mut new_ebpf.socket.sock_ops;
+        if sock_ops.tcp_option_trace.enabled != new_sock_ops.tcp_option_trace.enabled {
+            info!(
+                "Update inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled from {:?} to {:?}.",
+                sock_ops.tcp_option_trace.enabled, new_sock_ops.tcp_option_trace.enabled
+            );
+            sock_ops.tcp_option_trace.enabled = new_sock_ops.tcp_option_trace.enabled;
+        }
+        if sock_ops.tcp_option_trace.sampling_window_bytes
+            != new_sock_ops.tcp_option_trace.sampling_window_bytes
+        {
+            info!(
+                "Update inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes from {:?} to {:?}.",
+                sock_ops.tcp_option_trace.sampling_window_bytes,
+                new_sock_ops.tcp_option_trace.sampling_window_bytes
+            );
+            sock_ops.tcp_option_trace.sampling_window_bytes =
+                new_sock_ops.tcp_option_trace.sampling_window_bytes;
         }
 
         let uprobe = &mut ebpf.socket.uprobe;
@@ -3590,6 +3679,18 @@ impl ConfigHandler {
             );
             preprocess.out_of_order_reassembly_protocols =
                 new_preprocess.out_of_order_reassembly_protocols.clone();
+            restart_agent = !first_run;
+        }
+        if preprocess.out_of_order_reassembly_timeout
+            != new_preprocess.out_of_order_reassembly_timeout
+        {
+            info!(
+                "Update inputs.ebpf.socket.preprocess.out_of_order_reassembly_timeout from {:?} to {:?}.",
+                preprocess.out_of_order_reassembly_timeout,
+                new_preprocess.out_of_order_reassembly_timeout
+            );
+            preprocess.out_of_order_reassembly_timeout =
+                new_preprocess.out_of_order_reassembly_timeout.clone();
             restart_agent = !first_run;
         }
         if preprocess.segmentation_reassembly_protocols
@@ -5150,7 +5251,6 @@ impl ConfigHandler {
             filters.unconcerned_dns_nxdomain_response_suffixes = new_filters
                 .unconcerned_dns_nxdomain_response_suffixes
                 .clone();
-            restart_agent = !first_run;
         }
         if filters.cbpf_disabled != new_filters.cbpf_disabled {
             info!(
@@ -5274,18 +5374,21 @@ impl ConfigHandler {
             tunning.session_aggregate_max_entries = new_tunning.session_aggregate_max_entries;
         }
 
-        let vector = &mut config.inputs.vector;
-        let new_vector = &mut new_config.user_config.inputs.vector;
-        if vector.enabled != new_vector.enabled || vector.config != new_vector.config {
-            info!(
-                "vector inputs.vector from {:#?} to {:#?}",
-                vector, new_vector
-            );
-            if components.is_some() {
-                callbacks.push(Self::set_vector);
+        #[cfg(feature = "enterprise-integration")]
+        {
+            let vector = &mut config.inputs.vector;
+            let new_vector = &mut new_config.user_config.inputs.vector;
+            if vector.enabled != new_vector.enabled || vector.config != new_vector.config {
+                info!(
+                    "vector inputs.vector from {:#?} to {:#?}",
+                    vector, new_vector
+                );
+                if components.is_some() {
+                    callbacks.push(Self::set_vector);
+                }
+                vector.enabled = new_vector.enabled;
+                vector.config = new_vector.config.clone();
             }
-            vector.enabled = new_vector.enabled;
-            vector.config = new_vector.config.clone();
         }
 
         candidate_config.enabled = new_config.enabled;
@@ -5575,7 +5678,7 @@ impl ConfigHandler {
             candidate_config.synchronizer = new_config.synchronizer.clone();
         }
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(all(unix, feature = "libtrace"))]
         if candidate_config.ebpf != new_config.ebpf {
             if candidate_config.capture_mode != PacketCaptureType::Analyzer {
                 // Check if language-specific profiling configuration changed (only on dynamic config update, not on first start)
@@ -5820,5 +5923,21 @@ mod tests {
             assert_eq!(tt.decode_trace_id(value).as_ref().map(|s| s.as_ref()), tid);
             assert_eq!(tt.decode_span_id(value).as_ref().map(|s| s.as_ref()), sid);
         }
+    }
+
+    #[test]
+    fn test_domain_name_trie() {
+        let mut trie = DomainNameTrie::default();
+        trie.insert("www.xxx.yyy.zzz");
+        trie.insert("xxx.yyy.zzz");
+
+        assert!(trie.is_unconcerned("vv.www.xxx.yyy.zzz"));
+        assert!(trie.is_unconcerned("www.xxx.yyy.zzz"));
+        assert!(trie.is_unconcerned("xxx.yyy.zzz"));
+        assert!(trie.is_unconcerned("uuu.xxx.yyy.zzz"));
+
+        assert!(!trie.is_unconcerned("xx.yyy.zzz"));
+        assert!(!trie.is_unconcerned("xxx.yyy.zzz.aaa"));
+        assert!(!trie.is_unconcerned("yyy.zzz"));
     }
 }

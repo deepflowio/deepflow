@@ -245,6 +245,7 @@ message AppProtoLogsData {
     uint32 captured_response_byte = 20;
     string biz_code = 21;
     string biz_scenario = 22;
+    string biz_response_code = 23;
 }
 
 message AppProtoLogsBaseInfo {

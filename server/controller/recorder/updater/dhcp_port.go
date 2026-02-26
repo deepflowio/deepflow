@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// DHCPPortMessageFactory DHCPPort资源的消息工厂
+type DHCPPortMessageFactory struct{}
+
+func (f *DHCPPortMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedDHCPPorts{}
+}
+
+func (f *DHCPPortMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedDHCPPort{}
+}
+
+func (f *DHCPPortMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedDHCPPorts{}
+}
+
+func (f *DHCPPortMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedDHCPPortFields{}
+}
 
 type DHCPPort struct {
 	UpdaterBase[
@@ -32,36 +52,12 @@ type DHCPPort struct {
 		*diffbase.DHCPPort,
 		*metadbmodel.DHCPPort,
 		metadbmodel.DHCPPort,
-		*message.AddedDHCPPorts,
-		message.AddedDHCPPorts,
-		message.AddNoneAddition,
-		*message.UpdatedDHCPPort,
-		message.UpdatedDHCPPort,
-		*message.UpdatedDHCPPortFields,
-		message.UpdatedDHCPPortFields,
-		*message.DeletedDHCPPorts,
-		message.DeletedDHCPPorts,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCPPort {
 	updater := &DHCPPort{
-		newUpdaterBase[
-			cloudmodel.DHCPPort,
-			*diffbase.DHCPPort,
-			*metadbmodel.DHCPPort,
-			metadbmodel.DHCPPort,
-			*message.AddedDHCPPorts,
-			message.AddedDHCPPorts,
-			message.AddNoneAddition,
-			*message.UpdatedDHCPPort,
-			message.UpdatedDHCPPort,
-			*message.UpdatedDHCPPortFields,
-			message.UpdatedDHCPPortFields,
-			*message.DeletedDHCPPorts,
-			message.DeletedDHCPPorts,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
 			wholeCache,
 			db.NewDHCPPort().SetMetadata(wholeCache.GetMetadata()),
@@ -69,7 +65,12 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &DHCPPortMessageFactory{})
+	}
+
 	return updater
 }
 
@@ -93,7 +94,7 @@ func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*metadbm
 	return dbItem, true
 }
 
-func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cloudmodel.DHCPPort) (*message.UpdatedDHCPPortFields, map[string]interface{}, bool) {
+func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cloudmodel.DHCPPort) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedDHCPPortFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {

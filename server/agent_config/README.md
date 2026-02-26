@@ -4127,6 +4127,80 @@ Use kprobe to collect data on ports that are not in the blacklist or whitelist.
 
 Example: `ports: 80,1000-2000`
 
+#### SockOps {#inputs.ebpf.socket.sock_ops}
+
+##### TCP Option Trace {#inputs.ebpf.socket.sock_ops.tcp_option_trace}
+
+###### TCP Option Tracing {#inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      sock_ops:
+        tcp_option_trace:
+          enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to enable the tcp-option tracing SockOps program, which injects DeepFlow metadata
+(for example, process PID) into a custom TCP option for eligible connections.
+Note: This feature requires cgroup v2 (unified hierarchy) and kernel > 5.10. On hosts
+using cgroup v1 the SockOps program will fail to attach and the agent will log a warning.
+Compatibility: validated on x86 with kernel > 5.10; on arm we have only tested with
+kernel 6.8 so far.
+Limitation: PID tracking relies on the per-CPU syscall map in. Under CPU congestion,
+softirqs handling TCP may run on a different CPU than the userspace thread, so the
+injected metadata can be missing or stale.
+
+###### PID Injection Window {#inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      sock_ops:
+        tcp_option_trace:
+          sampling_window_bytes: 16384
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | Bytes |
+| Range | [0, 1048576] |
+
+**Description**:
+
+Minimum number of TCP payload bytes between PID injections. Default 16KB matches the
+legacy behavior; smaller windows increase frequency, larger windows decrease it. Set to
+0 to disable sampling and inject on every eligible packet.
+
 #### Tunning {#inputs.ebpf.socket.tunning}
 
 ##### Max Capture Rate {#inputs.ebpf.socket.tunning.max_capture_rate}
@@ -4348,6 +4422,39 @@ the agent's memory usage.
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
 
 Attention: configuring `HTTP2` or `gRPC` will enable both protocols.
+
+##### OOOR Timeout {#inputs.ebpf.socket.preprocess.out_of_order_reassembly_timeout}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.preprocess.out_of_order_reassembly_timeout`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      preprocess:
+        out_of_order_reassembly_timeout: 100ms
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['100ms', '1s'] |
+
+**Description**:
+
+When the OOOR cache data times out, it will be output directly. This parameter can be adjusted according to metric
+`deepflow_agent_ebpf_collect.metrics.time_backtrack_max`.
+
+Note: Increasing this value will consume more memory
 
 ##### SR Protocols {#inputs.ebpf.socket.preprocess.segmentation_reassembly_protocols}
 
@@ -7786,6 +7893,38 @@ Field Reference:
 | 126 | Additional Data |
 | 128 | Message Authentication Code (MAC) |
 
+##### WebSphereMQ {#processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq}
+
+###### Parse XML {#processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.parse_xml_enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.parse_xml_enabled`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        web_sphere_mq:
+          parse_xml_enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to parse XML.
+
 ##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
 
 ###### Decompress MySQL Payload {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}
@@ -7851,12 +7990,11 @@ processors:
 When enabled, all gRPC packets are considered to be of the `stream` type, and the `data` will be reported,
 and the rrt calculation of the response will use the `grpc-status` field.
 
-#### custom protocol parsing {#processors.request_log.application_protocol_inference.custom_protocols}
+#### Custom Protocol Parsing {#processors.request_log.application_protocol_inference.custom_protocols}
 
 **Tags**:
 
-<mark>agent_restart</mark>
-<mark>ee_feature</mark>
+<mark></mark>
 
 **FQCN**:
 
@@ -7877,24 +8015,7 @@ processors:
 
 **Description**:
 
-Custom protocol parsing configuration, which can be used to parse custom protocols through simple rules.
-Example:
-```yaml
-- protocol_name: "your_protocol_name" # Protocol name, corresponding to l7_flow_log.l7_protocol_str
-  pre_filter:
-    port_list: 1-65535 # Pre-filter port, which can improve parsing performance
-  request_characters:  # Multiple features are ORed
-    - character: # Multiple match_keywords are ANDed
-      - match_keyword: abc  # Feature string
-        match_type: "string" # Possible values: "string", "hex"
-        match_ignore_case: false # wheather ignore case when match keywords, when match_type == string effected, default: false
-        match_from_beginning: false # Whether to match from the beginning of the payload
-  response_characters:
-    - character:
-      - match_keyword: 0123af
-        match_type: "hex"
-        match_from_beginning: false
-```
+deprecated
 
 ### Filters {#processors.request_log.filters}
 
@@ -8213,7 +8334,7 @@ Match field value.
 
 **Tags**:
 
-<mark>agent_restart</mark>
+`hot_update`
 
 **FQCN**:
 
@@ -8608,6 +8729,14 @@ setting it to empty.
 If multiple values are specified, the first match will be used.
 Fields rewritten by plugins have the highest priority.
 
+Supports extracting the trace id from the following headers, in the following format:
+- traceparent: 00-TRACEID-SPANID-01
+- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+- sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
+- sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+- uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
+- b3: TRACEID-SPANID-1
+
 ##### Copy APM TraceID {#processors.request_log.tag_extraction.tracing_tag.copy_apm_trace_id}
 
 **Tags**:
@@ -8671,6 +8800,14 @@ in multiple values separated by commas. This feature can be turned off by
 setting it to empty.
 If multiple values are specified, the first match will be used.
 Fields rewritten by plugins have the highest priority.
+
+Supports extracting the span id from the following headers, in the following format:
+- traceparent: 00-TRACEID-SPANID-01
+- sw3: SEGMENTID|SPANID|100|100|#IPPORT|#PARENT_ENDPOINT|#ENDPOINT|TRACEID|SAMPLING 
+- sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
+- sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+- uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
+- b3: TRACEID-SPANID-1
 
 #### HTTP Endpoint {#processors.request_log.tag_extraction.http_endpoint}
 
@@ -8930,12 +9067,11 @@ processors:
 
 Field name.
 
-#### Custom Fields Policies {#processors.request_log.tag_extraction.custom_field_policies}
+#### Custom Protocol Parsing {#processors.request_log.tag_extraction.custom_field_policies}
 
 **Tags**:
 
-`hot_update`
-<mark>ee_feature</mark>
+<mark></mark>
 
 **FQCN**:
 
@@ -8956,239 +9092,7 @@ processors:
 
 **Description**:
 
-Custom field extraction policy, used to extract possible custom fields from L7 protocols via simple rules.
-When both plugin extraction and custom extraction policies match, the priority is as follows:
-1. Plugin extraction
-2. Custom field policies extraction
-3. Agent default extraction
-Example:
-```yaml
-- policy_name: "my_policy" # Policy name
-  protocol_name: HTTP # Protocol name. If you want to parse Grpc, configure as HTTP2. Possible values: HTTP/HTTP2/Dubbo/SofaRPC/Custom/...
-  custom_protocol_name: "my_protocol"  # Effective only when protocol_name is Custom. Note: At this time, there must be a `processors.request_log.application_protocol_inference.custom_protocols` config, and the custom protocol name must match exactly, otherwise parsing will not work.
-  filters:
-    traffic_direction: both # Search in request, response, or both. Default is both.
-    port_list: 1-65535 # Can be used to filter by port.
-    feature_string: "" # For pre-matching Payload extraction, does not apply to header_field type.
-  # Whether to save the original payload.
-  # Note: This configuration is only effective when the "filters" are met.
-  raw:
-    save_request:
-      enabled: false
-      output:
-        attribute_name: request
-    save_response:
-      enabled: false
-      output:
-        attribute_name: response
-  fields:
-  - name: "my_field" # Configured field
-    # Field extraction type, possible values and meanings:
-    # - `http_url_field`: Extract field from HTTP URL parameters at the end of the URL, e.g. `?key=value&key2=value2`
-    # - `header_field`: Extract field from protocol header section (HTTP/Dubbo/SofaRPC/...); for HTTP, e.g. `key: value`
-    # - `payload_json_value`: Extract field from JSON payload, e.g. `"key": 1`, `"key": "value"`, `"key": None`, etc.
-    # - `payload_xml_value`: Extract field from XML payload, e.g. `<key attr="xxx">value</key>`
-    # - `payload_hessian2_value`: Extract field from payload using Hessian2 encoding.
-    # - `sql_insertion_column`: Extract column from SQL insert statement, e.g. `INSERT INTO table (column1, column2) VALUES (value1, value2)`. Currently only MySQL is supported and only the first column's value can be extracted.
-    type: "http_url_field"
-    # Matching rule
-    match:
-      # Match type, possible values: "string" and "path"
-      # When set to "string":
-      # - For http_url_field and header_field, matches key; for sql_insertion_column, matches SQL insert column name.
-      # - For payload_json_value and payload_xml_value, matches JSON or XML content and takes the first matched element as the result.
-      # "path" type applies only to parse_json_value and parse_xml_value, supports extraction using hierarchical syntax like "aaa.bbb.ccc" for JSON and XML content.
-      type: "string"
-      keyword: "abc"
-      # Ignore case. Default: false. Only valid when `type` is "string".
-      ignore_case: false
-      # Apply field rule to all leaf nodes. Default: false.
-      # Only effective for parse_json_value and parse_xml_value types.
-      # When set to true:
-      # - Apply keyword matching to all leaf nodes in JSON or XML content.
-      # - Only attribute_name in output is valid, serving as the prefix of the output result. The output name uses attribute_name as prefix and the leaf node's path as suffix, separated by ".".
-      # - This field cannot be used in compound_fields.
-      all_leaves: false
-    # Post-processing. Note that settings are executed in order.
-    # Configuration format:
-    # - type: post_processing_type
-    #   settings:
-    #   - key: setting_key
-    #     value: setting_value
-    # Supported types for 'type' are:
-    # - remap
-    # - obfuscate
-    # - url_decode
-    # - base64_decode
-    # - parse_json_value
-    # - parse_xml_value
-    # - parse_key_value
-    # See below for details and configuration of each type
-    post:
-    # remap is used to map the extraction result to another value
-    # Supported settings:
-    # - dictionary_name: Name of the dictionary
-    - type: remap
-      settings:
-      - key: dictionary_name
-        value: dict_1
-    # obfuscate is used for masking/desensitizing extracted results
-    # Supported settings:
-    # - mask: The character used for masking, default is *, supports only ascii characters
-    # - preset: Use a prebuilt masking method, valid values are:
-    #   - id-card-name: Chinese ID card name masking (show only the first character of the name)
-    #   - id-card-number: Chinese ID card number masking (show only first 6 and last 4 digits)
-    #   - phone-number: Phone number masking (hide at least 4 characters in the middle)
-    # - range: Indicates which characters (by index) to mask with *, e.g. retain only the first and last character
-    - type: obfuscate
-      settings:
-      - key: mask
-        value: *
-      - key: preset
-        value: id-card-name
-      - key: range
-        value: "1, -1" # Mask from the second to the last character, keeping only the first character
-      - key: range # Multiple 'range' settings represent multiple masked ranges
-        value: "6, -5" # Mask from the 7th to the 5th from last character
-    # url_decode is used to decode the extracted result using URL-decoding
-    - type: url_decode
-    # base64_decode is used to decode the extracted result using Base64, output must be valid UTF-8
-    - type: base64_decode
-    # parse_json_value is used to further parse the extracted result as JSON
-    # Supported settings:
-    # - keyword: Key word to match
-    # - type: Value type, options are string/path
-    # - ignore_case: Whether to ignore case, default false
-    # - skip: Skip the first N matches, use from this index
-    - type: parse_json_value
-      settings:
-      - key: keyword
-        value: xyz
-      - key: type
-        value: string
-      - key: ignore_case
-        value: false
-      - key: skip
-        value: 0
-    # parse_xml_value is used to further parse the extracted result as XML
-    # Supported settings:
-    # - keyword: Key word to match
-    # - type: Value type, options are string/path
-    # - ignore_case: Whether to ignore case, default false
-    # - skip: Skip the first N matches, use from this index
-    - type: parse_xml_value
-      # This configuration is the same as fields->match, but in key/value form.
-      # Also, skip is supported to indicate which matching result to take.
-      settings:
-      - key: keyword
-        value: xyz
-      - key: type
-        value: string
-      - key: ignore_case
-        value: false
-      - key: skip
-        value: 0
-    # parse_key_value parses the result as key-value pairs
-    # Supported settings:
-    # - key_value_pair_separator: Separator between key-value pairs, default ","
-    # - key_value_separator: Separator between key and value, default "="
-    # - keyword: Key word to match
-    # - ignore_case: Whether to ignore case, default false
-    - type: parse_key_value
-      settings:
-      - key: key_value_pair_separator
-        value: ","
-      - key: key_value_separator
-        value: "="
-      - key: keyword
-        value: xyz
-      - key: ignore_case
-        value: true
-    # Validate if the post-processed result is legal
-    verify:
-      check_charset: false # Can be used to check if extraction result is valid
-      primary_charset: ["digits", "alphabets", "hanzi"] # Charsets used to check extraction result; optional values: digits/alphabets/hanzi
-      special_characters: ".-_" # Additional special characters allowed in result charset
-    output:
-      attribute_name: "xyz" # This field will appear in calling log as attribute.xyz. Default is empty; if empty, this field will not be added to the attribute.
-      metric_name: "xyz" # This field will appear in calling log as metrics.xyz. Default is empty.
-      rewrite_native_tag:
-        # Fill one of the following fields to overwrite the corresponding value
-        # Note: This requires support in the corresponding protocol, otherwise the configuration will not take effect
-        # When overwriting response_code, the original non-empty value will be saved into the attribute as `sys_response_code`
-        # - version
-        # - request_type
-        # - request_domain
-        # - request_resource
-        # - request_id
-        # - endpoint
-        # - response_code
-        # - response_exception
-        # - response_result
-        # - trace_id
-        # - span_id
-        # - x_request_id
-        # - x_request_id_0
-        # - x_request_id_1
-        # - http_proxy_client
-        # - biz_type
-        # - biz_code
-        # - biz_scenario
-        name: version
-        # When remapping, the input will be mapped using the configured dictionary. If empty, it will not take effect
-        # Note: The whitelist/blacklist in condition match the remapped result
-        remap: dict_1
-        condition:
-          enum_whitelist: [] # Whitelist: when the extraction result is in the list, overwrite. If empty, does not take effect.
-          enum_blacklist: [] # Blacklist: when result matches any in the list, do not update.
-      # Match to these arrays by extraction value. If matched, rewrite response_status to the corresponding value.
-      rewrite_response_status:
-        ok_values: []
-        client_error_values: []
-        server_error_values: []
-        default_status: "" # Optional: ok/client_error/server_error. If empty and no match, will NOT rewrite. Default is empty.
-      # Field output priority. Default is 0. Range 0-255. Smaller values have higher priority.
-      # For fields that keep only one value (except trace_id), only the one with the smallest priority is kept.
-      # For fields with multiple values (trace_id), output them in order from highest to lowest priority.
-      priority: 0
-  # Directly use a constant value as the field value
-  const_fields:
-  - value: "123"
-    # Output configuration, refer to the "output" section of "fields"
-    # "metric", "rewrite_response_status", and the "condition" and "remap" in "rewrite_native_tag" are not supported here
-    output:
-      attribute_name: "xyz"
-      rewrite_native_tag:
-        name: version
-      priority: 0
-  # Compound fields allow you to use configured fields or native_tags as input fields for formatted output
-  # If the corresponding field or native_tag is not resolved or is empty, the output will not be produced
-  compound_fields:
-  - format: "{field1_name}-{field2_name}" # Output format. field1_name and field2_name are the configured field names
-                                          # Native tags can also be used as an input field, but note that the configured fields take precedence.
-    output: # Configure as described in "output" section of "fields"
-      attribute_name: "xyz"
-      metric_name: "xyz"
-      rewrite_native_tag:
-        name: version
-        remap: dict_1
-        condition:
-          enum_whitelist: []
-          enum_blacklist: []
-      rewrite_response_status:
-        ok_values: []
-        client_error_values: []
-        server_error_values: []
-        default_status: ""
-      priority: 0
-  dictionaries:
-  - name: dict_1
-    entries:
-    - key: key1
-      value: value1
-    - key: key2
-      value: value2
-    default: value3
+deprecated
 
 #### Obfuscate Protocols {#processors.request_log.tag_extraction.obfuscate_protocols}
 

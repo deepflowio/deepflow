@@ -33,7 +33,7 @@ pub struct Querier {
     digest: u64,
 
     raw_hostname: Option<String>,
-    raw_ip_addrs: Vec<String>,
+    raw_ip_addr: String,
 
     process_data: Vec<ProcessData>,
 }
@@ -46,7 +46,7 @@ impl Querier {
             digest: Default::default(),
 
             raw_hostname: Default::default(),
-            raw_ip_addrs: Default::default(),
+            raw_ip_addr: Default::default(),
 
             process_data: Default::default(),
         }
@@ -74,7 +74,7 @@ impl Querier {
             platform_enabled: Some(config.enabled),
             raw_hostname: self.raw_hostname.clone(),
             raw_ip_netns: vec!["default".into()],
-            raw_ip_addrs: self.raw_ip_addrs.clone(),
+            raw_ip_addrs: vec![self.raw_ip_addr.clone()],
             ..Default::default()
         };
 
@@ -122,7 +122,7 @@ impl Querier {
                 hasher.write(line.as_bytes());
             }
         }
-        self.raw_ip_addrs.push(raw_host_ip_addr.unwrap_or_default());
+        self.raw_ip_addr = raw_host_ip_addr.unwrap_or_default();
         debug!("updated ip addresses");
         trace!("digest={:016x}", hasher.finish());
     }

@@ -24,6 +24,10 @@ pub mod remote_exec {
         SerializeError(#[from] serde_json::Error),
         #[error("transparent")]
         SyscallFailed(String),
+        #[error("batch length too small, need at least {0} bytes")]
+        BatchLengthTooSmall(usize),
+        #[error("pcap parse error failed: {0}")]
+        PcapParseFailed(String),
     }
 
     type Result<T> = std::result::Result<T, Error>;

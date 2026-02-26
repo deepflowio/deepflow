@@ -1228,6 +1228,9 @@ perf_event:
 		struct ebpf_object *obj = tracer->obj;
 		for (i = 0; i < obj->progs_cnt; i++) {
 			if (obj->progs[i].type == BPF_PROG_TYPE_PERF_EVENT) {
+				if (strcmp(obj->progs[i].sec_name, "perf_event") != 0) {
+					continue;
+				}
 				errno = 0;
 				int ret =
 				    program__attach_perf_event(obj->progs[i].

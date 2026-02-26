@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-use std::{
-    env,
-    path::{Path, PathBuf},
-    process::Command,
-    str,
-};
+#[cfg(feature = "libtrace")]
+use std::path::{Path, PathBuf};
+use std::{env, process::Command, str};
 
 use anyhow::Result;
 use chrono::prelude::*;
+#[cfg(feature = "libtrace")]
 use walkdir::WalkDir;
 
 fn get_branch() -> Result<String> {
@@ -100,6 +98,7 @@ fn set_build_info() -> Result<()> {
 //
 //     find src/ebpf -name '*.c' -type f -printf '%T+ %p\n' | sort -r
 //
+#[cfg(feature = "libtrace")]
 fn set_libtrace_rerun_files() -> Result<()> {
     fn watched(path: &Path) -> bool {
         if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
@@ -145,14 +144,15 @@ fn set_libtrace_rerun_files() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "libtrace")]
 fn set_build_libtrace() -> Result<()> {
     set_libtrace_rerun_files()?;
     let output = match env::var("CARGO_CFG_TARGET_ENV")?.as_str() {
         "gnu" => Command::new("sh").arg("-c")
-            .arg("cd src/ebpf && make clean && make --no-print-directory && make tools --no-print-directory")
+            .arg("cd src/ebpf && make clean && make -j$(nproc) --no-print-directory && make tools --no-print-directory")
             .output()?,
         "musl" => Command::new("sh").arg("-c")
-            .arg("cd src/ebpf && make clean && CC=musl-gcc CLANG=musl-clang make --no-print-directory && CC=musl-gcc CLANG=musl-clang make tools --no-print-directory")
+            .arg("cd src/ebpf && make clean && CC=musl-gcc CLANG=musl-clang make -j$(nproc) --no-print-directory && CC=musl-gcc CLANG=musl-clang make tools --no-print-directory")
             .output()?,
         _ => panic!("Unsupported target"),
     };
@@ -171,6 +171,7 @@ fn set_build_libtrace() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "libtrace")]
 fn set_linkage() -> Result<()> {
     let target_env = env::var("CARGO_CFG_TARGET_ENV")?;
     if target_env.as_str() == "musl" {
@@ -289,15 +290,18 @@ fn main() -> Result<()> {
      * We are pushing the generated protobuf code to repo as a workaround.
      *
      * TODO: Fix this issue in the rust-build image.
-     *
-    compile_wasm_plugin_proto()?;
      */
+    // uncomment the next line to compile wasm plugin proto
+    // compile_wasm_plugin_proto()?;
     make_pulsar_proto()?;
     make_brpc_proto()?;
-    let target_os = env::var("CARGO_CFG_TARGET_OS")?;
-    if target_os.as_str() == "linux" {
-        set_build_libtrace()?;
-        set_linkage()?;
+    #[cfg(feature = "libtrace")]
+    {
+        let target_os = env::var("CARGO_CFG_TARGET_OS")?;
+        if target_os.as_str() == "linux" {
+            set_build_libtrace()?;
+            set_linkage()?;
+        }
     }
     Ok(())
 }

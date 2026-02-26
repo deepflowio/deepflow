@@ -52,6 +52,7 @@ func NewChVTapPort() *ChVTapPort {
 		),
 	}
 	updater.updaterDG = updater
+	updater.dbOperator.setUpdateMode(UpdateByCondition)
 	return updater
 }
 

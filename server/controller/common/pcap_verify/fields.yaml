@@ -1,0 +1,87 @@
+# 本文件用于定义在 PCAP 验证场景下，API 响应数据中的各字段与 AppProtoLogsData protobuf 结构体中字段的映射关系：
+#   节点：API 响应数据中的字段名称。
+#   path：对应的 AppProtoLogsData protobuf 结构体中的字段路径，使用点号（.）分隔表示嵌套关系，例如 "base.ip_src" 表示 AppProtoLogsData 结构体中的 base 字段下的 ip_src 字段。
+#   type：API 响应字段的数据类型，通常与 AppProtoLogsData 结构体中对应字段的数据类型一致。
+#
+# 更新本文件后，需在本文件目录执行 `go generate` 以生成对应的 Go 代码
+
+# 列表显示字段
+response_status:
+  path: resp.status
+  type: uint32
+start_time:
+  path: base.start_time
+  type: string
+end_time:
+  path: base.end_time
+  type: string
+ip_0:
+  path: base.ip_src
+  type: string
+ip_1:
+  path: base.ip_dst
+  type: string
+server_port:
+  path: base.port_dst
+  type: uint32
+endpoint:
+  path: req.endpoint
+  type: string
+l7_protocol:
+  path: base.head.proto
+  type: uint32
+biz_protocol:
+  path: ext_info.protocol_str
+  type: string
+biz_type:
+  path: base.biz_type
+  type: uint32
+# native_tag 字段
+request_type:
+  path: req.req_type
+  type: string
+request_domain:
+  path: req.domain
+  type: string
+request_resource:
+  path: req.resource
+  type: string
+response_code:
+  path: resp.code
+  type: int32
+response_exception:
+  path: resp.exception
+  type: string
+response_result:
+  path: resp.result
+  type: string
+request_id:
+  path: ext_info.request_id
+  type: uint32
+x_request_id_0:
+  path: ext_info.x_request_id_0
+  type: string
+x_request_id_1:
+  path: ext_info.x_request_id_1
+  type: string
+http_proxy_client:
+  path: ext_info.client_ip
+  type: string
+trace_id:
+  path: trace_info.trace_id
+  type: string
+span_id:
+  path: trace_info.span_id
+  type: string
+version:
+  path: version
+  type: string
+biz_code:
+  path: biz_code
+  type: string
+biz_scenario:
+  path: biz_scenario
+  type: string
+biz_response_code:
+  path: biz_response_code
+  type: string

@@ -750,7 +750,7 @@ mod tests {
 
     use super::*;
 
-    use crate::utils::test::Capture;
+    use crate::utils::test_utils::Capture;
 
     pub const PCAP_PATH_PREFIX: &str = "./resources/test/common";
 

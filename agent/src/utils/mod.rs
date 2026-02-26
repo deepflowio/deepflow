@@ -16,9 +16,9 @@
 
 pub(crate) mod cgroups;
 pub(crate) mod command;
-pub(crate) mod environment;
+pub mod environment;
 pub(crate) mod guard;
-pub(crate) mod hasher;
+pub mod hasher;
 pub(crate) mod logger;
 pub(crate) mod lru;
 pub(crate) mod npb_bandwidth_watcher;
@@ -31,7 +31,8 @@ pub(crate) mod pid_file;
 
 pub use public::bytes;
 
-pub mod test;
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_utils;
 
 use std::thread;
 use std::time::Duration;

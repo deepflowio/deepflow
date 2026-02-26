@@ -60,16 +60,16 @@ func PutBuffer(buffer *bytes.Buffer) {
 	bufferPool.Put(buffer)
 }
 
-func ParseL7Protocol(l7ProtocolStr string, version string) (uint8, uint8) {
+func ParseL7Protocol(bizProtocol string, version string) (uint8, uint8) {
 	var l7Protocol uint8 = 0
 	var isTLS uint8 = 0
-	if len(l7ProtocolStr) > 0 {
-		l7ProtocolStrLower := strings.ToLower(l7ProtocolStr)
+	if len(bizProtocol) > 0 {
+		l7ProtocolStrLower := strings.ToLower(bizProtocol)
 		if strings.Contains(l7ProtocolStrLower, "https") {
 			isTLS = 1
 		}
-		for l7ProtocolStr, l7ProtocolMap := range datatype.L7ProtocolStringMap {
-			if strings.Contains(l7ProtocolStr, l7ProtocolStrLower) {
+		for protocol, l7ProtocolMap := range datatype.L7ProtocolStringMap {
+			if strings.Contains(protocol, l7ProtocolStrLower) {
 				l7Protocol = uint8(l7ProtocolMap)
 				break
 			}

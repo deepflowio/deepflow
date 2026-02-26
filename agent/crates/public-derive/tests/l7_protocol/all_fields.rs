@@ -39,6 +39,7 @@ struct TestInfo {
     biz_type: String,
     biz_code: String,
     biz_scenario: String,
+    biz_response_code: usize,
 }
 
 impl L7LogAttribute for TestInfo {}

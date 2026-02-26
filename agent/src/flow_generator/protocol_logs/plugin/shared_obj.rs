@@ -41,7 +41,7 @@ const RESULT_LEN: i32 = 8;
 pub struct SoLog {
     proto_num: Option<u8>,
     proto_str: String,
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 }
 
 impl L7ProtocolParserInterface for SoLog {
@@ -113,11 +113,7 @@ impl L7ProtocolParserInterface for SoLog {
         let ctx = &mut ParseCtx::from((param, payload));
         ctx.proto = self.proto_num.unwrap();
         let mut resp = [ParseInfo::default(); RESULT_LEN as usize];
-
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default());
-        }
-
+        self.perf_stats.clear();
         for c in c_funcs.iter() {
             let counter = &c.parse_payload_counter;
 
@@ -175,7 +171,8 @@ impl L7ProtocolParserInterface for SoLog {
                                 info.proto = self.proto_num.unwrap();
                                 set_captured_byte!(info, param);
 
-                                if let Some(perf_stats) = self.perf_stats.as_mut() {
+                                if param.parse_perf {
+                                    let mut perf_stat = L7PerfStats::default();
                                     if info.msg_type == LogMessageType::Response {
                                         if let Some(endpoint) =
                                             info.load_endpoint_from_cache(param, info.is_reversed())
@@ -185,8 +182,9 @@ impl L7ProtocolParserInterface for SoLog {
                                     }
                                     if let Some(stats) = info.perf_stats(param) {
                                         info.rrt = stats.rrt_sum;
-                                        perf_stats.sequential_merge(&stats);
+                                        perf_stat.sequential_merge(&stats);
                                     }
+                                    self.perf_stats.push(perf_stat);
                                 }
 
                                 if res.len == 1 {
@@ -231,8 +229,8 @@ impl L7ProtocolParserInterface for SoLog {
         ))
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 
@@ -240,6 +238,6 @@ pub fn get_so_parser(p: u8, s: String) -> SoLog {
     SoLog {
         proto_num: Some(p),
         proto_str: s,
-        perf_stats: None,
+        perf_stats: vec![],
     }
 }

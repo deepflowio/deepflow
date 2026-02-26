@@ -45,7 +45,7 @@ enum
 
 /* Current function name.  Need (char *) cast to silence gcc4 pointer signedness warning. */
 #define ebpf_error_function ((char *) __FUNCTION__)
-#define ebpf_error_file ((char *) __FILE__)
+#define ebpf_error_file ((char *) "src/ebpf/" __FILE__)
 
 #ifdef BPF_DEBUG
 #define ebpf_debug(fmt, ...)  printf(fmt, ##__VA_ARGS__);
@@ -54,13 +54,13 @@ enum
 #endif
 
 #define ebpf_info(format,args...) \
-	_ebpf_info (format, ## args)
+	_ebpf_log (0, ebpf_error_function, ebpf_error_file, __LINE__, format, ## args)
 
 #define ebpf_warning(format,args...) \
-	_ebpf_error (ERROR_WARNING, ebpf_error_function, ebpf_error_file, __LINE__, format, ## args)
+	_ebpf_log (ERROR_WARNING, ebpf_error_function, ebpf_error_file, __LINE__, format, ## args)
 
 #define ebpf_error(format,args...) \
-	_ebpf_error (ERROR_ABORT, ebpf_error_function, ebpf_error_file, __LINE__, format, ## args)
+	_ebpf_log (ERROR_ABORT, ebpf_error_function, ebpf_error_file, __LINE__, format, ## args)
 
 void _ebpf_error(int how_to_die,
                  char *function_name,
@@ -68,5 +68,10 @@ void _ebpf_error(int how_to_die,
                  uint32_t line_number,
                  char *fmt, ...);
 void _ebpf_info(char *fmt, ...);
+void _ebpf_log(int how_to_die,
+               char *function_name,
+               char *file_path,
+               int line_number,
+               char *fmt, ...);
 void os_puts(FILE *stream, char *string, uint32_t string_length, bool is_stdout);
 #endif /* __INCLUDE_LOG_H__ */

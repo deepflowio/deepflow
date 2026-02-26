@@ -54,7 +54,7 @@ type AgentGroupConfigChangelogQuery struct {
 
 // AgentGroupConfigChangelogCreate 定义了创建采集器配置变更记录的请求参数
 type AgentGroupConfigChangelogCreate struct {
-	UserID   int    `json:"USER_ID" binding:"required"`   // 变更人（用户ID）
+	User     string `json:"USER" binding:"required"`      // 变更人（用户名）
 	Remarks  string `json:"REMARKS" binding:"required"`   // 变更备注
 	YamlDiff string `json:"YAML_DIFF" binding:"required"` // 变更 Diff
 }

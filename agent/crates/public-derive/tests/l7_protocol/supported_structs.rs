@@ -40,6 +40,7 @@ use public_derive_internals::{
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
+#[l7_log(biz_response_code.skip = "true")]
 struct StringField {
     endpoint: String,
     endpoint2: usize,
@@ -78,6 +79,7 @@ fn string_field() {
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
+#[l7_log(biz_response_code.skip = "true")]
 struct OptionStringField {
     #[l7_log(endpoint)]
     path: Option<String>,
@@ -118,6 +120,7 @@ fn option_string_field() {
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
+#[l7_log(biz_response_code.skip = "true")]
 struct IntField {
     endpoint: String,
     // override endpoint field
@@ -161,6 +164,7 @@ fn int_field() {
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
+#[l7_log(biz_response_code.skip = "true")]
 struct OptionIntField {
     #[l7_log(endpoint)]
     id: Option<usize>,
@@ -204,6 +208,7 @@ struct SkipField {
     biz_type: u8,
     biz_code: String,
     biz_scenario: String,
+    biz_response_code: usize,
 }
 
 impl L7LogAttribute for SkipField {}
@@ -243,6 +248,7 @@ struct WithPrioField {
     biz_type: u8,
     biz_code: String,
     biz_scenario: String,
+    biz_response_code: usize,
 }
 
 impl L7LogAttribute for WithPrioField {}
@@ -285,6 +291,7 @@ struct OptionPrioField {
     biz_type: u8,
     biz_code: String,
     biz_scenario: String,
+    biz_response_code: usize,
 }
 
 impl L7LogAttribute for OptionPrioField {}

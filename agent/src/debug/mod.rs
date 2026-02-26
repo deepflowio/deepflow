@@ -15,7 +15,7 @@
  */
 
 mod debugger;
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "libtrace"))]
 mod ebpf;
 #[cfg(target_os = "linux")]
 mod platform;
@@ -24,7 +24,7 @@ mod rpc;
 
 use bincode::{Decode, Encode};
 pub use debugger::{Client, ConstructDebugCtx, Debugger};
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", feature = "libtrace"))]
 pub use ebpf::EbpfMessage;
 #[cfg(target_os = "linux")]
 pub use platform::PlatformMessage;
@@ -52,7 +52,7 @@ pub enum Module {
     List,
     Queue,
     Policy,
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "libtrace"))]
     Ebpf,
 }
 

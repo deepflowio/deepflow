@@ -949,14 +949,19 @@ static __inline bool infer_pgsql_startup_message(const char *buf, size_t count)
 /*
  * ref: https://developer.aliyun.com/article/751984
  * | char tag | int32 len | payload |
- * tag 的取值参考 src/flow_generator/protocol_logs/sql/postgresql.rs
+ * tag ref: src/flow_generator/protocol_logs/sql/postgresql.rs
+ *
+ * Message flow patterns in PostgreSQL protocol:
+ * 'P' (Parse) is usually followed by 'B' (Bind), but sometimes directly followed by 'S' (Sync).
+ * 'B' (Bind) is usually followed by 'E' (Execute), or sometimes 'S' (Sync).
+ * 'E' (Execute) is usually followed by 'S' (Sync).
+ * 'S' (Sync) generally does not have any message following it; it signals the end of a batch of messages.
+ * The 'Q' (Query) and 'C' (Close) messages always end with a null terminator character '\0'.
  */
 static __inline enum message_type infer_pgsql_query_message(const char *buf,
 							    const char *s_buf,
 							    size_t count)
 {
-	// Only a judgement query.
-	static const char tag_q = 'Q';
 	// In the protocol format, the size of the "len" field is 4 bytes,
 	// and the minimum command length is 4 bytes for "COPY/MOVE",
 	// The minimal length is therefore 8.
@@ -972,10 +977,34 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 	if (count < min_msg_len) {
 		return MSG_UNKNOWN;
 	}
-	// Tag check
-	if (buf[0] != tag_q) {
+
+	char tag = buf[0];
+
+	/*
+	 * NOTE:
+	 * In Linux 4.14, the eBPF verifier is very strict on complex boolean
+	 * expressions. The original explicit comparison:
+	 *
+	 *   if (tag != 'Q' && tag != 'P' && tag != 'B' &&
+	 *       tag != 'E' && tag != 'S' && tag != 'C')
+	 *
+	 * may fail verifier checks due to excessive branching and state explosion.
+	 *
+	 * To keep the program verifier-friendly, we intentionally simplify the
+	 * condition to a range check:
+	 *
+	 *   if (tag < 'B' || tag > 'S')
+	 *
+	 * This relaxes the validation and allows some non-target tag values
+	 * within ['B', 'S'], but is acceptable because:
+	 *   1) This is only a fast pre-filter.
+	 *   2) Invalid tags will be rejected by subsequent length/content checks.
+	 *
+	 * This trade-off is required for compatibility with Linux 4.14 eBPF verifier.
+	 */
+	if (tag < 'B' || tag > 'S')
 		return MSG_UNKNOWN;
-	}
+
 	// Payload length check
 	__u32 length;
 	bpf_probe_read_user(&length, sizeof(length), s_buf + 1);
@@ -983,17 +1012,26 @@ static __inline enum message_type infer_pgsql_query_message(const char *buf,
 	if (length < min_payload_len || length > max_payload_len) {
 		return MSG_UNKNOWN;
 	}
+
 	// If the input includes a whole message (1 byte tag + length),
 	// check the last character.
 	if (length + 1 <= (__u32) count) {
 		char last_char = ' ';	//Non-zero initial value
 		bpf_probe_read_user(&last_char, sizeof(last_char),
 				    s_buf + length);
-		if (last_char != '\0')
-			return MSG_UNKNOWN;
+		if (last_char == '\0' && (tag == 'Q' || tag == 'C'))
+			return MSG_REQUEST;
 	}
 
-	return MSG_REQUEST;
+	size_t pos = length + 1;
+	if (pos + 5 > count)
+		return MSG_UNKNOWN;
+
+	bpf_probe_read_user(&tag, sizeof(tag), s_buf + pos);
+	if (tag == 'B' || tag == 'E' || tag == 'S')
+		return MSG_REQUEST;
+
+	return MSG_UNKNOWN;
 }
 
 static __inline enum message_type infer_postgre_message(const char *buf,
@@ -1024,12 +1062,8 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 		case 'C': case 'E': case 'S': case 'D': case 'H': case 'd':
 		case 'c':
 			return MSG_REQUEST;
-		case 'Z': case 'I': case '1': case '2': case '3': case 'K':
-		case 'T': case 'n': case 'N': case 't': case 'G': case 'W':
-		case 'R':
-			return MSG_RESPONSE;
 		default:
-			return MSG_UNKNOWN;
+			return MSG_RESPONSE;
 		}
 		/* *INDENT-ON* */
 	}
@@ -1040,23 +1074,51 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 	return infer_pgsql_query_message(infer_buf, buf, count);
 }
 
+#define TNS_HEADER_LENGTH_OFFSET 0
+#define TNS_HEADER_CHECKSUM_OFFSET 2
+#define TNS_HEADER_TYPE_OFFSET 4
+#define TNS_TYPE_DATA_DATA_ID_OFFSET 10
+#define TNS_TYPE_DATA_CALL_ID_OFFSET 11
+
+#define TNS_RESP_DATA_ID_RET_STATUS 0x04
+#define TNS_RESP_DATA_ID_RET_PARAM 0x08
+#define TNS_RESP_DATA_ID_DESC_INFO 0x10
+
+#define TNS_REQ_DATA_ID_PIGGY_BACK_FUNC 0x11
+#define TNS_REQ_DATA_ID_USER_OCI_FUNC 0x3
+
+#define TNS_REQ_CALL_ID_USER_CURSOR_CLOSE_ALL 0x69
+#define TNS_REQ_CALL_ID_USER_BUNDLED_EXEC_CALL 0x5e
+#define TNS_REQ_CALL_ID_USER_SESS_SWITCH_OIGGY_BACK 0x6e
+
+#define TNS_TYPE_CONNECT    0x01
+#define TNS_TYPE_ACCEPT     0x02
+#define TNS_TYPE_ACK        0x03
+#define TNS_TYPE_REFUSE     0x04
+#define TNS_TYPE_REDIRECT   0x05
+#define TNS_TYPE_DATA       0x06
+#define TNS_TYPE_NULL       0x07
+#define TNS_TYPE_ABORT      0x09
+#define TNS_TYPE_RESEND     0x0b
+#define TNS_TYPE_MARKER     0x0c
+#define TNS_TYPE_ATTENTION  0x0d
+#define TNS_TYPE_CONTROL    0x0e
+#define TNS_TYPE_DD         0x0f
+
+static __inline bool is_tns_packet_type(const char ty) {
+	if (ty == 0x08 || ty == 0x0a) {
+		return false;
+	}
+	if (ty >= TNS_TYPE_CONNECT && ty <= TNS_TYPE_DD) {
+		return true;
+	}
+	return false;
+}
+
 static __inline enum message_type infer_oracle_tns_message(const char *buf,
-							   size_t count,
-							   struct conn_info_s
-							   *conn_info)
+								size_t count,
+								struct conn_info_s *conn_info)
 {
-#define OEACLE_INFER_BUF_SIZE 12
-#define PKT_TYPE_DATA 6
-#define RESP_DATA_ID_RET_STATUS 0x04
-#define RESP_DATA_ID_RET_PARAM 0x08
-#define RESP_DATA_ID_DESC_INFO 0x10
-
-#define REQ_DATA_ID_PIGGY_BACK_FUNC 0x11
-#define REQ_DATA_ID_USER_OCI_FUNC 0x3
-
-#define REQ_CALL_ID_USER_CURSOR_CLOSE_ALL 0x69
-#define REQ_CALL_ID_USER_BUNDLED_EXEC_CALL 0x5e
-#define REQ_CALL_ID_USER_SESS_SWITCH_OIGGY_BACK 0x6e
 
 	if (!protocol_port_check_2(PROTO_ORACLE, conn_info))
 		return MSG_UNKNOWN;
@@ -1069,27 +1131,100 @@ static __inline enum message_type infer_oracle_tns_message(const char *buf,
 			return MSG_UNKNOWN;
 	}
 
-	char pkt_type = buf[4];
-	char data_id = buf[10];
-	char call_id = buf[11];
-	if (pkt_type != PKT_TYPE_DATA) {
+	if (!is_tns_packet_type(buf[TNS_HEADER_TYPE_OFFSET])) {
 		return MSG_UNKNOWN;
 	}
 
-	if (data_id == RESP_DATA_ID_RET_STATUS
-	    || data_id == RESP_DATA_ID_RET_PARAM
-	    || data_id == RESP_DATA_ID_DESC_INFO) {
+	__u16 checksum = __bpf_ntohs(*(__u16 *)(buf + TNS_HEADER_CHECKSUM_OFFSET));
+	__u32 length = 0;
+	// TNS header can have 2/4 bytes length field
+	// ref: https://github.com/wireshark/wireshark/blob/d124e488b418acc2482fa2ae59ac69d5586d0d37/epan/dissectors/packet-tns.c#L1298
+	if (checksum == 0 || checksum == 4) {
+		length = (__u32)__bpf_ntohs(*(__u16 *)(buf + TNS_HEADER_LENGTH_OFFSET));
+	} else {
+		length = __bpf_ntohl(*(__u32 *)(buf + TNS_HEADER_LENGTH_OFFSET));
+	}
+
+	const char *infer_ptr = conn_info->syscall_infer_addr;
+	char pkt_type = 0;
+
+	// if count is larger than length, there are multiple TNS packets
+	// check the next packet for higher accuracy
+	if (count > length + TNS_HEADER_TYPE_OFFSET) {
+		if (bpf_probe_read_user(&pkt_type, sizeof(pkt_type), infer_ptr + length + TNS_HEADER_TYPE_OFFSET) == 0 && !is_tns_packet_type(pkt_type)) {
+			return MSG_UNKNOWN;
+		}
+	}
+
+	pkt_type = buf[TNS_HEADER_TYPE_OFFSET];
+	switch (pkt_type) {
+		case TNS_TYPE_CONNECT:
+			if (length < 26) {
+				return MSG_UNKNOWN;
+			}
+			return MSG_REQUEST;
+		case TNS_TYPE_ACCEPT:
+			if (length < 16) {
+				return MSG_UNKNOWN;
+			}
+			return MSG_RESPONSE;
+		case TNS_TYPE_REFUSE:
+			if (length < 4) {
+				return MSG_UNKNOWN;
+			}
+			return MSG_RESPONSE;
+		case TNS_TYPE_REDIRECT:
+			if (length < 2) {
+				return MSG_UNKNOWN;
+			}
+			return MSG_RESPONSE;
+		case TNS_TYPE_ABORT:
+			if (length < 2) {
+				return MSG_UNKNOWN;
+			}
+			break;
+		case TNS_TYPE_MARKER:
+			if (length < 3) {
+				return MSG_UNKNOWN;
+			}
+			break;
+		case TNS_TYPE_ATTENTION:
+			if (length < 3) {
+				return MSG_UNKNOWN;
+			}
+			return MSG_REQUEST;
+		case TNS_TYPE_CONTROL:
+			if (length < 2) {
+				return MSG_UNKNOWN;
+			}
+			return MSG_REQUEST;
+		default:
+			break;
+	}
+
+	// use upper layer to infer the message type
+	if (pkt_type != TNS_TYPE_DATA) {
+		return MSG_REQUEST;
+	}
+
+	char data_id = buf[TNS_TYPE_DATA_DATA_ID_OFFSET];
+	char call_id = buf[TNS_TYPE_DATA_CALL_ID_OFFSET];
+
+	if (data_id == TNS_RESP_DATA_ID_RET_STATUS
+	    || data_id == TNS_RESP_DATA_ID_RET_PARAM
+	    || data_id == TNS_RESP_DATA_ID_DESC_INFO) {
 		return MSG_RESPONSE;
-	} else if ((data_id == REQ_DATA_ID_PIGGY_BACK_FUNC
-		    && call_id == REQ_CALL_ID_USER_CURSOR_CLOSE_ALL)
-		   || (data_id == REQ_DATA_ID_PIGGY_BACK_FUNC
-		       && call_id == REQ_CALL_ID_USER_SESS_SWITCH_OIGGY_BACK)
-		   || (data_id == REQ_DATA_ID_USER_OCI_FUNC
-		       && call_id == REQ_CALL_ID_USER_BUNDLED_EXEC_CALL)
+	} else if ((data_id == TNS_REQ_DATA_ID_PIGGY_BACK_FUNC
+		    && call_id == TNS_REQ_CALL_ID_USER_CURSOR_CLOSE_ALL)
+		   || (data_id == TNS_REQ_DATA_ID_PIGGY_BACK_FUNC
+		       && call_id == TNS_REQ_CALL_ID_USER_SESS_SWITCH_OIGGY_BACK)
+		   || (data_id == TNS_REQ_DATA_ID_USER_OCI_FUNC
+		       && call_id == TNS_REQ_CALL_ID_USER_BUNDLED_EXEC_CALL)
 	    ) {
 		return MSG_REQUEST;
 	} else {
-		return MSG_UNKNOWN;
+		// use upper layer to infer the message type
+		return MSG_REQUEST;
 	}
 }
 
@@ -3733,7 +3868,7 @@ static __inline enum message_type infer_rocketmq_message(const char *buf,
 }
 
 // ref: https://www.ibm.com/docs/en/ibm-mq/
-static __inline enum message_type infer_webspheremq_message(const char *buf,
+static __inline enum message_type infer_web_sphere_mq_message(const char *buf,
 							 size_t count,
 							 struct conn_info_s *conn_info)
 {
@@ -3875,7 +4010,7 @@ infer_protocol_3(const char *infer_buf, size_t count,
 #else
 	} else if ((inferred_message.type =
 #endif
-		    infer_webspheremq_message(infer_buf, count,
+		    infer_web_sphere_mq_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_WEBSPHEREMQ;
 }
@@ -3997,8 +4132,8 @@ infer_protocol_2(const char *infer_buf, size_t count,
 	} else if ((inferred_message.type =
 #endif
 		    infer_oracle_tns_message(infer_buf,
-					     count,
-					     conn_info)) != MSG_UNKNOWN) {
+						count,
+						conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_ORACLE;
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_ISO8583 && (inferred_message.type =
@@ -4343,8 +4478,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 		case PROTO_ORACLE:
 			if ((inferred_message.type =
 			     infer_oracle_tns_message(infer_buf, count,
-						      conn_info)) !=
-			    MSG_UNKNOWN) {
+						conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_ORACLE;
 				return inferred_message;
 			}
@@ -4405,7 +4539,7 @@ infer_protocol_1(struct ctx_info_s *ctx,
 			break;
 		case PROTO_WEBSPHEREMQ:
 			if ((inferred_message.type =
-			     infer_webspheremq_message(infer_buf, count,
+			     infer_web_sphere_mq_message(infer_buf, count,
 						 conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_WEBSPHEREMQ;
 				return inferred_message;

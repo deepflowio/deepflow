@@ -34,6 +34,7 @@ use public_derive_internals::l7_protocol::{Field, L7Log, L7LogAttribute};
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
+#[l7_log(biz_response_code.skip = "true")]
 struct SoloField {
     x_request_id: String,
 }
@@ -57,6 +58,7 @@ impl L7LogAttribute for SoloField {}
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
+#[l7_log(biz_response_code.skip = "true")]
 struct DuetField {
     x_request_id_0: String,
     x_request_id_1: String,

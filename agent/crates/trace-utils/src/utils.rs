@@ -14,19 +14,22 @@
  * limitations under the License.
  */
 
-use std::collections::VecDeque;
-use std::ffi::CString;
-use std::fs::File;
-use std::io;
-use std::os::unix::fs::MetadataExt;
-use std::os::unix::io::AsRawFd;
-use std::sync::Mutex;
-use std::sync::OnceLock;
+use std::{
+    collections::VecDeque,
+    ffi::{CStr, CString},
+    fs::File,
+    io,
+    os::unix::{fs::MetadataExt, io::AsRawFd},
+    sync::{Mutex, OnceLock},
+};
 
 use libc::{c_int, c_longlong, c_void};
-use nix::sched::setns;
-use nix::sys::wait::{waitpid, WaitStatus};
-use nix::unistd::{execve, fork, ForkResult};
+use log::debug;
+use nix::{
+    sched::setns,
+    sys::wait::{waitpid, WaitStatus},
+    unistd::{execve, fork, ForkResult},
+};
 use procfs::process::all_processes;
 
 #[derive(Default)]
@@ -202,6 +205,7 @@ pub fn protect_cpu_affinity() -> io::Result<()> {
                     eprintln!("execve failed: {:?}", e);
                     libc::_exit(127);
                 });
+                #[allow(unreachable_code)]
                 libc::_exit(127);
             }
             Err(e) => Err(io::Error::new(
@@ -209,5 +213,101 @@ pub fn protect_cpu_affinity() -> io::Result<()> {
                 format!("fork failed: {}", e),
             )),
         }
+    }
+}
+
+#[repr(u8)]
+pub enum LogLevel {
+    Error = 1,
+    Warn = 2,
+    Info = 3,
+    Debug = 4,
+    Trace = 5,
+}
+
+impl From<LogLevel> for log::Level {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Error => log::Level::Error,
+            LogLevel::Warn => log::Level::Warn,
+            LogLevel::Info => log::Level::Info,
+            LogLevel::Debug => log::Level::Debug,
+            LogLevel::Trace => log::Level::Trace,
+        }
+    }
+}
+
+// levels:
+//   check the enums in src/ebpf/user/log.h
+//   - info: 0
+//   - error: 2
+//   - warn: 4
+//   other levels are ignored
+// msg/function_name/file_path should be null terminated utf8 strings or will be ignored
+// function_name and file_path can be nil
+// _function_name is ignored at the moment because file_name + line_number should be enough for debugging
+#[no_mangle]
+pub unsafe extern "C" fn rust_log_wrapper(
+    level: LogLevel,
+    error_number: libc::c_int,
+    msg: *const libc::c_char,
+    _function_name: *const libc::c_char,
+    file_path: *const libc::c_char,
+    line_number: libc::c_int,
+) {
+    if msg.is_null() {
+        debug!("msg is null");
+        return;
+    }
+    let msg = match CStr::from_ptr(msg).to_str() {
+        Ok(msg) => msg,
+        Err(e) => {
+            debug!("msg is not null terminated utf8 string: {e}");
+            return;
+        }
+    };
+
+    let err_msg = if error_number == 0 {
+        None
+    } else {
+        match CStr::from_ptr(libc::strerror(error_number)).to_str() {
+            Ok(err_msg) => Some(err_msg),
+            Err(e) => {
+                debug!("failed to convert strerror to string: {e}");
+                None
+            }
+        }
+    };
+
+    let file_path = if file_path.is_null() {
+        None
+    } else {
+        match CStr::from_ptr(file_path).to_str() {
+            Ok(path) => Some(path),
+            Err(e) => {
+                debug!("file_path is not null terminated utf8 string: {e}");
+                None
+            }
+        }
+    };
+
+    let line_number = if line_number == 0 {
+        None
+    } else {
+        Some(line_number as u32)
+    };
+
+    let mut rb = log::Record::builder();
+    rb.target("libtrace")
+        .level(level.into())
+        .file(file_path)
+        .line(line_number);
+    // `format_args!` must be put into `args()` to avoid borrow checker issues as of rust 1.83
+    match err_msg {
+        Some(err_msg) => log::logger().log(
+            &rb.args(format_args!("{msg}: {err_msg} (errno {error_number})"))
+                .build(),
+        ),
+        None => log::logger().log(&rb.args(format_args!("{msg}")).build()),
     }
 }

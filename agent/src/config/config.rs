@@ -1023,8 +1023,39 @@ pub struct EbpfSocketTunning {
 pub struct EbpfSocket {
     pub uprobe: EbpfSocketUprobe,
     pub kprobe: EbpfSocketKprobe,
+    pub sock_ops: EbpfSocketSockOps,
     pub tunning: EbpfSocketTunning,
     pub preprocess: EbpfSocketPreprocess,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfSocketSockOps {
+    pub tcp_option_trace: EbpfTcpOptionTrace,
+}
+
+impl Default for EbpfSocketSockOps {
+    fn default() -> Self {
+        Self {
+            tcp_option_trace: EbpfTcpOptionTrace::default(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfTcpOptionTrace {
+    pub enabled: bool,
+    pub sampling_window_bytes: u32,
+}
+
+impl Default for EbpfTcpOptionTrace {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            sampling_window_bytes: 16 * 1024,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -1237,11 +1268,12 @@ pub struct EbpfNetwork {
     pub nic_optimize: Vec<NicOptimizeConfig>,
 }
 
-#iderive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct EbpfSocketPreprocess {
     pub out_of_order_reassembly_cache_size: usize,
     pub out_of_order_reassembly_protocols: Vec<String>,
+    pub out_of_order_reassembly_timeout: Duration,
     pub segmentation_reassembly_protocols: Vec<String>,
 }
 
@@ -1250,6 +1282,7 @@ impl Default for EbpfSocketPreprocess {
         Self {
             out_of_order_reassembly_cache_size: 16,
             out_of_order_reassembly_protocols: vec![],
+            out_of_order_reassembly_timeout: Duration::from_millis(100),
             segmentation_reassembly_protocols: vec![],
         }
     }
@@ -1729,6 +1762,20 @@ impl Default for Iso8583Config {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct WebSphereMqConfig {
+    pub parse_xml_enabled: bool,
+}
+
+impl Default for WebSphereMqConfig {
+    fn default() -> Self {
+        Self {
+            parse_xml_enabled: true,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct MysqlConfig {
@@ -1804,6 +1851,7 @@ impl Default for InferenceWhitelist {
 pub struct ProtocolSpecialConfig {
     pub oracle: OracleConfig,
     pub iso8583: Iso8583Config,
+    pub web_sphere_mq: WebSphereMqConfig,
     pub mysql: MysqlConfig,
     pub grpc: GrpcConfig,
 }
@@ -3509,6 +3557,19 @@ impl Default for Iso8583ParseConfig {
             extract_fields: Bitmap::new(0, false),
             translation_enabled: true,
             pan_obfuscate: true,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WebSphereMqParseConfig {
+    pub parse_xml_enabled: bool,
+}
+
+impl Default for WebSphereMqParseConfig {
+    fn default() -> Self {
+        Self {
+            parse_xml_enabled: true,
         }
     }
 }

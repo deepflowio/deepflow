@@ -734,7 +734,7 @@ mod tests {
     use crate::flow_generator::{FlowTimeout, TcpTimeout};
     use crate::flow_generator::{FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, TIME_UNIT};
     use crate::rpc::get_timestamp;
-    use crate::utils::test::Capture;
+    use crate::utils::test_utils::Capture;
     use public::proto::agent::AgentType;
 
     use packet_sequence_block::PacketSequenceBlock;

@@ -34,6 +34,7 @@ use public_derive_internals::l7_protocol::Field;
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
+#[l7_log(biz_response_code.skip = "true")]
 struct MissingFields {
     path: String,
 }
@@ -56,6 +57,7 @@ struct MissingFields {
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
+#[l7_log(biz_response_code.skip = "true")]
 struct MissingSetter {
 }
 
@@ -81,6 +83,7 @@ fn get_endpoint(_: &MissingSetter) -> Field<'_> {
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
+#[l7_log(biz_response_code.skip = "true")]
 struct MissingGetter {
 }
 

@@ -1385,7 +1385,7 @@ mod tests {
 
     use super::*;
 
-    use crate::utils::test::Capture;
+    use crate::utils::test_utils::Capture;
 
     const FILE_DIR: &'static str = "resources/test/flow_generator";
 

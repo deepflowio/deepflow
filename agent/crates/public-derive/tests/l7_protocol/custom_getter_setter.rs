@@ -37,6 +37,7 @@ use public_derive_internals::{
 #[l7_log(biz_type.skip = "true")]
 #[l7_log(biz_code.skip = "true")]
 #[l7_log(biz_scenario.skip = "true")]
+#[l7_log(biz_response_code.skip = "true")]
 struct CustomFields {
     switch: u8,
     field0: String,

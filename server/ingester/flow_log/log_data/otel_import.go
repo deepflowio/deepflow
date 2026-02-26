@@ -239,7 +239,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 					}
 				}
 			case "http.scheme", "db.system", "rpc.system", "messaging.system", "messaging.protocol":
-				h.L7ProtocolStr = value.GetStringValue()
+				h.BizProtocol = value.GetStringValue()
 			case "http.flavor":
 				h.Version = value.GetStringValue()
 			case "http.status_code":
@@ -303,8 +303,8 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 		}
 	}
 
-	if isHttp && len(h.L7ProtocolStr) == 0 {
-		h.L7ProtocolStr = datatype.L7_PROTOCOL_HTTP_1.String(false)
+	if isHttp && len(h.BizProtocol) == 0 {
+		h.BizProtocol = datatype.L7_PROTOCOL_HTTP_1.String(false)
 	}
 
 	// If http.target exists, read it for RequestResource. If not exist, read the part after the domain name from http.url.
@@ -318,7 +318,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 		}
 	}
 
-	h.L7Protocol, h.IsTLS = ParseL7Protocol(h.L7ProtocolStr, h.Version)
+	h.L7Protocol, h.IsTLS = ParseL7Protocol(h.BizProtocol, h.Version)
 	h.AttributeNames = attributeNames
 	h.AttributeValues = attributeValues
 	h.MetricsNames = metricsNames

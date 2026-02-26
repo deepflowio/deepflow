@@ -71,8 +71,8 @@ http2 = { path = "plugins/http2" }
 humantime = "2.1"
 humantime-serde = "1.0"
 hyper = { version = "0.14", features = ["full"] }
-integration_skywalking = { path = "plugins/integration_skywalking" }
-integration_vector = { path = "plugins/integration_vector" }
+integration_skywalking = { path = "plugins/integration_skywalking", optional = true }
+integration_vector = { path = "plugins/integration_vector", optional = true }
 ipnet = "2.4.0"
 ipnetwork = "0.18.0"
 lazy_static = "1.5.0"
@@ -91,7 +91,9 @@ packet_segmentation_reassembly = { path = "plugins/packet_segmentation_reassembl
 packet_sequence_block = { path = "plugins/packet_sequence_block" }
 page_size = "0.4.2"
 parking_lot = "0.11"
+pcap = "2.4"
 pcap_assembler = { path = "plugins/pcap_assembler" }
+pcap-parser = { version = "0.17", optional = true }
 pcap-sys = "0.1.3"
 pnet = "^0.29"
 prost.workspace = true
@@ -125,7 +127,6 @@ zstd = "0.13.2"
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 cgroups-rs = "0.2.9"
 nix = "0.23"
-pcap = "0.9.1"
 # As of procfs 0.16.0, Process::fd().iter() still not giving correct results on kernel 2.6.32
 # ref: https://github.com/eminence/procfs/pull/241
 procfs = { git = "https://github.com/deepflowio/procfs/" }
@@ -145,7 +146,6 @@ schemars = "0.8"
 trace-utils = { path = "crates/trace-utils" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-pcap = "0.10.1"
 winapi = { version = "0.3.9", features = [
     "errhandlingapi",
     "libloaderapi",
@@ -164,8 +164,10 @@ windows = { version = "0.30", features = [
 
 [dev-dependencies]
 criterion = "0.3.5"
+env_logger = "0.11"
 lru = "0.9.0"
 tempfile = "3.2.0"
+tokio-stream = "0.1"
 uluru = "3.0.0"
 
 [build-dependencies]
@@ -176,9 +178,14 @@ tonic-build.workspace = true
 walkdir = "2"
 
 [features]
-enterprise = ["extended_observability", "enterprise-utils"]
-extended_observability = []
+default = ["libtrace"]
+enterprise = ["dep:enterprise-utils", "dep:pcap-parser"]
+enterprise-integration = ["dep:integration_skywalking", "dep:integration_vector"]
+extended_observability = ["libtrace"]
 dylib_pcap = []
+libtrace = []
+# `test-utils` feature is only used in test cases, DO NOT use in production code
+test-utils = []
 
 [[bench]]
 name = "common"
@@ -187,6 +194,7 @@ harness = false
 [[bench]]
 name = "flow_generator"
 harness = false
+required-features = ["test-utils"]
 
 [[bench]]
 name = "utils"
@@ -199,6 +207,10 @@ harness = false
 [[bench]]
 name = "labeler"
 harness = false
+
+[[example]]
+name = "parse_http_v1"
+required-features = ["test-utils"]
 
 [profile.release]
 panic = 'abort'

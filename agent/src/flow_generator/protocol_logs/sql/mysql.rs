@@ -194,6 +194,9 @@ pub struct MysqlInfo {
 
     #[serde(skip)]
     attributes: Vec<KeyVal>,
+
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_response_code: String,
 }
 
 impl L7LogAttribute for MysqlInfo {
@@ -535,11 +538,11 @@ impl MysqlInfo {
         }
     }
 
-    fn get_command(&self) -> Field {
+    fn get_command(&self) -> Field<'_> {
         Field::Str(Cow::Borrowed(self.get_command_str()))
     }
 
-    fn get_trace_id(&self) -> Field {
+    fn get_trace_id(&self) -> Field<'_> {
         if let Some(trace_id) = self.trace_ids.first() {
             return Field::Str(Cow::Borrowed(trace_id));
         }
@@ -623,6 +626,7 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
                 None
             },
             flags,
+            biz_response_code: f.biz_response_code,
             ..Default::default()
         };
         return log;
@@ -656,7 +660,7 @@ fn give_buffer(buffer: Vec<u8>) {
 #[derive(Default)]
 pub struct MysqlLog {
     pub protocol_version: u8,
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     obfuscate_cache: Option<ObfuscateCache>,
 
     // This field is extracted in the COM_STMT_PREPARE request and calculate based on SQL statements
@@ -724,9 +728,6 @@ impl L7ProtocolParserInterface for MysqlLog {
             trace_ids: PrioStrings::new(multiple_trace_id_collection),
             ..Default::default()
         };
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
 
         if self.has_compressed_header.is_none() {
             let _ = self.check_compressed_header(payload)?;
@@ -792,7 +793,9 @@ impl L7ProtocolParserInterface for MysqlLog {
         if let Some(config) = param.parse_config {
             info.set_is_on_blacklist(config);
         }
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+        self.perf_stats.clear();
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if info.msg_type == LogMessageType::Response {
                 if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
                     info.endpoint = Some(endpoint.to_string());
@@ -800,8 +803,9 @@ impl L7ProtocolParserInterface for MysqlLog {
             }
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::MysqlInfo(info)))
@@ -818,8 +822,8 @@ impl L7ProtocolParserInterface for MysqlLog {
         L7Protocol::MySQL
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn set_obfuscate_cache(&mut self, obfuscate_cache: Option<ObfuscateCache>) {
@@ -1413,7 +1417,7 @@ impl MysqlLog {
         };
         for op in self.custom_field_store.drain_with(policies, &*info) {
             match &op.op {
-                Op::AddMetric(_, _) | Op::SavePayload(_) => (),
+                Op::AddMetric(_, _) | Op::SaveHeader(_) | Op::SavePayload(_) => (),
                 _ => auto_merge_custom_field(op, info),
             }
         }
@@ -1675,7 +1679,7 @@ mod tests {
         common::{flow::PacketDirection, l7_protocol_log::L7PerfCache},
         config::handler::{L7LogDynamicConfigBuilder, TraceType},
         flow_generator::{protocol_logs::PrioStrings, L7_RRT_CACHE_CAPACITY},
-        utils::test::Capture,
+        utils::test_utils::Capture,
     };
 
     const FILE_DIR: &str = "resources/test/flow_generator/mysql";
@@ -1710,7 +1714,7 @@ mod tests {
 
             let mut param = ParseParam::new(
                 &*packet,
-                log_cache.clone(),
+                Some(log_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
@@ -1875,6 +1879,7 @@ mod tests {
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap));
         let mut packets = capture.collect::<Vec<_>>();
+        let mut perf_stat = L7PerfStats::default();
 
         let first_src_mac = packets[0].lookup_key.src_mac;
         for packet in packets.iter_mut() {
@@ -1886,7 +1891,7 @@ mod tests {
             if packet.get_l4_payload().is_some() {
                 let param = &ParseParam::new(
                     &*packet,
-                    rrt_cache.clone(),
+                    Some(rrt_cache.clone()),
                     Default::default(),
                     #[cfg(any(target_os = "linux", target_os = "android"))]
                     Default::default(),
@@ -1894,9 +1899,12 @@ mod tests {
                     true,
                 );
                 let _ = mysql.parse_payload(packet.get_l4_payload().unwrap(), param);
+                for i in mysql.perf_stats() {
+                    perf_stat.sequential_merge(&i);
+                }
             }
         }
-        mysql.perf_stats.unwrap()
+        perf_stat
     }
 
     #[test]
@@ -1925,10 +1933,6 @@ mod tests {
 
     #[test]
     fn comment_extractor() {
-        flexi_logger::Logger::try_with_env()
-            .unwrap()
-            .start()
-            .unwrap();
         let testcases = vec![
             (
                 "/* traceparent: 00-trace_id-span_id-01 */ SELECT * FROM table",

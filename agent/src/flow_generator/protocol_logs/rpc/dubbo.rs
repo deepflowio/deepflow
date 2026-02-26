@@ -169,6 +169,8 @@ pub struct DubboInfo {
     biz_code: String,
     #[serde(skip_serializing_if = "value_is_default")]
     biz_scenario: String,
+    #[serde(skip_serializing_if = "value_is_default")]
+    biz_response_code: String,
 }
 
 impl L7LogAttribute for DubboInfo {
@@ -235,6 +237,7 @@ impl DubboInfo {
         }
         swap_if!(self, biz_code, is_empty, other);
         swap_if!(self, biz_scenario, is_empty, other);
+        swap_if!(self, biz_response_code, is_empty, other);
     }
 
     fn add_trace_id(&mut self, trace_id: String, trace_type: &TraceType) {
@@ -262,18 +265,6 @@ impl DubboInfo {
         });
     }
 
-    // when response_code is overwritten, put it into the attributes.
-    fn response_code_to_attribute(&mut self) {
-        self.attributes.push(KeyVal {
-            key: SYS_RESPONSE_CODE_ATTR.to_string(),
-            val: self
-                .status_code
-                .as_ref()
-                .map(ToString::to_string)
-                .unwrap_or_default(),
-        });
-    }
-
     pub fn merge_custom_info(&mut self, custom: CustomInfo) {
         // req rewrite
         if !custom.req.domain.is_empty() {
@@ -286,7 +277,6 @@ impl DubboInfo {
 
         //resp rewrite
         if let Some(code) = custom.resp.code {
-            self.response_code_to_attribute();
             self.status_code = Some(code);
         }
 
@@ -319,6 +309,10 @@ impl DubboInfo {
             }
         }
 
+        if let Some(biz_response_code) = custom.biz_response_code {
+            self.biz_response_code = biz_response_code;
+        }
+
         // extend attribute
         if !custom.attributes.is_empty() {
             self.attributes.extend(custom.attributes);
@@ -344,7 +338,7 @@ impl DubboInfo {
         }
     }
 
-    fn get_trace_id(&self) -> Field {
+    fn get_trace_id(&self) -> Field<'_> {
         Field::Str(Cow::Borrowed(&self.trace_ids.highest()))
     }
 
@@ -497,6 +491,7 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 ..Default::default()
             }),
             flags: flags.bits(),
+            biz_response_code: f.biz_response_code,
             ..Default::default()
         }
     }
@@ -516,7 +511,7 @@ impl From<&DubboInfo> for LogCache {
 
 #[derive(Default)]
 pub struct DubboLog {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
 
     #[cfg(feature = "enterprise")]
     custom_field_store: Store,
@@ -555,10 +550,7 @@ impl L7ProtocolParserInterface for DubboLog {
         let Some(config) = param.parse_config else {
             return Err(Error::NoParseConfig);
         };
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default())
-        };
-
+        self.perf_stats.clear();
         #[cfg(feature = "enterprise")]
         self.custom_field_store.clear();
         #[cfg(feature = "enterprise")]
@@ -587,7 +579,8 @@ impl L7ProtocolParserInterface for DubboLog {
 
         info.set_is_on_blacklist(config);
 
-        if let Some(perf_stats) = self.perf_stats.as_mut() {
+        if param.parse_perf {
+            let mut perf_stat = L7PerfStats::default();
             if info.msg_type == LogMessageType::Response {
                 if let Some(endpoint) = info.load_endpoint_from_cache(param, info.is_reversed) {
                     info.endpoint = Some(endpoint.to_string());
@@ -595,8 +588,9 @@ impl L7ProtocolParserInterface for DubboLog {
             }
             if let Some(stats) = info.perf_stats(param) {
                 info.rrt = stats.rrt_sum;
-                perf_stats.sequential_merge(&stats);
+                perf_stat.sequential_merge(&stats);
             }
+            self.perf_stats.push(perf_stat);
         }
         if param.parse_log {
             Ok(L7ParseResult::Single(L7ProtocolInfo::DubboInfo(info)))
@@ -613,8 +607,8 @@ impl L7ProtocolParserInterface for DubboLog {
         false
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 }
 
@@ -997,14 +991,8 @@ impl DubboLog {
     fn set_status(&mut self, status_code: u8, info: &mut DubboInfo) {
         info.resp_status = match status_code {
             20 => L7ResponseStatus::Ok,
-            30 | 40 | 90 => {
-                self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                L7ResponseStatus::ClientError
-            }
-            31 | 50 | 60 | 70 | 80 | 100 => {
-                self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                L7ResponseStatus::ServerError
-            }
+            30 | 40 | 90 => L7ResponseStatus::ClientError,
+            31 | 50 | 60 | 70 | 80 | 100 => L7ResponseStatus::ServerError,
             _ => L7ResponseStatus::Ok,
         }
     }
@@ -1151,7 +1139,7 @@ impl DubboLog {
                     });
                 }
                 // not supported
-                Op::SavePayload(_) => (),
+                Op::SaveHeader(_) | Op::SavePayload(_) => (),
                 _ => auto_merge_custom_field(op, info),
             }
         }
@@ -1226,7 +1214,7 @@ mod tests {
     use crate::flow_generator::L7_RRT_CACHE_CAPACITY;
     use crate::{
         common::{flow::PacketDirection, MetaPacket},
-        utils::test::Capture,
+        utils::test_utils::Capture,
     };
 
     const FILE_DIR: &str = "resources/test/flow_generator/dubbo";
@@ -1301,7 +1289,7 @@ mod tests {
             let mut dubbo = DubboLog::default();
             let param = &mut ParseParam::new(
                 packet as &MetaPacket,
-                log_cache.clone(),
+                Some(log_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
@@ -1399,7 +1387,7 @@ mod tests {
         let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
         let param = &mut ParseParam::new(
             &meta_packet,
-            log_cache.clone(),
+            Some(log_cache.clone()),
             Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
             Default::default(),
@@ -1482,6 +1470,7 @@ mod tests {
 
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap));
         let mut packets = capture.collect::<Vec<_>>();
+        let mut perf_stat = L7PerfStats::default();
 
         let config = LogParserConfig {
             l7_log_dynamic: L7LogDynamicConfigBuilder {
@@ -1510,7 +1499,7 @@ mod tests {
             }
             let param = &mut ParseParam::new(
                 &*packet,
-                rrt_cache.clone(),
+                Some(rrt_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
@@ -1521,7 +1510,10 @@ mod tests {
             if packet.get_l4_payload().is_some() {
                 let _ = dubbo.parse_payload(packet.get_l4_payload().unwrap(), param);
             }
+            for i in dubbo.perf_stats() {
+                perf_stat.sequential_merge(&i);
+            }
         }
-        dubbo.perf_stats.unwrap()
+        perf_stat
     }
 }

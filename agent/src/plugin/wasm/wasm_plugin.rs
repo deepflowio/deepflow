@@ -82,6 +82,8 @@ pub struct AppInfo {
     pub biz_code: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "34")]
     pub biz_scenario: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "35")]
+    pub biz_response_code: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(oneof = "app_info::Info", tags = "10, 11")]
     pub info: ::core::option::Option<app_info::Info>,
 }

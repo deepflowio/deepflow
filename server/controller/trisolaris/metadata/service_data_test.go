@@ -32,18 +32,18 @@ func TestServiceRawData_MergeCustomServices(t *testing.T) {
 	t.Run("BasicDeduplication", func(t *testing.T) {
 		services := []*model.CustomService{
 			{
-				Base:     model.Base{ID: 1},
-				Name:     "service1",
-				Type:     CUSTOM_SERVICE_TYPE_PORT,
-				Resource: "192.168.1.1:80,192.168.1.2:443",
-				VPCIDs:   1,
+				Base:      model.Base{ID: 1},
+				Name:      "service1",
+				Type:      CUSTOM_SERVICE_TYPE_PORT,
+				Resources: "192.168.1.1:80,192.168.1.2:443",
+				VPCIDs:    1,
 			},
 			{
-				Base:     model.Base{ID: 2},
-				Name:     "service2",
-				Type:     CUSTOM_SERVICE_TYPE_PORT,
-				Resource: "192.168.1.1:80,192.168.1.3:80", // 192.168.1.1:80 already exists
-				VPCIDs:   1,
+				Base:      model.Base{ID: 2},
+				Name:      "service2",
+				Type:      CUSTOM_SERVICE_TYPE_PORT,
+				Resources: "192.168.1.1:80,192.168.1.3:80", // 192.168.1.1:80 already exists
+				VPCIDs:    1,
 			},
 		}
 
@@ -74,18 +74,18 @@ func TestServiceRawData_MergeCustomServices(t *testing.T) {
 	t.Run("EmptyPortRule", func(t *testing.T) {
 		services := []*model.CustomService{
 			{
-				Base:     model.Base{ID: 3},
-				Name:     "service3",
-				Type:     CUSTOM_SERVICE_TYPE_PORT,
-				Resource: "192.168.1.1:80,192.168.1.2:443",
-				VPCIDs:   1,
+				Base:      model.Base{ID: 3},
+				Name:      "service3",
+				Type:      CUSTOM_SERVICE_TYPE_PORT,
+				Resources: "192.168.1.1:80,192.168.1.2:443",
+				VPCIDs:    1,
 			},
 			{
-				Base:     model.Base{ID: 4},
-				Name:     "service4",
-				Type:     CUSTOM_SERVICE_TYPE_IP,
-				Resource: "192.168.1.1,192.168.1.3", // 192.168.1.1 has empty port
-				VPCIDs:   1,
+				Base:      model.Base{ID: 4},
+				Name:      "service4",
+				Type:      CUSTOM_SERVICE_TYPE_IP,
+				Resources: "192.168.1.1,192.168.1.3", // 192.168.1.1 has empty port
+				VPCIDs:    1,
 			},
 		}
 
@@ -119,18 +119,18 @@ func TestServiceRawData_MergeCustomServices(t *testing.T) {
 	t.Run("DifferentVPCs", func(t *testing.T) {
 		services := []*model.CustomService{
 			{
-				Base:     model.Base{ID: 5},
-				Name:     "service5",
-				Type:     CUSTOM_SERVICE_TYPE_PORT,
-				Resource: "192.168.1.1:80",
-				VPCIDs:   1,
+				Base:      model.Base{ID: 5},
+				Name:      "service5",
+				Type:      CUSTOM_SERVICE_TYPE_PORT,
+				Resources: "192.168.1.1:80",
+				VPCIDs:    1,
 			},
 			{
-				Base:     model.Base{ID: 6},
-				Name:     "service6",
-				Type:     CUSTOM_SERVICE_TYPE_PORT,
-				Resource: "192.168.1.1:80", // Same IP:port but different VPC
-				VPCIDs:   2,
+				Base:      model.Base{ID: 6},
+				Name:      "service6",
+				Type:      CUSTOM_SERVICE_TYPE_PORT,
+				Resources: "192.168.1.1:80", // Same IP:port but different VPC
+				VPCIDs:    2,
 			},
 		}
 
@@ -170,18 +170,18 @@ func TestServiceDataOP_MergeCustomServices(t *testing.T) {
 	// Create mock custom services
 	customServices := []*model.CustomService{
 		{
-			Base:     model.Base{ID: 1},
-			Name:     "service1",
-			VPCIDs:   1,
-			Type:     CUSTOM_SERVICE_TYPE_PORT,
-			Resource: "192.168.1.1:80",
+			Base:      model.Base{ID: 1},
+			Name:      "service1",
+			VPCIDs:    1,
+			Type:      CUSTOM_SERVICE_TYPE_PORT,
+			Resources: "192.168.1.1:80",
 		},
 		{
-			Base:     model.Base{ID: 2},
-			Name:     "service2",
-			VPCIDs:   2,
-			Type:     CUSTOM_SERVICE_TYPE_IP,
-			Resource: "192.168.1.2",
+			Base:      model.Base{ID: 2},
+			Name:      "service2",
+			VPCIDs:    2,
+			Type:      CUSTOM_SERVICE_TYPE_IP,
+			Resources: "192.168.1.2",
 		},
 	}
 

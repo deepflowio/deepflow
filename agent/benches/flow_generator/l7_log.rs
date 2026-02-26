@@ -27,7 +27,7 @@ use deepflow_agent::{
     _benchmark_session_peer_seq_no_assert as benchmark_session_peer_seq_no_assert,
     _meta_flow_perf_update as meta_flow_perf_update,
     common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
-    utils::test::Capture,
+    utils::test_utils::Capture,
     HttpLog,
 };
 
@@ -86,7 +86,7 @@ pub(super) fn bench(c: &mut Criterion) {
             let rrt_cache = Rc::new(RefCell::new(L7PerfCache::new(8)));
             let req_param = ParseParam::new(
                 &packets[0],
-                rrt_cache.clone(),
+                Some(rrt_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
@@ -95,7 +95,7 @@ pub(super) fn bench(c: &mut Criterion) {
             );
             let resp_param = ParseParam::new(
                 &packets[1],
-                rrt_cache.clone(),
+                Some(rrt_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),

@@ -80,6 +80,7 @@ use crate::{
             get_executable_path, is_tt_pod, running_in_container, running_in_k8s,
             running_in_only_watch_k8s_mode, KubeWatchPolicy,
         },
+        hasher::md5_to_string,
         stats,
     },
 };
@@ -948,7 +949,7 @@ impl Synchronizer {
         status: &RwLock<Status>,
         config: &Option<pb::CustomAppConfig>,
         _: &mut UserConfig,
-    ) -> Result<(), config::ConfigError> {
+    ) -> Result<bool, config::ConfigError> {
         // only do version updates
         if let Some(version) = config.as_ref().and_then(|c| c.version) {
             let mut sg = status.write();
@@ -958,9 +959,10 @@ impl Synchronizer {
                     sg.custom_app.version
                 );
                 sg.custom_app.version = version;
+                return Ok(true);
             }
         }
-        Ok(())
+        Ok(false)
     }
 
     #[cfg(feature = "enterprise")]
@@ -968,7 +970,7 @@ impl Synchronizer {
         status: &RwLock<Status>,
         config: &Option<pb::CustomAppConfig>,
         user_config: &mut UserConfig,
-    ) -> Result<(), config::ConfigError> {
+    ) -> Result<bool, config::ConfigError> {
         use enterprise_utils::l7::custom_policy::{
             config::{CustomApp, CustomField},
             custom_protocol_policy::ExtraCustomProtocolConfig,
@@ -1021,17 +1023,17 @@ impl Synchronizer {
                 ca.config = Some(ca_config);
             }
 
-            return Ok(());
+            return Ok(true);
         };
 
         let Some(version) = config.version else {
             debug!("ignored message without version in custom_app_config");
-            return Ok(());
+            return Ok(false);
         };
         let mut sg = status.write();
         if version == sg.custom_app.version {
             debug!("custom_app_config not updated, version: {version}");
-            return Ok(());
+            return Ok(false);
         }
 
         let custom_app_config: CustomApp = if config.compressed() {
@@ -1087,7 +1089,7 @@ impl Synchronizer {
             extra_headers,
         };
 
-        Ok(())
+        Ok(true)
     }
 
     // Note that both 'status' and 'flow_acl_listener' will be locked here, and other places where 'status'
@@ -1145,12 +1147,24 @@ impl Synchronizer {
             }
         }
         user_config.adjust();
-        if let Err(e) =
-            Self::parse_custom_app_config(status, &resp.custom_app_config, &mut user_config)
-        {
-            warn!("parse custom_app_config failed: {e}");
-            exception_handler.set(Exception::InvalidConfiguration);
-            return;
+        match Self::parse_custom_app_config(status, &resp.custom_app_config, &mut user_config) {
+            #[cfg(feature = "enterprise")]
+            Ok(false) => {
+                // no update, need to copy old data from cache
+                let sg = status.read();
+                user_config.custom_app = config::CustomApp {
+                    version: sg.custom_app.version,
+                    custom_protocol_port_ranges: sg.custom_app.custom_protocol_port_ranges.clone(),
+                    extra_headers: sg.custom_app.extra_headers.clone(),
+                    config: None,
+                };
+            }
+            Err(e) => {
+                warn!("parse custom_app_config failed: {e}");
+                exception_handler.set(Exception::InvalidConfiguration);
+                return;
+            }
+            _ => (),
         }
 
         if resp.only_partial_fields() {
@@ -1726,10 +1740,7 @@ impl Synchronizer {
             ));
         }
 
-        let checksum = checksum
-            .finalize()
-            .into_iter()
-            .fold(String::new(), |s, c| s + &format!("{:02x}", c));
+        let checksum = md5_to_string(&mut checksum);
         if checksum != md5_sum {
             return Err(format!(
                 "Binary checksum mismatch, expected: {}, received: {}",

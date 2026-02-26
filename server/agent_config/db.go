@@ -36,7 +36,7 @@ type MetadbAgentGroupConfigurationChangelog struct {
 	Lcuuid             string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 	AgentGroupConfigID int       `gorm:"column:agent_group_configuration_id;type:int;not null" json:"AGENT_GROUP_CONFIGURATION_ID"`
 	YamlDiff           string    `gorm:"column:yaml_diff;type:mediumtext;not null" json:"YAML_DIFF"`
-	UserID             int       `gorm:"column:user_id;type:int;not null" json:"USER_ID"`
+	User               string    `gorm:"column:user;type:varchar(256);not null" json:"USER"`
 	Remarks            string    `gorm:"column:remarks;type:text;not null" json:"REMARKS"`
 	CreatedAt          time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT" mapstructure:"CREATED_AT"`
 	UpdatedAt          time.Time `gorm:"autoUpdateTime;column:updated_at;type:datetime" json:"UPDATED_AT" mapstructure:"UPDATED_AT"`

@@ -23,6 +23,8 @@
 #include <time.h>
 #include "log.h"
 
+#include "trace_utils.h"
+
 FILE *log_stream;
 bool log_to_stdout;
 
@@ -146,4 +148,56 @@ void _ebpf_info(char *fmt, ...)
 	}
 
 	dispatch_message(msg, len);
+}
+
+__attribute__((weak)) void rust_log_wrapper(LogLevel level,
+                                            int error_number,
+                                            const char *msg,
+                                            const char *function_name,
+                                            const char *file_path,
+                                            int line_number)
+{
+    printf("%s\n", msg);
+}
+
+void _ebpf_log(int how_to_die, char *function_name, char *file_path,
+               int line_number, char *fmt, ...)
+{
+    char msg[MSG_SZ] = {};
+    va_list va;
+
+    va_start(va, fmt);
+    uint16_t len = vsnprintf(msg, MSG_SZ, fmt, va);
+    va_end(va);
+
+	if (len >= MSG_SZ) {
+		len = MSG_SZ - 1;
+	}
+	// remove trailing newline if any
+	if (msg[len - 1] == '\n') {
+		msg[len - 1] = '\0';
+	}
+
+    int errcode = 0;
+#ifdef HAVE_ERRNO
+    if (how_to_die & ERROR_ERRNO_VALID) {
+        errcode = errno;
+    }
+#endif
+
+    LogLevel level = LOG_LEVEL_INFO;
+    if (how_to_die & ERROR_WARNING) {
+        level = LOG_LEVEL_WARN;
+    } else if (how_to_die & (ERROR_ABORT | ERROR_FATAL)) {
+        level = LOG_LEVEL_ERROR;
+    }
+    rust_log_wrapper(level, errcode, msg, function_name, file_path, line_number);
+
+    if (how_to_die & ERROR_ABORT) {
+        debugger();
+    }
+
+    if (how_to_die & ERROR_FATAL) {
+        error_exit(1);
+    }
 }

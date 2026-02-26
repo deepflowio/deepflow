@@ -22,7 +22,7 @@ pub(crate) mod mq;
 mod parser;
 pub mod pb_adapter;
 pub(crate) mod ping;
-pub(crate) mod plugin;
+pub mod plugin;
 pub(crate) mod rpc;
 pub(crate) mod sql;
 
@@ -47,6 +47,7 @@ pub use sql::{
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
+        use std::borrow::Cow;
         pub mod tls;
 
         pub use mq::{WebSphereMqInfo, WebSphereMqLog};
@@ -60,8 +61,7 @@ cfg_if::cfg_if! {
 pub use self::plugin::wasm::{get_wasm_parser, WasmLog};
 
 use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fmt,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str,
@@ -207,6 +207,57 @@ pub struct AppProtoLogsBaseInfo {
     pub pod_id_0: u32,
     #[serde(skip)]
     pub pod_id_1: u32,
+}
+
+impl Default for AppProtoLogsBaseInfo {
+    fn default() -> Self {
+        Self {
+            start_time: Default::default(),
+            end_time: Default::default(),
+            flow_id: Default::default(),
+            tap_port: Default::default(),
+            signal_source: Default::default(),
+            agent_id: Default::default(),
+            tap_type: Default::default(),
+            tap_side: Default::default(),
+            biz_type: Default::default(),
+            head: Default::default(),
+
+            mac_src: Default::default(),
+            mac_dst: Default::default(),
+            ip_src: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            ip_dst: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            l3_epc_id_src: Default::default(),
+            l3_epc_id_dst: Default::default(),
+            port_src: Default::default(),
+            port_dst: Default::default(),
+            req_tcp_seq: Default::default(),
+            resp_tcp_seq: Default::default(),
+
+            gpid_0: Default::default(),
+            gpid_1: Default::default(),
+
+            ebpf_type: Default::default(),
+            process_id_0: Default::default(),
+            process_id_1: Default::default(),
+            process_kname_0: Default::default(),
+            process_kname_1: Default::default(),
+            syscall_trace_id_request: Default::default(),
+            syscall_trace_id_response: Default::default(),
+            syscall_trace_id_thread_0: Default::default(),
+            syscall_trace_id_thread_1: Default::default(),
+            syscall_coroutine_0: Default::default(),
+            syscall_coroutine_1: Default::default(),
+            syscall_cap_seq_0: Default::default(),
+            syscall_cap_seq_1: Default::default(),
+
+            protocol: Default::default(),
+            is_vip_interface_src: Default::default(),
+            is_vip_interface_dst: Default::default(),
+            pod_id_0: Default::default(),
+            pod_id_1: Default::default(),
+        }
+    }
 }
 
 pub fn timestamp_to_micros<S>(d: &Timestamp, serializer: S) -> Result<S::Ok, S::Error>
@@ -529,88 +580,7 @@ const CUSTOM_FIELD_POLICY_PRIORITY: u8 = 64;
 const PLUGIN_FIELD_PRIORITY: u8 = 32;
 
 pub use public::types::PrioField;
-
-#[derive(Clone, Debug)]
-pub enum PrioStrings {
-    Single(PrioField<String>),
-    Multiple(HashMap<String, u8>),
-}
-
-impl Default for PrioStrings {
-    fn default() -> Self {
-        Self::Multiple(Default::default())
-    }
-}
-
-impl Serialize for PrioStrings {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Self::Single(field) => field.serialize(serializer),
-            Self::Multiple(_) => {
-                let r = self.clone().into_sorted_vec();
-                r.serialize(serializer)
-            }
-        }
-    }
-}
-
-impl PrioStrings {
-    pub fn new(multi: bool) -> Self {
-        if multi {
-            Self::Multiple(HashMap::new())
-        } else {
-            Self::Single(PrioField::default())
-        }
-    }
-
-    pub fn is_default(&self) -> bool {
-        match self {
-            Self::Single(field) => field.is_default(),
-            Self::Multiple(m) => m.is_empty(),
-        }
-    }
-
-    pub fn push(&mut self, prio: u8, value: Cow<str>) {
-        match self {
-            Self::Single(field) if prio < field.prio() => {
-                *field = PrioField::new(prio, value.into_owned())
-            }
-            Self::Multiple(m) => {
-                if let Some(p) = m.get_mut(value.as_ref()) {
-                    *p = prio.min(*p);
-                } else {
-                    m.insert(value.into_owned(), prio);
-                }
-            }
-            _ => (),
-        }
-    }
-
-    pub fn first(&self) -> Option<&String> {
-        if self.is_default() {
-            return None;
-        }
-        match self {
-            Self::Single(field) => Some(field.get()),
-            Self::Multiple(m) => m.iter().min_by_key(|(_, p)| *p).map(|(k, _)| k),
-        }
-    }
-
-    pub fn into_sorted_vec(self) -> Vec<String> {
-        match self {
-            Self::Single(field) => vec![field.into_inner()],
-            Self::Multiple(m) => {
-                let mut strings = m.into_iter().collect::<Vec<_>>();
-                // smaller is higher priority, sort by ascending order
-                strings.sort_unstable_by_key(|(_, p)| *p);
-                strings.into_iter().map(|(k, _)| k).collect()
-            }
-        }
-    }
-}
+pub use public::types::PrioStrings;
 
 // Wrapper around Option<Vec<PrioField<String>>> for easier manipulation
 #[derive(Serialize, Debug, Default, Clone, Eq, PartialEq)]
@@ -726,23 +696,13 @@ cfg_if::cfg_if! {
         use log::warn;
 
         use enterprise_utils::l7::custom_policy::custom_field_policy::enums::{Op, Operation};
-        use public::l7_protocol::{Field, FieldSetter, L7Log, NativeTag};
-
-        use consts::SYS_RESPONSE_CODE_ATTR;
+        use public::l7_protocol::{FieldSetter, L7Log};
 
         pub fn auto_merge_custom_field<L: L7Log>(op: Operation, log: &mut L) {
             let Operation { op, prio } = op;
             match op {
                 Op::RewriteResponseStatus(status) => log.set_response_status(status),
                 Op::RewriteNativeTag(tag, value) => {
-                    // append to sys_response_code if response_code is not empty
-                    if tag == NativeTag::ResponseCode {
-                        match log.get_response_code() {
-                            Field::Str(s) => log.add_attribute(Cow::Borrowed(SYS_RESPONSE_CODE_ATTR), Cow::Owned(s.to_string())),
-                            Field::Int(i) => log.add_attribute(Cow::Borrowed(SYS_RESPONSE_CODE_ATTR), Cow::Owned(i.to_string())),
-                            Field::None => (),
-                        }
-                    }
                     let field = FieldSetter::new(CUSTOM_FIELD_POLICY_PRIORITY + prio, value.as_str().into());
                     log.set(tag, field);
                 }
@@ -750,5 +710,114 @@ cfg_if::cfg_if! {
                 _ => warn!("Ignored operation {op:?} that is not supported by auto custom field merging"),
             }
         }
+    }
+}
+
+// Estimate RRT (microseconds) from a time string.
+//
+// Only integer-offset time zones are supported (non-integer ones like India and Nepal are not supported).
+// Since the timezone of the input time is unknown, for integer-offset time zones the minute and second
+// values are the same across time zones, only the hour may differ.
+// As RRT is limited to within 2 minutes, the hour can be ignored and RRT can be computed using only mm:ss.
+// If the response crosses an hour boundary, add 3600 seconds for correction.
+//
+// Input:
+// - mmss: "mmss" (4), must be in Beijing Time (UTC+8)
+// - now_us: current time in microseconds since epoch
+//
+// Behavior:
+// - infer current or previous hour for cross-hour
+// - Compute microsecond difference with now_us
+// - Clamp future time to 0
+// - Ignore if older than 2 minutes
+pub fn estimate_rrt_us_by_beijing_mmss(mmss: &str, now_us: u64) -> Option<u64> {
+    if mmss.len() != 4 || now_us == 0 {
+        return None;
+    }
+
+    let input_mm: i64 = mmss[0..2].parse().ok()?;
+    let input_ss: i64 = mmss[2..4].parse().ok()?;
+    let input_sec = input_mm * 60 + input_ss;
+
+    let now_sec = (now_us / 1_000_000) as i64;
+    let now_sec_in_hour = now_sec % 3600;
+
+    let mut diff_sec = now_sec_in_hour - input_sec;
+
+    // 59 -> 00 cross-hour correction
+    if diff_sec < 0 {
+        diff_sec += 3600;
+    }
+
+    // future time
+    if diff_sec < 0 {
+        return Some(0);
+    }
+
+    // RRT exceeding 120s is considered invalid
+    if diff_sec > 120 {
+        return None;
+    }
+
+    let diff_us = diff_sec * 1_000_000 + (now_us % 1_000_000) as i64;
+    Some(diff_us as u64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_now_us(min: i64, sec: i64) -> u64 {
+        let total_sec = min * 60 + sec;
+        (total_sec * 1_000_000) as u64
+    }
+
+    #[test]
+    fn test_normal_case() {
+        // 16:53:55 -> 16:54:10
+        let now_us = make_now_us(54, 10);
+        let rrt = estimate_rrt_us_by_beijing_mmss("5355", now_us).unwrap();
+        assert_eq!(rrt, 15_000_000);
+    }
+
+    #[test]
+    fn test_cross_hour_59_to_00() {
+        // 16:59:58 -> 17:00:02
+        let now_us = make_now_us(0, 2);
+        let rrt = estimate_rrt_us_by_beijing_mmss("5958", now_us).unwrap();
+        assert_eq!(rrt, 4_000_000);
+    }
+
+    #[test]
+    fn test_future_time_clamped() {
+        let now_us = make_now_us(10, 0);
+        let rrt = estimate_rrt_us_by_beijing_mmss("1010", now_us).unwrap();
+        assert_eq!(rrt, 0);
+    }
+
+    #[test]
+    fn test_older_than_120s_invalid() {
+        let now_us = make_now_us(10, 0);
+        let rrt = estimate_rrt_us_by_beijing_mmss("0700", now_us);
+        assert!(rrt.is_none());
+    }
+
+    #[test]
+    fn test_invalid_input_length() {
+        let now_us = make_now_us(10, 0);
+        assert!(estimate_rrt_us_by_beijing_mmss("123", now_us).is_none());
+    }
+
+    #[test]
+    fn test_invalid_string() {
+        let now_us = make_now_us(10, 0);
+        assert!(estimate_rrt_us_by_beijing_mmss("ab12", now_us).is_none());
+    }
+
+    #[test]
+    fn test_exact_120s_boundary() {
+        let now_us = make_now_us(10, 0);
+        let rrt = estimate_rrt_us_by_beijing_mmss("0800", now_us).unwrap();
+        assert_eq!(rrt, 120_000_000);
     }
 }

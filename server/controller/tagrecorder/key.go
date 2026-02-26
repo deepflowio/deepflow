@@ -16,6 +16,10 @@
 
 package tagrecorder
 
+type KeyConverter interface {
+	Map() map[string]interface{}
+}
+
 type DeviceKey struct {
 	DeviceID   int `json:"deviceid"`
 	DeviceType int `json:"devicetype"`
@@ -85,6 +89,13 @@ type PortDeviceKey struct {
 type VtapPortKey struct {
 	VtapID  int
 	TapPort int64
+}
+
+func (k VtapPortKey) Map() map[string]interface{} {
+	return map[string]interface{}{
+		"vtap_id":  k.VtapID,
+		"tap_port": k.TapPort,
+	}
 }
 
 type IPRelationKey struct {

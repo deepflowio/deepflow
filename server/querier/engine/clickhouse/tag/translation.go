@@ -1175,6 +1175,15 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"observation_point",
 		),
 	}
+	tagResourceMap["l7_protocol_str"] = map[string]*Tag{
+		"default": NewTag(
+			"biz_protocol",
+			"",
+			"biz_protocol %s %s",
+			"%s (biz_protocol, %s)",
+			"biz_protocol",
+		),
+	}
 	// tap_port_type & Enum(tap_port_type)
 	tagResourceMap["tap_port_type"] = map[string]*Tag{
 		"enum": NewTag(
@@ -2299,6 +2308,27 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			"indexOf(tag_string_names,'%s') != 0",
 			"tag_string_values[indexOf(tag_string_names,'%s')] %s %v",
 			"%s(tag_string_values[indexOf(tag_string_names,'%s')],%v)",
+			"",
+		),
+	}
+
+	tagResourceMap["custom_tag"] = map[string]*Tag{
+		"default": NewTag(
+			"toJSONString(CAST((custom_tag_names, custom_tag_values), 'Map(String, String)'))",
+			"",
+			"",
+			"",
+			"",
+		),
+	}
+
+	tagResourceMap["custom_tag."] = map[string]*Tag{
+		"default": NewTag(
+			// null indicates the absence of this key
+			"if(indexOf(custom_tag_names,'%s') != 0, custom_tag_values[indexOf(custom_tag_names,'%s')], NULL)",
+			"indexOf(custom_tag_names,'%s') != 0",
+			"custom_tag_values[indexOf(custom_tag_names,'%s')] %s %v",
+			"%s(custom_tag_values[indexOf(custom_tag_names,'%s')],%v)",
 			"",
 		),
 	}

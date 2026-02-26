@@ -22,6 +22,8 @@
 //   1.雪崩性（更改输入参数的任何一位，就将引起输出有一半以上的位发生变化）
 //   2.可逆性
 
+use md5::{Digest, Md5};
+
 pub fn jenkins64(mut hash: u64) -> u64 {
     hash = hash
         .overflowing_shl(21)
@@ -46,6 +48,13 @@ pub fn jenkins64(mut hash: u64) -> u64 {
     hash = hash.overflowing_add(hash.overflowing_shl(31).0).0;
 
     hash
+}
+
+pub fn md5_to_string(checksum: &mut Md5) -> String {
+    checksum
+        .finalize_reset()
+        .into_iter()
+        .fold(String::new(), |s, c| s + &format!("{:02x}", c))
 }
 
 #[cfg(test)]

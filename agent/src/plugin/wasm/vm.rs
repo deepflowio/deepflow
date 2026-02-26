@@ -155,6 +155,14 @@ impl From<(&ParseParam<'_>, u8, &[u8])> for VmCtxBase {
     fn from(p: (&ParseParam<'_>, u8, &[u8])) -> Self {
         let (p, wasm_proto, payload) = p;
 
+        #[cfg(feature = "libtrace")]
+        let process_kname = if let Some(ebpf_param) = p.ebpf_param.as_ref() {
+            Some(ebpf_param.process_kname.to_owned())
+        } else {
+            None
+        };
+        #[cfg(not(feature = "libtrace"))]
+        let process_kname = None;
         Self {
             ip_src: p.ip_src,
             ip_dst: p.ip_dst,
@@ -165,11 +173,7 @@ impl From<(&ParseParam<'_>, u8, &[u8])> for VmCtxBase {
             ebpf_type: p.ebpf_type,
             time: p.time,
             direction: p.direction,
-            process_kname: if let Some(ebpf_param) = p.ebpf_param.as_ref() {
-                Some(ebpf_param.process_kname.to_owned())
-            } else {
-                None
-            },
+            process_kname,
             flow_id: p.flow_id,
             buf_size: p.buf_size,
             /*

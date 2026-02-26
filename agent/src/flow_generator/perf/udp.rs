@@ -89,7 +89,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use crate::utils::test::Capture;
+    use crate::utils::test_utils::Capture;
 
     use super::*;
 

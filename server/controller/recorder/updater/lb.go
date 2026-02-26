@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// LBMessageFactory LB资源的消息工厂
+type LBMessageFactory struct{}
+
+func (f *LBMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedLBs{}
+}
+
+func (f *LBMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedLB{}
+}
+
+func (f *LBMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedLBs{}
+}
+
+func (f *LBMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedLBFields{}
+}
 
 type LB struct {
 	UpdaterBase[
@@ -32,36 +52,12 @@ type LB struct {
 		*diffbase.LB,
 		*metadbmodel.LB,
 		metadbmodel.LB,
-		*message.AddedLBs,
-		message.AddedLBs,
-		message.AddNoneAddition,
-		*message.UpdatedLB,
-		message.UpdatedLB,
-		*message.UpdatedLBFields,
-		message.UpdatedLBFields,
-		*message.DeletedLBs,
-		message.DeletedLBs,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 	updater := &LB{
-		newUpdaterBase[
-			cloudmodel.LB,
-			*diffbase.LB,
-			*metadbmodel.LB,
-			metadbmodel.LB,
-			*message.AddedLBs,
-			message.AddedLBs,
-			message.AddNoneAddition,
-			*message.UpdatedLB,
-			message.UpdatedLB,
-			*message.UpdatedLBFields,
-			message.UpdatedLBFields,
-			*message.DeletedLBs,
-			message.DeletedLBs,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			wholeCache,
 			db.NewLB().SetMetadata(wholeCache.GetMetadata()),
@@ -69,7 +65,12 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &LBMessageFactory{})
+	}
+
 	return updater
 }
 
@@ -97,7 +98,7 @@ func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*metadbmodel.LB, boo
 	return dbItem, true
 }
 
-func (l *LB) generateUpdateInfo(diffBase *diffbase.LB, cloudItem *cloudmodel.LB) (*message.UpdatedLBFields, map[string]interface{}, bool) {
+func (l *LB) generateUpdateInfo(diffBase *diffbase.LB, cloudItem *cloudmodel.LB) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedLBFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {

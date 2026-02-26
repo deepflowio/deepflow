@@ -29,7 +29,7 @@ func NewSubDomain() *SubDomain {
 	return &SubDomain{
 		newOperatorBase[*metadbmodel.SubDomain](
 			ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
-			false,
+			true,
 			false,
 		),
 	}

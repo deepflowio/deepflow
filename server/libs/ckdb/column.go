@@ -60,6 +60,7 @@ const (
 	COLUMN_BIZ_TYPE                   = "biz_type"
 	COLUMN_BIZ_CODE                   = "biz_code"
 	COLUMN_BIZ_SCENARIO               = "biz_scenario"
+	COLUMN_BIZ_RESPONSE_CODE          = "biz_response_code"
 	COLUMN_BODY                       = "body"
 	COLUMN_BYTE                       = "byte"
 	COLUMN_BYTES                      = "bytes"
@@ -85,6 +86,8 @@ const (
 	COLUMN_CLOSE_TYPE                 = "close_type"
 	COLUMN_COMPRESSION_ALGO           = "compression_algo"
 	COLUMN_COUNT                      = "count"
+	COLUMN_CUSTOM_TAG_NAMES           = "custom_tag_names"
+	COLUMN_CUSTOM_TAG_VALUES          = "custom_tag_values"
 	COLUMN_DIRECTION_SCORE            = "direction_score"
 	COLUMN_DURATION                   = "duration"
 	COLUMN_ENCODED_SPAN               = "encoded_span"
@@ -152,7 +155,7 @@ const (
 	COLUMN_L7_ERROR                   = "l7_error"
 	COLUMN_L7_PARSE_FAILED            = "l7_parse_failed"
 	COLUMN_L7_PROTOCOL                = "l7_protocol"
-	COLUMN_L7_PROTOCOL_STR            = "l7_protocol_str"
+	COLUMN_BIZ_PROTOCOL               = "biz_protocol"
 	COLUMN_L7_REQUEST                 = "l7_request"
 	COLUMN_L7_RESPONSE                = "l7_response"
 	COLUMN_L7_SERVER_ERROR            = "l7_server_error"
@@ -405,6 +408,7 @@ var ColumnNames = []string{
 	COLUMN_BIZ_TYPE,
 	COLUMN_BIZ_CODE,
 	COLUMN_BIZ_SCENARIO,
+	COLUMN_BIZ_RESPONSE_CODE,
 	COLUMN_BODY,
 	COLUMN_BYTE,
 	COLUMN_BYTES,
@@ -430,6 +434,8 @@ var ColumnNames = []string{
 	COLUMN_CLOSE_TYPE,
 	COLUMN_COMPRESSION_ALGO,
 	COLUMN_COUNT,
+	COLUMN_CUSTOM_TAG_NAMES,
+	COLUMN_CUSTOM_TAG_VALUES,
 	COLUMN_DIRECTION_SCORE,
 	COLUMN_DURATION,
 	COLUMN_ENCODED_SPAN,
@@ -497,7 +503,7 @@ var ColumnNames = []string{
 	COLUMN_L7_ERROR,
 	COLUMN_L7_PARSE_FAILED,
 	COLUMN_L7_PROTOCOL,
-	COLUMN_L7_PROTOCOL_STR,
+	COLUMN_BIZ_PROTOCOL,
 	COLUMN_L7_REQUEST,
 	COLUMN_L7_RESPONSE,
 	COLUMN_L7_SERVER_ERROR,

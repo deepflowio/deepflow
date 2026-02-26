@@ -17,7 +17,10 @@
 use serde::Serialize;
 
 use enterprise_utils::l7::rpc::iso8583::{Iso8583ParseConfig, Iso8583Parser};
-use public::l7_protocol::{L7Protocol, LogMessageType};
+use public::{
+    enums::PacketDirection,
+    l7_protocol::{L7Protocol, LogMessageType},
+};
 
 use crate::config::handler::LogParserConfig;
 use crate::{
@@ -29,6 +32,7 @@ use crate::{
     },
     flow_generator::{
         protocol_logs::{
+            estimate_rrt_us_by_beijing_mmss,
             pb_adapter::{
                 ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
             },
@@ -55,6 +59,7 @@ pub struct Iso8583Info {
     f33: String,
     f3: String,
     f25: String,
+    f39: String,
     // it is formed by connecting f7,f11,f32,f33 with -
     pub trace_ids: PrioFields,
 
@@ -66,6 +71,7 @@ pub struct Iso8583Info {
     captured_request_byte: u32,
     captured_response_byte: u32,
 
+    // precision: microseconds
     pub rrt: u64,
 
     #[serde(skip)]
@@ -189,6 +195,7 @@ impl From<Iso8583Info> for L7ProtocolSendLog {
                 ..Default::default()
             }),
             flags: flags.bits(),
+            biz_response_code: f.f39,
             ..Default::default()
         };
         log
@@ -208,7 +215,7 @@ impl From<&Iso8583Info> for LogCache {
 
 #[derive(Default)]
 pub struct Iso8583Log {
-    perf_stats: Option<L7PerfStats>,
+    perf_stats: Vec<L7PerfStats>,
     parser: Iso8583Parser,
 }
 
@@ -238,9 +245,7 @@ impl L7ProtocolParserInterface for Iso8583Log {
             return Err(Error::L7ProtocolUnknown);
         }
 
-        if self.perf_stats.is_none() && param.parse_perf {
-            self.perf_stats = Some(L7PerfStats::default());
-        };
+        self.perf_stats.clear();
 
         // 对每条解析到的消息构造 Iso8583Info，并返回 Multiple 或 Single
         let mut results: Vec<L7ProtocolInfo> = Vec::with_capacity(msgs.len());
@@ -271,18 +276,12 @@ impl L7ProtocolParserInterface for Iso8583Log {
                 } else if field.id == 25 {
                     info.f25 = field.value.clone();
                 } else if field.id == 39 {
+                    info.f39 = field.value.clone();
                     info.msg_type = LogMessageType::Response;
-                    if field.value == "00"
-                        || field.value == "10"
-                        || field.value == "11"
-                        || field.value == "16"
-                        || field.value == "A2"
-                        || field.value == "A4"
-                        || field.value == "A5"
-                        || field.value == "A6"
-                        || field.value == "Y1"
-                        || field.value == "Y3"
-                    {
+                    if matches!(
+                        field.value.as_str(),
+                        "00" | "10" | "11" | "16" | "A2" | "A4" | "A5" | "A6" | "Y1" | "Y3"
+                    ) {
                         info.response_status = L7ResponseStatus::Ok;
                     } else {
                         info.response_status = L7ResponseStatus::ClientError;
@@ -330,47 +329,62 @@ impl L7ProtocolParserInterface for Iso8583Log {
             }
             info.is_async = true;
 
-            match info.response_status {
-                L7ResponseStatus::ServerError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp_err());
-                }
-                L7ResponseStatus::ClientError => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req_err());
-                }
-                _ => {}
-            }
             match info.msg_type {
                 LogMessageType::Request => {
-                    self.perf_stats.as_mut().map(|p| p.inc_req());
+                    if param.direction == PacketDirection::ServerToClient {
+                        info.is_reversed = true;
+                    }
                 }
                 LogMessageType::Response => {
-                    self.perf_stats.as_mut().map(|p| p.inc_resp());
+                    if param.direction == PacketDirection::ClientToServer {
+                        info.is_reversed = true;
+                    }
                 }
                 _ => {}
             }
 
+            if param.parse_perf {
+                let mut perf_stat = L7PerfStats::default();
+                match info.response_status {
+                    L7ResponseStatus::ServerError => perf_stat.inc_resp_err(),
+                    L7ResponseStatus::ClientError => perf_stat.inc_req_err(),
+                    _ => {}
+                }
+                match info.msg_type {
+                    LogMessageType::Request => perf_stat.inc_req(),
+                    LogMessageType::Response => perf_stat.inc_resp(),
+                    _ => {}
+                }
+                // As the protocol is asynchronous and requests/responses are not correlated into a session,
+                // RRT cannot be measured using generic methods.
+                // But ISO8583 `Field 7 (Transmission Date & Time)` represents the request send time
+                // second precision, in the format of "MMddhhmmss", length = 10.
+                // RRT can be roughly estimated by (response receive time - Field 7).
+                if info.msg_type == LogMessageType::Response && info.f7.len() == 10 {
+                    // get 'mmss' part of info.f7, info.f7 must be in Beijing Time (UTC+8)
+                    if let Some(rrt_us) = estimate_rrt_us_by_beijing_mmss(&info.f7[6..], param.time)
+                    {
+                        info.rrt = rrt_us;
+                        perf_stat.rrt_count += 1;
+                        perf_stat.rrt_sum += rrt_us;
+                        perf_stat.rrt_max = perf_stat.rrt_max.max(rrt_us as u32);
+                    }
+                }
+                self.perf_stats.push(perf_stat);
+            }
+
             if is_00x000(&info.f3) {
                 if info.f25 == "28" {
-                    if info.mti == "0200-金融类请求" {
+                    if info.mti == "0200-金融类请求" || info.mti == "0210-金融类应答" {
                         info.endpoint = format!(
-                            "{}:{}-28消费一次性付款类",
-                            info.mti,
-                            take_first_n(&info.f3, 6)
-                        );
-                    } else if info.mti == "0210-金融类应答" {
-                        info.endpoint = format!(
-                            "{}:{}-28消费一次性付款类",
-                            info.mti,
+                            "0200-金融类:{}-28消费一次性付款类",
                             take_first_n(&info.f3, 6)
                         );
                     }
                 } else if info.f25 == "00" {
-                    if info.mti == "0200-金融类请求" {
+                    if info.mti == "0200-金融类请求" || info.mti == "0210-金融类应答" {
                         info.endpoint =
-                            format!("{}:{}-00-代收", info.mti, take_first_n(&info.f3, 6));
-                    } else if info.mti == "0210-金融类应答" {
-                        info.endpoint =
-                            format!("{}:{}-00-代收", info.mti, take_first_n(&info.f3, 6));
+                            format!("0200-金融类:{}-00-代收", take_first_n(&info.f3, 6));
                     }
                 }
             }
@@ -392,8 +406,8 @@ impl L7ProtocolParserInterface for Iso8583Log {
         L7Protocol::Iso8583
     }
 
-    fn perf_stats(&mut self) -> Option<L7PerfStats> {
-        self.perf_stats.take()
+    fn perf_stats(&mut self) -> Vec<L7PerfStats> {
+        std::mem::take(&mut self.perf_stats)
     }
 
     fn parsable_on_udp(&self) -> bool {

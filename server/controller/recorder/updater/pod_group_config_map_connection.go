@@ -24,7 +24,27 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/diffbase"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
+	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
 )
+
+// PodGroupConfigMapConnectionMessageFactory defines the message factory for PodGroupConfigMapConnection
+type PodGroupConfigMapConnectionMessageFactory struct{}
+
+func (f *PodGroupConfigMapConnectionMessageFactory) CreateAddedMessage() types.Added {
+	return &message.AddedPodGroupConfigMapConnections{}
+}
+
+func (f *PodGroupConfigMapConnectionMessageFactory) CreateUpdatedMessage() types.Updated {
+	return &message.UpdatedPodGroupConfigMapConnection{}
+}
+
+func (f *PodGroupConfigMapConnectionMessageFactory) CreateDeletedMessage() types.Deleted {
+	return &message.DeletedPodGroupConfigMapConnections{}
+}
+
+func (f *PodGroupConfigMapConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields {
+	return &message.UpdatedPodGroupConfigMapConnectionFields{}
+}
 
 type PodGroupConfigMapConnection struct {
 	UpdaterBase[
@@ -32,36 +52,12 @@ type PodGroupConfigMapConnection struct {
 		*diffbase.PodGroupConfigMapConnection,
 		*metadbmodel.PodGroupConfigMapConnection,
 		metadbmodel.PodGroupConfigMapConnection,
-		*message.AddedPodGroupConfigMapConnections,
-		message.AddedPodGroupConfigMapConnections,
-		message.AddNoneAddition,
-		*message.UpdatedPodGroupConfigMapConnection,
-		message.UpdatedPodGroupConfigMapConnection,
-		*message.UpdatedPodGroupConfigMapConnectionFields,
-		message.UpdatedPodGroupConfigMapConnectionFields,
-		*message.DeletedPodGroupConfigMapConnections,
-		message.DeletedPodGroupConfigMapConnections,
-		message.DeleteNoneAddition]
+	]
 }
 
 func NewPodGroupConfigMapConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupConfigMapConnection) *PodGroupConfigMapConnection {
 	updater := &PodGroupConfigMapConnection{
-		newUpdaterBase[
-			cloudmodel.PodGroupConfigMapConnection,
-			*diffbase.PodGroupConfigMapConnection,
-			*metadbmodel.PodGroupConfigMapConnection,
-			metadbmodel.PodGroupConfigMapConnection,
-			*message.AddedPodGroupConfigMapConnections,
-			message.AddedPodGroupConfigMapConnections,
-			message.AddNoneAddition,
-			*message.UpdatedPodGroupConfigMapConnection,
-			message.UpdatedPodGroupConfigMapConnection,
-			*message.UpdatedPodGroupConfigMapConnectionFields,
-			message.UpdatedPodGroupConfigMapConnectionFields,
-			*message.DeletedPodGroupConfigMapConnections,
-			message.DeletedPodGroupConfigMapConnections,
-			message.DeleteNoneAddition,
-		](
+		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN,
 			wholeCache,
 			db.NewPodGroupConfigMapConnection().SetMetadata(wholeCache.GetMetadata()),
@@ -69,10 +65,16 @@ func NewPodGroupConfigMapConnection(wholeCache *cache.Cache, cloudData []cloudmo
 			cloudData,
 		),
 	}
-	updater.dataGenerator = updater
+	updater.setDataGenerator(updater)
+
+	if !hasMessageFactory(updater.resourceType) {
+		RegisterMessageFactory(updater.resourceType, &PodGroupConfigMapConnectionMessageFactory{})
+	}
+
 	return updater
 }
 
+// Implement DataGenerator interface
 func (h *PodGroupConfigMapConnection) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupConfigMapConnection) (*metadbmodel.PodGroupConfigMapConnection, bool) {
 	podGroupID, exists := h.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
 	if !exists {
@@ -100,6 +102,7 @@ func (h *PodGroupConfigMapConnection) generateDBItemToAdd(cloudItem *cloudmodel.
 	return dbItem, true
 }
 
-func (h *PodGroupConfigMapConnection) generateUpdateInfo(diffBase *diffbase.PodGroupConfigMapConnection, cloudItem *cloudmodel.PodGroupConfigMapConnection) (*message.UpdatedPodGroupConfigMapConnectionFields, map[string]interface{}, bool) {
+// 保留接口
+func (h *PodGroupConfigMapConnection) generateUpdateInfo(diffBase *diffbase.PodGroupConfigMapConnection, cloudItem *cloudmodel.PodGroupConfigMapConnection) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

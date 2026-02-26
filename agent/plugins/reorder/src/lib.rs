@@ -16,6 +16,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
 use std::sync::Arc;
+use std::time::Duration;
 
 use public::packet::Downcast;
 use public::{
@@ -93,7 +94,12 @@ pub struct Reorder {
 }
 
 impl Reorder {
-    pub fn new(_: Box<dyn L7ProtocolChecker>, counter: Arc<ReorderCounter>, _: usize) -> Self {
+    pub fn new(
+        _: Box<dyn L7ProtocolChecker>,
+        counter: Arc<ReorderCounter>,
+        _: usize,
+        _: Duration,
+    ) -> Self {
         Self { counter }
     }
 

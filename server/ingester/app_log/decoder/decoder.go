@@ -278,7 +278,7 @@ func (d *Decoder) WriteAgentLog(agentId uint16, bs []byte) error {
 		}
 
 		s.AutoInstanceID, s.AutoInstanceType = ingestercommon.GetAutoInstance(s.PodID, 0, s.PodNodeID, s.L3DeviceID, uint32(s.SubnetID), uint8(s.L3DeviceType), s.L3EpcID)
-		customServiceID := d.platformData.QueryCustomService(s.OrgId, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, s.ServiceID, s.PodGroupID, s.L3DeviceID, s.PodID, uint8(s.L3DeviceType))
+		customServiceID := d.platformData.QueryCustomService(s.OrgId, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, s.PodClusterID, s.ServiceID, s.PodGroupID, s.L3DeviceID, s.PodID, uint8(s.L3DeviceType), 0)
 		s.AutoServiceID, s.AutoServiceType = ingestercommon.GetAutoService(customServiceID, s.ServiceID, s.PodGroupID, 0, s.PodNodeID, s.L3DeviceID, uint32(s.SubnetID), uint8(s.L3DeviceType), podGroupType, s.L3EpcID)
 	}
 
@@ -355,6 +355,60 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 		default:
 			if d.counter.ErrorCount == 0 {
 				log.Warningf("parse application log json filed failed. %v", l.Json)
+			}
+			d.counter.ErrorCount++
+		}
+	}
+
+	if l.Metrics != nil {
+		switch v := l.Metrics.(type) {
+		case map[string]interface{}:
+			for key, value := range v {
+				switch t := value.(type) {
+				case float64:
+					s.MetricsNames = append(s.MetricsNames, strings.Clone(key))
+					s.MetricsValues = append(s.MetricsValues, float64(t))
+				case float32:
+					s.MetricsNames = append(s.MetricsNames, strings.Clone(key))
+					s.MetricsValues = append(s.MetricsValues, float64(t))
+				case int:
+					s.MetricsNames = append(s.MetricsNames, strings.Clone(key))
+					s.MetricsValues = append(s.MetricsValues, float64(t))
+				case int64:
+					s.MetricsNames = append(s.MetricsNames, strings.Clone(key))
+					s.MetricsValues = append(s.MetricsValues, float64(t))
+				case int32:
+					s.MetricsNames = append(s.MetricsNames, strings.Clone(key))
+					s.MetricsValues = append(s.MetricsValues, float64(t))
+				case uint:
+					s.MetricsNames = append(s.MetricsNames, strings.Clone(key))
+					s.MetricsValues = append(s.MetricsValues, float64(t))
+				case uint64:
+					s.MetricsNames = append(s.MetricsNames, strings.Clone(key))
+					s.MetricsValues = append(s.MetricsValues, float64(t))
+				case uint32:
+					s.MetricsNames = append(s.MetricsNames, strings.Clone(key))
+					s.MetricsValues = append(s.MetricsValues, float64(t))
+				case string:
+					// strings go into attributes
+					f, err := strconv.ParseFloat(t, 64)
+					if err == nil {
+						s.MetricsNames = append(s.MetricsNames, strings.Clone(key))
+						s.MetricsValues = append(s.MetricsValues, f)
+					} else {
+						s.AttributeNames = append(s.AttributeNames, strings.Clone(key))
+						s.AttributeValues = append(s.AttributeValues, strings.Clone(t))
+					}
+				default:
+					// fallback: stringify other types into attributes
+					strVal := fmt.Sprintf("%v", t)
+					s.AttributeNames = append(s.AttributeNames, strings.Clone(key))
+					s.AttributeValues = append(s.AttributeValues, strVal)
+				}
+			}
+		default:
+			if d.counter.ErrorCount == 0 {
+				log.Warningf("parse application log metrics filed failed. %v", l.Metrics)
 			}
 			d.counter.ErrorCount++
 		}
@@ -448,7 +502,7 @@ func (d *Decoder) WriteAppLog(agentId uint16, l *AppLogEntry) error {
 	}
 
 	s.AutoInstanceID, s.AutoInstanceType = ingestercommon.GetAutoInstance(s.PodID, 0, s.PodNodeID, s.L3DeviceID, uint32(s.SubnetID), uint8(s.L3DeviceType), s.L3EpcID)
-	customServiceID := d.platformData.QueryCustomService(s.OrgId, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, s.ServiceID, s.PodGroupID, s.L3DeviceID, s.PodID, uint8(s.L3DeviceType))
+	customServiceID := d.platformData.QueryCustomService(s.OrgId, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, s.PodClusterID, s.ServiceID, s.PodGroupID, s.L3DeviceID, s.PodID, uint8(s.L3DeviceType), 0)
 	s.AutoServiceID, s.AutoServiceType = ingestercommon.GetAutoService(customServiceID, s.ServiceID, s.PodGroupID, 0, s.PodNodeID, s.L3DeviceID, uint32(s.SubnetID), uint8(s.L3DeviceType), podGroupType, s.L3EpcID)
 
 	d.logWriter.Write(s)
@@ -465,6 +519,7 @@ type AppLogEntry struct {
 	} `json:"kubernetes"`
 	Message    string      `json:"message"`
 	Json       interface{} `json:"json"`
+	Metrics    interface{} `json:"metrics"`
 	Level      string      `json:"level"`
 	Timestamp  string      `json:"timestamp"`
 	AppService string      `json:"app_service"`

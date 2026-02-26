@@ -30,10 +30,13 @@ use public::l7_protocol::{CustomProtocol, LogMessageType};
 use crate::common::ebpf::EbpfType;
 use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_info::L7ProtocolInfo;
-use crate::common::l7_protocol_log::{EbpfParam, L7PerfCache};
+use crate::common::l7_protocol_log::L7PerfCache;
 
 use crate::config::handler::LogParserConfig;
-use crate::config::{config::Iso8583ParseConfig, OracleConfig};
+use crate::config::{
+    config::{Iso8583ParseConfig, WebSphereMqParseConfig},
+    OracleConfig,
+};
 use crate::flow_generator::protocol_logs::pb_adapter::L7ProtocolSendLog;
 use crate::flow_generator::protocol_logs::{get_wasm_parser, L7ResponseStatus, WasmLog};
 use crate::{
@@ -56,7 +59,8 @@ fn get_req_param<'a>(
         flow_id: 1234567,
         direction: PacketDirection::ClientToServer,
         ebpf_type: EbpfType::TracePoint,
-        ebpf_param: Some(EbpfParam {
+        #[cfg(feature = "libtrace")]
+        ebpf_param: Some(crate::common::l7_protocol_log::EbpfParam {
             is_tls: false,
             is_req_end: false,
             is_resp_end: false,
@@ -68,7 +72,7 @@ fn get_req_param<'a>(
         parse_perf: true,
         parse_log: true,
         parse_config: None,
-        l7_perf_cache: rrt_cache.clone(),
+        l7_perf_cache: Some(rrt_cache.clone()),
         wasm_vm: vm,
         #[cfg(any(target_os = "linux", target_os = "android"))]
         so_func: Default::default(),
@@ -78,6 +82,7 @@ fn get_req_param<'a>(
         captured_byte: 999,
         oracle_parse_conf: OracleConfig::default(),
         iso8583_parse_conf: Iso8583ParseConfig::default(),
+        web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
         icmp_data: None,
     }
 }
@@ -95,8 +100,8 @@ fn get_resq_param<'a>(
         flow_id: 1234567,
         direction: PacketDirection::ServerToClient,
         ebpf_type: EbpfType::TracePoint,
-
-        ebpf_param: Some(EbpfParam {
+        #[cfg(feature = "libtrace")]
+        ebpf_param: Some(crate::common::l7_protocol_log::EbpfParam {
             is_tls: false,
             is_req_end: false,
             is_resp_end: false,
@@ -108,7 +113,7 @@ fn get_resq_param<'a>(
         parse_perf: true,
         parse_log: true,
         parse_config: None,
-        l7_perf_cache: rrt_cache.clone(),
+        l7_perf_cache: Some(rrt_cache.clone()),
         wasm_vm: vm,
         #[cfg(any(target_os = "linux", target_os = "android"))]
         so_func: Default::default(),
@@ -118,6 +123,7 @@ fn get_resq_param<'a>(
         captured_byte: 999,
         oracle_parse_conf: OracleConfig::default(),
         iso8583_parse_conf: Iso8583ParseConfig::default(),
+        web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
         icmp_data: None,
     }
 }

@@ -744,9 +744,9 @@ mod tests {
 
     #[test]
     fn get_nonexist_link() {
-        match link_by_name("nonexist42") {
-            Err(Error::LinkNotFound(link)) => assert_eq!(link, String::from("nonexist42")),
-            _ => assert!(false),
-        }
+        assert!(matches!(
+            link_by_name("nonexist42"),
+            Err(Error::LinkNotFound(_))
+        ));
     }
 }

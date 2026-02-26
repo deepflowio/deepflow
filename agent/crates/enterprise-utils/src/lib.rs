@@ -59,6 +59,7 @@ pub mod l7 {
                         const JSON = 0x01;
                         const XML = 0x02;
                         const HESSIAN2 = 0x04;
+                        const TLV = 0x08;
                     }
                 }
 
@@ -84,6 +85,7 @@ pub mod l7 {
                     RewriteNativeTag(public::l7_protocol::NativeTag, Arc<String>),
                     AddAttribute(Arc<String>, Arc<String>),
                     AddMetric(Arc<String>, f32),
+                    SaveHeader(Arc<String>),
                     SavePayload(Arc<String>),
                 }
             }
@@ -91,15 +93,15 @@ pub mod l7 {
             #[derive(Clone, Default, Debug, PartialEq)]
             pub struct CustomFieldPolicy;
             impl CustomFieldPolicy {
-                pub fn new(_: &super::config::CustomField) -> Self {
+                pub fn new(_: &super::config::CustomApp) -> Self {
                     unimplemented!()
                 }
                 pub fn select(
                     &self,
                     _: public::l7_protocol::L7ProtocolEnum,
                     _: u16,
-                ) -> Option<PolicySlice> {
-                    unimplemented!()
+                ) -> Option<PolicySlice<'_>> {
+                    None
                 }
                 pub fn counters(
                     &self,
@@ -122,7 +124,6 @@ pub mod l7 {
                     _: super::enums::TrafficDirection,
                     _: enums::Source,
                 ) {
-                    unimplemented!()
                 }
             }
 
@@ -130,12 +131,10 @@ pub mod l7 {
             pub struct Store;
             impl Store {
                 pub fn is_empty(&self) -> bool {
-                    unimplemented!()
+                    true
                 }
 
-                pub fn clear(&mut self) {
-                    unimplemented!()
-                }
+                pub fn clear(&mut self) {}
 
                 pub fn into_iter_with<L: public::l7_protocol::L7Log>(
                     self,
@@ -156,15 +155,26 @@ pub mod l7 {
         }
 
         pub mod custom_protocol_policy {
-            use std::collections::HashMap;
-
             #[derive(Clone, Default, Debug, PartialEq, Eq)]
             pub struct ExtraProtocolCharacters;
+            impl ExtraProtocolCharacters {
+                pub fn l7_protocol(&self) -> public::l7_protocol::L7Protocol {
+                    unimplemented!()
+                }
+                pub fn biz_protocol(&self) -> &str {
+                    unimplemented!()
+                }
+                pub fn check_payload(
+                    &self,
+                    _: &[u8],
+                    _: super::enums::TrafficDirection,
+                ) -> Option<public::l7_protocol::LogMessageType> {
+                    unimplemented!()
+                }
+            }
 
             #[derive(Clone, Debug, Default, PartialEq)]
-            pub struct ExtraCustomProtocolConfig {
-                pub protocol_characters: Vec<ExtraProtocolCharacters>,
-            }
+            pub struct ExtraCustomProtocolConfig;
             impl ExtraCustomProtocolConfig {
                 pub fn port_range(_: &[super::config::CustomProtocolConfig]) -> String {
                     unimplemented!()
@@ -172,49 +182,17 @@ pub mod l7 {
                 pub fn new(_: &[super::config::CustomProtocolConfig]) -> Self {
                     unimplemented!()
                 }
-            }
-
-            #[derive(Default, Debug)]
-            pub struct CustomPolicyInfo {
-                pub is_request: bool,
-                pub version: String,
-                pub request_type: String,
-                pub request_domain: String,
-                pub request_resource: String,
-                pub endpoint: String,
-                pub request_id: Option<u32>,
-                pub response_code: Option<i32>,
-                pub response_status: String,
-                pub response_exception: String,
-                pub response_result: String,
-                pub trace_id: Option<String>,
-                pub span_id: Option<String>,
-                pub http_proxy_client: Option<String>,
-                pub x_request_id: Option<String>,
-                pub attributes: HashMap<String, String>,
-                pub metrics: HashMap<String, f32>,
-            }
-
-            #[derive(Default, Debug)]
-            pub struct CustomPolicyParser {
-                pub info: CustomPolicyInfo,
-            }
-            impl CustomPolicyParser {
-                pub fn check_payload(
-                    &mut self,
-                    _: &[u8],
-                    _: &ExtraCustomProtocolConfig,
-                    _: super::enums::TrafficDirection,
-                    _: u16,
-                ) -> Option<String> {
+                pub fn select(&self, _: u16) -> Option<PolicySlice<'_>> {
                     unimplemented!()
                 }
-                pub fn parse_payload(
-                    &mut self,
-                    _: &[u8],
-                    _: super::enums::TrafficDirection,
-                    _: super::custom_field_policy::PolicySlice,
-                ) -> bool {
+            }
+
+            pub struct PolicySlice<'a> {
+                _marker: std::marker::PhantomData<&'a ()>,
+            }
+            impl<'a> Iterator for PolicySlice<'a> {
+                type Item = &'a ExtraProtocolCharacters;
+                fn next(&mut self) -> Option<Self::Item> {
                     unimplemented!()
                 }
             }
@@ -351,22 +329,21 @@ pub mod l7 {
 
     pub mod mq {
         pub mod web_sphere_mq {
-            use public::l7_protocol::LogMessageType;
+            use public::enums::PacketDirection;
+            use public::l7_protocol::{L7LogBase, LogMessageType};
 
             #[derive(Default)]
             pub struct WebSphereMqParser {
-                pub request_type: Option<String>,
-                pub end_to_end_id: Option<String>,
-                pub ret_code: Option<String>,
-                pub exception: Option<String>,
+                pub base: L7LogBase,
+                pub orig_send_time: String,
             }
 
             impl WebSphereMqParser {
-                pub fn check_payload(&mut self, _: &[u8], _: bool) -> Option<LogMessageType> {
+                pub fn check_payload(&mut self, _: &[u8]) -> Option<LogMessageType> {
                     unimplemented!()
                 }
 
-                pub fn parse_payload(&mut self, _: &[u8], _: bool) -> bool {
+                pub fn parse_payload(&mut self, _: &[u8], _: PacketDirection, _: bool) -> usize {
                     unimplemented!()
                 }
             }

@@ -21,7 +21,7 @@ use std::rc::Rc;
 use deepflow_agent::{
     _PacketDirection as PacketDirection,
     common::l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface, ParseParam},
-    utils::test::Capture,
+    utils::test_utils::Capture,
     HttpLog,
 };
 
@@ -57,7 +57,7 @@ fn main() {
             &packets[0].get_l4_payload().unwrap(),
             &ParseParam::new(
                 &packets[0],
-                log_cache.clone(),
+                Some(log_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),
@@ -69,7 +69,7 @@ fn main() {
             &packets[1].get_l4_payload().unwrap(),
             &ParseParam::new(
                 &packets[1],
-                log_cache.clone(),
+                Some(log_cache.clone()),
                 Default::default(),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Default::default(),

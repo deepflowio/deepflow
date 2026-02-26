@@ -60,25 +60,26 @@ type L7Base struct {
 	ServerPort uint16 `json:"server_port" category:"$tag" sub:"transport_layer"`
 
 	// 流信息
-	FlowID       uint64 `json:"flow_id" category:"$tag" sub:"flow_info"`
-	TapType      uint8  `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
-	NatSource    uint8  `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source"`
-	TapPortType  uint8  `json:"capture_nic_type category:"$tag" sub:"capture_info"`
-	SignalSource uint16 `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"l7_signal_source"`
-	TunnelType   uint8  `json:"tunnel_type" category:"$tag" sub:"tunnel_info"`
-	TapPort      uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
-	TapSide      string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
-	TapSideEnum  uint8
-	VtapID       uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
-	ReqTcpSeq    uint32 `json:"req_tcp_seq" category:"$tag" sub:"transport_layer"`
-	RespTcpSeq   uint32 `json:"resp_tcp_seq" category:"$tag" sub:"transport_layer"`
-	StartTime    int64  `json:"start_time" category:"$tag" sub:"flow_info"` // us
-	EndTime      int64  `json:"end_time" category:"$tag" sub:"flow_info"`   // us
-	GPID0        uint32 `json:"gprocess_id_0" category:"$tag" sub:"universal_tag"`
-	GPID1        uint32 `json:"gprocess_id_1" category:"$tag" sub:"universal_tag"`
-	BizType      uint8  `json:"biz_type" category:"$tag" sub:"business_info"`
-	BizCode      string `json:"biz_code" category:"$tag" sub:"business_info"`
-	BizScenario  string `json:"biz_scenario" category:"$tag" sub:"business_info"`
+	FlowID          uint64 `json:"flow_id" category:"$tag" sub:"flow_info"`
+	TapType         uint8  `json:"capture_network_type_id" category:"$tag" sub:"capture_info"`
+	NatSource       uint8  `json:"nat_source" category:"$tag" sub:"capture_info" enumfile:"nat_source"`
+	TapPortType     uint8  `json:"capture_nic_type category:"$tag" sub:"capture_info"`
+	SignalSource    uint16 `json:"signal_source" category:"$tag" sub:"capture_info" enumfile:"l7_signal_source"`
+	TunnelType      uint8  `json:"tunnel_type" category:"$tag" sub:"tunnel_info"`
+	TapPort         uint32 `json:"capture_nic" category:"$tag" sub:"capture_info"`
+	TapSide         string `json:"observation_point" category:"$tag" sub:"capture_info" enumfile:"observation_point"`
+	TapSideEnum     uint8
+	VtapID          uint16 `json:"agent_id" category:"$tag" sub:"capture_info"`
+	ReqTcpSeq       uint32 `json:"req_tcp_seq" category:"$tag" sub:"transport_layer"`
+	RespTcpSeq      uint32 `json:"resp_tcp_seq" category:"$tag" sub:"transport_layer"`
+	StartTime       int64  `json:"start_time" category:"$tag" sub:"flow_info"` // us
+	EndTime         int64  `json:"end_time" category:"$tag" sub:"flow_info"`   // us
+	GPID0           uint32 `json:"gprocess_id_0" category:"$tag" sub:"universal_tag"`
+	GPID1           uint32 `json:"gprocess_id_1" category:"$tag" sub:"universal_tag"`
+	BizType         uint8  `json:"biz_type" category:"$tag" sub:"business_info"`
+	BizCode         string `json:"biz_code" category:"$tag" sub:"business_info"`
+	BizScenario     string `json:"biz_scenario" category:"$tag" sub:"business_info"`
+	BizResponseCode string `json:"biz_response_code" category:"$tag" sub:"business_info"`
 
 	ProcessID0             uint32 `json:"process_id_0" category:"$tag" sub:"service_info"`
 	ProcessID1             uint32 `json:"process_id_1" category:"$tag" sub:"service_info"`
@@ -133,6 +134,7 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("biz_type", ckdb.UInt8).SetComment("Business Type"),
 		ckdb.NewColumn("biz_code", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
 		ckdb.NewColumn("biz_scenario", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
+		ckdb.NewColumn("biz_response_code", ckdb.String).SetIndex(ckdb.IndexBloomfilter),
 
 		ckdb.NewColumn("process_id_0", ckdb.Int32).SetComment("客户端进程ID"),
 		ckdb.NewColumn("process_id_1", ckdb.Int32).SetComment("服务端进程ID"),
@@ -157,13 +159,13 @@ type L7FlowLog struct {
 
 	L7Base
 
-	L7Protocol    uint8  `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol"`
-	L7ProtocolStr string `json:"l7_protocol_str" category:"$tag" sub:"application_layer"`
-	Version       string `json:"version" category:"$tag" sub:"application_layer"`
-	Type          uint8  `json:"type" category:"$tag" sub:"application_layer" enumfile:"l7_log_type"`
-	IsTLS         uint8  `json:"is_tls" category:"$tag" sub:"application_layer"`
-	IsAsync       uint8  `json:"is_async" category:"$tag" sub:"application_layer"`
-	IsReversed    uint8  `json:"is_reversed" category:"$tag" sub:"application_layer"`
+	L7Protocol  uint8  `json:"l7_protocol" category:"$tag" sub:"application_layer" enumfile:"l7_protocol"`
+	BizProtocol string `json:"biz_protocol" category:"$tag" sub:"application_layer"`
+	Version     string `json:"version" category:"$tag" sub:"application_layer"`
+	Type        uint8  `json:"type" category:"$tag" sub:"application_layer" enumfile:"l7_log_type"`
+	IsTLS       uint8  `json:"is_tls" category:"$tag" sub:"application_layer"`
+	IsAsync     uint8  `json:"is_async" category:"$tag" sub:"application_layer"`
+	IsReversed  uint8  `json:"is_reversed" category:"$tag" sub:"application_layer"`
 
 	RequestType     string `json:"request_type" category:"$tag" sub:"application_layer"`
 	RequestDomain   string `json:"request_domain" category:"$tag" sub:"application_layer"`
@@ -221,7 +223,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 	l7Columns = append(l7Columns, L7BaseColumns()...)
 	l7Columns = append(l7Columns,
 		ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("0:未知 1:其他, 20:http1, 21:http2, 40:dubbo, 60:mysql, 80:redis, 100:kafka, 101:mqtt, 120:dns"),
-		ckdb.NewColumn("l7_protocol_str", ckdb.LowCardinalityString).SetIndex(ckdb.IndexNone).SetComment("应用协议"),
+		ckdb.NewColumn("biz_protocol", ckdb.LowCardinalityString).SetIndex(ckdb.IndexNone).SetComment("应用协议"),
 		ckdb.NewColumn("version", ckdb.LowCardinalityString).SetComment("协议版本"),
 		ckdb.NewColumn("type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("日志类型, 0:请求, 1:响应, 2:会话"),
 		ckdb.NewColumn("is_tls", ckdb.UInt8),
@@ -328,9 +330,9 @@ func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 	}
 	h.L7Protocol = uint8(l.Base.Head.Proto)
 	if l.ExtInfo != nil && l.ExtInfo.ProtocolStr != "" {
-		h.L7ProtocolStr = l.ExtInfo.ProtocolStr
+		h.BizProtocol = l.ExtInfo.ProtocolStr
 	} else {
-		h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String(h.IsTLS == 1)
+		h.BizProtocol = datatype.L7Protocol(h.L7Protocol).String(h.IsTLS == 1)
 	}
 
 	h.ResponseStatus = uint8(datatype.STATUS_UNKNOWN)
@@ -561,6 +563,7 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.BizType = uint8(l.BizType)
 	b.BizCode = log.BizCode
 	b.BizScenario = log.BizScenario
+	b.BizResponseCode = log.BizResponseCode
 
 	b.ProcessID0 = l.ProcessId_0
 	b.ProcessID1 = l.ProcessId_1

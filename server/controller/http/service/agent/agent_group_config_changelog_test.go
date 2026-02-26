@@ -209,28 +209,28 @@ func TestConfigChangelog_getAggregatedChangelogs_1h(t *testing.T) {
 		{
 			ID:        1,
 			Lcuuid:    "uuid-1",
-			UserID:    1,
+			User:      "user1",
 			Remarks:   "Change 1",
 			CreatedAt: baseTime.Add(10 * time.Minute), // 14:10
 		},
 		{
 			ID:        2,
 			Lcuuid:    "uuid-2",
-			UserID:    1,
+			User:      "user1",
 			Remarks:   "Change 2",
 			CreatedAt: baseTime.Add(30 * time.Minute), // 14:30
 		},
 		{
 			ID:        3,
 			Lcuuid:    "uuid-3",
-			UserID:    2,
+			User:      "user2",
 			Remarks:   "Change 3",
 			CreatedAt: baseTime.Add(1*time.Hour + 15*time.Minute), // 15:15
 		},
 		{
 			ID:        4,
 			Lcuuid:    "uuid-4",
-			UserID:    2,
+			User:      "user2",
 			Remarks:   "Change 4",
 			CreatedAt: baseTime.Add(2*time.Hour + 45*time.Minute), // 16:45
 		},
@@ -275,35 +275,35 @@ func TestConfigChangelog_getAggregatedChangelogs_1d(t *testing.T) {
 		{
 			ID:        1,
 			Lcuuid:    "uuid-1",
-			UserID:    1,
+			User:      "user1",
 			Remarks:   "Change 1",
 			CreatedAt: baseTime.Add(2 * time.Hour), // Nov 24, 02:00
 		},
 		{
 			ID:        2,
 			Lcuuid:    "uuid-2",
-			UserID:    1,
+			User:      "user1",
 			Remarks:   "Change 2",
 			CreatedAt: baseTime.Add(14 * time.Hour), // Nov 24, 14:00
 		},
 		{
 			ID:        3,
 			Lcuuid:    "uuid-3",
-			UserID:    2,
+			User:      "user2",
 			Remarks:   "Change 3",
 			CreatedAt: baseTime.Add(24*time.Hour + 5*time.Hour), // Nov 25, 05:00
 		},
 		{
 			ID:        4,
 			Lcuuid:    "uuid-4",
-			UserID:    2,
+			User:      "user2",
 			Remarks:   "Change 4",
 			CreatedAt: baseTime.Add(48*time.Hour + 18*time.Hour), // Nov 26, 18:00
 		},
 		{
 			ID:        5,
 			Lcuuid:    "uuid-5",
-			UserID:    3,
+			User:      "user3",
 			Remarks:   "Change 5",
 			CreatedAt: baseTime.Add(48*time.Hour + 20*time.Hour), // Nov 26, 20:00
 		},
@@ -370,7 +370,7 @@ func TestConfigChangelog_getAggregatedChangelogs_singleRecord(t *testing.T) {
 		{
 			ID:        1,
 			Lcuuid:    "uuid-1",
-			UserID:    1,
+			User:      "testuser",
 			Remarks:   "Single change",
 			CreatedAt: baseTime,
 		},

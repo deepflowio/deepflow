@@ -178,7 +178,7 @@ TRUNCATE TABLE agent_group_configuration;
 CREATE TABLE IF NOT EXISTS agent_group_configuration_changelog (
     id                              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     agent_group_configuration_id    INTEGER NOT NULL,
-    user_id                         INTEGER NOT NULL,
+    user                            VARCHAR(256) NOT NULL,
     remarks                         TEXT NOT NULL,
     yaml_diff                       MEDIUMTEXT NOT NULL,
     lcuuid                          CHAR(64) NOT NULL,
@@ -406,6 +406,7 @@ CREATE TABLE IF NOT EXISTS sub_domain (
     synced_at           DATETIME DEFAULT NULL,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at          DATETIME DEFAULT NULL,
     UNIQUE INDEX lcuuid_index(lcuuid)
 )ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE sub_domain;
@@ -1286,6 +1287,7 @@ CREATE TABLE IF NOT EXISTS custom_service (
     domain              CHAR(64) DEFAULT '' COMMENT 'reserved for backend',
     team_id             INTEGER DEFAULT 1,
     service_group_name  VARCHAR(128) DEFAULT '',
+    match_port_enabled  TINYINT(1) DEFAULT NULL COMMENT '0: disable 1: enable, only effective when type=pod_service',
     lcuuid              CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -2411,7 +2413,9 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     auto_service_id_1       INTEGER DEFAULT 0,
     auto_service_type_1     INTEGER DEFAULT 0,
     auto_service_1          VARCHAR(256) DEFAULT '',
-    comb_policy_lcuuids     TEXT
+    comb_policy_lcuuids     TEXT,
+    static_labels           TEXT,
+    dynamic_labels          TEXT
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_policy;
 
