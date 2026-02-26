@@ -3965,20 +3965,20 @@ inputs:
       #     inputs:
       #       eppf:
       #         network:
-      #           nic_opt_enabled: ture
+      #           nic_opt_enabled: true
       #           nic_optimize:
       #           - interface: eth0
       #             rx_ring_size: 4096
       #             rss_channel_count: 2
       #             irq_cpu_list: 1,2
-      #             xdp_cpu_redirect: ture
+      #             xdp_cpu_redirect: true
       #             xdp_queue_size: 2048
       #             xdp_cpu_redirect_list: 4,5,6,7
       #           - interface: eth1
       #             rx_ring_size: 4096
       #             rss_channel_count: 2
       #             irq_cpu_list: 1,2
-      #             xdp_cpu_redirect: ture
+      #             xdp_cpu_redirect: true
       #             xdp_queue_size: 2048
       #             xdp_cpu_redirect_list: 4,5,6,7
       #     ```
@@ -4003,20 +4003,20 @@ inputs:
       #     inputs:
       #       eppf:
       #         network:
-      #           nic_opt_enabled: ture
+      #           nic_opt_enabled: true
       #           nic_optimize:
       #           - interface: eth0
       #             rx_ring_size: 4096
       #             rss_channel_count: 2
       #             irq_cpu_list: 1,2
-      #             xdp_cpu_redirect: ture
+      #             xdp_cpu_redirect: true
       #             xdp_queue_size: 2048
       #             xdp_cpu_redirect_list: 4,5,6,7
       #           - interface: eth1
       #             rx_ring_size: 4096
       #             rss_channel_count: 2
       #             irq_cpu_list: 1,2
-      #             xdp_cpu_redirect: ture
+      #             xdp_cpu_redirect: true
       #             xdp_queue_size: 2048
       #             xdp_cpu_redirect_list: 4,5,6,7
       #     ```

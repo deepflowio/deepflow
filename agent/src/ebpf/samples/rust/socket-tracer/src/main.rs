@@ -28,6 +28,21 @@ use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 use log::info;
 
+// Reference trace-utils-interp when building the Enterprise edition.
+// The purpose is to ensure that Rust links against libtrace_utils_interp-xxxx.rlib
+// during the linking stage.
+//
+// interpreter_tracer.c calls is_php_process(),
+// and this function is defined in the trace-utils-interp crate.
+//
+// However, the Rust code in socket_tracer does not directly reference
+// trace-utils-interp. As a result, Cargo considers this dependency unused
+// and excludes it from the linking stage.
+//
+// Therefore, we explicitly reference trace-utils-interp here to force
+// Cargo to include it in the final link.
+//use trace_utils_interp as _;
+
 extern "C" {
     fn print_uprobe_http2_info(data: *mut c_char, len: c_uint);
     fn print_uprobe_grpc_dataframe(data: *mut c_char, len: c_uint);
