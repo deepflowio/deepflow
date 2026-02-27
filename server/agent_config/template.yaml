@@ -4045,6 +4045,7 @@ inputs:
       #
       #     Increasing this value improves burst traffic buffering
       #     and reduces packet drops caused by ring overflow.
+      #     Specifically, use `ethtool -g <iface>` to check the current configuration.
       #
       #     0 (default) means keep the original state and ignore this setting.
       #
@@ -4053,6 +4054,7 @@ inputs:
       #
       #     增大该值可提升突发流量场景下的缓存能力，
       #     降低因 ring 满导致的丢包风险。
+      #     具体使用`ethtool -g <iface>` 查看当前配置情况。
       #
       #     默认值为 0 表示保持原状忽略此项配置。
       # ---
@@ -4070,6 +4072,7 @@ inputs:
       #
       #     Maximum supported value is typically 16 and must not exceed
       #     the number of logical CPU cores.
+      #     Specifically, use `ethtool -l <iface>` to check the current configuration.
       #
       #     When XDP CPU redirect is enabled, it is recommended to set this to 1.
       #     0 (default) means keep the original state and ignore this setting.
@@ -4079,6 +4082,7 @@ inputs:
       #     数据包在物理网卡完成哈希后，将分发到指定数量的队列并触发中断。
       #
       #     最大一般支持 16，且不要超过逻辑 CPU 核数。
+      #     具体使用`ethtool -l <iface>` 查看当前配置情况。
       #
       #     当启用 XDP CPU Redirect 时建议设置为 1。
       #     默认值为 0 表示保持原状忽略此项配置。
@@ -4099,7 +4103,6 @@ inputs:
       #     Value can be:
       #       - Specific CPU list (e.g., 2,4,6)
       #       - "local" (auto match CPUs in local NUMA node)
-      #       - "all" (use all CPUs)
       #
       #     CPUs should be located on the same NUMA node as the NIC.
       #
@@ -4112,7 +4115,6 @@ inputs:
       #     可设置为：
       #       - 指定 CPU 列表（如 2,4,6）
       #       - local（自动匹配本地 NUMA 节点 CPU）
-      #       - all（使用所有 CPU）
       #
       #     建议所选 CPU 与物理网卡位于同一 NUMA 节点。
       # ---

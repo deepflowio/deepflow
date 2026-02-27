@@ -761,6 +761,31 @@ fn main() {
             std::thread::sleep(Duration::from_secs(1));
         }
 
+        // ------ Nic Optimization ----
+        //if set_nic_optimization(true) != 0 {
+        //    println!("set_nic_optimization() error.");
+        //    ::std::process::exit(1);
+        //}
+
+        //let nic_name = CString::new("p2p2").unwrap();
+        //let irq_cpu_list = CString::new("").unwrap();
+        //let xdp_cpu_list = CString::new("").unwrap();
+
+        //if nic_optimize_config(
+        //    nic_name.as_c_str().as_ptr(),
+        //    0, // rx_ring_size
+        //    0, // rss_channel_count
+        //    irq_cpu_list.as_c_str().as_ptr(),
+        //    true, // xdp_cpu_redirect
+        //    0,    // xdp_queue_size
+        //    xdp_cpu_list.as_c_str().as_ptr(),
+        //) != 0
+        //{
+        //    println!("nic_optimize_config() error.");
+        //    ::std::process::exit(1);
+        //}
+        // ------ Nic Optimization end ----
+
         //thread::sleep(Duration::from_secs(60));
         //stop_continuous_profiler();
         //print!(
