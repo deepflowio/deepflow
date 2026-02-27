@@ -386,6 +386,9 @@ func (p *prometheusReader) parseExtraFilters(filter *extraFilters, db string) (s
 	if filter.label == "" || filter.operator == "" {
 		return "", ""
 	}
+	if filter.operator == "exist" || filter.operator == "not exist" {
+		return filter.label, fmt.Sprintf("%s(%s)", filter.operator, filter.label)
+	}
 	return filter.label, fmt.Sprintf("%s %s %s", filter.label, filter.operator, escapeSingleQuote(filter.value))
 }
 
@@ -424,26 +427,34 @@ func (p *prometheusReader) parseMatchers(matcher *prompb.LabelMatcher, prefixTyp
 }
 
 // parse extra-filters to filters in `where` clause
-func (p *prometheusReader) parseExtraFiltersToWhereClause(extraLabelFilters [][]*extraFilters, prefixType prefix, db string, handleTags func(string, bool)) string {
-	outerFilters := make([]string, 0, len(extraLabelFilters))
-	for i := 0; i < len(extraLabelFilters); i++ {
-		innerFilters := make([]string, 0, len(extraLabelFilters[i]))
-		for j := 0; j < len(extraLabelFilters[i]); j++ {
-			matcher := extraLabelFilters[i][j]
-			tagName, newFilter := p.parseExtraFilters(matcher, db)
-			if newFilter == "" {
-				continue
-			}
-			innerFilters = append(innerFilters, newFilter)
-			handleTags(tagName, matcher.isTag)
+func (p *prometheusReader) parseExtraFiltersToWhereClause(node *filterNode, prefixType prefix, db string, handleTags func(string, bool)) string {
+	if node == nil {
+		return ""
+	}
+	if node.filter != nil {
+		// leaf node
+		tagName, sql := p.parseExtraFilters(node.filter, db)
+		if sql == "" {
+			return ""
 		}
-		// inside matchers use 'AND' for connected
-		if len(innerFilters) > 0 {
-			outerFilters = append(outerFilters, fmt.Sprintf("(%s)", strings.Join(innerFilters, " AND ")))
+		handleTags(tagName, node.filter.isTag)
+		return sql
+	}
+	// internal AND/OR node: recurse into children
+	parts := make([]string, 0, len(node.children))
+	for _, child := range node.children {
+		s := p.parseExtraFiltersToWhereClause(child, prefixType, db, handleTags)
+		if s != "" {
+			parts = append(parts, s)
 		}
 	}
-	// outside matchers use 'OR' for connected
-	return fmt.Sprintf("(%s)", strings.Join(outerFilters, " OR "))
+	if len(parts) == 0 {
+		return ""
+	}
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	return fmt.Sprintf("(%s)", strings.Join(parts, " "+node.op+" "))
 }
 
 // return: prefixType, metricName, db, table, dataPrecision, metricAlias
@@ -1569,60 +1580,62 @@ type extraFilters struct {
 	isTag    bool
 }
 
-func parseExtraFiltersToMatchers(filters string) ([][]*extraFilters, error) {
+// filterNode is a boolean expression tree of extra filters.
+// Leaf node: filter != nil. Internal node: op is "AND"/"OR", children non-empty.
+type filterNode struct {
+	filter   *extraFilters
+	op       string
+	children []*filterNode
+}
+
+func parseExtraFiltersToMatchers(filters string) (*filterNode, error) {
 	fakeSQL := fmt.Sprintf("select 1 from t where %s", filters)
 	stmt, err := sqlparser.Parse(fakeSQL)
 	if err != nil {
 		return nil, err
 	}
 	selectStmt := stmt.(*sqlparser.Select)
-	labelMatchers := make([][]*extraFilters, 0)
-	_, err = iterateExprs(selectStmt.Where.Expr, &labelMatchers)
-	if err != nil {
-		return nil, err
-	}
-	return labelMatchers, nil
+	return iterateExprs(selectStmt.Where.Expr)
 }
 
-func iterateExprs(node sqlparser.Expr, labelMatchers *[][]*extraFilters) (sqlparser.Expr, error) {
+// iterateExprs builds a filterNode tree from a SQL expression.
+// AND/OR structure is preserved as-is; no DNF flattening needed.
+func iterateExprs(node sqlparser.Expr) (*filterNode, error) {
 	switch node := node.(type) {
 	case *sqlparser.AndExpr:
-		left, err := iterateExprs(node.Left, labelMatchers)
+		left, err := iterateExprs(node.Left)
 		if err != nil {
-			return left, err
+			return nil, err
 		}
-		right, err := iterateExprs(node.Right, labelMatchers)
+		right, err := iterateExprs(node.Right)
 		if err != nil {
-			return right, err
+			return nil, err
 		}
 		if left == nil {
 			return right, nil
-		} else if right == nil {
+		}
+		if right == nil {
 			return left, nil
 		}
-		return node, nil
+		return &filterNode{op: "AND", children: []*filterNode{left, right}}, nil
 	case *sqlparser.OrExpr:
-		left, err := iterateExprs(node.Left, labelMatchers)
+		left, err := iterateExprs(node.Left)
 		if err != nil {
-			return left, err
+			return nil, err
 		}
-		right, err := iterateExprs(node.Right, labelMatchers)
+		right, err := iterateExprs(node.Right)
 		if err != nil {
-			return right, err
+			return nil, err
 		}
 		if left == nil {
 			return right, nil
-		} else if right == nil {
+		}
+		if right == nil {
 			return left, nil
 		}
-		return node, nil
+		return &filterNode{op: "OR", children: []*filterNode{left, right}}, nil
 	case *sqlparser.ParenExpr:
-		(*labelMatchers) = append((*labelMatchers), []*extraFilters{})
-		expr, err := iterateExprs(node.Expr, labelMatchers)
-		if err != nil {
-			return expr, err
-		}
-		return expr, nil
+		return iterateExprs(node.Expr)
 	case *sqlparser.ComparisonExpr:
 		var comparExpr sqlparser.Expr
 		if parenExpr, ok := node.Left.(*sqlparser.ParenExpr); ok {
@@ -1644,22 +1657,41 @@ func iterateExprs(node sqlparser.Expr, labelMatchers *[][]*extraFilters) (sqlpar
 			op = node.Operator
 			istag = true
 		}
-		lastIndex := len(*labelMatchers) - 1
-		if lastIndex < 0 {
-			(*labelMatchers) = append((*labelMatchers), []*extraFilters{})
-			lastIndex = len(*labelMatchers) - 1
-		}
-
-		(*labelMatchers)[lastIndex] = append((*labelMatchers)[lastIndex], &extraFilters{
+		return &filterNode{filter: &extraFilters{
 			operator: op,
 			// some tag will escape by sqlparser
 			// https://github.com/xwb1989/sqlparser/blob/master/token.go#L85
 			label: removeEscapeQuote(colName, "`"),
 			value: removeEscapeQuote(colValue, "'"),
 			isTag: istag,
-		})
-		return node, nil
+		}}, nil
+	case *sqlparser.NotExpr:
+		if funcExpr, ok := node.Expr.(*sqlparser.FuncExpr); ok &&
+			strings.ToLower(funcExpr.Name.String()) == "exist" &&
+			len(funcExpr.Exprs) == 1 {
+			if aliasedExpr, ok := funcExpr.Exprs[0].(*sqlparser.AliasedExpr); ok {
+				tagName := removeEscapeQuote(sqlparser.String(aliasedExpr.Expr), "`")
+				return &filterNode{filter: &extraFilters{
+					operator: "not exist",
+					label:    tagName,
+					isTag:    true,
+				}}, nil
+			}
+		}
+		return nil, nil
+	case *sqlparser.FuncExpr:
+		if strings.ToLower(node.Name.String()) == "exist" && len(node.Exprs) == 1 {
+			if aliasedExpr, ok := node.Exprs[0].(*sqlparser.AliasedExpr); ok {
+				tagName := removeEscapeQuote(sqlparser.String(aliasedExpr.Expr), "`")
+				return &filterNode{filter: &extraFilters{
+					operator: "exist",
+					label:    tagName,
+					isTag:    true,
+				}}, nil
+			}
+		}
+		return nil, nil
 	default:
-		return node, nil
+		return nil, nil
 	}
 }

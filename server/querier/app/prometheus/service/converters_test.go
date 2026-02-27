@@ -918,33 +918,52 @@ func TestParseQueryRequestToSQL(t *testing.T) {
 }
 
 func TestParseExFilters(t *testing.T) {
+	p := &prometheusReader{}
+	noopTags := func(string, bool) {}
+
 	var testCases = []struct {
-		input  string
-		output [][]*prompb.LabelMatcher
-	}{{
-		input: "(pod=1 and pod_ns=2) or (pod=1 and pod_ns=3) or (pod=5 and pod_ns=3)",
-		output: [][]*prompb.LabelMatcher{
-			{{Name: "pod", Type: prompb.LabelMatcher_EQ, Value: "1"}, {Name: "pod_ns", Type: prompb.LabelMatcher_EQ, Value: "2"}},
-			{{Name: "pod", Type: prompb.LabelMatcher_EQ, Value: "1"}, {Name: "pod_ns", Type: prompb.LabelMatcher_EQ, Value: "3"}},
-			{{Name: "pod", Type: prompb.LabelMatcher_EQ, Value: "5"}, {Name: "pod_ns", Type: prompb.LabelMatcher_EQ, Value: "3"}},
+		input   string
+		wantSQL string
+	}{
+		{
+			// AND/OR tree preserved: A AND B AND (C OR D) stays as-is, no DNF expansion
+			input:   "((pod_cluster_id in (2) AND vpc_id IN (1) AND (chost_id IN (1,2,3,4,5,6) OR exist(chost_id))))",
+			wantSQL: "((pod_cluster_id in (2) AND vpc_id in (1)) AND (chost_id in (1, 2, 3, 4, 5, 6) OR exist(chost_id)))",
 		},
-	}}
+		{
+			input:   "((pod_cluster_id in (2) AND vpc_id IN (1) AND (chost_id IN (1,2,3,4,5,6) OR not exist(chost_id))))",
+			wantSQL: "((pod_cluster_id in (2) AND vpc_id in (1)) AND (chost_id in (1, 2, 3, 4, 5, 6) OR not exist(chost_id)))",
+		},
+		{
+			// explicit parentheses with OR
+			input:   "(pod_id=1 and pod_ns_id=2) or (pod_id=1 and pod_ns_id=3) or (pod_id=5 and pod_ns_id=3)",
+			wantSQL: "(((pod_id = 1 AND pod_ns_id = 2) OR (pod_id = 1 AND pod_ns_id = 3)) OR (pod_id = 5 AND pod_ns_id = 3))",
+		},
+		{
+			// AND binds tighter than OR without parentheses
+			input:   "pod_id=1 and pod_ns_id=2 or pod_id=5 and pod_ns_id=3",
+			wantSQL: "((pod_id = 1 AND pod_ns_id = 2) OR (pod_id = 5 AND pod_ns_id = 3))",
+		},
+		{
+			// simple OR chain
+			input:   "pod_id=1 or pod_id=2 or pod_id=3",
+			wantSQL: "((pod_id = 1 OR pod_id = 2) OR pod_id = 3)",
+		},
+		{
+			// left side with parens, right side plain
+			input:   "(pod_id=1 and pod_ns_id=2) or pod_id=5",
+			wantSQL: "((pod_id = 1 AND pod_ns_id = 2) OR pod_id = 5)",
+		},
+	}
 	t.Run("ParseExFilters", func(t *testing.T) {
-		for i := 0; i < len(testCases); i++ {
-			output, err := parseExtraFiltersToMatchers(testCases[i].input)
+		for i, tc := range testCases {
+			tree, err := parseExtraFiltersToMatchers(tc.input)
 			if err != nil {
-				t.Errorf("Expected output: %v, got: %v", testCases[i].output, err)
-			} else {
-				outerIndex := len(testCases[i].output)
-				for j := 0; j < outerIndex; j++ {
-					innerIndex := len(testCases[i].output[j])
-					for k := 0; k < innerIndex; k++ {
-						assert.Equal(t, testCases[i].output[j][k].Name, output[j][k].Name)
-						assert.Equal(t, testCases[i].output[j][k].Value, output[j][k].Value)
-						assert.Equal(t, testCases[i].output[j][k].Type, output[j][k].Type)
-					}
-				}
+				t.Errorf("case %d: unexpected error: %v", i, err)
+				continue
 			}
+			got := p.parseExtraFiltersToWhereClause(tree, prefixNone, "", noopTags)
+			assert.Equal(t, tc.wantSQL, got, "case %d", i)
 		}
 	})
 }
