@@ -145,7 +145,7 @@ func doRequest(req *http.Request, url string, options ...HeaderOption) (*simplej
 
 	response, err := simplejson.NewJson(respBytes)
 	if err != nil {
-		log.Errorf("parse (%s) body failed, (%v)", url, err)
+		log.Errorf("parse (%s) body failed; error: %v; res: %s", url, err, string(respBytes))
 		return errResponse, err
 	}
 
