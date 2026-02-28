@@ -694,7 +694,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 							}
 						}
 					} else {
-						if t.Tag == strings.TrimSuffix(table, "_map") {
+						if t.Tag == strings.TrimSuffix(table, "_map") || checkTag == common.CHOST_HOSTNAME || checkTag == common.CHOST_IP {
 							tagItem, ok := tag.GetTag("display_name", db, table, "default")
 							if ok {
 								switch strings.ToLower(op) {
