@@ -1153,6 +1153,20 @@ impl EbpfCollector {
                 warn!("ebpf start_continuous_profiler error.");
             }
 
+            // Register the process event callback to receive real-time
+            // exec/exit notifications from the eBPF layer. This enables
+            // near-instant PID filter map updates instead of waiting for
+            // the 10-second /proc scan interval.
+            if ebpf::register_event_handle(
+                ebpf::EVENT_TYPE_PROC_EXEC | ebpf::EVENT_TYPE_PROC_EXIT,
+                crate::utils::process::process_event_callback,
+            ) != 0
+            {
+                warn!("ebpf register_event_handle for process events failed");
+            } else {
+                info!("ebpf register_event_handle for process events succeeded");
+            }
+
             if !is_uprobe_meltdown && !on_cpu.disabled {
                 let feature = "ebpf.profile.on_cpu";
                 process_listener.register(feature, set_feature_on_cpu);
