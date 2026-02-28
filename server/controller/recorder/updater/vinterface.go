@@ -35,19 +35,19 @@ import (
 type VInterfaceMessageFactory struct{}
 
 func (f *VInterfaceMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedVInterfaces{}
+	return &message.AddedVinterfaces{}
 }
 
 func (f *VInterfaceMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedVInterface{}
+	return &message.UpdatedVinterface{}
 }
 
 func (f *VInterfaceMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedVInterfaces{}
+	return &message.DeletedVinterfaces{}
 }
 
 func (f *VInterfaceMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedVInterfaceFields{}
+	return &message.UpdatedVinterfaceFields{}
 }
 
 type VInterface struct {
@@ -149,7 +149,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*met
 }
 
 func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem *cloudmodel.VInterface) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedVInterfaceFields)
+	structInfo := new(message.UpdatedVinterfaceFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.NetworkLcuuid != cloudItem.NetworkLcuuid {
 		if cloudItem.NetworkLcuuid == "" {
@@ -170,7 +170,7 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 			}
 			mapInfo["subnetid"] = networkID
 		}
-		structInfo.NetworkID.SetNew(mapInfo["subnetid"].(int))
+		structInfo.NetworkId.SetNew(mapInfo["subnetid"].(int))
 		structInfo.NetworkLcuuid.Set(diffBase.NetworkLcuuid, cloudItem.NetworkLcuuid)
 	}
 	if diffBase.DeviceLcuuid != cloudItem.DeviceLcuuid {
@@ -202,11 +202,11 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.VInterface, cloudItem
 	}
 	if diffBase.NetnsID != cloudItem.NetnsID {
 		mapInfo["netns_id"] = cloudItem.NetnsID
-		structInfo.NetnsID.Set(diffBase.NetnsID, cloudItem.NetnsID)
+		structInfo.NetnsId.Set(diffBase.NetnsID, cloudItem.NetnsID)
 	}
 	if diffBase.VtapID != cloudItem.VTapID {
 		mapInfo["vtap_id"] = cloudItem.VTapID
-		structInfo.VTapID.Set(diffBase.VtapID, cloudItem.VTapID)
+		structInfo.VtapId.Set(diffBase.VtapID, cloudItem.VTapID)
 	}
 
 	var vpcID int

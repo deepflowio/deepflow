@@ -33,19 +33,19 @@ import (
 type LANIPMessageFactory struct{}
 
 func (f *LANIPMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedLANIPs{}
+	return &message.AddedLanIps{}
 }
 
 func (f *LANIPMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedLANIP{}
+	return &message.UpdatedLanIp{}
 }
 
 func (f *LANIPMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedLANIPs{}
+	return &message.DeletedLanIps{}
 }
 
 func (f *LANIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedLANIPFields{}
+	return &message.UpdatedLanIpFields{}
 }
 
 type LANIP struct {
@@ -143,7 +143,7 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.LANI
 }
 
 func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmodel.IP) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedLANIPFields)
+	structInfo := new(message.UpdatedLanIpFields)
 	mapInfo := make(map[string]interface{})
 
 	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
@@ -164,7 +164,7 @@ func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LANIP, cloudItem *cloudmod
 	// 		}
 	// 	}
 	// 	mapInfo["vl2_net_id"] = subnetID
-	// 	structInfo.SubnetID.SetNew(mapInfo["vl2_net_id"].(int))
+	// 	structInfo.SubnetId.SetNew(mapInfo["vl2_net_id"].(int))
 	// 	structInfo.SubnetLcuuid.Set(diffBase.SubnetLcuuid, cloudItem.SubnetLcuuid)
 	// }
 

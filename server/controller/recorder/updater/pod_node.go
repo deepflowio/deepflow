@@ -124,7 +124,7 @@ func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *clou
 	}
 	if diffBase.IP != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP
-		structInfo.IP.Set(diffBase.IP, cloudItem.IP)
+		structInfo.Ip.Set(diffBase.IP, cloudItem.IP)
 	}
 	if diffBase.State != cloudItem.State {
 		mapInfo["state"] = cloudItem.State
@@ -136,11 +136,11 @@ func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *clou
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 	if diffBase.VCPUNum != cloudItem.VCPUNum {
 		mapInfo["vcpu_num"] = cloudItem.VCPUNum
-		structInfo.VCPUNum.Set(diffBase.VCPUNum, cloudItem.VCPUNum)
+		structInfo.VcpuNum.Set(diffBase.VCPUNum, cloudItem.VCPUNum)
 	}
 	if diffBase.MemTotal != cloudItem.MemTotal {
 		mapInfo["mem_total"] = cloudItem.MemTotal

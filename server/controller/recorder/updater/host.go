@@ -105,7 +105,7 @@ func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel
 	}
 	if diffBase.IP != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP
-		structInfo.IP.Set(diffBase.IP, cloudItem.IP)
+		structInfo.Ip.Set(diffBase.IP, cloudItem.IP)
 	}
 	if diffBase.Hostname != cloudItem.Hostname {
 		mapInfo["hostname"] = cloudItem.Hostname
@@ -113,11 +113,11 @@ func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel
 	}
 	if diffBase.HType != cloudItem.HType {
 		mapInfo["htype"] = cloudItem.HType
-		structInfo.HType.Set(diffBase.HType, cloudItem.HType)
+		structInfo.Htype.Set(diffBase.HType, cloudItem.HType)
 	}
 	if diffBase.VCPUNum != cloudItem.VCPUNum {
 		mapInfo["vcpu_num"] = cloudItem.VCPUNum
-		structInfo.VCPUNum.Set(diffBase.VCPUNum, cloudItem.VCPUNum)
+		structInfo.VcpuNum.Set(diffBase.VCPUNum, cloudItem.VCPUNum)
 	}
 	if diffBase.MemTotal != cloudItem.MemTotal {
 		mapInfo["mem_total"] = cloudItem.MemTotal
@@ -133,7 +133,7 @@ func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

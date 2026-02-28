@@ -114,8 +114,8 @@ func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *clou
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID
-		structInfo.VPCID.SetNew(vpcID)
-		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
+		structInfo.VpcId.SetNew(vpcID)
+		structInfo.VpcLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -127,11 +127,11 @@ func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *clou
 	}
 	if diffBase.TunnelID != cloudItem.TunnelID {
 		mapInfo["tunnel_id"] = cloudItem.TunnelID
-		structInfo.TunnelID.Set(diffBase.TunnelID, cloudItem.TunnelID)
+		structInfo.TunnelId.Set(diffBase.TunnelID, cloudItem.TunnelID)
 	}
 	if diffBase.SegmentationID != cloudItem.SegmentationID {
 		mapInfo["segmentation_id"] = cloudItem.SegmentationID
-		structInfo.SegmentationID.Set(diffBase.SegmentationID, cloudItem.SegmentationID)
+		structInfo.SegmentationId.Set(diffBase.SegmentationID, cloudItem.SegmentationID)
 	}
 	if diffBase.NetType != cloudItem.NetType {
 		mapInfo["net_type"] = cloudItem.NetType
@@ -143,7 +143,7 @@ func (n *Network) generateUpdateInfo(diffBase *diffbase.Network, cloudItem *clou
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

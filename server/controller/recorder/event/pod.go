@@ -121,13 +121,13 @@ func (p *Pod) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 		description = fmt.Sprintf(DESCStateChangeFormat, dbItemNew.Name,
 			podStateToString[updatedFields.State.GetOld()], podStateToString[updatedFields.State.GetNew()])
 	}
-	if updatedFields.CreatedAt.IsDifferent() && updatedFields.PodNodeID.IsDifferent() {
+	if updatedFields.CreatedAt.IsDifferent() && updatedFields.PodNodeId.IsDifferent() {
 		eType = eventapi.RESOURCE_EVENT_TYPE_RECREATE
-		oldPodNodeName, err := md.GetToolDataSet().GetPodNodeNameByID(updatedFields.PodNodeID.GetOld())
+		oldPodNodeName, err := md.GetToolDataSet().GetPodNodeNameByID(updatedFields.PodNodeId.GetOld())
 		if err != nil {
 			log.Errorf("%v, %v", nameByIDNotFound(p.resourceType, updatedFields.GetID()), err, md.LogPrefixes)
 		}
-		newPodNodeName, err := md.GetToolDataSet().GetPodNodeNameByID(updatedFields.PodNodeID.GetNew())
+		newPodNodeName, err := md.GetToolDataSet().GetPodNodeNameByID(updatedFields.PodNodeId.GetNew())
 		if err != nil {
 			log.Errorf("%v, %v", nameByIDNotFound(p.resourceType, updatedFields.GetID()), err, md.LogPrefixes)
 		}

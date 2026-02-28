@@ -116,7 +116,7 @@ func (r *RedisInstance) generateUpdateInfo(diffBase *diffbase.RedisInstance, clo
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

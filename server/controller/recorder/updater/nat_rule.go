@@ -31,19 +31,19 @@ import (
 type NATRuleMessageFactory struct{}
 
 func (f *NATRuleMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedNATRules{}
+	return &message.AddedNatRules{}
 }
 
 func (f *NATRuleMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedNATRule{}
+	return &message.UpdatedNatRule{}
 }
 
 func (f *NATRuleMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedNATRules{}
+	return &message.DeletedNatRules{}
 }
 
 func (f *NATRuleMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedNATRuleFields{}
+	return &message.UpdatedNatRuleFields{}
 }
 
 type NATRule struct {

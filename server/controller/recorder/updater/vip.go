@@ -31,19 +31,19 @@ import (
 type VIPMessageFactory struct{}
 
 func (f *VIPMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedVIPs{}
+	return &message.AddedVips{}
 }
 
 func (f *VIPMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedVIP{}
+	return &message.UpdatedVip{}
 }
 
 func (f *VIPMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedVIPs{}
+	return &message.DeletedVips{}
 }
 
 func (f *VIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedVIPFields{}
+	return &message.UpdatedVipFields{}
 }
 
 type VIP struct {
@@ -85,15 +85,15 @@ func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*metadbmodel.VIP, 
 }
 
 func (p *VIP) generateUpdateInfo(diffBase *diffbase.VIP, cloudItem *cloudmodel.VIP) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedVIPFields)
+	structInfo := new(message.UpdatedVipFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP
-		structInfo.IP.Set(diffBase.IP, cloudItem.IP)
+		structInfo.Ip.Set(diffBase.IP, cloudItem.IP)
 	}
 	if diffBase.VTapID != cloudItem.VTapID {
 		mapInfo["vtap_id"] = cloudItem.VTapID
-		structInfo.VTapID.Set(diffBase.VTapID, cloudItem.VTapID)
+		structInfo.VtapId.Set(diffBase.VTapID, cloudItem.VTapID)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

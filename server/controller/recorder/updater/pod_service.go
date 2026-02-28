@@ -167,7 +167,7 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 			}
 		}
 		mapInfo["pod_ingress_id"] = podIngressID
-		structInfo.PodIngressID.SetNew(podIngressID)
+		structInfo.PodIngressId.SetNew(podIngressID)
 		structInfo.PodIngressLcuuid.Set(diffBase.PodIngressLcuuid, cloudItem.PodIngressLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
@@ -188,11 +188,11 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 	}
 	if diffBase.ExternalIP != cloudItem.ExternalIP {
 		mapInfo["external_ip"] = cloudItem.ExternalIP
-		structInfo.ExternalIP.Set(diffBase.ExternalIP, cloudItem.ExternalIP)
+		structInfo.ExternalIp.Set(diffBase.ExternalIP, cloudItem.ExternalIP)
 	}
 	if diffBase.ServiceClusterIP != cloudItem.ServiceClusterIP {
 		mapInfo["service_cluster_ip"] = cloudItem.ServiceClusterIP
-		structInfo.ServiceClusterIP.Set(diffBase.ServiceClusterIP, cloudItem.ServiceClusterIP)
+		structInfo.ServiceClusterIp.Set(diffBase.ServiceClusterIP, cloudItem.ServiceClusterIP)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid

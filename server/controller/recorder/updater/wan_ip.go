@@ -35,19 +35,19 @@ import (
 type WANIPMessageFactory struct{}
 
 func (f *WANIPMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedWANIPs{}
+	return &message.AddedWanIps{}
 }
 
 func (f *WANIPMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedWANIP{}
+	return &message.UpdatedWanIp{}
 }
 
 func (f *WANIPMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedWANIPs{}
+	return &message.DeletedWanIps{}
 }
 
 func (f *WANIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedWANIPFields{}
+	return &message.UpdatedWanIpFields{}
 }
 
 type WANIP struct {
@@ -122,7 +122,7 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.WANI
 }
 
 func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmodel.IP) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedWANIPFields)
+	structInfo := new(message.UpdatedWanIpFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid

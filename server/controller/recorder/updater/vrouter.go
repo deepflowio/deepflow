@@ -32,19 +32,19 @@ import (
 type VRouterMessageFactory struct{}
 
 func (f *VRouterMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedVRouters{}
+	return &message.AddedVrouters{}
 }
 
 func (f *VRouterMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedVRouter{}
+	return &message.UpdatedVrouter{}
 }
 
 func (f *VRouterMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedVRouters{}
+	return &message.DeletedVrouters{}
 }
 
 func (f *VRouterMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedVRouterFields{}
+	return &message.UpdatedVrouterFields{}
 }
 
 type VRouter struct {
@@ -98,7 +98,7 @@ func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*metadbmod
 }
 
 func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *cloudmodel.VRouter) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedVRouterFields)
+	structInfo := new(message.UpdatedVrouterFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
@@ -110,8 +110,8 @@ func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *clou
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID
-		structInfo.VPCID.SetNew(vpcID)
-		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
+		structInfo.VpcId.SetNew(vpcID)
+		structInfo.VpcLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

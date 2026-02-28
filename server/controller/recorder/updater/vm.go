@@ -35,19 +35,19 @@ import (
 type VMMessageFactory struct{}
 
 func (f *VMMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedVMs{}
+	return &message.AddedVms{}
 }
 
 func (f *VMMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedVM{}
+	return &message.UpdatedVm{}
 }
 
 func (f *VMMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedVMs{}
+	return &message.DeletedVms{}
 }
 
 func (f *VMMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedVMFields{}
+	return &message.UpdatedVmFields{}
 }
 
 type VM struct {
@@ -139,7 +139,7 @@ func (m *VM) recordStatsd(cloudItem *cloudmodel.VM) {
 }
 
 func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedVMFields)
+	structInfo := new(message.UpdatedVmFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
@@ -151,8 +151,8 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID
-		structInfo.VPCID.SetNew(vpcID) // TODO is old value needed?
-		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
+		structInfo.VpcId.SetNew(vpcID) // TODO is old value needed?
+		structInfo.VpcLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -172,7 +172,7 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 	}
 	if diffBase.IP != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP
-		structInfo.IP.Set(diffBase.IP, cloudItem.IP)
+		structInfo.Ip.Set(diffBase.IP, cloudItem.IP)
 	}
 	if diffBase.Hostname != cloudItem.Hostname {
 		mapInfo["hostname"] = cloudItem.Hostname
@@ -184,7 +184,7 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 	}
 	if diffBase.HType != cloudItem.HType {
 		mapInfo["htype"] = cloudItem.HType
-		structInfo.HType.Set(diffBase.HType, cloudItem.HType)
+		structInfo.Htype.Set(diffBase.HType, cloudItem.HType)
 	}
 	if diffBase.LaunchServer != cloudItem.LaunchServer {
 		mapInfo["launch_server"] = cloudItem.LaunchServer
@@ -194,7 +194,7 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 		hostID, _ := m.cache.ToolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
 		if diffBase.HostID != hostID {
 			mapInfo["host_id"] = hostID
-			structInfo.HostID.Set(diffBase.HostID, hostID)
+			structInfo.HostId.Set(diffBase.HostID, hostID)
 		}
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
@@ -203,7 +203,7 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 	if cloudcommon.DiffMap(diffBase.LearnedCloudTags, cloudItem.CloudTags) {
 		updateTags := map[string]string{}
@@ -227,7 +227,7 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 			}
 		}
 		mapInfo["vl2id"] = networkID
-		structInfo.NetworkID.SetNew(networkID)
+		structInfo.NetworkId.SetNew(networkID)
 		structInfo.NetworkLcuuid.Set(diffBase.NetworkLcuuid, cloudItem.NetworkLcuuid)
 	}
 

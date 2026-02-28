@@ -31,19 +31,19 @@ import (
 type NATGatewayMessageFactory struct{}
 
 func (f *NATGatewayMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedNATGateways{}
+	return &message.AddedNatGateways{}
 }
 
 func (f *NATGatewayMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedNATGateway{}
+	return &message.UpdatedNatGateway{}
 }
 
 func (f *NATGatewayMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedNATGateways{}
+	return &message.DeletedNatGateways{}
 }
 
 func (f *NATGatewayMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedNATGatewayFields{}
+	return &message.UpdatedNatGatewayFields{}
 }
 
 type NATGateway struct {
@@ -98,7 +98,7 @@ func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*met
 }
 
 func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem *cloudmodel.NATGateway) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedNATGatewayFields)
+	structInfo := new(message.UpdatedNatGatewayFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -110,7 +110,7 @@ func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem
 	}
 	if diffBase.FloatingIPs != cloudItem.FloatingIPs {
 		mapInfo["floating_ips"] = cloudItem.FloatingIPs
-		structInfo.FloatingIPs.Set(diffBase.FloatingIPs, cloudItem.FloatingIPs)
+		structInfo.FloatingIps.Set(diffBase.FloatingIPs, cloudItem.FloatingIPs)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

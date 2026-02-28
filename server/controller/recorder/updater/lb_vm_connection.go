@@ -31,19 +31,19 @@ import (
 type LBVMConnectionMessageFactory struct{}
 
 func (f *LBVMConnectionMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedLBVMConnections{}
+	return &message.AddedLbVmConnections{}
 }
 
 func (f *LBVMConnectionMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedLBVMConnection{}
+	return &message.UpdatedLbVmConnection{}
 }
 
 func (f *LBVMConnectionMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedLBVMConnections{}
+	return &message.DeletedLbVmConnections{}
 }
 
 func (f *LBVMConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedLBVMConnectionFields{}
+	return &message.UpdatedLbVmConnectionFields{}
 }
 
 type LBVMConnection struct {

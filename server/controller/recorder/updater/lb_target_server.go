@@ -31,19 +31,19 @@ import (
 type LBTargetServerMessageFactory struct{}
 
 func (f *LBTargetServerMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedLBTargetServers{}
+	return &message.AddedLbTargetServers{}
 }
 
 func (f *LBTargetServerMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedLBTargetServer{}
+	return &message.UpdatedLbTargetServer{}
 }
 
 func (f *LBTargetServerMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedLBTargetServers{}
+	return &message.DeletedLbTargetServers{}
 }
 
 func (f *LBTargetServerMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedLBTargetServerFields{}
+	return &message.UpdatedLbTargetServerFields{}
 }
 
 type LBTargetServer struct {
@@ -125,11 +125,11 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 }
 
 func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LBTargetServer, cloudItem *cloudmodel.LBTargetServer) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedLBTargetServerFields)
+	structInfo := new(message.UpdatedLbTargetServerFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.IP != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP
-		structInfo.IP.Set(diffBase.IP, cloudItem.IP)
+		structInfo.Ip.Set(diffBase.IP, cloudItem.IP)
 	}
 	if diffBase.Port != cloudItem.Port {
 		mapInfo["port"] = cloudItem.Port

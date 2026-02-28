@@ -154,7 +154,7 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 	}
 	if diffBase.OSAPPTags != cloudItem.OSAPPTags {
 		mapInfo["os_app_tags"] = cloudItem.OSAPPTags
-		structInfo.OSAPPTags.Set(diffBase.OSAPPTags, cloudItem.OSAPPTags)
+		structInfo.OsAppTags.Set(diffBase.OSAPPTags, cloudItem.OSAPPTags)
 	}
 	if diffBase.ContainerID != cloudItem.ContainerID {
 		mapInfo["container_id"] = cloudItem.ContainerID
@@ -186,7 +186,7 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 			log.Errorf("process %s gid not found", diffBase.Lcuuid, p.metadata.LogPrefixes)
 			return nil, nil, false
 		}
-		structInfo.GID.Set(gid, gid)
+		structInfo.Gid.Set(gid, gid)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

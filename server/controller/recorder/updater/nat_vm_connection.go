@@ -31,19 +31,19 @@ import (
 type NATVMConnectionMessageFactory struct{}
 
 func (f *NATVMConnectionMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedNATVMConnections{}
+	return &message.AddedNatVmConnections{}
 }
 
 func (f *NATVMConnectionMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedNATVMConnection{}
+	return &message.UpdatedNatVmConnection{}
 }
 
 func (f *NATVMConnectionMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedNATVMConnections{}
+	return &message.DeletedNatVmConnections{}
 }
 
 func (f *NATVMConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedNATVMConnectionFields{}
+	return &message.UpdatedNatVmConnectionFields{}
 }
 
 type NATVMConnection struct {

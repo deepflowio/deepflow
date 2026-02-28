@@ -31,19 +31,19 @@ import (
 type VMPodNodeConnectionMessageFactory struct{}
 
 func (f *VMPodNodeConnectionMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedVMPodNodeConnections{}
+	return &message.AddedVmPodNodeConnections{}
 }
 
 func (f *VMPodNodeConnectionMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedVMPodNodeConnection{}
+	return &message.UpdatedVmPodNodeConnection{}
 }
 
 func (f *VMPodNodeConnectionMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedVMPodNodeConnections{}
+	return &message.DeletedVmPodNodeConnections{}
 }
 
 func (f *VMPodNodeConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedVMPodNodeConnectionFields{}
+	return &message.UpdatedVmPodNodeConnectionFields{}
 }
 
 type VMPodNodeConnection struct {

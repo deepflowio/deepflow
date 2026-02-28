@@ -32,19 +32,19 @@ import (
 type CENMessageFactory struct{}
 
 func (f *CENMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedCENs{}
+	return &message.AddedCens{}
 }
 
 func (f *CENMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedCEN{}
+	return &message.UpdatedCen{}
 }
 
 func (f *CENMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedCENs{}
+	return &message.DeletedCens{}
 }
 
 func (f *CENMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedCENFields{}
+	return &message.UpdatedCenFields{}
 }
 
 type CEN struct {
@@ -99,7 +99,7 @@ func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*metadbmodel.CEN, 
 }
 
 func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.CEN) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedCENFields)
+	structInfo := new(message.UpdatedCenFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -119,8 +119,8 @@ func (c *CEN) generateUpdateInfo(diffBase *diffbase.CEN, cloudItem *cloudmodel.C
 			vpcIDs = append(vpcIDs, vpcID)
 		}
 		mapInfo["epc_ids"] = rcommon.IntSliceToString(vpcIDs)
-		structInfo.VPCIDs.SetNew(vpcIDs)
-		structInfo.VPCLcuuids.Set(diffBase.VPCLcuuids, cloudItem.VPCLcuuids)
+		structInfo.VpcIds.SetNew(vpcIDs)
+		structInfo.VpcLcuuids.Set(diffBase.VPCLcuuids, cloudItem.VPCLcuuids)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

@@ -180,13 +180,13 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID
-		structInfo.VPCID.SetNew(vpcID) // TODO is old value needed?
-		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
+		structInfo.VpcId.SetNew(vpcID) // TODO is old value needed?
+		structInfo.VpcLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.PodNodeLcuuid != cloudItem.PodNodeLcuuid {
 		podNodeID := p.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid) // TODO need to log not found error
 		mapInfo["pod_node_id"] = podNodeID
-		structInfo.PodNodeID.SetNew(podNodeID)
+		structInfo.PodNodeId.SetNew(podNodeID)
 		structInfo.PodNodeLcuuid.Set(diffBase.PodNodeLcuuid, cloudItem.PodNodeLcuuid)
 	}
 	if diffBase.PodReplicaSetLcuuid != cloudItem.PodReplicaSetLcuuid {
@@ -203,7 +203,7 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 			}
 		}
 		mapInfo["pod_rs_id"] = podReplicaSetID
-		structInfo.PodReplicaSetID.SetNew(podReplicaSetID)
+		structInfo.PodReplicaSetId.SetNew(podReplicaSetID)
 		structInfo.PodReplicaSetLcuuid.Set(diffBase.PodReplicaSetLcuuid, cloudItem.PodReplicaSetLcuuid)
 	}
 	if diffBase.PodGroupLcuuid != cloudItem.PodGroupLcuuid {
@@ -216,7 +216,7 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 			return nil, nil, false
 		}
 		mapInfo["pod_group_id"] = podGroupID
-		structInfo.PodGroupID.SetNew(podGroupID)
+		structInfo.PodGroupId.SetNew(podGroupID)
 		structInfo.PodGroupLcuuid.Set(diffBase.PodGroupLcuuid, cloudItem.PodGroupLcuuid)
 	}
 	if diffBase.PodServiceLcuuid != cloudItem.PodServiceLcuuid {
@@ -233,7 +233,7 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 			}
 		}
 		mapInfo["pod_service_id"] = podServiceID
-		structInfo.PodServiceID.SetNew(podServiceID)
+		structInfo.PodServiceId.SetNew(podServiceID)
 		structInfo.PodServiceLcuuid.Set(diffBase.PodServiceLcuuid, cloudItem.PodServiceLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
@@ -250,11 +250,11 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 	}
 	if diffBase.ENV != cloudItem.ENV {
 		mapInfo["env"] = cloudItem.ENV
-		structInfo.ENV.Set(diffBase.ENV, cloudItem.ENV)
+		structInfo.Env.Set(diffBase.ENV, cloudItem.ENV)
 	}
 	if diffBase.ContainerIDs != cloudItem.ContainerIDs {
 		mapInfo["container_ids"] = cloudItem.ContainerIDs
-		structInfo.ContainerIDs.Set(diffBase.ContainerIDs, cloudItem.ContainerIDs)
+		structInfo.ContainerIds.Set(diffBase.ContainerIDs, cloudItem.ContainerIDs)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid
@@ -262,7 +262,7 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 	if diffBase.State != cloudItem.State {
 		mapInfo["state"] = cloudItem.State

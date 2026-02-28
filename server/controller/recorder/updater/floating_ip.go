@@ -32,19 +32,19 @@ import (
 type FloatingIPMessageFactory struct{}
 
 func (f *FloatingIPMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedFloatingIPs{}
+	return &message.AddedFloatingIps{}
 }
 
 func (f *FloatingIPMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedFloatingIP{}
+	return &message.UpdatedFloatingIp{}
 }
 
 func (f *FloatingIPMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedFloatingIPs{}
+	return &message.DeletedFloatingIps{}
 }
 
 func (f *FloatingIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedFloatingIPFields{}
+	return &message.UpdatedFloatingIpFields{}
 }
 
 type FloatingIP struct {
@@ -120,7 +120,7 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*met
 }
 
 func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem *cloudmodel.FloatingIP) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedFloatingIPFields)
+	structInfo := new(message.UpdatedFloatingIpFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := f.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
@@ -132,8 +132,8 @@ func (f *FloatingIP) generateUpdateInfo(diffBase *diffbase.FloatingIP, cloudItem
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID
-		structInfo.VPCID.SetNew(vpcID)
-		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
+		structInfo.VpcId.SetNew(vpcID)
+		structInfo.VpcLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid

@@ -31,19 +31,19 @@ import (
 type LBListenerMessageFactory struct{}
 
 func (f *LBListenerMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedLBListeners{}
+	return &message.AddedLbListeners{}
 }
 
 func (f *LBListenerMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedLBListener{}
+	return &message.UpdatedLbListener{}
 }
 
 func (f *LBListenerMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedLBListeners{}
+	return &message.DeletedLbListeners{}
 }
 
 func (f *LBListenerMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedLBListenerFields{}
+	return &message.UpdatedLbListenerFields{}
 }
 
 type LBListener struct {
@@ -98,7 +98,7 @@ func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*met
 }
 
 func (l *LBListener) generateUpdateInfo(diffBase *diffbase.LBListener, cloudItem *cloudmodel.LBListener) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedLBListenerFields)
+	structInfo := new(message.UpdatedLbListenerFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -106,11 +106,11 @@ func (l *LBListener) generateUpdateInfo(diffBase *diffbase.LBListener, cloudItem
 	}
 	if diffBase.IPs != cloudItem.IPs {
 		mapInfo["ips"] = cloudItem.IPs
-		structInfo.IPs.Set(diffBase.IPs, cloudItem.IPs)
+		structInfo.Ips.Set(diffBase.IPs, cloudItem.IPs)
 	}
 	if diffBase.SNATIPs != cloudItem.SNATIPs {
 		mapInfo["snat_ips"] = cloudItem.SNATIPs
-		structInfo.SNATIPs.Set(diffBase.SNATIPs, cloudItem.SNATIPs)
+		structInfo.SnatIps.Set(diffBase.SNATIPs, cloudItem.SNATIPs)
 	}
 	if diffBase.Port != cloudItem.Port {
 		mapInfo["port"] = cloudItem.Port

@@ -31,19 +31,19 @@ import (
 type DHCPPortMessageFactory struct{}
 
 func (f *DHCPPortMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedDHCPPorts{}
+	return &message.AddedDhcpPorts{}
 }
 
 func (f *DHCPPortMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedDHCPPort{}
+	return &message.UpdatedDhcpPort{}
 }
 
 func (f *DHCPPortMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedDHCPPorts{}
+	return &message.DeletedDhcpPorts{}
 }
 
 func (f *DHCPPortMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedDHCPPortFields{}
+	return &message.UpdatedDhcpPortFields{}
 }
 
 type DHCPPort struct {
@@ -95,7 +95,7 @@ func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*metadbm
 }
 
 func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cloudmodel.DHCPPort) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedDHCPPortFields)
+	structInfo := new(message.UpdatedDhcpPortFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
 		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
@@ -107,8 +107,8 @@ func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cl
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID
-		structInfo.VPCID.SetNew(vpcID)
-		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
+		structInfo.VpcId.SetNew(vpcID)
+		structInfo.VpcLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -120,7 +120,7 @@ func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DHCPPort, cloudItem *cl
 	}
 	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0
