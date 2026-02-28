@@ -943,6 +943,16 @@ static inline int process_exists(pid_t pid)
 	return 0; // does not exist
 }
 
+static void library_load_event(struct library_load_event_t *e)
+{
+	/*
+	 * A shared library was loaded via dlopen(). Re-trigger the process
+	 * initialization pipeline so that maps are rescanned and uprobes
+	 * are attached for the newly loaded library.
+	 */
+	extended_process_exec(e->pid);
+}
+
 static void process_event(struct process_event_t *e)
 {
 	if (e->meta.event_type == EVENT_TYPE_PROC_EXEC) {
@@ -990,6 +1000,11 @@ static int register_events_handle(struct reader_forward_info *fwd_info,
 	if (meta->event_type == EVENT_TYPE_PROC_EXEC ||
 	    meta->event_type == EVENT_TYPE_PROC_EXIT) {
 		process_event((struct process_event_t *)meta);
+	}
+
+	// Handle library load events (dlopen detection).
+	if (meta->event_type == EVENT_TYPE_LIB_LOAD) {
+		library_load_event((struct library_load_event_t *)meta);
 	}
 
 	struct extra_event *e;
