@@ -30,25 +30,33 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// RefConfig 统一的外键引用配置（使用 small_snake_case 值，运行时转换为 PascalCase）
 type RefConfig struct {
-	Resource     string `yaml:"resource"`
-	LookupMethod string `yaml:"lookup_method"`
-	TargetField  string `yaml:"target_field"`
+	Resource string `yaml:"resource"`
+	LookupBy string `yaml:"lookup_by"`
+	Target   string `yaml:"target"`
 }
 
 type Field struct {
-	Name         string     `yaml:"name"`
-	OrmName      string     `yaml:"orm_name"`
-	Type         string     `yaml:"type"`
-	ForValidation bool      `yaml:"for_validation"`
-	ForIndex     bool       `yaml:"for_index"`
-	ForMutation  bool       `yaml:"for_mutation"`
-	IsExtension  bool       `yaml:"is_extension"`
-	IsCollection bool       `yaml:"is_collection"`
-	Ref          *RefConfig `yaml:"ref"`
-	Comment      string     `yaml:"comment"`
+	Name          string     `yaml:"name"`
+	OrmName       string     `yaml:"orm_name"`
+	Type          string     `yaml:"type"`
+	Of            string     `yaml:"of"`              // 集合元素类型，配合 type: set 使用
+	ForValidation bool       `yaml:"for_validation"`
+	ForIndex      bool       `yaml:"for_index"`
+	ForMutation   bool       `yaml:"for_mutation"`
+	IsExtension   bool       `yaml:"is_extension"`
+	Ref           *RefConfig `yaml:"ref"`
+	Comment       string     `yaml:"comment"`
+
+	// 运行时填充
 	CamelName       string
 	PublicCamelName string
+	IsSet           bool   // 运行时从 type == "set" 推导
+	GoType          string // 运行时生成的实际 Go 类型
+	RefResource     string // 运行时 toCamel(ref.resource)
+	RefLookupBy     string // 运行时 toCamel(ref.lookup_by)
+	RefTarget       string // 运行时 toCamel(ref.target)
 }
 
 // KeyField 运行时从 fields 中 for_index=true 的字段推导生成
@@ -59,24 +67,17 @@ type KeyField struct {
 	PublicCamelName string
 }
 
-// DiffbaseRefConfig cache_diffbase 中的外键引用配置（使用 small_snake_case 值）
-type DiffbaseRefConfig struct {
-	Resource string `yaml:"resource"`
-	LookupBy string `yaml:"lookup_by"`
-	Target   string `yaml:"target"`
-}
-
 // DiffbaseField cache_diffbase 中的字段定义
 type DiffbaseField struct {
-	Name        string             `yaml:"name"`
-	OrmName     string             `yaml:"orm_name"`
-	Type        string             `yaml:"type"`
-	Of          string             `yaml:"of"`            // 集合元素类型，配合 type: list 使用
-	From        string             `yaml:"from"`           // 数据源类型转换，如 bytes
-	IsLarge     bool               `yaml:"is_large"`       // 是否为大字段（日志输出时隐藏）
-	IsExtension bool               `yaml:"is_extension"`   // 是否为扩展字段（reset 中跳过，由 resetExt 处理）
-	Ref         *DiffbaseRefConfig `yaml:"ref"`
-	Comment     string             `yaml:"comment"`
+	Name        string     `yaml:"name"`
+	OrmName     string     `yaml:"orm_name"`
+	Type        string     `yaml:"type"`
+	Of          string     `yaml:"of"`            // 集合元素类型，配合 type: list 使用
+	From        string     `yaml:"from"`           // 数据源类型转换，如 bytes
+	IsLarge     bool       `yaml:"is_large"`       // 是否为大字段（日志输出时隐藏）
+	IsExtension bool       `yaml:"is_extension"`   // 是否为扩展字段（reset 中跳过，由 resetExt 处理）
+	Ref         *RefConfig `yaml:"ref"`
+	Comment     string     `yaml:"comment"`
 
 	// 运行时填充
 	CamelName       string
@@ -231,11 +232,22 @@ func (g *CacheToolGenerator) adaptConfig() error {
 	return nil
 }
 
-// processFields 处理字段配置，生成 CamelName 和 PublicCamelName
+// processFields 处理字段配置，生成 CamelName、PublicCamelName、GoType 和 Ref 运行时字段
 func (g *CacheToolGenerator) processFields() {
 	for i := range g.cacheConfig.Fields {
-		g.cacheConfig.Fields[i].CamelName = toCamel(g.cacheConfig.Fields[i].Name, false)
-		g.cacheConfig.Fields[i].PublicCamelName = toCamel(g.cacheConfig.Fields[i].Name, true)
+		f := &g.cacheConfig.Fields[i]
+		f.CamelName = toCamel(f.Name, false)
+		f.PublicCamelName = toCamel(f.Name, true)
+
+		// 处理 set 类型
+		if f.Type == "set" {
+			f.IsSet = true
+			f.GoType = "mapset.Set[" + f.Of + "]"
+		} else {
+			f.GoType = f.Type
+		}
+
+		processRefConfig(f.Ref, &f.RefResource, &f.RefLookupBy, &f.RefTarget)
 	}
 }
 
@@ -261,7 +273,7 @@ func (g *CacheToolGenerator) deriveFlags() {
 				PublicCamelName: f.PublicCamelName,
 			})
 		}
-		if f.IsCollection {
+		if f.IsSet {
 			g.cacheConfig.HasMapset = true
 		}
 		if f.IsExtension {
@@ -475,11 +487,7 @@ func (g *CacheDiffbaseGenerator) processFields() {
 		}
 
 		// 处理 ref 配置，转换为 PascalCase
-		if f.Ref != nil {
-			f.RefResource = toCamel(f.Ref.Resource, true)
-			f.RefLookupBy = toCamel(f.Ref.LookupBy, true)
-			f.RefTarget = toCamel(f.Ref.Target, true)
-		}
+		processRefConfig(f.Ref, &f.RefResource, &f.RefLookupBy, &f.RefTarget)
 
 		// 推导 HasExtensionField 和 HasLargeField
 		if f.IsExtension {
@@ -599,6 +607,16 @@ func toCamel(s string, public bool) string {
 
 func toUpper(s string) string {
 	return strings.ToUpper(s)
+}
+
+// processRefConfig 将 ref 配置的 snake_case 值转换为 PascalCase 运行时字段（公共方法）
+func processRefConfig(ref *RefConfig, refResource, refLookupBy, refTarget *string) {
+	if ref == nil {
+		return
+	}
+	*refResource = toCamel(ref.Resource, true)
+	*refLookupBy = toCamel(ref.LookupBy, true)
+	*refTarget = toCamel(ref.Target, true)
 }
 
 // formatGoFile 使用 go fmt  格式化 Go 代码文件（通用工具函数）,使用 goimports 格式化 import

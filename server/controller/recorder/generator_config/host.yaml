@@ -49,16 +49,16 @@ cache_tool:
     orm_name: Region
     type: int
     ref:
-      resource: Region
-      lookup_method: GetByLcuuid
-      target_field: Id
+      resource: region
+      lookup_by: lcuuid
+      target: id
   - name: az_id
     orm_name: AZ
     type: int
     ref:
-      resource: Az
-      lookup_method: GetByLcuuid
-      target_field: Id
+      resource: az
+      lookup_by: lcuuid
+      target: id
   - name: ip
     orm_name: IP
     type: string

@@ -23,7 +23,7 @@ import (
 // OnAfterAdd implements CollectionExtender interface
 // Maintains ConfigMap's podGroupIDs when connection is added
 func (c *PodGroupConfigMapConnectionCollection) OnAfterAdd(item *PodGroupConfigMapConnection, dbItem *metadbmodel.PodGroupConfigMapConnection) {
-	c.tool.ConfigMap().GetById(item.ConfigMapId()).AddPodGroupID(item.PodGroupId())
+	c.tool.ConfigMap().GetById(item.ConfigMapId()).AddToPodGroupIds(item.PodGroupId())
 }
 
 // OnAfterUpdate implements CollectionExtender interface
@@ -35,5 +35,5 @@ func (c *PodGroupConfigMapConnectionCollection) OnAfterUpdate(item *PodGroupConf
 // OnAfterDelete implements CollectionExtender interface
 // Maintains ConfigMap's podGroupIDs when connection is deleted
 func (c *PodGroupConfigMapConnectionCollection) OnAfterDelete(item *PodGroupConfigMapConnection, dbItem *metadbmodel.PodGroupConfigMapConnection) {
-	c.tool.ConfigMap().GetById(item.ConfigMapId()).RemovePodGroupID(item.PodGroupId())
+	c.tool.ConfigMap().GetById(item.ConfigMapId()).RemoveFromPodGroupIds(item.PodGroupId())
 }

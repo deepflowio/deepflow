@@ -41,12 +41,12 @@ func (t *ConfigMap) PodGroupIdsToSlice() []int {
 	return t.podGroupIds.ToSlice()
 }
 
-func (t *ConfigMap) AddPodGroupID(id int) {
-	t.podGroupIds.Add(id)
+func (t *ConfigMap) AddToPodGroupIds(item int) {
+	t.podGroupIds.Add(item)
 }
 
-func (t *ConfigMap) RemovePodGroupID(id int) {
-	t.podGroupIds.Remove(id)
+func (t *ConfigMap) RemoveFromPodGroupIds(item int) {
+	t.podGroupIds.Remove(item)
 }
 
 func (t *ConfigMap) reset(dbItem *metadbmodel.ConfigMap, tool *Tool) {

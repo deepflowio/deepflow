@@ -31,6 +31,6 @@ cache_tool:
     type: string
   - name: pod_group_ids
     orm_name: PodGroupIDs
-    type: mapset.Set[int]
-    is_collection: true
+    type: set
+    of: int
     comment: 'data source: pod_group_config_map_connection'

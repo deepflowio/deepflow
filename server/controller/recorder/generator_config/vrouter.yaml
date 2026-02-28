@@ -38,9 +38,9 @@ cache_tool:
     orm_name: Region
     type: int
     ref:
-      resource: Region
-      lookup_method: GetByLcuuid
-      target_field: Id
+      resource: region
+      lookup_by: lcuuid
+      target: id
   - name: vpc_id
     orm_name: VPCID
     type: int

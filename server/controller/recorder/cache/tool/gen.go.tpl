@@ -16,9 +16,9 @@ type {{.PublicName}} struct {
 {{- range .Fields}}
 {{- if not .IsExtension}}
 {{- if .Comment}}
-	{{.CamelName}} {{.Type}} // {{.Comment}}
+	{{.CamelName}} {{.GoType}} // {{.Comment}}
 {{- else}}
-	{{.CamelName}} {{.Type}}
+	{{.CamelName}} {{.GoType}}
 {{- end}}
 {{- end}}
 {{- end}}
@@ -36,7 +36,7 @@ func (t *{{.PublicName}}) IsValid() bool {
 }
 {{range .Fields}}
 
-func (t *{{$.PublicName}}) {{.PublicCamelName}}() {{.Type}} {
+func (t *{{$.PublicName}}) {{.PublicCamelName}}() {{.GoType}} {
 	return t.{{.CamelName}}
 }
 {{- end}}
@@ -49,27 +49,27 @@ func (t *{{$.PublicName}}) Set{{.PublicCamelName}}({{.CamelName}} {{.Type}}) {
 {{- end}}
 {{- end}}
 {{- range .Fields}}
-{{- if .IsCollection}}
+{{- if .IsSet}}
 
-func (t *{{$.PublicName}}) {{.PublicCamelName}}ToSlice() []int {
+func (t *{{$.PublicName}}) {{.PublicCamelName}}ToSlice() []{{.Of}} {
 	return t.{{.CamelName}}.ToSlice()
 }
 
-func (t *{{$.PublicName}}) AddPodGroupID(id int) {
-	t.{{.CamelName}}.Add(id)
+func (t *{{$.PublicName}}) AddTo{{.PublicCamelName}}(item {{.Of}}) {
+	t.{{.CamelName}}.Add(item)
 }
 
-func (t *{{$.PublicName}}) RemovePodGroupID(id int) {
-	t.{{.CamelName}}.Remove(id)
+func (t *{{$.PublicName}}) RemoveFrom{{.PublicCamelName}}(item {{.Of}}) {
+	t.{{.CamelName}}.Remove(item)
 }
 {{- end}}
 {{- end}}
 
 func (t *{{.PublicName}}) reset(dbItem *metadbmodel.{{.OrmName}}, tool *Tool) {
 {{- range .Fields}}
-{{- if and (not .ForMutation) (not .IsCollection) (not .IsExtension)}}
+{{- if and (not .ForMutation) (not .IsSet) (not .IsExtension)}}
 {{- if .Ref}}
-	t.{{.CamelName}} = tool.{{.Ref.Resource}}().{{.Ref.LookupMethod}}(dbItem.{{.OrmName}}).{{.Ref.TargetField}}()
+	t.{{.CamelName}} = tool.{{.RefResource}}().GetBy{{.RefLookupBy}}(dbItem.{{.OrmName}}).{{.RefTarget}}()
 {{- else}}
 	t.{{.CamelName}} = dbItem.{{.OrmName}}
 {{- end}}
@@ -79,8 +79,8 @@ func (t *{{.PublicName}}) reset(dbItem *metadbmodel.{{.OrmName}}, tool *Tool) {
 	t.resetExt(dbItem, tool)
 {{- end}}
 {{- range .Fields}}
-{{- if .IsCollection}}
-	t.{{.CamelName}} = mapset.NewSet[int]()
+{{- if .IsSet}}
+	t.{{.CamelName}} = mapset.NewSet[{{.Of}}]()
 {{- end}}
 {{- end}}
 }
