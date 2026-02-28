@@ -16,32 +16,26 @@
 
 package message
 
-type AddAddition interface {
-	AddNoneAddition | ProcessAddAddition
+import (
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+)
+
+type AddedPodIngressRules struct {
+	MetadbItems[metadbmodel.PodIngressRule]
+	addition[AddNoneAddition]
 }
 
-type DeleteAddition interface {
-	DeleteNoneAddition | ProcessDeleteAddition
+type DeletedPodIngressRules struct {
+	Lcuuids
+	MetadbItems[metadbmodel.PodIngressRule]
+	addition[DeleteNoneAddition]
 }
 
-type AddNoneAddition struct {
-	NoneAddition
+type UpdatedPodIngressRuleFields struct {
+	Key
 }
 
-type DeleteNoneAddition struct {
-	NoneAddition
-}
-
-type NoneAddition struct{}
-
-type addition[T AddAddition | DeleteAddition] struct {
-	data *T
-}
-
-func (a *addition[T]) GetAddition() interface{} {
-	return a.data
-}
-
-func (a *addition[T]) SetAddition(data interface{}) {
-	a.data = data.(*T)
+type UpdatedPodIngressRule struct {
+	Fields[UpdatedPodIngressRuleFields]
+	MetadbData[metadbmodel.PodIngressRule]
 }

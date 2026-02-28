@@ -40,7 +40,7 @@ type Tool struct {
 	vpc        *VpcCollection
 	network    *NetworkCollection
 	subnet     *SubnetCollection
-	vrouter    *VrouterCollection	
+	vrouter    *VrouterCollection
 	dhcpPort   *DhcpPortCollection
 	vinterface *VinterfaceCollection
 	lanIP      *LanIpCollection
@@ -52,7 +52,7 @@ type Tool struct {
 	lbListener *LbListenerCollection
 
 	// Storage services
-	rdsInstance   *RdsInstanceCollection				
+	rdsInstance   *RdsInstanceCollection
 	redisInstance *RedisInstanceCollection
 
 	// Kubernetes
@@ -95,7 +95,7 @@ func NewTool(md *rcommon.Metadata) *Tool {
 	t.dhcpPort = NewDhcpPortCollection(t)
 	t.vinterface = NewVinterfaceCollection(t)
 	t.lanIP = NewLanIpCollection(t)
-	t.wanIP = NewWanIpCollection(t)	
+	t.wanIP = NewWanIpCollection(t)
 
 	// Network services
 	t.natGateway = NewNatGatewayCollection(t)
@@ -103,7 +103,7 @@ func NewTool(md *rcommon.Metadata) *Tool {
 	t.lbListener = NewLbListenerCollection(t)
 
 	// Storage services
-	t.rdsInstance = NewRdsInstanceCollection(t)		
+	t.rdsInstance = NewRdsInstanceCollection(t)
 	t.redisInstance = NewRedisInstanceCollection(t)
 
 	// Kubernetes
@@ -122,7 +122,7 @@ func NewTool(md *rcommon.Metadata) *Tool {
 	// Processes
 	t.vmPodNodeConnection = NewVmPodNodeConnectionCollection(t)
 	t.process = NewProcessCollection(t)
-	t.agent = NewVtapCollection(t)		
+	t.agent = NewVtapCollection(t)
 
 	return t
 }
@@ -135,7 +135,7 @@ func (t *Tool) SetSequence(sequence int) {
 
 // Clouds
 func (t Tool) Region() *RegionCollection { return t.region }
-func (t Tool) Az() *AzCollection                 { return t.az }
+func (t Tool) Az() *AzCollection         { return t.az }
 
 // Computes
 func (t Tool) Host() *HostCollection             { return t.host }
@@ -155,7 +155,7 @@ func (t Tool) Lb() *LbCollection                 { return t.lb }
 func (t Tool) LbListener() *LbListenerCollection { return t.lbListener }
 
 // Storage services
-func (t Tool) RdsInstance() *RdsInstanceCollection     { return t.rdsInstance }	
+func (t Tool) RdsInstance() *RdsInstanceCollection     { return t.rdsInstance }
 func (t Tool) RedisInstance() *RedisInstanceCollection { return t.redisInstance }
 
 // Kubernetes
@@ -186,7 +186,7 @@ func (t Tool) GetDeviceVPCIDByLcuuid(deviceType int, deviceLcuuid string) (int, 
 	case ctrlrcommon.VIF_DEVICE_TYPE_VROUTER:
 		vpcID = t.Vrouter().GetByLcuuid(deviceLcuuid).VpcId()
 	case ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT:
-		vpcID = t.DhcpPort().GetByLcuuid(deviceLcuuid).VpcId()	
+		vpcID = t.DhcpPort().GetByLcuuid(deviceLcuuid).VpcId()
 	case ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY:
 		vpcID = t.NatGateway().GetByLcuuid(deviceLcuuid).VpcId()
 	case ctrlrcommon.VIF_DEVICE_TYPE_LB:
@@ -217,7 +217,7 @@ func (t Tool) GetDeviceIDByLcuuid(deviceType int, deviceLcuuid string) (int, boo
 	case ctrlrcommon.VIF_DEVICE_TYPE_VROUTER:
 		id = t.Vrouter().GetByLcuuid(deviceLcuuid).Id()
 	case ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT:
-		id = t.DhcpPort().GetByLcuuid(deviceLcuuid).Id()	
+		id = t.DhcpPort().GetByLcuuid(deviceLcuuid).Id()
 	case ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY:
 		id = t.NatGateway().GetByLcuuid(deviceLcuuid).Id()
 	case ctrlrcommon.VIF_DEVICE_TYPE_LB:

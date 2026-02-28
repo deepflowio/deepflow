@@ -41,7 +41,7 @@ type Field struct {
 	Name          string     `yaml:"name"`
 	OrmName       string     `yaml:"orm_name"`
 	Type          string     `yaml:"type"`
-	Of            string     `yaml:"of"`              // 集合元素类型，配合 type: set 使用
+	Of            string     `yaml:"of"` // 集合元素类型，配合 type: set 使用
 	ForValidation bool       `yaml:"for_validation"`
 	ForIndex      bool       `yaml:"for_index"`
 	ForMutation   bool       `yaml:"for_mutation"`
@@ -72,10 +72,10 @@ type DiffbaseField struct {
 	Name        string     `yaml:"name"`
 	OrmName     string     `yaml:"orm_name"`
 	Type        string     `yaml:"type"`
-	Of          string     `yaml:"of"`            // 集合元素类型，配合 type: list 使用
-	From        string     `yaml:"from"`           // 数据源类型转换，如 bytes
-	IsLarge     bool       `yaml:"is_large"`       // 是否为大字段（日志输出时隐藏）
-	IsExtension bool       `yaml:"is_extension"`   // 是否为扩展字段（reset 中跳过，由 resetExt 处理）
+	Of          string     `yaml:"of"`           // 集合元素类型，配合 type: list 使用
+	From        string     `yaml:"from"`         // 数据源类型转换，如 bytes
+	IsLarge     bool       `yaml:"is_large"`     // 是否为大字段（日志输出时隐藏）
+	IsExtension bool       `yaml:"is_extension"` // 是否为扩展字段（reset 中跳过，由 resetExt 处理）
 	Ref         *RefConfig `yaml:"ref"`
 	Comment     string     `yaml:"comment"`
 
@@ -118,9 +118,9 @@ type CacheDiffbaseConfig struct {
 }
 
 type Config struct {
-	Name      string          `yaml:"name"`
-	OrmName   string          `yaml:"orm_name"`
-	CacheTool CacheToolConfig `yaml:"cache_tool"`
+	Name          string              `yaml:"name"`
+	OrmName       string              `yaml:"orm_name"`
+	CacheTool     CacheToolConfig     `yaml:"cache_tool"`
 	CacheDiffbase CacheDiffbaseConfig `yaml:"cache_diffbase"`
 
 	PublicName string // 运行时生成
