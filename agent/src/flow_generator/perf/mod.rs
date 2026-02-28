@@ -298,6 +298,8 @@ impl FlowLog {
                 .is_enabled(self.l7_protocol_enum.get_l7_protocol())
             {
                 parser.set_obfuscate_cache(self.obfuscate_cache.as_ref().map(|o| o.clone()));
+            } else {
+                parser.set_obfuscate_cache(None);
             }
 
             let ret = parser.parse_payload(
@@ -403,6 +405,8 @@ impl FlowLog {
                     .is_enabled(*protocol)
                 {
                     parser.set_obfuscate_cache(self.obfuscate_cache.as_ref().map(|o| o.clone()));
+                } else {
+                    parser.set_obfuscate_cache(None);
                 }
                 if let Some(message_type) = parser.check_payload(cut_payload, &param) {
                     self.l7_protocol_enum = parser.l7_protocol_enum();
