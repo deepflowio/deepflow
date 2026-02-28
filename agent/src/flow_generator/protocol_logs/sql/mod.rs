@@ -40,7 +40,7 @@ pub use oracle::{OracleInfo, OracleLog};
 pub use postgresql::{PostgreInfo, PostgresqlLog};
 pub use redis::{RedisInfo, RedisLog};
 
-pub type ObfuscateCache = Rc<RefCell<LruCache<u64, Vec<u8>>>>;
+pub type ObfuscateCache = Rc<RefCell<LruCache<u64, String>>>;
 
 pub const OBFUSCATE_CACHE_SIZE: usize = 8192;
 pub const QUESTION_MARK: u8 = b'?';
