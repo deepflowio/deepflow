@@ -62,6 +62,159 @@ static const char *k_sym_prefix = "[k] ";
 static const char *lib_sym_prefix = "[l] ";
 static const char *u_sym_prefix = "";
 
+#define PROC_SYM_CACHE_SIZE 8192
+#define FOLDED_STACK_CACHE_SIZE 16384
+#define FOLDED_STACK_CACHE_OPT_IGNORE_LIBS 0x1
+#define FOLDED_STACK_CACHE_OPT_USE_SYMBOL_TABLE 0x2
+
+struct proc_symbol_cache_entry {
+	pid_t pid;
+	u64 stime;
+	u64 resolver;
+	u64 address;
+	char *symbol;
+	bool valid;
+};
+
+static __thread struct proc_symbol_cache_entry g_proc_symbol_cache[PROC_SYM_CACHE_SIZE];
+
+struct folded_stack_cache_entry {
+	pid_t pid;
+	u64 stime;
+	u64 stack_hash;
+	u32 opts;
+	char *folded;
+	bool valid;
+};
+
+static __thread struct folded_stack_cache_entry
+	g_folded_stack_cache[FOLDED_STACK_CACHE_SIZE];
+
+static inline u32 proc_symbol_cache_hash(pid_t pid, u64 stime, u64 resolver,
+					 u64 address)
+{
+	u64 h = address;
+	h ^= resolver + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+	h ^= stime + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+	h ^= ((u64)(u32)pid) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+	return (u32)h & (PROC_SYM_CACHE_SIZE - 1);
+}
+
+static inline u32 folded_stack_cache_hash(pid_t pid, u64 stime, u64 stack_hash,
+					  u32 opts)
+{
+	u64 h = stack_hash;
+	h ^= stime + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+	h ^= ((u64)(u32)pid) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+	h ^= (u64)opts + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+	return (u32)h & (FOLDED_STACK_CACHE_SIZE - 1);
+}
+
+static char *clone_symbol_str(const char *src)
+{
+	if (src == NULL) {
+		return NULL;
+	}
+	int len = strlen(src);
+	char *dst = clib_mem_alloc_aligned("symbol_str", len + 1, 0, NULL);
+	if (dst == NULL) {
+		return NULL;
+	}
+	memcpy(dst, src, len + 1);
+	return dst;
+}
+
+static inline bool is_unresolved_symbol(const char *symbol)
+{
+	return symbol
+	       && strncmp(symbol, "[unknown", strlen("[unknown")) == 0;
+}
+
+static bool proc_symbol_cache_lookup(pid_t pid, u64 stime, u64 resolver,
+				     u64 address, char **sym_ptr)
+{
+	if (sym_ptr == NULL) {
+		return false;
+	}
+	u32 idx = proc_symbol_cache_hash(pid, stime, resolver, address);
+	struct proc_symbol_cache_entry *entry = &g_proc_symbol_cache[idx];
+	if (!entry->valid || entry->pid != pid || entry->stime != stime
+	    || entry->resolver != resolver || entry->address != address
+	    || entry->symbol == NULL) {
+		return false;
+	}
+	*sym_ptr = clone_symbol_str(entry->symbol);
+	return *sym_ptr != NULL;
+}
+
+static void proc_symbol_cache_store(pid_t pid, u64 stime, u64 resolver,
+				    u64 address, const char *symbol)
+{
+	if (symbol == NULL) {
+		return;
+	}
+	u32 idx = proc_symbol_cache_hash(pid, stime, resolver, address);
+	struct proc_symbol_cache_entry *entry = &g_proc_symbol_cache[idx];
+	char *new_symbol = clone_symbol_str(symbol);
+	if (new_symbol == NULL) {
+		return;
+	}
+	if (entry->symbol != NULL) {
+		clib_mem_free(entry->symbol);
+	}
+	entry->pid = pid;
+	entry->stime = stime;
+	entry->resolver = resolver;
+	entry->address = address;
+	entry->symbol = new_symbol;
+	entry->valid = true;
+}
+
+static bool folded_stack_cache_lookup(pid_t pid, u64 stime, u64 stack_hash,
+				      u32 opts, char **folded_ptr)
+{
+	if (folded_ptr == NULL) {
+		return false;
+	}
+
+	u32 idx = folded_stack_cache_hash(pid, stime, stack_hash, opts);
+	struct folded_stack_cache_entry *entry = &g_folded_stack_cache[idx];
+	if (!entry->valid || entry->pid != pid || entry->stime != stime
+	    || entry->stack_hash != stack_hash || entry->opts != opts
+	    || entry->folded == NULL) {
+		return false;
+	}
+
+	*folded_ptr = clone_symbol_str(entry->folded);
+	return *folded_ptr != NULL;
+}
+
+static void folded_stack_cache_store(pid_t pid, u64 stime, u64 stack_hash,
+				     u32 opts, const char *folded)
+{
+	if (folded == NULL) {
+		return;
+	}
+
+	u32 idx = folded_stack_cache_hash(pid, stime, stack_hash, opts);
+	struct folded_stack_cache_entry *entry = &g_folded_stack_cache[idx];
+	char *new_folded = clone_symbol_str(folded);
+	if (new_folded == NULL) {
+		return;
+	}
+
+	if (entry->folded != NULL) {
+		clib_mem_free(entry->folded);
+	}
+
+	entry->pid = pid;
+	entry->stime = stime;
+	entry->stack_hash = stack_hash;
+	entry->opts = opts;
+	entry->folded = new_folded;
+	entry->valid = true;
+}
+
 // Stack trace structure definition (user-space copy of eBPF structure)
 // Must match the definition in perf_profiler.bpf.c
 #ifndef PERF_MAX_STACK_DEPTH
@@ -77,6 +230,33 @@ typedef struct {
 	u64 extra_data_a[PERF_MAX_STACK_DEPTH];
 	u64 extra_data_b[PERF_MAX_STACK_DEPTH];
 } stack_t;
+
+static u64 folded_stack_calc_hash(const stack_t *stack, u64 sentinel_addr)
+{
+	if (!stack) {
+		return 0;
+	}
+
+	u64 hash = 1469598103934665603ULL;
+	for (int i = 0; i < PERF_MAX_STACK_DEPTH; i++) {
+		u64 addr = stack->addrs[i];
+		u8 frame_type = stack->frame_types[i];
+
+		if (addr == 0) {
+			break;
+		}
+		if (addr == sentinel_addr) {
+			continue;
+		}
+
+		hash ^= addr + 0x9e3779b97f4a7c15ULL + (hash << 6)
+			+ (hash >> 2);
+		hash ^= (u64)frame_type + 0x9e3779b97f4a7c15ULL + (hash << 6)
+			+ (hash >> 2);
+	}
+
+	return hash;
+}
 
 /*
  * To track the scenario where stack data is missing in the eBPF
@@ -147,9 +327,12 @@ static char *proc_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	ASSERT(pid >= 0);
 
 	int len = 0;
-	char *ptr = (char *)sym->demangle_name;
+	char *ptr = (char *)(sym->demangle_name ? sym->demangle_name : sym->name);
+	if (ptr == NULL) {
+		ptr = "[unknown]";
+	}
 
-	if (maybe_rust_symbol(sym->demangle_name)) {
+	if (maybe_rust_symbol(ptr)) {
 		// likely a rust name
 		char rust_name[RUST_SYM_MAX_LEN];
 		memset(rust_name, 0, sizeof(rust_name));
@@ -274,13 +457,29 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 	} else {
 		struct symbolizer_proc_info *p = info_p;
 		if (p) {
+			bool cache_allowed = !p->is_java && p->stime != 0;
+			u64 resolver_key = (u64)resolver;
 			if (p->is_exit
 			    || ((u64) resolver != (u64) p->syms_cache))
 				return (-1);
 			pthread_mutex_lock(&p->mutex);
+			if (cache_allowed
+			    && proc_symbol_cache_lookup(pid, p->stime,
+							resolver_key, address,
+							sym_ptr)) {
+				pthread_mutex_unlock(&p->mutex);
+				return 0;
+			}
+
 			ret = bcc_symcache_resolve(resolver, address, sym);
 			if (ret == 0) {
 				*sym_ptr = proc_symbol_name_fetch(pid, sym);
+				if (cache_allowed && *sym_ptr != NULL
+				    && !is_unresolved_symbol(*sym_ptr)) {
+					proc_symbol_cache_store(pid, p->stime,
+								resolver_key,
+								address, *sym_ptr);
+				}
 				if (p->is_java) {
 					// handle java encoded symbols
 					char *new_sym =
@@ -518,6 +717,32 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		return NULL;
 	}
 
+	bool stack_cache_enabled = new_cache && !use_symbol_table;
+	u64 stime_key = 0;
+	u64 stack_hash = 0;
+	u32 stack_cache_opts = 0;
+	if (stack_cache_enabled) {
+		if (ignore_libs) {
+			stack_cache_opts |= FOLDED_STACK_CACHE_OPT_IGNORE_LIBS;
+		}
+		if (use_symbol_table) {
+			stack_cache_opts |= FOLDED_STACK_CACHE_OPT_USE_SYMBOL_TABLE;
+		}
+
+		if (pid > 0 && info_p) {
+			struct symbolizer_proc_info *proc_info = info_p;
+			stime_key = proc_info->stime;
+		}
+
+		stack_hash = folded_stack_calc_hash(&stack, sentinel_addr);
+		char *cached_folded = NULL;
+		if (folded_stack_cache_lookup(pid, stime_key, stack_hash,
+					      stack_cache_opts,
+					      &cached_folded)) {
+			return cached_folded;
+		}
+	}
+
 	// For debugging: stack.len is the number of frames
 	u64 *ips = stack.addrs;
 
@@ -529,6 +754,7 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		return NULL;
 
 	int start_idx = -1, folded_size = 0;
+	bool has_unresolved_frame = false;
 	for (i = PERF_MAX_STACK_DEPTH - 1; i >= 0; i--) {
 		if (ips[i] == 0 || ips[i] == sentinel_addr)
 			continue;
@@ -554,13 +780,16 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		} else {
 			str = resolve_addr(t, pid, (i == start_idx),
 					   ips[i], new_cache, info_p);
-		}
-		if (str) {
-			// ignore frames in library for memory profiling
-			if (ignore_libs && strlen(str) >= strlen(lib_sym_prefix)
-			    && strncmp(str, lib_sym_prefix,
-				       strlen(lib_sym_prefix)) == 0) {
-				clib_mem_free(str);
+			}
+			if (str) {
+				if (is_unresolved_symbol(str)) {
+					has_unresolved_frame = true;
+				}
+				// ignore frames in library for memory profiling
+				if (ignore_libs && strlen(str) >= strlen(lib_sym_prefix)
+				    && strncmp(str, lib_sym_prefix,
+					       strlen(lib_sym_prefix)) == 0) {
+					clib_mem_free(str);
 				continue;
 			}
 			symbol_array[i] = pointer_to_uword(str);
@@ -590,6 +819,14 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 	if (len - 1 >= 0) {
 		fold_stack_trace_str[len - 1] = '\0';
 	}
+
+	if (stack_cache_enabled && !has_unresolved_frame
+	    && fold_stack_trace_str[0] != '\0') {
+		folded_stack_cache_store(pid, stime_key, stack_hash,
+					 stack_cache_opts,
+					 fold_stack_trace_str);
+	}
+
 	vec_free(symbol_array);
 	return fold_stack_trace_str;
 
