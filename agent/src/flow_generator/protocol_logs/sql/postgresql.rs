@@ -42,7 +42,7 @@ use super::{
     super::value_is_default,
     postgre_convert::{get_code_desc, get_request_str},
     sql_check::is_postgresql,
-    sql_obfuscate::attempt_obfuscation,
+    sql_obfuscate::CachedObfuscator,
     ObfuscateCache,
 };
 
@@ -207,7 +207,7 @@ impl From<&PostgreInfo> for LogCache {
 #[derive(Default)]
 pub struct PostgresqlLog {
     perf_stats: Vec<L7PerfStats>,
-    obfuscate_cache: Option<ObfuscateCache>,
+    obfuscator: CachedObfuscator,
 
     has_request: bool,
 }
@@ -272,7 +272,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
     }
 
     fn set_obfuscate_cache(&mut self, obfuscate_cache: Option<ObfuscateCache>) {
-        self.obfuscate_cache = obfuscate_cache;
+        self.obfuscator.set_obfuscate_cache(obfuscate_cache);
     }
 }
 
@@ -339,10 +339,11 @@ impl PostgresqlLog {
             'Q' => {
                 info.req_type = tag;
                 let payload = strip_string_end_with_zero(data)?;
-                info.context = attempt_obfuscation(&self.obfuscate_cache, payload)
-                    .map_or(String::from_utf8_lossy(payload).to_string(), |m| {
-                        String::from_utf8_lossy(&m).to_string()
-                    });
+                let context = String::from_utf8_lossy(payload);
+                info.context = match self.obfuscator.apply(&context) {
+                    Ok(obfuscated) => obfuscated.to_string(),
+                    Err(_) => context.to_string(),
+                };
                 info.ignore = false;
 
                 Ok(true)
@@ -362,10 +363,11 @@ impl PostgresqlLog {
                     if let Some(idx) = data.iter().position(|x| *x == 0x0) {
                         let payload = &data[..idx];
                         let postgresql = is_postgresql(payload);
-                        info.context = attempt_obfuscation(&self.obfuscate_cache, payload)
-                            .map_or(String::from_utf8_lossy(payload).to_string(), |m| {
-                                String::from_utf8_lossy(&m).to_string()
-                            });
+                        let context = String::from_utf8_lossy(payload);
+                        info.context = match self.obfuscator.apply(&context) {
+                            Ok(obfuscated) => obfuscated.to_string(),
+                            Err(_) => context.to_string(),
+                        };
                         if postgresql {
                             return Ok(true);
                         }
