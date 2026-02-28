@@ -137,8 +137,8 @@ func listAgentGroupConfig(cmd *cobra.Command, args []string, output string) {
 	}
 
 	server := common.GetServerInfo(cmd)
-	url := fmt.Sprintf("http://%s:%d/v1/agent-group-configuration/", server.IP, server.Port)
 	if output == "yaml" {
+		url := fmt.Sprintf("http://%s:%d/v1/agent-group-configuration/", server.IP, server.Port)
 		if agentGroupShortUUID != "" {
 			agentLcuuid, err := getAgentGroupLcuuid(cmd, server, agentGroupShortUUID)
 			if err != nil {
@@ -147,7 +147,8 @@ func listAgentGroupConfig(cmd *cobra.Command, args []string, output string) {
 			}
 			url += fmt.Sprintf("%s/yaml", agentLcuuid)
 		} else {
-			url += "yaml"
+			fmt.Fprintln(os.Stderr, "Must specify agent group ID")
+			return
 		}
 
 		response, err := common.CURLPerform("GET", url, nil, "",
@@ -174,7 +175,7 @@ func listAgentGroupConfig(cmd *cobra.Command, args []string, output string) {
 			return
 		}
 
-		url += "yaml"
+		url := fmt.Sprintf("http://%s:%d/v1/agent-group-configurations", server.IP, server.Port)
 		response, err := common.CURLPerform("GET", url, nil, "",
 			[]common.HTTPOption{common.WithTimeout(common.GetTimeout(cmd)), common.WithORGID(common.GetORGID(cmd))}...)
 		if err != nil {
