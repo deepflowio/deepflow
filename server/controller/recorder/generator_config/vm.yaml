@@ -96,3 +96,42 @@ cache_tool:
     orm_name: PodNodeID
     type: int
     for_mutation: true
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: ip
+        type: string
+      - name: label
+        type: string
+      - name: state
+        type: int
+      - name: htype
+        type: int
+      - name: launch_server
+        type: string
+      - name: learned_cloud_tags
+        type: map[string]string
+      - name: custom_cloud_tags
+        type: map[string]string
+      - name: host_id
+        type: int
+      - name: uid
+        type: string
+      - name: hostname
+        type: string
+      - name: vpc_id
+        type: int
+      - name: vpc_lcuuid
+        type: string
+      - name: az_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string
+      - name: network_id
+        type: int
+      - name: network_lcuuid
+        type: string

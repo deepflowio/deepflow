@@ -52,3 +52,26 @@ cache_tool:
   - name: vpc_id
     orm_name: VPCID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: label
+        type: string
+      - name: tunnel_id
+        type: int
+      - name: segmentation_id
+        type: int
+      - name: net_type
+        type: int
+      - name: vpc_id
+        type: int
+      - name: vpc_lcuuid
+        type: string
+      - name: az_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string

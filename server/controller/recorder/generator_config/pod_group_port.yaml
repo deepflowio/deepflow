@@ -13,3 +13,10 @@ cache_diffbase:
 
 cache_tool:
   enabled: false
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string

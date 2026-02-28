@@ -16,3 +16,14 @@ cache_diffbase:
 
 cache_tool:
   enabled: false
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: destination
+        type: string
+      - name: nexthop_type
+        type: string
+      - name: nexthop
+        type: string

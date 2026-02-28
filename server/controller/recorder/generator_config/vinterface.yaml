@@ -92,3 +92,24 @@ cache_tool:
   extensions:
     - collection
     - struct
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: tap_mac
+        type: string
+      - name: type
+        type: int
+      - name: netns_id
+        type: uint32
+      - name: vtap_id
+        type: uint32
+      - name: network_id
+        type: int
+      - name: network_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string

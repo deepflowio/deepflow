@@ -27,3 +27,14 @@ cache_tool:
     - name: name
       orm_name: Name
       type: string
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: label
+        type: string
+      - name: region_lcuuid
+        type: string

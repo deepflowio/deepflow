@@ -21,3 +21,8 @@ cache_tool:
   - name: name
     orm_name: Name
     type: string
+
+pubsub:
+  message:
+    enabled: true
+    fields: []

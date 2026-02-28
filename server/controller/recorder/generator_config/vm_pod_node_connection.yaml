@@ -24,3 +24,8 @@ cache_tool:
   - name: pod_node_id
     orm_name: PodNodeID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields: []

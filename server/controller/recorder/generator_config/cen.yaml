@@ -18,3 +18,14 @@ cache_diffbase:
 
 cache_tool:
   enabled: false
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: vpc_ids
+        type: "[]int"
+      - name: vpc_lcuuids
+        type: "[]string"

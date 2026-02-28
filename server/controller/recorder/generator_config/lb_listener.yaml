@@ -36,3 +36,18 @@ cache_tool:
   - name: lb_id
     orm_name: LBID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: ips
+        type: string
+      - name: snat_ips
+        type: string
+      - name: port
+        type: int
+      - name: protocol
+        type: string

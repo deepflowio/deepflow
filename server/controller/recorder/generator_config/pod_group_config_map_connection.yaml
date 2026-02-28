@@ -21,3 +21,8 @@ cache_tool:
   - name: pod_group_id
     orm_name: PodGroupID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields: []

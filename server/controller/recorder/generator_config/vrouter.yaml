@@ -47,3 +47,18 @@ cache_tool:
   - name: gw_launch_server
     orm_name: GWLaunchServer
     type: string
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: label
+        type: string
+      - name: vpc_id
+        type: int
+      - name: vpc_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string

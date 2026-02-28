@@ -16,3 +16,14 @@ cache_diffbase:
 
 cache_tool:
   enabled: false
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: ip
+        type: string
+      - name: port
+        type: int
+      - name: protocol
+        type: string

@@ -26,3 +26,12 @@ cache_tool:
     type: int
   extensions:
     - collection
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: subnet_id
+        type: int
+      - name: subnet_lcuuid
+        type: string

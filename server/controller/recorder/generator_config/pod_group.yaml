@@ -81,3 +81,30 @@ cache_tool:
   - name: pod_cluster_id
     orm_name: PodClusterID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: label
+        type: string
+      - name: network_mode
+        type: int
+      - name: type
+        type: int
+      - name: pod_num
+        type: int
+      - name: metadata
+        type: string
+      - name: spec
+        type: string
+      - name: az_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string
+      - name: pod_cluster_id
+        type: int
+      - name: pod_namespace_id
+        type: int

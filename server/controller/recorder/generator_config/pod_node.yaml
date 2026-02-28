@@ -72,3 +72,26 @@ cache_tool:
     orm_name: VMID
     type: int
     for_mutation: true
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: type
+        type: int
+      - name: state
+        type: int
+      - name: hostname
+        type: string
+      - name: ip
+        type: string
+      - name: vcpu_num
+        type: int
+      - name: mem_total
+        type: int
+      - name: az_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string
+      - name: name
+        type: string

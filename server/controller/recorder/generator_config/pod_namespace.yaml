@@ -47,3 +47,20 @@ cache_tool:
   - name: pod_cluster_id
     orm_name: PodClusterID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: learned_cloud_tags
+        type: map[string]string
+      - name: custom_cloud_tags
+        type: map[string]string
+      - name: az_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string
+      - name: name
+        type: string
+      - name: pod_cluster_id
+        type: int

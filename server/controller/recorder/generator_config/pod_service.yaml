@@ -91,3 +91,38 @@ cache_tool:
   - name: pod_namespace_id
     orm_name: PodNamespaceID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: label
+        type: string
+      - name: annotation
+        type: string
+      - name: selector
+        type: string
+      - name: external_ip
+        type: string
+      - name: service_cluster_ip
+        type: string
+      - name: metadata
+        type: string
+      - name: spec
+        type: string
+      - name: pod_ingress_id
+        type: int
+      - name: pod_ingress_lcuuid
+        type: string
+      - name: az_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string
+      - name: pod_namespace_id
+        type: int
+      - name: vpc_id
+        type: int
+      - name: pod_cluster_id
+        type: int

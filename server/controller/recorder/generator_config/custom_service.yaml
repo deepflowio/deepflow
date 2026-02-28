@@ -1,12 +1,8 @@
-name: sub_domain
-orm_name: SubDomain
+name: custom_service
+orm_name: CustomService
 
 cache_diffbase:
-  enabled: true
-  fields:
-    - name: name
-      orm_name: Name
-      type: string
+  enabled: false
 
 cache_tool:
   enabled: false

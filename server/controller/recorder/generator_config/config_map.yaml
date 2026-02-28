@@ -34,3 +34,12 @@ cache_tool:
     type: set
     of: int
     comment: 'data source: pod_group_config_map_connection'
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: data
+        type: string

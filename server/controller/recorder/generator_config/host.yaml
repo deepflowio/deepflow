@@ -63,3 +63,28 @@ cache_tool:
     orm_name: IP
     type: string
     for_index: true
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: ip
+        type: string
+      - name: uid
+        type: string
+      - name: htype
+        type: int
+      - name: vcpu_num
+        type: int
+      - name: mem_total
+        type: int
+      - name: extra_info
+        type: string
+      - name: hostname
+        type: string
+      - name: az_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string

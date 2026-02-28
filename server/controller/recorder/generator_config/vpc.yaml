@@ -33,3 +33,22 @@ cache_tool:
   - name: id
     orm_name: ID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: label
+        type: string
+      - name: owner
+        type: string
+      - name: cidr
+        type: string
+      - name: tunnel_id
+        type: int
+      - name: region_lcuuid
+        type: string
+      - name: uid
+        type: string

@@ -59,3 +59,18 @@ cache_tool:
   - name: pod_cluster_id
     orm_name: PodClusterID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: label
+        type: string
+      - name: pod_num
+        type: int
+      - name: az_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string

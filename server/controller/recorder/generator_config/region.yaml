@@ -21,3 +21,12 @@ cache_tool:
   - name: id
     orm_name: ID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: label
+        type: string

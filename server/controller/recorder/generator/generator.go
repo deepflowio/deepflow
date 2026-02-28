@@ -117,11 +117,36 @@ type CacheDiffbaseConfig struct {
 	HasLargeField      bool
 }
 
+// PubsubMessageField pubsub/message 中的字段定义
+type PubsubMessageField struct {
+	Name string `yaml:"name"`
+	Type string `yaml:"type"`
+
+	// 运行时填充
+	PublicCamelName string
+	GoType          string
+}
+
+type PubsubMessageConfig struct {
+	Enabled        bool                 `yaml:"enabled"`
+	Fields         []PubsubMessageField `yaml:"fields"`
+	AddAddition    string               `yaml:"add_addition"`
+	DeleteAddition string               `yaml:"delete_addition"`
+
+	// 运行时推导
+	HasTimeImport bool
+}
+
+type PubsubConfig struct {
+	Message PubsubMessageConfig `yaml:"message"`
+}
+
 type Config struct {
 	Name          string              `yaml:"name"`
 	OrmName       string              `yaml:"orm_name"`
 	CacheTool     CacheToolConfig     `yaml:"cache_tool"`
 	CacheDiffbase CacheDiffbaseConfig `yaml:"cache_diffbase"`
+	Pubsub        PubsubConfig        `yaml:"pubsub"`
 
 	PublicName string // 运行时生成
 }
@@ -138,6 +163,13 @@ type CacheDiffbaseGenerator struct {
 	config         Config
 	diffbaseConfig CacheDiffbaseConfig
 	template       *template.Template
+}
+
+// PubsubMessageGenerator 聚合 pubsub/message 代码生成器的所有方法
+type PubsubMessageGenerator struct {
+	config        Config
+	messageConfig PubsubMessageConfig
+	template      *template.Template
 }
 
 // NewCacheToolGenerator 创建新的 CacheToolGenerator 实例
@@ -609,6 +641,14 @@ func toUpper(s string) string {
 	return strings.ToUpper(s)
 }
 
+// pluralize 简单的英文复数形式：以 s 结尾加 es，否则加 s
+func pluralize(s string) string {
+	if strings.HasSuffix(s, "s") {
+		return s + "es"
+	}
+	return s + "s"
+}
+
 // processRefConfig 将 ref 配置的 snake_case 值转换为 PascalCase 运行时字段（公共方法）
 func processRefConfig(ref *RefConfig, refResource, refLookupBy, refTarget *string) {
 	if ref == nil {
@@ -635,6 +675,145 @@ func formatGoFile(filePath string) error {
 		return fmt.Errorf("goimports failed: %v, output: %s", err, string(output))
 	}
 
+	return nil
+}
+
+// NewPubsubMessageGenerator 创建新的 PubsubMessageGenerator 实例
+func NewPubsubMessageGenerator(configFile string) (*PubsubMessageGenerator, error) {
+	configData, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %v", err)
+	}
+
+	var config Config
+	err = yaml.Unmarshal(configData, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config data: %v", err)
+	}
+
+	generator := &PubsubMessageGenerator{config: config}
+
+	// 解析和适配配置
+	err = generator.adaptConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// 处理字段
+	generator.processFields()
+
+	// 加载模板
+	err = generator.loadTemplate()
+	if err != nil {
+		return nil, err
+	}
+
+	return generator, nil
+}
+
+// adaptConfig 适配配置结构
+func (g *PubsubMessageGenerator) adaptConfig() error {
+	if !g.config.Pubsub.Message.Enabled {
+		return fmt.Errorf("pubsub.message is not enabled in configuration")
+	}
+
+	g.config.PublicName = toCamel(g.config.Name, true)
+
+	if g.config.OrmName == "" {
+		return fmt.Errorf("orm_name is required in configuration")
+	}
+
+	g.messageConfig = g.config.Pubsub.Message
+
+	// 设置默认的 addition 类型
+	if g.messageConfig.AddAddition == "" {
+		g.messageConfig.AddAddition = "AddNoneAddition"
+	}
+	if g.messageConfig.DeleteAddition == "" {
+		g.messageConfig.DeleteAddition = "DeleteNoneAddition"
+	}
+
+	return nil
+}
+
+// processFields 处理字段配置，生成 PublicCamelName 和 GoType
+func (g *PubsubMessageGenerator) processFields() {
+	for i := range g.messageConfig.Fields {
+		f := &g.messageConfig.Fields[i]
+		f.PublicCamelName = toCamel(f.Name, true)
+		f.GoType = f.Type
+
+		// 检测是否需要 time 包
+		if strings.Contains(f.Type, "time.Time") {
+			g.messageConfig.HasTimeImport = true
+		}
+	}
+}
+
+// loadTemplate 加载模板文件
+func (g *PubsubMessageGenerator) loadTemplate() error {
+	templateFile := "../pubsub/message/gen.go.tpl"
+	templateName := filepath.Base(templateFile)
+
+	tmpl, err := template.New(templateName).Funcs(template.FuncMap{
+		"ToUpper":      toUpper,
+		"toLowerCamel": toLowerCamel,
+		"hasSuffix":    strings.HasSuffix,
+		"trimPrefix":   strings.TrimPrefix,
+		"pluralize":    pluralize,
+	}).ParseFiles(templateFile)
+	if err != nil {
+		return fmt.Errorf("failed to parse template: %v", err)
+	}
+
+	g.template = tmpl
+	return nil
+}
+
+// Generate 生成代码文件
+func (g *PubsubMessageGenerator) Generate() error {
+	templateData := struct {
+		Name           string
+		PublicName     string
+		OrmName        string
+		Fields         []PubsubMessageField
+		AddAddition    string
+		DeleteAddition string
+		HasTimeImport  bool
+	}{
+		Name:           g.config.Name,
+		PublicName:     g.config.PublicName,
+		OrmName:        g.config.OrmName,
+		Fields:         g.messageConfig.Fields,
+		AddAddition:    g.messageConfig.AddAddition,
+		DeleteAddition: g.messageConfig.DeleteAddition,
+		HasTimeImport:  g.messageConfig.HasTimeImport,
+	}
+
+	var generatedCode bytes.Buffer
+	err := g.template.Execute(&generatedCode, templateData)
+	if err != nil {
+		return fmt.Errorf("failed to execute template: %v", err)
+	}
+
+	outputDir := "../pubsub/message"
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			return fmt.Errorf("failed to create output directory: %v", err)
+		}
+	}
+
+	outputFile := filepath.Join(outputDir, g.config.Name+".go")
+	err = os.WriteFile(outputFile, generatedCode.Bytes(), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write generated code to file: %v", err)
+	}
+
+	if err := formatGoFile(outputFile); err != nil {
+		log.Printf("Warning: failed to format %s: %v", outputFile, err)
+	}
+
+	fmt.Printf("Generated pubsub message code for %s in %s\n", g.config.Name, outputFile)
 	return nil
 }
 
@@ -679,6 +858,18 @@ func generateFromFiles(configFiles []string) error {
 				errors = append(errors, fmt.Sprintf("%s (cache_diffbase): %v", configFile, err))
 			} else if err := generator.Generate(); err != nil {
 				errors = append(errors, fmt.Sprintf("%s (cache_diffbase): %v", configFile, err))
+			} else {
+				successCount++
+			}
+		}
+
+		// 生成 pubsub message
+		if config.Pubsub.Message.Enabled {
+			generator, err := NewPubsubMessageGenerator(configFile)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("%s (pubsub_message): %v", configFile, err))
+			} else if err := generator.Generate(); err != nil {
+				errors = append(errors, fmt.Sprintf("%s (pubsub_message): %v", configFile, err))
 			} else {
 				successCount++
 			}
