@@ -745,6 +745,8 @@ void unwind_table_destroy(unwind_table_t *table);
 
 void unwind_table_load(unwind_table_t *table, uint32_t pid);
 
+bool unwind_table_load_with_status(unwind_table_t *table, uint32_t pid);
+
 void unwind_table_unload(unwind_table_t *table, uint32_t pid);
 
 void unwind_table_unload_all(unwind_table_t *table);

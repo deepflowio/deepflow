@@ -94,6 +94,7 @@ pub struct UnwindTable {
     id_gen: IdGenerator,
     object_cache: HashMap<u64, ObjectInfo>,
     shard_rc: HashMap<u32, usize>,
+    loaded_pids: HashSet<u32>,
 
     process_shard_list_map_fd: i32,
     unwind_entry_shard_map_fd: i32,
@@ -112,12 +113,17 @@ impl UnwindTable {
         }
     }
 
-    pub fn load(&mut self, pid: u32) {
+    pub fn load(&mut self, pid: u32) -> bool {
+        if self.loaded_pids.contains(&pid) {
+            trace!("process#{pid} dwarf entries already loaded");
+            return true;
+        }
+
         let mm = match get_memory_mappings(pid) {
             Ok(m) => m,
             Err(e) => {
                 debug!("failed loading maps for process#{pid}: {e}");
-                return;
+                return false;
             }
         };
         trace!("load dwarf entries for process#{pid}");
@@ -187,7 +193,9 @@ impl UnwindTable {
                     "object {} found in cache, use loaded shards",
                     path.display()
                 );
-                obj.pids.push(pid);
+                if !obj.pids.contains(&pid) {
+                    obj.pids.push(pid);
+                }
                 for s in obj.shards.iter() {
                     if shard_list.len as usize >= UNWIND_SHARDS_PER_PROCESS {
                         warn!(
@@ -353,7 +361,7 @@ impl UnwindTable {
 
         if shard_list.len == 0 {
             trace!("no dwarf entry shards loaded for process#{pid}");
-            return;
+            return false;
         }
 
         if log::log_enabled!(log::Level::Debug) {
@@ -370,6 +378,8 @@ impl UnwindTable {
         (&mut shard_list.entries[..shard_list.len as usize])
             .sort_unstable_by_key(|e| e.offset + e.pc_min);
         self.update_process_shard_list(pid, &shard_list);
+        self.loaded_pids.insert(pid);
+        true
     }
 
     pub fn unload(&mut self, pid: u32) {
@@ -411,6 +421,7 @@ impl UnwindTable {
             }
         });
         if found_process {
+            self.loaded_pids.remove(&pid);
             for id in shards_to_remove.iter() {
                 self.delete_unwind_entry_shard(*id);
                 self.id_gen.release(*id);
@@ -425,6 +436,8 @@ impl UnwindTable {
 
     pub fn unload_all(&mut self) {
         trace!("unload all dwarf entries");
+
+        self.loaded_pids.clear();
 
         let shards: Vec<u32> = self.shard_rc.drain().map(|(id, _)| id).collect();
         for id in shards.iter() {
