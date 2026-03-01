@@ -62,7 +62,7 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 			ctrlrcommon.RESOURCE_TYPE_CEN_EN,
 			wholeCache,
 			db.NewCEN().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.CENs,
+			wholeCache.DiffBases().CEN().GetAll(),
 			cloudData,
 		),
 	}
@@ -78,7 +78,8 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 func (c *CEN) generateDBItemToAdd(cloudItem *cloudmodel.CEN) (*metadbmodel.CEN, bool) {
 	vpcIDs := []int{}
 	for _, vpcLcuuid := range cloudItem.VPCLcuuids {
-		vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(vpcLcuuid)
+		vpcItem := c.cache.Tool().Vpc().GetByLcuuid(vpcLcuuid)
+		vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, vpcLcuuid,
@@ -105,10 +106,11 @@ func (c *CEN) generateUpdateInfo(diffBase *diffbase.Cen, cloudItem *cloudmodel.C
 		mapInfo["name"] = cloudItem.Name
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
-	if !rcommon.ElementsSame(diffBase.VPCLcuuids, cloudItem.VPCLcuuids) {
+	if !rcommon.ElementsSame(diffBase.VpcLcuuids, cloudItem.VPCLcuuids) {
 		vpcIDs := []int{}
 		for _, vpcLcuuid := range cloudItem.VPCLcuuids {
-			vpcID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(vpcLcuuid)
+			vpcItem := c.cache.Tool().Vpc().GetByLcuuid(vpcLcuuid)
+			vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 			if !exists {
 				log.Error(resourceAForResourceBNotFound(
 					ctrlrcommon.RESOURCE_TYPE_VPC_EN, vpcLcuuid,
@@ -120,7 +122,7 @@ func (c *CEN) generateUpdateInfo(diffBase *diffbase.Cen, cloudItem *cloudmodel.C
 		}
 		mapInfo["epc_ids"] = rcommon.IntSliceToString(vpcIDs)
 		structInfo.VpcIds.SetNew(vpcIDs)
-		structInfo.VpcLcuuids.Set(diffBase.VPCLcuuids, cloudItem.VPCLcuuids)
+		structInfo.VpcLcuuids.Set(diffBase.VpcLcuuids, cloudItem.VPCLcuuids)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

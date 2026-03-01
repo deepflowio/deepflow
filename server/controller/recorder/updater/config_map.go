@@ -65,7 +65,7 @@ func NewConfigMap(wholeCache *cache.Cache, cloudData []cloudmodel.ConfigMap) *Co
 			ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN,
 			wholeCache,
 			db.NewConfigMap().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.ConfigMaps,
+			wholeCache.DiffBases().ConfigMap().GetAll(),
 			cloudData,
 		),
 	}
@@ -80,7 +80,8 @@ func NewConfigMap(wholeCache *cache.Cache, cloudData []cloudmodel.ConfigMap) *Co
 }
 
 func (h *ConfigMap) generateDBItemToAdd(cloudItem *cloudmodel.ConfigMap) (*metadbmodel.ConfigMap, bool) {
-	podClusterID, exists := h.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
+	podClusterItem := h.cache.Tool().PodCluster().GetByLcuuid(cloudItem.PodClusterLcuuid)
+	podClusterID, exists := podClusterItem.Id(), podClusterItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
@@ -88,7 +89,8 @@ func (h *ConfigMap) generateDBItemToAdd(cloudItem *cloudmodel.ConfigMap) (*metad
 		), h.metadata.LogPrefixes)
 		return nil, false
 	}
-	podNamespaceID, exists := h.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
+	podNamespaceItem := h.cache.Tool().PodNamespace().GetByLcuuid(cloudItem.PodNamespaceLcuuid)
+	podNamespaceID, exists := podNamespaceItem.Id(), podNamespaceItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
@@ -96,7 +98,8 @@ func (h *ConfigMap) generateDBItemToAdd(cloudItem *cloudmodel.ConfigMap) (*metad
 		), h.metadata.LogPrefixes)
 		return nil, false
 	}
-	vpcID, exists := h.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := h.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,

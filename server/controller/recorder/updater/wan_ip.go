@@ -59,13 +59,13 @@ type WANIP struct {
 	]
 }
 
-func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
+func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.Tool) *WANIP {
 	updater := &WANIP{
 		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
 			wholeCache,
 			db.NewWANIP().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.WANIPs,
+			wholeCache.DiffBases().WANIP().GetAll(),
 			[]cloudmodel.IP(nil),
 		),
 	}
@@ -84,7 +84,8 @@ func (i *WANIP) SetCloudData(cloudData []cloudmodel.IP) {
 }
 
 func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.WANIP, bool) {
-	vinterfaceID, exists := i.cache.ToolDataSet.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
+	vinterfaceItem := i.cache.Tool().Vinterface().GetByLcuuid(cloudItem.VInterfaceLcuuid)
+	vinterfaceID, exists := vinterfaceItem.Id(), vinterfaceItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,

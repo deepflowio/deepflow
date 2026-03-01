@@ -48,10 +48,11 @@ func NewProcess(q *queue.OverwriteQueue) *Process {
 func (p *Process) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	items := msg.([]*metadbmodel.Process)
 	for _, item := range items {
-		vtapName, ok := md.GetToolDataSet().GetVTapNameByID(int(item.VTapID))
-		if !ok {
+		vtapItem := md.GetToolDataSet().Agent().GetById(int(item.VTapID))
+		if !vtapItem.IsValid() {
 			log.Errorf("vtap name not found for vtap id %d", item.VTapID, md.LogPrefixes)
 		}
+		vtapName := vtapItem.Name()
 		description := fmt.Sprintf("agent %s report process %s cmdline %s",
 			vtapName, item.ProcessName, item.CommandLine)
 
@@ -60,43 +61,43 @@ func (p *Process) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 		switch t := item.DeviceType; t {
 		case common.VIF_DEVICE_TYPE_POD:
 			podID := item.DeviceID
-			info, err := md.GetToolDataSet().GetPodInfoByID(podID)
-			if err != nil {
-				log.Error(err)
+			podItem := md.GetToolDataSet().Pod().GetById(podID)
+			if !podItem.IsValid() {
+				log.Errorf("pod(id=%d) not found", podID, md.LogPrefixes)
 			} else {
-				podGroupType, ok := md.GetToolDataSet().GetPodGroupTypeByID(info.PodGroupID)
-				if !ok {
-					log.Errorf("db pod_group type(id: %d) not found", info.PodGroupID, md.LogPrefixes)
+				pgItem := md.GetToolDataSet().PodGroup().GetById(podItem.PodGroupId())
+				if !pgItem.IsValid() {
+					log.Errorf("db pod_group type(id: %d) not found", podItem.PodGroupId(), md.LogPrefixes)
 				}
 
 				opts = append(opts, []eventapi.TagFieldOption{
 					eventapi.TagPodID(podID),
-					eventapi.TagRegionID(info.RegionID),
-					eventapi.TagAZID(info.AZID),
-					eventapi.TagVPCID(info.VPCID),
-					eventapi.TagPodClusterID(info.PodClusterID),
-					eventapi.TagPodGroupID(info.PodGroupID),
-					eventapi.TagPodGroupType(metadata.PodGroupTypeMap[podGroupType]),
-					eventapi.TagPodNodeID(info.PodNodeID),
-					eventapi.TagPodNSID(info.PodNamespaceID),
+					eventapi.TagRegionID(podItem.RegionId()),
+					eventapi.TagAZID(podItem.AzId()),
+					eventapi.TagVPCID(podItem.VpcId()),
+					eventapi.TagPodClusterID(podItem.PodClusterId()),
+					eventapi.TagPodGroupID(podItem.PodGroupId()),
+					eventapi.TagPodGroupType(metadata.PodGroupTypeMap[pgItem.GType()]),
+					eventapi.TagPodNodeID(podItem.PodNodeId()),
+					eventapi.TagPodNSID(podItem.PodNamespaceId()),
 				}...)
-				if l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(md, info.PodNodeID); ok {
+				if l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(md, podItem.PodNodeId()); ok {
 					opts = append(opts, l3DeviceOpts...)
 				}
 			}
 
 		case common.VIF_DEVICE_TYPE_POD_NODE:
 			podNodeID := item.DeviceID
-			info, err := md.GetToolDataSet().GetPodNodeInfoByID(podNodeID)
-			if err != nil {
-				log.Error(err)
+			pnItem := md.GetToolDataSet().PodNode().GetById(podNodeID)
+			if !pnItem.IsValid() {
+				log.Errorf("pod_node(id=%d) not found", podNodeID, md.LogPrefixes)
 			} else {
 				opts = append(opts, []eventapi.TagFieldOption{
 					eventapi.TagPodNodeID(podNodeID),
-					eventapi.TagRegionID(info.RegionID),
-					eventapi.TagAZID(info.AZID),
-					eventapi.TagVPCID(info.VPCID),
-					eventapi.TagPodClusterID(info.PodClusterID),
+					eventapi.TagRegionID(pnItem.RegionId()),
+					eventapi.TagAZID(pnItem.AzId()),
+					eventapi.TagVPCID(pnItem.VpcId()),
+					eventapi.TagPodClusterID(pnItem.PodClusterId()),
 				}...)
 				if l3DeviceOpts, ok := p.tool.getL3DeviceOptionsByPodNodeID(md, podNodeID); ok {
 					opts = append(opts, l3DeviceOpts...)
@@ -105,17 +106,17 @@ func (p *Process) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 
 		case common.VIF_DEVICE_TYPE_VM:
 			vmID := item.DeviceID
-			info, err := md.GetToolDataSet().GetVMInfoByID(vmID)
-			if err != nil {
-				log.Error(err)
+			vmItem := md.GetToolDataSet().Vm().GetById(vmID)
+			if !vmItem.IsValid() {
+				log.Errorf("vm(id=%d) not found", vmID, md.LogPrefixes)
 			} else {
 				opts = append(opts, []eventapi.TagFieldOption{
 					eventapi.TagL3DeviceType(item.DeviceType),
 					eventapi.TagL3DeviceID(vmID),
-					eventapi.TagAZID(info.AZID),
-					eventapi.TagRegionID(info.RegionID),
-					eventapi.TagHostID(info.HostID),
-					eventapi.TagVPCID(info.VPCID),
+					eventapi.TagAZID(vmItem.AzId()),
+					eventapi.TagRegionID(vmItem.RegionId()),
+					eventapi.TagHostID(vmItem.HostId()),
+					eventapi.TagVPCID(vmItem.VpcId()),
 				}...)
 			}
 		default:

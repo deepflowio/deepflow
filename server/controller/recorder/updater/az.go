@@ -61,7 +61,7 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 			ctrlrcommon.RESOURCE_TYPE_AZ_EN,
 			wholeCache,
 			db.NewAZ().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.AZs,
+			wholeCache.DiffBases().AZ().GetAll(),
 			cloudData,
 		),
 	}

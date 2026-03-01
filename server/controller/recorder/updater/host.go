@@ -61,7 +61,7 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 			ctrlrcommon.RESOURCE_TYPE_HOST_EN,
 			wholeCache,
 			db.NewHost().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.Hosts,
+			wholeCache.DiffBases().Host().GetAll(),
 			cloudData,
 		),
 	}
@@ -103,21 +103,21 @@ func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel
 		mapInfo["name"] = cloudItem.Name
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
-	if diffBase.IP != cloudItem.IP {
+	if diffBase.Ip != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP
-		structInfo.Ip.Set(diffBase.IP, cloudItem.IP)
+		structInfo.Ip.Set(diffBase.Ip, cloudItem.IP)
 	}
 	if diffBase.Hostname != cloudItem.Hostname {
 		mapInfo["hostname"] = cloudItem.Hostname
 		structInfo.Hostname.Set(diffBase.Hostname, cloudItem.Hostname)
 	}
-	if diffBase.HType != cloudItem.HType {
+	if diffBase.Htype != cloudItem.HType {
 		mapInfo["htype"] = cloudItem.HType
-		structInfo.Htype.Set(diffBase.HType, cloudItem.HType)
+		structInfo.Htype.Set(diffBase.Htype, cloudItem.HType)
 	}
-	if diffBase.VCPUNum != cloudItem.VCPUNum {
+	if diffBase.VcpuNum != cloudItem.VCPUNum {
 		mapInfo["vcpu_num"] = cloudItem.VCPUNum
-		structInfo.VcpuNum.Set(diffBase.VCPUNum, cloudItem.VCPUNum)
+		structInfo.VcpuNum.Set(diffBase.VcpuNum, cloudItem.VCPUNum)
 	}
 	if diffBase.MemTotal != cloudItem.MemTotal {
 		mapInfo["mem_total"] = cloudItem.MemTotal
@@ -131,9 +131,9 @@ func (h *Host) generateUpdateInfo(diffBase *diffbase.Host, cloudItem *cloudmodel
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	if diffBase.AzLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AzLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AzLcuuid, cloudItem.AZLcuuid)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

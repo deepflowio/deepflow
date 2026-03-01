@@ -29,7 +29,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
-	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/controller/recorder/statsd"
@@ -111,31 +110,31 @@ func (s *subDomains) newRefresher(lcuuid string) (*subDomain, error) {
 	}
 	md := s.metadata.Copy()
 	md.SetSubDomain(sd)
-	return newSubDomain(md, s.cacheMng.DomainCache.ToolDataSet, s.cacheMng.CreateSubDomainCacheIfNotExists(md)), nil
+	return newSubDomain(md, s.cacheMng.DomainCache.Tool(), s.cacheMng.CreateSubDomainCacheIfNotExists(md)), nil
 }
 
 type subDomain struct {
 	metadata *rcommon.Metadata
 	statsd   *statsd.SubDomainStatsd
 
-	domainToolDataSet *tool.DataSet
-	cache             *cache.Cache
+	domainTool *tool.Tool
+	cache      *cache.Cache
 
 	pubsub      pubsub.AnyChangePubSub
 	msgMetadata *message.Metadata
 }
 
-func newSubDomain(md *rcommon.Metadata, domainToolDataSet *tool.DataSet, cache *cache.Cache) *subDomain {
+func newSubDomain(md *rcommon.Metadata, domainTool *tool.Tool, cache *cache.Cache) *subDomain {
 	return &subDomain{
 		metadata: md,
 		statsd:   statsd.NewSubDomainStatsd(md),
 
-		domainToolDataSet: domainToolDataSet,
-		cache:             cache,
-		pubsub:            pubsub.GetPubSub(pubsub.PubSubTypeWholeSubDomain).(pubsub.AnyChangePubSub),
+		domainTool: domainTool,
+		cache:      cache,
+		pubsub:     pubsub.GetPubSub(pubsub.PubSubTypeWholeSubDomain).(pubsub.AnyChangePubSub),
 		msgMetadata: message.NewMetadata(
 			message.MetadataPlatform(md.Platform),
-			message.MetadataToolDataSet(cache.ToolDataSet),
+			message.MetadataToolDataSet(cache.Tool()),
 		),
 	}
 }
@@ -162,9 +161,6 @@ func (s *subDomain) tryRefresh(cloudData cloudmodel.SubDomainResource) error {
 func (s *subDomain) refresh(cloudData cloudmodel.SubDomainResource) {
 	log.Info("sub_domain sync refresh started", s.metadata.LogPrefixes)
 
-	// TODO refactor
-	// for process
-	s.cache.RefreshVTaps()
 	s.refreshResource(&cloudData)
 	s.updateSyncedAt(s.metadata.GetSubDomainLcuuid(), cloudData.SyncAt)
 
@@ -210,50 +206,29 @@ func (s *subDomain) shouldRefresh(lcuuid string, cloudData cloudmodel.SubDomainR
 }
 
 func (s *subDomain) getUpdatersInOrder(cloudData cloudmodel.SubDomainResource) []updater.ResourceUpdater {
-	ip := updater.NewIP(s.cache, cloudData.IPs, s.domainToolDataSet)
-	ip.GetLANIP().RegisterListener(listener.NewLANIP(s.cache))
-	ip.GetWANIP().RegisterListener(listener.NewWANIP(s.cache))
+	ip := updater.NewIP(s.cache, cloudData.IPs, s.domainTool)
 
 	return []updater.ResourceUpdater{
-		updater.NewPodCluster(s.cache, cloudData.PodClusters).RegisterListener(
-			listener.NewPodCluster(s.cache)),
-		updater.NewPodNode(s.cache, cloudData.PodNodes).RegisterListener(
-			listener.NewPodNode(s.cache)),
-		updater.NewPodNamespace(s.cache, cloudData.PodNamespaces).RegisterListener(
-			listener.NewPodNamespace(s.cache)),
-		updater.NewPodIngress(s.cache, cloudData.PodIngresses).RegisterListener(
-			listener.NewPodIngress(s.cache)),
-		updater.NewPodIngressRule(s.cache, cloudData.PodIngressRules).RegisterListener(
-			listener.NewPodIngressRule(s.cache)),
-		updater.NewPodService(s.cache, cloudData.PodServices).RegisterListener(
-			listener.NewPodService(s.cache)),
-		updater.NewPodIngressRuleBackend(s.cache, cloudData.PodIngressRuleBackends).RegisterListener(
-			listener.NewPodIngressRuleBackend(s.cache)),
-		updater.NewPodServicePort(s.cache, cloudData.PodServicePorts).RegisterListener(
-			listener.NewPodServicePort(s.cache)),
-		updater.NewPodGroup(s.cache, cloudData.PodGroups).RegisterListener(
-			listener.NewPodGroup(s.cache)),
-		updater.NewPodGroupPort(s.cache, cloudData.PodGroupPorts).RegisterListener(
-			listener.NewPodGroupPort(s.cache)),
-		updater.NewPodReplicaSet(s.cache, cloudData.PodReplicaSets).RegisterListener(
-			listener.NewPodReplicaSet(s.cache)),
-		updater.NewPod(s.cache, cloudData.Pods).RegisterListener(
-			listener.NewPod(s.cache)).BuildStatsd(s.statsd),
-		updater.NewConfigMap(s.cache, cloudData.ConfigMaps).RegisterListener(
-			listener.NewConfigMap(s.cache)),
-		updater.NewPodGroupConfigMapConnection(s.cache, cloudData.PodGroupConfigMapConnections).RegisterListener(
-			listener.NewPodGroupConfigMapConnection(s.cache)),
-		updater.NewNetwork(s.cache, cloudData.Networks).RegisterListener(
-			listener.NewNetwork(s.cache)),
-		updater.NewSubnet(s.cache, cloudData.Subnets).RegisterListener(
-			listener.NewSubnet(s.cache)),
-		updater.NewVInterface(s.cache, cloudData.VInterfaces, s.domainToolDataSet).RegisterListener(
-			listener.NewVInterface(s.cache)),
+		updater.NewPodCluster(s.cache, cloudData.PodClusters),
+		updater.NewPodNode(s.cache, cloudData.PodNodes),
+		updater.NewPodNamespace(s.cache, cloudData.PodNamespaces),
+		updater.NewPodIngress(s.cache, cloudData.PodIngresses),
+		updater.NewPodIngressRule(s.cache, cloudData.PodIngressRules),
+		updater.NewPodService(s.cache, cloudData.PodServices),
+		updater.NewPodIngressRuleBackend(s.cache, cloudData.PodIngressRuleBackends),
+		updater.NewPodServicePort(s.cache, cloudData.PodServicePorts),
+		updater.NewPodGroup(s.cache, cloudData.PodGroups),
+		updater.NewPodGroupPort(s.cache, cloudData.PodGroupPorts),
+		updater.NewPodReplicaSet(s.cache, cloudData.PodReplicaSets),
+		updater.NewPod(s.cache, cloudData.Pods).BuildStatsd(s.statsd),
+		updater.NewConfigMap(s.cache, cloudData.ConfigMaps),
+		updater.NewPodGroupConfigMapConnection(s.cache, cloudData.PodGroupConfigMapConnections),
+		updater.NewNetwork(s.cache, cloudData.Networks),
+		updater.NewSubnet(s.cache, cloudData.Subnets),
+		updater.NewVInterface(s.cache, cloudData.VInterfaces, s.domainTool),
 		ip,
-		updater.NewVMPodNodeConnection(s.cache, cloudData.VMPodNodeConnections).RegisterListener( // VMPodNodeConnection需放在最后
-			listener.NewVMPodNodeConnection(s.cache)),
-		updater.NewProcess(s.cache, cloudData.Processes).RegisterListener(
-			listener.NewProcess(s.cache)),
+		updater.NewVMPodNodeConnection(s.cache, cloudData.VMPodNodeConnections), // VMPodNodeConnection需放在最后
+		updater.NewProcess(s.cache, cloudData.Processes),
 	}
 }
 

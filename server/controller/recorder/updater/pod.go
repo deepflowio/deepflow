@@ -64,7 +64,7 @@ func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 			ctrlrcommon.RESOURCE_TYPE_POD_EN,
 			wholeCache,
 			db.NewPod().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.Pods,
+			wholeCache.DiffBases().Pod().GetAll(),
 			cloudData,
 		),
 	}
@@ -79,7 +79,8 @@ func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 
 // Implement DataGenerator interface
 func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*metadbmodel.Pod, bool) {
-	vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := p.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -87,7 +88,8 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*metadbmodel.Pod, 
 		), p.metadata.LogPrefixes)
 		return nil, false
 	}
-	podNamespaceID, exists := p.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
+	podNamespaceItem := p.cache.Tool().PodNamespace().GetByLcuuid(cloudItem.PodNamespaceLcuuid)
+	podNamespaceID, exists := podNamespaceItem.Id(), podNamespaceItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
@@ -95,7 +97,8 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*metadbmodel.Pod, 
 		), p.metadata.LogPrefixes)
 		return nil, false
 	}
-	podClusterID, exists := p.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
+	podClusterItem := p.cache.Tool().PodCluster().GetByLcuuid(cloudItem.PodClusterLcuuid)
+	podClusterID, exists := podClusterItem.Id(), podClusterItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
@@ -103,7 +106,8 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*metadbmodel.Pod, 
 		), p.metadata.LogPrefixes)
 		return nil, false
 	}
-	podGroupID, exists := p.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
+	podGroupItem := p.cache.Tool().PodGroup().GetByLcuuid(cloudItem.PodGroupLcuuid)
+	podGroupID, exists := podGroupItem.Id(), podGroupItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
@@ -113,7 +117,8 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*metadbmodel.Pod, 
 	}
 	var podServiceID int
 	if cloudItem.PodServiceLcuuid != "" {
-		podServiceID, exists = p.cache.ToolDataSet.GetPodServiceIDByLcuuid(cloudItem.PodServiceLcuuid)
+		podServiceItem := p.cache.Tool().PodService().GetByLcuuid(cloudItem.PodServiceLcuuid)
+		podServiceID, exists = podServiceItem.Id(), podServiceItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.PodServiceLcuuid,
@@ -124,7 +129,8 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*metadbmodel.Pod, 
 	}
 	var podReplicaSetID int
 	if cloudItem.PodReplicaSetLcuuid != "" {
-		podReplicaSetID, exists = p.cache.ToolDataSet.GetPodReplicaSetIDByLcuuid(cloudItem.PodReplicaSetLcuuid)
+		podReplicaSetItem := p.cache.Tool().PodReplicaSet().GetByLcuuid(cloudItem.PodReplicaSetLcuuid)
+		podReplicaSetID, exists = podReplicaSetItem.Id(), podReplicaSetItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.PodReplicaSetLcuuid,
@@ -144,7 +150,7 @@ func (p *Pod) generateDBItemToAdd(cloudItem *cloudmodel.Pod) (*metadbmodel.Pod, 
 		State:           cloudItem.State,
 		PodClusterID:    podClusterID,
 		PodNamespaceID:  podNamespaceID,
-		PodNodeID:       p.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid),
+		PodNodeID:       p.cache.Tool().PodNode().GetByLcuuid(cloudItem.PodNodeLcuuid).Id(),
 		PodReplicaSetID: podReplicaSetID,
 		PodGroupID:      podGroupID,
 		PodServiceID:    podServiceID,
@@ -170,8 +176,9 @@ func (p *Pod) recordStatsd(cloudItem *cloudmodel.Pod) {
 func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.Pod) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedPodFields)
 	mapInfo := make(map[string]interface{})
-	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
-		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	if diffBase.VpcLcuuid != cloudItem.VPCLcuuid {
+		vpcItem := p.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+		vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -181,10 +188,10 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 		}
 		mapInfo["epc_id"] = vpcID
 		structInfo.VpcId.SetNew(vpcID) // TODO is old value needed?
-		structInfo.VpcLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
+		structInfo.VpcLcuuid.Set(diffBase.VpcLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.PodNodeLcuuid != cloudItem.PodNodeLcuuid {
-		podNodeID := p.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid) // TODO need to log not found error
+		podNodeID := p.cache.Tool().PodNode().GetByLcuuid(cloudItem.PodNodeLcuuid).Id() // TODO need to log not found error
 		mapInfo["pod_node_id"] = podNodeID
 		structInfo.PodNodeId.SetNew(podNodeID)
 		structInfo.PodNodeLcuuid.Set(diffBase.PodNodeLcuuid, cloudItem.PodNodeLcuuid)
@@ -193,7 +200,8 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 		var podReplicaSetID int
 		if cloudItem.PodReplicaSetLcuuid != "" {
 			var exists bool
-			podReplicaSetID, exists = p.cache.ToolDataSet.GetPodReplicaSetIDByLcuuid(cloudItem.PodReplicaSetLcuuid)
+			podReplicaSetItem := p.cache.Tool().PodReplicaSet().GetByLcuuid(cloudItem.PodReplicaSetLcuuid)
+			podReplicaSetID, exists = podReplicaSetItem.Id(), podReplicaSetItem.IsValid()
 			if !exists {
 				log.Error(resourceAForResourceBNotFound(
 					ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.PodReplicaSetLcuuid,
@@ -207,7 +215,8 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 		structInfo.PodReplicaSetLcuuid.Set(diffBase.PodReplicaSetLcuuid, cloudItem.PodReplicaSetLcuuid)
 	}
 	if diffBase.PodGroupLcuuid != cloudItem.PodGroupLcuuid {
-		podGroupID, exists := p.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
+		podGroupItem := p.cache.Tool().PodGroup().GetByLcuuid(cloudItem.PodGroupLcuuid)
+		podGroupID, exists := podGroupItem.Id(), podGroupItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
@@ -223,7 +232,8 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 		var podServiceID int
 		if cloudItem.PodServiceLcuuid != "" {
 			var exists bool
-			podServiceID, exists = p.cache.ToolDataSet.GetPodServiceIDByLcuuid(cloudItem.PodServiceLcuuid)
+			podServiceItem := p.cache.Tool().PodService().GetByLcuuid(cloudItem.PodServiceLcuuid)
+			podServiceID, exists = podServiceItem.Id(), podServiceItem.IsValid()
 			if !exists {
 				log.Error(resourceAForResourceBNotFound(
 					ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.PodServiceLcuuid,
@@ -248,21 +258,21 @@ func (p *Pod) generateUpdateInfo(diffBase *diffbase.Pod, cloudItem *cloudmodel.P
 		mapInfo["annotation"] = cloudItem.Annotation
 		structInfo.Annotation.Set(diffBase.Annotation, cloudItem.Annotation)
 	}
-	if diffBase.ENV != cloudItem.ENV {
+	if diffBase.Env != cloudItem.ENV {
 		mapInfo["env"] = cloudItem.ENV
-		structInfo.Env.Set(diffBase.ENV, cloudItem.ENV)
+		structInfo.Env.Set(diffBase.Env, cloudItem.ENV)
 	}
-	if diffBase.ContainerIDs != cloudItem.ContainerIDs {
+	if diffBase.ContainerIds != cloudItem.ContainerIDs {
 		mapInfo["container_ids"] = cloudItem.ContainerIDs
-		structInfo.ContainerIds.Set(diffBase.ContainerIDs, cloudItem.ContainerIDs)
+		structInfo.ContainerIds.Set(diffBase.ContainerIds, cloudItem.ContainerIDs)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	if diffBase.AzLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AzLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AzLcuuid, cloudItem.AZLcuuid)
 	}
 	if diffBase.State != cloudItem.State {
 		mapInfo["state"] = cloudItem.State

@@ -61,7 +61,7 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 			ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
 			wholeCache,
 			db.NewNATVMConnection().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.NATVMConnections,
+			wholeCache.DiffBases().NATVMConnection().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 }
 
 func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnection) (*metadbmodel.NATVMConnection, bool) {
-	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
+	vmItem := c.cache.Tool().Vm().GetByLcuuid(cloudItem.VMLcuuid)
+	vmID, exists := vmItem.Id(), vmItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
@@ -83,7 +84,8 @@ func (c *NATVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.NATVMConnect
 		), c.metadata.LogPrefixes)
 		return nil, false
 	}
-	natID, exists := c.cache.ToolDataSet.GetNATGatewayIDByLcuuid(cloudItem.NATGatewayLcuuid)
+	natGatewayItem := c.cache.Tool().NatGateway().GetByLcuuid(cloudItem.NATGatewayLcuuid)
+	natID, exists := natGatewayItem.Id(), natGatewayItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, cloudItem.NATGatewayLcuuid,

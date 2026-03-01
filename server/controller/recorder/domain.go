@@ -31,7 +31,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
-	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/controller/recorder/statsd"
@@ -68,7 +67,7 @@ func newDomain(ctx context.Context, cfg config.RecorderConfig, md *rcommon.Metad
 		pubsub: pubsub.GetPubSub(pubsub.PubSubTypeWholeDomain).(pubsub.AnyChangePubSub),
 		msgMetadata: message.NewMetadata(
 			message.MetadataPlatform(md.Platform),
-			message.MetadataToolDataSet(cacheMng.DomainCache.ToolDataSet),
+			message.MetadataToolDataSet(cacheMng.DomainCache.Tool()),
 		),
 	}
 }
@@ -161,10 +160,6 @@ func (d *domain) shouldRefresh(cloudData cloudmodel.Resource) error {
 func (d *domain) refresh(cloudData cloudmodel.Resource) {
 	log.Info("domain refresh started", d.metadata.LogPrefixes)
 
-	// TODO refactor
-	// for process
-	d.cache.RefreshVTaps()
-
 	// 指定创建及更新操作的资源顺序
 	// 基本原则：无依赖资源优先；实时性需求高资源优先
 	domainUpdatersInUpdateOrder := d.getUpdatersInOrder(cloudData)
@@ -179,91 +174,49 @@ func (d *domain) refresh(cloudData cloudmodel.Resource) {
 
 func (d *domain) getUpdatersInOrder(cloudData cloudmodel.Resource) []updater.ResourceUpdater {
 	ip := updater.NewIP(d.cache, cloudData.IPs, nil)
-	ip.GetLANIP().RegisterListener(listener.NewLANIP(d.cache))
-	ip.GetWANIP().RegisterListener(listener.NewWANIP(d.cache))
 
 	return []updater.ResourceUpdater{
-		updater.NewAZ(d.cache, cloudData.AZs).RegisterListener(
-			listener.NewAZ(d.cache)),
-		updater.NewSubDomain(d.cache, cloudData.SubDomains).RegisterListener(
-			listener.NewSubDomain(d.cache)),
-		updater.NewVPC(d.cache, cloudData.VPCs).RegisterListener(
-			listener.NewVPC(d.cache)),
-		updater.NewHost(d.cache, cloudData.Hosts).RegisterListener(
-			listener.NewHost(d.cache)),
-		updater.NewVM(d.cache, cloudData.VMs).RegisterListener(
-			listener.NewVM(d.cache)).BuildStatsd(d.statsd),
-		updater.NewPodCluster(d.cache, cloudData.PodClusters).RegisterListener(
-			listener.NewPodCluster(d.cache)),
-		updater.NewPodNode(d.cache, cloudData.PodNodes).RegisterListener(
-			listener.NewPodNode(d.cache)),
-		updater.NewPodNamespace(d.cache, cloudData.PodNamespaces).RegisterListener(
-			listener.NewPodNamespace(d.cache)),
-		updater.NewPodIngress(d.cache, cloudData.PodIngresses).RegisterListener(
-			listener.NewPodIngress(d.cache)),
-		updater.NewPodIngressRule(d.cache, cloudData.PodIngressRules).RegisterListener(
-			listener.NewPodIngressRule(d.cache)),
-		updater.NewPodService(d.cache, cloudData.PodServices).RegisterListener(
-			listener.NewPodService(d.cache)),
-		updater.NewPodIngressRuleBackend(d.cache, cloudData.PodIngressRuleBackends).RegisterListener(
-			listener.NewPodIngressRuleBackend(d.cache)),
-		updater.NewPodServicePort(d.cache, cloudData.PodServicePorts).RegisterListener(
-			listener.NewPodServicePort(d.cache)),
-		updater.NewPodGroup(d.cache, cloudData.PodGroups).RegisterListener(
-			listener.NewPodGroup(d.cache)),
-		updater.NewPodGroupPort(d.cache, cloudData.PodGroupPorts).RegisterListener(
-			listener.NewPodGroupPort(d.cache)),
-		updater.NewPodReplicaSet(d.cache, cloudData.PodReplicaSets).RegisterListener(
-			listener.NewPodReplicaSet(d.cache)),
-		updater.NewPod(d.cache, cloudData.Pods).RegisterListener(
-			listener.NewPod(d.cache)).BuildStatsd(d.statsd),
-		updater.NewConfigMap(d.cache, cloudData.ConfigMaps).RegisterListener(
-			listener.NewConfigMap(d.cache)),
-		updater.NewPodGroupConfigMapConnection(d.cache, cloudData.PodGroupConfigMapConnections).RegisterListener(
-			listener.NewPodGroupConfigMapConnection(d.cache)),
-		updater.NewNetwork(d.cache, cloudData.Networks).RegisterListener(
-			listener.NewNetwork(d.cache)),
-		updater.NewSubnet(d.cache, cloudData.Subnets).RegisterListener(
-			listener.NewSubnet(d.cache)),
-		updater.NewVRouter(d.cache, cloudData.VRouters).RegisterListener(
-			listener.NewVRouter(d.cache)),
-		updater.NewRoutingTable(d.cache, cloudData.RoutingTables).RegisterListener(
-			listener.NewRoutingTable(d.cache)),
-		updater.NewDHCPPort(d.cache, cloudData.DHCPPorts).RegisterListener(
-			listener.NewDHCPPort(d.cache)),
-		updater.NewNATGateway(d.cache, cloudData.NATGateways).RegisterListener(
-			listener.NewNATGateway(d.cache)),
-		updater.NewNATVMConnection(d.cache, cloudData.NATVMConnections).RegisterListener(
-			listener.NewNATVMConnection(d.cache)),
-		updater.NewNATRule(d.cache, cloudData.NATRules).RegisterListener(
-			listener.NewNATRule(d.cache)),
-		updater.NewLB(d.cache, cloudData.LBs).RegisterListener(
-			listener.NewLB(d.cache)),
-		updater.NewLBVMConnection(d.cache, cloudData.LBVMConnections).RegisterListener(
-			listener.NewLBVMConnection(d.cache)),
-		updater.NewLBListener(d.cache, cloudData.LBListeners).RegisterListener(
-			listener.NewLBListener(d.cache)),
-		updater.NewLBTargetServer(d.cache, cloudData.LBTargetServers).RegisterListener(
-			listener.NewLBTargetServer(d.cache)),
-		updater.NewRDSInstance(d.cache, cloudData.RDSInstances).RegisterListener(
-			listener.NewRDSInstance(d.cache)),
-		updater.NewRedisInstance(d.cache, cloudData.RedisInstances).RegisterListener(
-			listener.NewRedisInstance(d.cache)),
-		updater.NewPeerConnection(d.cache, cloudData.PeerConnections).RegisterListener(
-			listener.NewPeerConnection(d.cache)),
-		updater.NewCEN(d.cache, cloudData.CENs).RegisterListener(
-			listener.NewCEN(d.cache)),
-		updater.NewVInterface(d.cache, cloudData.VInterfaces, nil).RegisterListener(
-			listener.NewVInterface(d.cache)),
-		updater.NewFloatingIP(d.cache, cloudData.FloatingIPs).RegisterListener(
-			listener.NewFloatingIP(d.cache)),
+		updater.NewAZ(d.cache, cloudData.AZs),
+		updater.NewSubDomain(d.cache, cloudData.SubDomains),
+		updater.NewVPC(d.cache, cloudData.VPCs),
+		updater.NewHost(d.cache, cloudData.Hosts),
+		updater.NewVM(d.cache, cloudData.VMs).BuildStatsd(d.statsd),
+		updater.NewPodCluster(d.cache, cloudData.PodClusters),
+		updater.NewPodNode(d.cache, cloudData.PodNodes),
+		updater.NewPodNamespace(d.cache, cloudData.PodNamespaces),
+		updater.NewPodIngress(d.cache, cloudData.PodIngresses),
+		updater.NewPodIngressRule(d.cache, cloudData.PodIngressRules),
+		updater.NewPodService(d.cache, cloudData.PodServices),
+		updater.NewPodIngressRuleBackend(d.cache, cloudData.PodIngressRuleBackends),
+		updater.NewPodServicePort(d.cache, cloudData.PodServicePorts),
+		updater.NewPodGroup(d.cache, cloudData.PodGroups),
+		updater.NewPodGroupPort(d.cache, cloudData.PodGroupPorts),
+		updater.NewPodReplicaSet(d.cache, cloudData.PodReplicaSets),
+		updater.NewPod(d.cache, cloudData.Pods).BuildStatsd(d.statsd),
+		updater.NewConfigMap(d.cache, cloudData.ConfigMaps),
+		updater.NewPodGroupConfigMapConnection(d.cache, cloudData.PodGroupConfigMapConnections),
+		updater.NewNetwork(d.cache, cloudData.Networks),
+		updater.NewSubnet(d.cache, cloudData.Subnets),
+		updater.NewVRouter(d.cache, cloudData.VRouters),
+		updater.NewRoutingTable(d.cache, cloudData.RoutingTables),
+		updater.NewDHCPPort(d.cache, cloudData.DHCPPorts),
+		updater.NewNATGateway(d.cache, cloudData.NATGateways),
+		updater.NewNATVMConnection(d.cache, cloudData.NATVMConnections),
+		updater.NewNATRule(d.cache, cloudData.NATRules),
+		updater.NewLB(d.cache, cloudData.LBs),
+		updater.NewLBVMConnection(d.cache, cloudData.LBVMConnections),
+		updater.NewLBListener(d.cache, cloudData.LBListeners),
+		updater.NewLBTargetServer(d.cache, cloudData.LBTargetServers),
+		updater.NewRDSInstance(d.cache, cloudData.RDSInstances),
+		updater.NewRedisInstance(d.cache, cloudData.RedisInstances),
+		updater.NewPeerConnection(d.cache, cloudData.PeerConnections),
+		updater.NewCEN(d.cache, cloudData.CENs),
+		updater.NewVInterface(d.cache, cloudData.VInterfaces, nil),
+		updater.NewFloatingIP(d.cache, cloudData.FloatingIPs),
 		ip,
-		updater.NewVIP(d.cache, cloudData.VIPs).RegisterListener(
-			listener.NewVIP(d.cache)),
-		updater.NewVMPodNodeConnection(d.cache, cloudData.VMPodNodeConnections).RegisterListener( // VMPodNodeConnection需放在最后
-			listener.NewVMPodNodeConnection(d.cache)),
-		updater.NewProcess(d.cache, cloudData.Processes).RegisterListener(
-			listener.NewProcess(d.cache)),
+		updater.NewVIP(d.cache, cloudData.VIPs),
+		updater.NewVMPodNodeConnection(d.cache, cloudData.VMPodNodeConnections), // VMPodNodeConnection需放在最后
+		updater.NewProcess(d.cache, cloudData.Processes),
 	}
 }
 

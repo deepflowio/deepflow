@@ -60,7 +60,7 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 			ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
 			wholeCache,
 			db.NewProcess().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.Process,
+			wholeCache.DiffBases().Process().GetAll(),
 			cloudData,
 		),
 	}
@@ -76,19 +76,15 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 }
 
 func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*metadbmodel.Process, bool) {
-	deviceType, deviceID := p.cache.ToolDataSet.GetProcessDeviceTypeAndID(cloudItem.ContainerID, cloudItem.VTapID)
+	deviceType, deviceID := p.cache.Tool().GetProcessDeviceTypeAndID(cloudItem.ContainerID, int(cloudItem.VTapID))
 	// add pod node id
 	var podNodeID int
 	var podGroupID int
 	if deviceType == common.VIF_DEVICE_TYPE_POD {
-		podInfo, err := p.cache.ToolDataSet.GetPodInfoByID(deviceID)
-		if err != nil {
-			log.Error(err)
-		}
-
-		if podInfo != nil {
-			podNodeID = podInfo.PodNodeID
-			podGroupID = podInfo.PodGroupID
+		podItem := p.cache.Tool().Pod().GetById(deviceID)
+		if podItem.IsValid() {
+			podNodeID = podItem.PodNodeId()
+			podGroupID = podItem.PodGroupId()
 		}
 	} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
 		podNodeID = deviceID
@@ -99,22 +95,15 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*metadbmod
 	if deviceType == common.VIF_DEVICE_TYPE_POD ||
 		deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
 		if podNodeID != 0 {
-			id, ok := p.cache.ToolDataSet.GetVMIDByPodNodeID(podNodeID)
-			if ok {
-				vmID = id
-			}
-
+			vmID = p.cache.Tool().PodNode().GetById(podNodeID).VmId()
 		}
 	} else {
 		vmID = deviceID
 	}
-	vmInfo, err := p.cache.ToolDataSet.GetVMInfoByID(vmID)
-	if err != nil {
-		log.Error(err)
-	}
 	var vpcID int
-	if vmInfo != nil {
-		vpcID = vmInfo.VPCID
+	vmItem := p.cache.Tool().Vm().GetById(vmID)
+	if vmItem.IsValid() {
+		vpcID = vmItem.VpcId()
 	}
 	dbItem := &metadbmodel.Process{
 		Name:        cloudItem.Name,
@@ -137,8 +126,8 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*metadbmod
 		VPCID:       vpcID,
 	}
 
-	gid, _ := p.cache.ToolDataSet.GetProcessGIDByIdentifier(
-		p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(dbItem),
+	gid, _ := p.cache.Tool().Process().GetGIDByIdentifier(
+		p.cache.Tool().Process().GenerateIdentifierByDBProcess(dbItem),
 	)
 	dbItem.GID = gid
 	dbItem.Lcuuid = cloudItem.Lcuuid
@@ -152,16 +141,16 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 		mapInfo["name"] = cloudItem.Name
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
-	if diffBase.OSAPPTags != cloudItem.OSAPPTags {
+	if diffBase.OsAppTags != cloudItem.OSAPPTags {
 		mapInfo["os_app_tags"] = cloudItem.OSAPPTags
-		structInfo.OsAppTags.Set(diffBase.OSAPPTags, cloudItem.OSAPPTags)
+		structInfo.OsAppTags.Set(diffBase.OsAppTags, cloudItem.OSAPPTags)
 	}
-	if diffBase.ContainerID != cloudItem.ContainerID {
+	if diffBase.ContainerId != cloudItem.ContainerID {
 		mapInfo["container_id"] = cloudItem.ContainerID
-		structInfo.ContainerID.Set(diffBase.ContainerID, cloudItem.ContainerID)
+		structInfo.ContainerId.Set(diffBase.ContainerId, cloudItem.ContainerID)
 	}
-	deviceType, deviceID := p.cache.ToolDataSet.GetProcessDeviceTypeAndID(cloudItem.ContainerID, cloudItem.VTapID)
-	if diffBase.DeviceType != deviceType || diffBase.DeviceID != deviceID {
+	deviceType, deviceID := p.cache.Tool().GetProcessDeviceTypeAndID(cloudItem.ContainerID, int(cloudItem.VTapID))
+	if diffBase.DeviceType != deviceType || diffBase.DeviceId != deviceID {
 		mapInfo["devicetype"] = deviceType
 		mapInfo["deviceid"] = deviceID
 	}
@@ -169,18 +158,14 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 	if len(mapInfo) > 0 {
 		var podGroupID int
 		if deviceType == common.VIF_DEVICE_TYPE_POD {
-			podInfo, err := p.cache.ToolDataSet.GetPodInfoByID(deviceID)
-			if err != nil {
-				log.Error(err)
+			podItem := p.cache.Tool().Pod().GetById(deviceID)
+			if !podItem.IsValid() {
 				return nil, nil, false
 			}
-
-			if podInfo != nil {
-				podGroupID = podInfo.PodGroupID
-			}
+			podGroupID = podItem.PodGroupId()
 		}
-		gid, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(
-			p.cache.ToolDataSet.GetProcessIdentifier(diffBase.Name, cloudItem.ProcessName, podGroupID, cloudItem.VTapID, cloudItem.CommandLine),
+		gid, ok := p.cache.Tool().Process().GetGIDByIdentifier(
+			p.cache.Tool().Process().GenerateIdentifier(diffBase.Name, cloudItem.ProcessName, podGroupID, cloudItem.VTapID, cloudItem.CommandLine),
 		)
 		if !ok {
 			log.Errorf("process %s gid not found", diffBase.Lcuuid, p.metadata.LogPrefixes)
@@ -198,7 +183,7 @@ func (p *Process) beforeAddPage(dbData []*metadbmodel.Process) ([]*metadbmodel.P
 		if item.GID != 0 {
 			continue
 		}
-		identifier := p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)
+		identifier := p.cache.Tool().Process().GenerateIdentifierByDBProcess(item)
 		if _, ok := identifierToNewGID[identifier]; !ok {
 			identifierToNewGID[identifier] = item.GID
 		}
@@ -230,7 +215,7 @@ func (p *Process) beforeAddPage(dbData []*metadbmodel.Process) ([]*metadbmodel.P
 			if item.GID != 0 {
 				continue
 			}
-			item.GID = identifierToNewGID[p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)]
+			item.GID = identifierToNewGID[p.cache.Tool().Process().GenerateIdentifierByDBProcess(item)]
 		}
 	}
 	return dbData, &message.ProcessAddAddition{}, true
@@ -239,8 +224,8 @@ func (p *Process) beforeAddPage(dbData []*metadbmodel.Process) ([]*metadbmodel.P
 func (p *Process) afterDeletePage(dbData []*metadbmodel.Process) (interface{}, bool) {
 	deletedGIDs := mapset.NewSet[uint32]()
 	for _, item := range dbData {
-		if gid, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(p.cache.ToolDataSet.GetProcessIdentifierByDBProcess(item)); ok {
-			if p.cache.ToolDataSet.IsProcessGIDSoftDeleted(gid) {
+		if gid, ok := p.cache.Tool().Process().GetGIDByIdentifier(p.cache.Tool().Process().GenerateIdentifierByDBProcess(item)); ok {
+			if p.cache.Tool().Process().IsProcessGIDSoftDeleted(gid) {
 				deletedGIDs.Add(gid)
 			}
 		}

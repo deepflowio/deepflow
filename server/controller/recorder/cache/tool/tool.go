@@ -209,6 +209,37 @@ func (t Tool) GetDeviceVPCIDByLcuuid(deviceType int, deviceLcuuid string) (int, 
 	return 0, vpcID != 0
 }
 
+func (t Tool) GetDeviceVPCIDByID(deviceType int, deviceID int) (int, bool) {
+	var vpcID int
+	switch deviceType {
+	case ctrlrcommon.VIF_DEVICE_TYPE_VM:
+		vpcID = t.Vm().GetById(deviceID).VpcId()
+	case ctrlrcommon.VIF_DEVICE_TYPE_VROUTER:
+		vpcID = t.Vrouter().GetById(deviceID).VpcId()
+	case ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT:
+		vpcID = t.DhcpPort().GetById(deviceID).VpcId()
+	case ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY:
+		vpcID = t.NatGateway().GetById(deviceID).VpcId()
+	case ctrlrcommon.VIF_DEVICE_TYPE_LB:
+		vpcID = t.Lb().GetById(deviceID).VpcId()
+	case ctrlrcommon.VIF_DEVICE_TYPE_RDS_INSTANCE:
+		vpcID = t.RdsInstance().GetById(deviceID).VpcId()
+	case ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE:
+		vpcID = t.RedisInstance().GetById(deviceID).VpcId()
+	case ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE:
+		vpcID = t.PodNode().GetById(deviceID).VpcId()
+	case ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE:
+		vpcID = t.PodService().GetById(deviceID).VpcId()
+	case ctrlrcommon.VIF_DEVICE_TYPE_POD:
+		vpcID = t.Pod().GetById(deviceID).VpcId()
+	default:
+		log.Errorf("device type %d not supported", deviceType, t.metadata.LogPrefixes)
+		return 0, false
+	}
+
+	return vpcID, vpcID != 0
+}
+
 func (t Tool) GetDeviceIDByLcuuid(deviceType int, deviceLcuuid string) (int, bool) {
 	var id int
 	switch deviceType {

@@ -61,7 +61,7 @@ func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 			ctrlrcommon.RESOURCE_TYPE_VIP_EN,
 			wholeCache,
 			db.NewVIP().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.VIP,
+			wholeCache.DiffBases().VIP().GetAll(),
 			cloudData,
 		),
 	}
@@ -87,13 +87,13 @@ func (p *VIP) generateDBItemToAdd(cloudItem *cloudmodel.VIP) (*metadbmodel.VIP, 
 func (p *VIP) generateUpdateInfo(diffBase *diffbase.Vip, cloudItem *cloudmodel.VIP) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedVipFields)
 	mapInfo := make(map[string]interface{})
-	if diffBase.IP != cloudItem.IP {
+	if diffBase.Ip != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP
-		structInfo.Ip.Set(diffBase.IP, cloudItem.IP)
+		structInfo.Ip.Set(diffBase.Ip, cloudItem.IP)
 	}
-	if diffBase.VTapID != cloudItem.VTapID {
+	if diffBase.VtapId != cloudItem.VTapID {
 		mapInfo["vtap_id"] = cloudItem.VTapID
-		structInfo.VtapId.Set(diffBase.VTapID, cloudItem.VTapID)
+		structInfo.VtapId.Set(diffBase.VtapId, cloudItem.VTapID)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

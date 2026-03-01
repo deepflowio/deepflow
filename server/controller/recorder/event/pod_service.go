@@ -47,13 +47,13 @@ func NewPodService(cfg config.Config, q *queue.OverwriteQueue) *PodService {
 func (p *PodService) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.PodService) {
 		var opts []eventapi.TagFieldOption
-		info, err := md.GetToolDataSet().GetPodServiceInfoByID(item.ID)
-		if err != nil {
-			log.Error(err)
+		psItem := md.GetToolDataSet().PodService().GetById(item.ID)
+		if !psItem.IsValid() {
+			log.Errorf("pod_service(id=%d) not found", item.ID, md.LogPrefixes)
 		} else {
 			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagAZID(info.AZID),
-				eventapi.TagRegionID(info.RegionID),
+				eventapi.TagAZID(psItem.AzId()),
+				eventapi.TagRegionID(psItem.RegionId()),
 			}...)
 		}
 		opts = append(opts, []eventapi.TagFieldOption{

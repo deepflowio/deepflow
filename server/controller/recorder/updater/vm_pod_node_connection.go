@@ -61,7 +61,7 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			wholeCache,
 			db.NewVMPodNodeConnection().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.VMPodNodeConnections,
+			wholeCache.DiffBases().VMPodNodeConnection().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 }
 
 func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNodeConnection) (*metadbmodel.VMPodNodeConnection, bool) {
-	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
+	vmItem := c.cache.Tool().Vm().GetByLcuuid(cloudItem.VMLcuuid)
+	vmID, exists := vmItem.Id(), vmItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
@@ -87,7 +88,7 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 		Domain:    c.metadata.GetDomainLcuuid(),
 		SubDomain: cloudItem.SubDomainLcuuid,
 		VMID:      vmID,
-		PodNodeID: c.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid),
+		PodNodeID: c.cache.Tool().PodNode().GetByLcuuid(cloudItem.PodNodeLcuuid).Id(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

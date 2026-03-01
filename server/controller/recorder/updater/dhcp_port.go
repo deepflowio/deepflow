@@ -61,7 +61,7 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 			ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN,
 			wholeCache,
 			db.NewDHCPPort().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.DHCPPorts,
+			wholeCache.DiffBases().DHCPPort().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 }
 
 func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*metadbmodel.DHCPPort, bool) {
-	vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := p.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -97,8 +98,9 @@ func (p *DHCPPort) generateDBItemToAdd(cloudItem *cloudmodel.DHCPPort) (*metadbm
 func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DhcpPort, cloudItem *cloudmodel.DHCPPort) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedDhcpPortFields)
 	mapInfo := make(map[string]interface{})
-	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
-		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	if diffBase.VpcLcuuid != cloudItem.VPCLcuuid {
+		vpcItem := p.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+		vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -108,7 +110,7 @@ func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DhcpPort, cloudItem *cl
 		}
 		mapInfo["epc_id"] = vpcID
 		structInfo.VpcId.SetNew(vpcID)
-		structInfo.VpcLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
+		structInfo.VpcLcuuid.Set(diffBase.VpcLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -118,9 +120,9 @@ func (p *DHCPPort) generateUpdateInfo(diffBase *diffbase.DhcpPort, cloudItem *cl
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	if diffBase.AzLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AzLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AzLcuuid, cloudItem.AZLcuuid)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

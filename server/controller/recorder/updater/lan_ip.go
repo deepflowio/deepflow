@@ -57,13 +57,13 @@ type LANIP struct {
 	]
 }
 
-func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
+func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.Tool) *LANIP {
 	updater := &LANIP{
 		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN,
 			wholeCache,
 			db.NewLANIP().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.LANIPs,
+			wholeCache.DiffBases().LANIP().GetAll(),
 			[]cloudmodel.IP(nil),
 		),
 	}
@@ -82,7 +82,8 @@ func (i *LANIP) SetCloudData(cloudData []cloudmodel.IP) {
 }
 
 func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.LANIP, bool) {
-	vinterfaceID, exists := i.cache.ToolDataSet.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
+	vinterfaceItem := i.cache.Tool().Vinterface().GetByLcuuid(cloudItem.VInterfaceLcuuid)
+	vinterfaceID, exists := vinterfaceItem.Id(), vinterfaceItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
@@ -90,10 +91,12 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.LANI
 		), i.metadata.LogPrefixes)
 		return nil, false
 	}
-	networkID, exists := i.cache.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(cloudItem.VInterfaceLcuuid)
+	vinterfaceForNetworkItem := i.cache.Tool().Vinterface().GetByLcuuid(cloudItem.VInterfaceLcuuid)
+	networkID, exists := vinterfaceForNetworkItem.NetworkId(), vinterfaceForNetworkItem.IsValid()
 	if !exists {
 		if i.domainToolDataSet != nil {
-			networkID, exists = i.domainToolDataSet.GetNetworkIDByVInterfaceLcuuid(cloudItem.VInterfaceLcuuid)
+			domainVinterfaceItem := i.domainToolDataSet.Vinterface().GetByLcuuid(cloudItem.VInterfaceLcuuid)
+			networkID, exists = domainVinterfaceItem.NetworkId(), domainVinterfaceItem.IsValid()
 		}
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
@@ -109,7 +112,7 @@ func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.LANI
 	// ip subnet id is not used in the current version, so it is commented out to avoid updating the subnet id too frequently,
 	// which may cause recorder performance issues.
 
-	// subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	// subnetID, exists := i.cache.Tool().GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
 	// if !exists {
 	// 	if i.domainToolDataSet != nil {
 	// 		subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
@@ -150,7 +153,7 @@ func (i *LANIP) generateUpdateInfo(diffBase *diffbase.LanIp, cloudItem *cloudmod
 	// which may cause recorder performance issues.
 
 	// if diffBase.SubnetLcuuid != cloudItem.SubnetLcuuid {
-	// 	subnetID, exists := i.cache.ToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
+	// 	subnetID, exists := i.cache.Tool().GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)
 	// 	if !exists {
 	// 		if i.domainToolDataSet != nil {
 	// 			subnetID, exists = i.domainToolDataSet.GetSubnetIDByLcuuid(cloudItem.SubnetLcuuid)

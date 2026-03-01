@@ -61,7 +61,7 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
 			wholeCache,
 			db.NewNATGateway().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.NATGateways,
+			wholeCache.DiffBases().NATGateway().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 }
 
 func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*metadbmodel.NATGateway, bool) {
-	vpcID, exists := g.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := g.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -108,9 +109,9 @@ func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NatGateway, cloudItem
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.FloatingIPs != cloudItem.FloatingIPs {
+	if diffBase.FloatingIps != cloudItem.FloatingIPs {
 		mapInfo["floating_ips"] = cloudItem.FloatingIPs
-		structInfo.FloatingIps.Set(diffBase.FloatingIPs, cloudItem.FloatingIPs)
+		structInfo.FloatingIps.Set(diffBase.FloatingIps, cloudItem.FloatingIPs)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

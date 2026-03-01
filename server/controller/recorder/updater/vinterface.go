@@ -59,13 +59,13 @@ type VInterface struct {
 	]
 }
 
-func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, domainToolDataSet *tool.DataSet) *VInterface {
+func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, domainToolDataSet *tool.Tool) *VInterface {
 	updater := &VInterface{
 		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN,
 			wholeCache,
 			db.NewVInterface().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.VInterfaces,
+			wholeCache.DiffBases().VInterface().GetAll(),
 			cloudData,
 		),
 	}
@@ -83,10 +83,12 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*met
 	var networkID int
 	if cloudItem.NetworkLcuuid != "" {
 		var exists bool
-		networkID, exists = i.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+		networkItem := i.cache.Tool().Network().GetByLcuuid(cloudItem.NetworkLcuuid)
+		networkID, exists = networkItem.Id(), networkItem.IsValid()
 		if !exists {
 			if i.domainToolDataSet != nil {
-				networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+				domainNetworkItem := i.domainToolDataSet.Network().GetByLcuuid(cloudItem.NetworkLcuuid)
+				networkID, exists = domainNetworkItem.Id(), domainNetworkItem.IsValid()
 			}
 			if !exists {
 				log.Error(resourceAForResourceBNotFound(
@@ -97,7 +99,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*met
 			}
 		}
 	}
-	deviceID, exists := i.cache.ToolDataSet.GetDeviceIDByDeviceLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
+	deviceID, exists := i.cache.Tool().GetDeviceIDByLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
 	if !exists {
 		log.Errorf(
 			"device (type: %d, lcuuid: %s) for %s (lcuuid: %s) not found",
@@ -108,7 +110,7 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*met
 	}
 	var vpcID int
 	if cloudItem.DeviceType != common.VIF_DEVICE_TYPE_HOST {
-		vpcID, exists = i.cache.ToolDataSet.GetDeviceVPCIDByID(cloudItem.DeviceType, deviceID)
+		vpcID, exists = i.cache.Tool().GetDeviceVPCIDByID(cloudItem.DeviceType, deviceID)
 		if !exists {
 			log.Errorf(
 				"vpc for device (type: %d, lcuuid: %s) for %s (lcuuid: %s) not found",
@@ -118,7 +120,8 @@ func (i *VInterface) generateDBItemToAdd(cloudItem *cloudmodel.VInterface) (*met
 		}
 	}
 	if vpcID == 0 {
-		vpcID, exists = i.cache.ToolDataSet.GetNetworkVPCIDByID(networkID)
+		networkByIdItem := i.cache.Tool().Network().GetById(networkID)
+		vpcID, exists = networkByIdItem.VpcId(), networkByIdItem.IsValid()
 		if !exists {
 			log.Error(
 				"vpc for network (id: %d) for %s (lcuuid: %s) not found",
@@ -155,10 +158,12 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.Vinterface, cloudItem
 		if cloudItem.NetworkLcuuid == "" {
 			mapInfo["subnetid"] = 0
 		} else {
-			networkID, exists := i.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+			networkItem := i.cache.Tool().Network().GetByLcuuid(cloudItem.NetworkLcuuid)
+			networkID, exists := networkItem.Id(), networkItem.IsValid()
 			if !exists {
 				if i.domainToolDataSet != nil {
-					networkID, exists = i.domainToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+					domainNetworkItem := i.domainToolDataSet.Network().GetByLcuuid(cloudItem.NetworkLcuuid)
+					networkID, exists = domainNetworkItem.Id(), domainNetworkItem.IsValid()
 				}
 				if !exists {
 					log.Error(resourceAForResourceBNotFound(
@@ -174,7 +179,7 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.Vinterface, cloudItem
 		structInfo.NetworkLcuuid.Set(diffBase.NetworkLcuuid, cloudItem.NetworkLcuuid)
 	}
 	if diffBase.DeviceLcuuid != cloudItem.DeviceLcuuid {
-		deviceID, exists := i.cache.ToolDataSet.GetDeviceIDByDeviceLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
+		deviceID, exists := i.cache.Tool().GetDeviceIDByLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
 		if !exists {
 			log.Errorf(resourceAForResourceBNotFound(
 				common.VIF_DEVICE_TYPE_TO_RESOURCE_TYPE[cloudItem.DeviceType], cloudItem.DeviceLcuuid,
@@ -200,19 +205,19 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.Vinterface, cloudItem
 		mapInfo["iftype"] = cloudItem.Type
 		structInfo.Type.Set(diffBase.Type, cloudItem.Type)
 	}
-	if diffBase.NetnsID != cloudItem.NetnsID {
+	if diffBase.NetnsId != cloudItem.NetnsID {
 		mapInfo["netns_id"] = cloudItem.NetnsID
-		structInfo.NetnsId.Set(diffBase.NetnsID, cloudItem.NetnsID)
+		structInfo.NetnsId.Set(diffBase.NetnsId, cloudItem.NetnsID)
 	}
-	if diffBase.VtapID != cloudItem.VTapID {
+	if diffBase.VtapId != cloudItem.VTapID {
 		mapInfo["vtap_id"] = cloudItem.VTapID
-		structInfo.VtapId.Set(diffBase.VtapID, cloudItem.VTapID)
+		structInfo.VtapId.Set(diffBase.VtapId, cloudItem.VTapID)
 	}
 
 	var vpcID int
 	var exists bool
 	if cloudItem.DeviceType != common.VIF_DEVICE_TYPE_HOST {
-		vpcID, exists = i.cache.ToolDataSet.GetDeviceVPCIDByLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
+		vpcID, exists = i.cache.Tool().GetDeviceVPCIDByLcuuid(cloudItem.DeviceType, cloudItem.DeviceLcuuid)
 		if !exists {
 			log.Errorf(
 				"vpc for device (type: %d, lcuuid: %s) for %s (lcuuid: %s) not found",
@@ -222,7 +227,8 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.Vinterface, cloudItem
 		}
 	}
 	if vpcID == 0 {
-		vpcID, exists = i.cache.ToolDataSet.GetNetworkVPCIDByLcuuid(cloudItem.NetworkLcuuid)
+		networkByLcuuidItem := i.cache.Tool().Network().GetByLcuuid(cloudItem.NetworkLcuuid)
+		vpcID, exists = networkByLcuuidItem.VpcId(), networkByLcuuidItem.IsValid()
 		if !exists {
 			log.Error(
 				"vpc for network (lcuuid: %d) for %s (lcuuid: %s) not found",
@@ -231,7 +237,7 @@ func (i *VInterface) generateUpdateInfo(diffBase *diffbase.Vinterface, cloudItem
 		}
 	}
 	cloudItem.VPCID = vpcID
-	if exists && diffBase.VPCID != cloudItem.VPCID {
+	if exists && diffBase.VpcId != cloudItem.VPCID {
 		mapInfo["epc_id"] = vpcID
 	}
 

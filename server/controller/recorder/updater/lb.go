@@ -61,7 +61,7 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 			ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			wholeCache,
 			db.NewLB().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.LBs,
+			wholeCache.DiffBases().LB().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 }
 
 func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*metadbmodel.LB, bool) {
-	vpcID, exists := l.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := l.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -109,9 +110,9 @@ func (l *LB) generateUpdateInfo(diffBase *diffbase.Lb, cloudItem *cloudmodel.LB)
 		mapInfo["model"] = cloudItem.Model
 		structInfo.Model.Set(diffBase.Model, cloudItem.Model)
 	}
-	if diffBase.VIP != cloudItem.VIP {
+	if diffBase.Vip != cloudItem.VIP {
 		mapInfo["vip"] = cloudItem.VIP
-		structInfo.Vip.Set(diffBase.VIP, cloudItem.VIP)
+		structInfo.Vip.Set(diffBase.Vip, cloudItem.VIP)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid

@@ -46,15 +46,15 @@ func (p *PodNode) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.PodNode) {
 		var opts []eventapi.TagFieldOption
 		var domainLcuuid string
-		info, err := md.GetToolDataSet().GetPodNodeInfoByID(item.ID)
-		if err != nil {
-			log.Error(err)
+		pnItem := md.GetToolDataSet().PodNode().GetById(item.ID)
+		if !pnItem.IsValid() {
+			log.Errorf("pod_node(id=%d) not found", item.ID, md.LogPrefixes)
 		} else {
 			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagAZID(info.AZID),
-				eventapi.TagRegionID(info.RegionID),
+				eventapi.TagAZID(pnItem.AzId()),
+				eventapi.TagRegionID(pnItem.RegionId()),
 			}...)
-			domainLcuuid = info.DomainLcuuid
+			domainLcuuid = pnItem.DomainLcuuid()
 		}
 		opts = append(opts, []eventapi.TagFieldOption{
 			eventapi.TagPodNodeID(item.ID),

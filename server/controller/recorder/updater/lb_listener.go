@@ -61,7 +61,7 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
 			wholeCache,
 			db.NewLBListener().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.LBListeners,
+			wholeCache.DiffBases().LBListener().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 }
 
 func (l *LBListener) generateDBItemToAdd(cloudItem *cloudmodel.LBListener) (*metadbmodel.LBListener, bool) {
-	lbID, exists := l.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
+	lbItem := l.cache.Tool().Lb().GetByLcuuid(cloudItem.LBLcuuid)
+	lbID, exists := lbItem.Id(), lbItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
@@ -104,13 +105,13 @@ func (l *LBListener) generateUpdateInfo(diffBase *diffbase.LbListener, cloudItem
 		mapInfo["name"] = cloudItem.Name
 		structInfo.Name.Set(diffBase.Name, cloudItem.Name)
 	}
-	if diffBase.IPs != cloudItem.IPs {
+	if diffBase.Ips != cloudItem.IPs {
 		mapInfo["ips"] = cloudItem.IPs
-		structInfo.Ips.Set(diffBase.IPs, cloudItem.IPs)
+		structInfo.Ips.Set(diffBase.Ips, cloudItem.IPs)
 	}
-	if diffBase.SNATIPs != cloudItem.SNATIPs {
+	if diffBase.SnatIps != cloudItem.SNATIPs {
 		mapInfo["snat_ips"] = cloudItem.SNATIPs
-		structInfo.SnatIps.Set(diffBase.SNATIPs, cloudItem.SNATIPs)
+		structInfo.SnatIps.Set(diffBase.SnatIps, cloudItem.SNATIPs)
 	}
 	if diffBase.Port != cloudItem.Port {
 		mapInfo["port"] = cloudItem.Port

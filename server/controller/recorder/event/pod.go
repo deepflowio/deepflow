@@ -57,18 +57,18 @@ func (p *Pod) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.Pod) {
 		var opts []eventapi.TagFieldOption
 		var domainLcuuid string
-		info, err := md.GetToolDataSet().GetPodInfoByID(item.ID)
-		if err != nil {
-			log.Error(err)
+		podItem := md.GetToolDataSet().Pod().GetById(item.ID)
+		if !podItem.IsValid() {
+			log.Errorf("pod(id=%d) not found", item.ID, md.LogPrefixes)
 		} else {
 			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagAZID(info.AZID),
-				eventapi.TagRegionID(info.RegionID),
+				eventapi.TagAZID(podItem.AzId()),
+				eventapi.TagRegionID(podItem.RegionId()),
 			}...)
-			domainLcuuid = info.DomainLcuuid
+			domainLcuuid = podItem.DomainLcuuid()
 		}
-		podGroupType, ok := md.GetToolDataSet().GetPodGroupTypeByID(item.PodGroupID)
-		if !ok {
+		pgItem := md.GetToolDataSet().PodGroup().GetById(item.PodGroupID)
+		if !pgItem.IsValid() {
 			log.Errorf("db pod_group type(id: %d) not found", item.PodGroupID, md.LogPrefixes)
 		}
 
@@ -77,7 +77,7 @@ func (p *Pod) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 			eventapi.TagVPCID(item.VPCID),
 			eventapi.TagPodClusterID(item.PodClusterID),
 			eventapi.TagPodGroupID(item.PodGroupID),
-			eventapi.TagPodGroupType(metadata.PodGroupTypeMap[podGroupType]),
+			eventapi.TagPodGroupType(metadata.PodGroupTypeMap[pgItem.GType()]),
 			eventapi.TagPodServiceID(item.PodServiceID), // TODO 此字段在 ingester 中并未被使用，待删除
 			eventapi.TagPodNodeID(item.PodNodeID),
 			eventapi.TagPodNSID(item.PodNamespaceID),
@@ -123,15 +123,15 @@ func (p *Pod) OnResourceUpdated(md *message.Metadata, msg interface{}) {
 	}
 	if updatedFields.CreatedAt.IsDifferent() && updatedFields.PodNodeId.IsDifferent() {
 		eType = eventapi.RESOURCE_EVENT_TYPE_RECREATE
-		oldPodNodeName, err := md.GetToolDataSet().GetPodNodeNameByID(updatedFields.PodNodeId.GetOld())
-		if err != nil {
-			log.Errorf("%v, %v", nameByIDNotFound(p.resourceType, updatedFields.GetID()), err, md.LogPrefixes)
+		oldPnItem := md.GetToolDataSet().PodNode().GetById(updatedFields.PodNodeId.GetOld())
+		if !oldPnItem.IsValid() {
+			log.Errorf("%v, pod_node(id=%d) not found", nameByIDNotFound(p.resourceType, updatedFields.GetID()), updatedFields.PodNodeId.GetOld(), md.LogPrefixes)
 		}
-		newPodNodeName, err := md.GetToolDataSet().GetPodNodeNameByID(updatedFields.PodNodeId.GetNew())
-		if err != nil {
-			log.Errorf("%v, %v", nameByIDNotFound(p.resourceType, updatedFields.GetID()), err, md.LogPrefixes)
+		newPnItem := md.GetToolDataSet().PodNode().GetById(updatedFields.PodNodeId.GetNew())
+		if !newPnItem.IsValid() {
+			log.Errorf("%v, pod_node(id=%d) not found", nameByIDNotFound(p.resourceType, updatedFields.GetID()), updatedFields.PodNodeId.GetNew(), md.LogPrefixes)
 		}
-		description = fmt.Sprintf(DESCRecreateFormat, dbItemNew.Name, oldPodNodeName, newPodNodeName)
+		description = fmt.Sprintf(DESCRecreateFormat, dbItemNew.Name, oldPnItem.Name(), newPnItem.Name())
 	}
 
 	nIDs, ips := p.getIPNetworksByID(md, updatedFields.GetID()) // TODO 用途
@@ -166,10 +166,5 @@ func (p *Pod) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 }
 
 func (p *Pod) getIPNetworksByID(md *message.Metadata, id int) (networkIDs []uint32, ips []string) {
-	ipNetworkMap, _ := md.GetToolDataSet().EventDataSet.GetPodIPNetworkMapByID(id)
-	for ip, nID := range ipNetworkMap {
-		networkIDs = append(networkIDs, uint32(nID))
-		ips = append(ips, ip.IP)
-	}
-	return
+	return getDeviceIPNetworks(md.GetToolDataSet(), ctrlrcommon.VIF_DEVICE_TYPE_POD, id)
 }

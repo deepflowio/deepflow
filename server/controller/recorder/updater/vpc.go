@@ -62,7 +62,7 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			wholeCache,
 			db.NewVPC().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.VPCs,
+			wholeCache.DiffBases().VPC().GetAll(),
 			cloudData,
 		),
 	}
@@ -122,13 +122,13 @@ func (v *VPC) generateUpdateInfo(diffBase *diffbase.Vpc, cloudItem *cloudmodel.V
 		mapInfo["owner"] = cloudItem.Owner
 		structInfo.Owner.Set(diffBase.Owner, cloudItem.Owner)
 	}
-	if diffBase.CIDR != cloudItem.CIDR {
+	if diffBase.Cidr != cloudItem.CIDR {
 		mapInfo["cidr"] = cloudItem.CIDR
-		structInfo.Cidr.Set(diffBase.CIDR, cloudItem.CIDR)
+		structInfo.Cidr.Set(diffBase.Cidr, cloudItem.CIDR)
 	}
-	if diffBase.TunnelID != cloudItem.TunnelID {
+	if diffBase.TunnelId != cloudItem.TunnelID {
 		mapInfo["tunnel_id"] = cloudItem.TunnelID
-		structInfo.TunnelId.Set(diffBase.TunnelID, cloudItem.TunnelID)
+		structInfo.TunnelId.Set(diffBase.TunnelId, cloudItem.TunnelID)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

@@ -61,7 +61,7 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 			ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
 			wholeCache,
 			db.NewLBTargetServer().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.LBTargetServers,
+			wholeCache.DiffBases().LBTargetServer().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 }
 
 func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServer) (*metadbmodel.LBTargetServer, bool) {
-	lbID, exists := s.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
+	lbItem := s.cache.Tool().Lb().GetByLcuuid(cloudItem.LBLcuuid)
+	lbID, exists := lbItem.Id(), lbItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
@@ -83,7 +84,8 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 		), s.metadata.LogPrefixes)
 		return nil, false
 	}
-	lbListenerID, exists := s.cache.ToolDataSet.GetLBListenerIDByLcuuid(cloudItem.LBListenerLcuuid)
+	lbListenerItem := s.cache.Tool().LbListener().GetByLcuuid(cloudItem.LBListenerLcuuid)
+	lbListenerID, exists := lbListenerItem.Id(), lbListenerItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, cloudItem.LBListenerLcuuid,
@@ -93,7 +95,8 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 	}
 	var vmID int
 	if cloudItem.VMLcuuid != "" {
-		vmID, exists = s.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
+		vmItem := s.cache.Tool().Vm().GetByLcuuid(cloudItem.VMLcuuid)
+		vmID, exists = vmItem.Id(), vmItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
@@ -102,7 +105,8 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 			return nil, false
 		}
 	}
-	vpcID, exists := s.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := s.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -127,9 +131,9 @@ func (s *LBTargetServer) generateDBItemToAdd(cloudItem *cloudmodel.LBTargetServe
 func (s *LBTargetServer) generateUpdateInfo(diffBase *diffbase.LbTargetServer, cloudItem *cloudmodel.LBTargetServer) (types.UpdatedFields, map[string]interface{}, bool) {
 	structInfo := new(message.UpdatedLbTargetServerFields)
 	mapInfo := make(map[string]interface{})
-	if diffBase.IP != cloudItem.IP {
+	if diffBase.Ip != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP
-		structInfo.Ip.Set(diffBase.IP, cloudItem.IP)
+		structInfo.Ip.Set(diffBase.Ip, cloudItem.IP)
 	}
 	if diffBase.Port != cloudItem.Port {
 		mapInfo["port"] = cloudItem.Port
