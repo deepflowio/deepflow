@@ -109,7 +109,7 @@ func main() {
 
 	go mcp.NewMCPServer(*configPath).Start()
 
-	go controller.Start(ctx, *configPath, cfg.LogFile, shared)
+	go controller.Start(ctx, Revision, *configPath, cfg.LogFile, shared)
 
 	go querier.Start(*configPath, cfg.LogFile, shared)
 	closers := ingester.Start(*configPath, shared)

@@ -812,3 +812,7 @@ const (
 	CUSTOM_SERVICE_MATCH_TYPE_NAME = 1
 	CUSTOM_SERVICE_MATCH_TYPE_UID  = 2
 )
+
+const (
+	SYS_CONFIG_MASTER_COMMIT_ID = "master_commit_id"
+)
