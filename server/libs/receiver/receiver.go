@@ -113,8 +113,10 @@ var recvBufferPools = []*pool.LockFreePool[*RecvBuffer]{
 	newBufferPool(0, 8),
 }
 
+var bufferSizeBounds = [6]int{RECV_BUFSIZE_2K, RECV_BUFSIZE_8K, RECV_BUFSIZE_64K, RECV_BUFSIZE_256K, RECV_BUFSIZE_320K, RECV_BUFSIZE_512K}
+
 func getBufferPoolIndex(length int) int {
-	for i, v := range []int{RECV_BUFSIZE_2K, RECV_BUFSIZE_8K, RECV_BUFSIZE_64K, RECV_BUFSIZE_256K, RECV_BUFSIZE_320K, RECV_BUFSIZE_512K} {
+	for i, v := range bufferSizeBounds {
 		if length <= v {
 			return i
 		}
@@ -150,6 +152,8 @@ func ReleaseRecvBuffer(b *RecvBuffer) {
 	b.End = 0
 	b.IP = nil
 	b.VtapID = 0
+	b.TeamID = 0
+	b.OrgID = 0
 	recvBufferPools[getBufferPoolIndex(len(b.Buffer))].Put(b)
 }
 
@@ -865,7 +869,7 @@ func getIpHash(ip net.IP) uint32 {
 }
 
 func (r *Receiver) getMetricsTimestamp(buffer []byte) uint32 {
-	now := uint32(time.Now().Unix())
+	now := uint32(r.timeNow)
 	if len(buffer) >= 4 {
 		// FIXME metrics time is encoded in probuf, may not be available
 		metricsTime := binary.LittleEndian.Uint32(buffer) // doc的前4个字节是时间
