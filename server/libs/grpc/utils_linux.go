@@ -28,6 +28,9 @@ func Lookup(host net.IP) (net.IP, error) {
 	if err != nil {
 		return nil, fmt.Errorf("RouteGet %v %s", host, err)
 	}
+	if len(routes) == 0 {
+		return nil, fmt.Errorf("RouteGet %v returned no routes", host)
+	}
 	route := routes[0]
 	src := route.Src
 	if route.Src.To4() != nil {
