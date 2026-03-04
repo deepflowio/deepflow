@@ -575,15 +575,6 @@ extern "C" {
     pub fn is_v8_process(pid: u32) -> bool;
 
     pub fn lua_detect(pid: u32, out: *mut LuaRuntimeInfo) -> i32;
-    pub fn lua_format_folded_stack_trace(
-        tracer: *mut libc::c_void,
-        pid: u32,
-        frames: *const u64,
-        frame_count: u32,
-        new_cache: bool,
-        info_p: *mut libc::c_void,
-        err_tag: *const libc::c_char,
-    ) -> *mut libc::c_char;
     pub fn lua_set_map_fds(
         lang_flags_fd: i32,
         unwind_info_fd: i32,
@@ -621,31 +612,6 @@ extern "C" {
     pub fn v8_unwind_table_destroy(table: *mut V8UnwindTable);
     pub fn v8_unwind_table_load(table: *mut V8UnwindTable, pid: u32);
     pub fn v8_unwind_table_unload(table: *mut V8UnwindTable, pid: u32);
-
-    pub fn merge_lua_stacks(
-        trace_str: *mut libc::c_void,
-        len: usize,
-        u_trace: *const libc::c_void,
-        i_trace: *const libc::c_void,
-    ) -> usize;
-    pub fn merge_python_stacks(
-        trace_str: *mut libc::c_void,
-        len: usize,
-        i_trace: *const libc::c_void,
-        u_trace: *const libc::c_void,
-    ) -> usize;
-    pub fn merge_php_stacks(
-        trace_str: *mut libc::c_void,
-        len: usize,
-        i_trace: *const libc::c_void,
-        u_trace: *const libc::c_void,
-    ) -> usize;
-    pub fn merge_v8_stacks(
-        trace_str: *mut libc::c_void,
-        len: usize,
-        i_trace: *const libc::c_void,
-        u_trace: *const libc::c_void,
-    ) -> usize;
 
     pub fn resolve_php_frame(
         pid: u32,

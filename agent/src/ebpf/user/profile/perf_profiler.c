@@ -257,14 +257,8 @@ static void oncpu_reader_work(void *arg)
 exit:
 	print_cp_tracer_status();
 
-	print_hash_stack_str(&oncpu_ctx.stack_str_hash);
-	/* free stack_str_hash */
-	if (likely(oncpu_ctx.stack_str_hash.buckets != NULL)) {
-		release_stack_str_hash(&oncpu_ctx.stack_str_hash);
-	}
-
 	print_hash_stack_trace_msg(&oncpu_ctx.msg_hash);
-	/* free stack_str_hash */
+	/* free msg_hash */
 	if (likely(oncpu_ctx.msg_hash.buckets != NULL)) {
 		/* Ensure that all elements are released properly/cleanly */
 		push_and_release_stack_trace_msg(&oncpu_ctx,

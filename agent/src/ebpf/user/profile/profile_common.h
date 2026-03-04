@@ -19,7 +19,6 @@
 
 #include "../load.h"
 #include "perf_profiler.h"
-#include "stringifier.h"
 
 typedef struct {
 	char name[MAP_NAME_SZ];
@@ -50,8 +49,6 @@ struct profiler_context {
 	// Read raw data from the eBPF perfbuf and temporarily store it.
 	struct stack_trace_key_t *raw_stack_data;
 
-	// Cache hash: obtain folded stack trace string from stack ID.
-	stack_str_hash_t stack_str_hash;
 	// Used for tracking data statistics and pushing.
 	stack_trace_msg_hash_t msg_hash;
 

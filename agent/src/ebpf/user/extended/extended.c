@@ -26,6 +26,7 @@
 #include "../tracer.h"
 #include "../socket.h"
 #include "../proc.h"
+#include "extended.h"
 
 int __attribute__ ((weak)) extended_reader_create(struct bpf_tracer *tracer)
 {
@@ -91,19 +92,31 @@ int __attribute__ ((weak)) print_extra_pkt_info(bool datadump_enable,
 	return 0;
 }
 
-char * __attribute__ ((weak)) extended_resolve_frame(int pid, u64 addr, u8 frame_type, u64 extra_a, u64 extra_b)
-{
-	return NULL;
-}
-
-int __attribute__ ((weak)) extended_merge_stacks(char *dst, int len, const char *i_trace, const char *u_trace, int pid)
+int __attribute__ ((weak)) extended_extract_interpreter_frames(int pid,
+                                                               const u8 *frame_types,
+                                                               const u64 *addrs,
+                                                               const u64 *extra_data_a,
+                                                               const u64 *extra_data_b,
+                                                               int frame_count,
+                                                               void *tracer,
+                                                               bool new_cache,
+                                                               void *info_p,
+                                                               interp_symbol_info_t *out_frames,
+                                                               int max_out)
 {
 	return 0;
 }
 
-char * __attribute__ ((weak)) extended_format_lua_stack(void *tracer, int pid, int stack_id,
-                                                        const char *stack_map_name, void *h,
-                                                        bool new_cache, void *info_p)
+void __attribute__ ((weak)) extended_free_interp_frames(interp_symbol_info_t *frames, int count)
 {
-	return NULL;
+}
+
+int __attribute__ ((weak)) extended_extract_structured_frames(void *tracer, int tgid,
+                                                              int user_stack_id, int interp_stack_id,
+                                                              const char *custom_stack_map_name,
+                                                              bool new_cache, void *info_p,
+                                                              interp_symbol_info_t *out_frames,
+                                                              int max_out)
+{
+	return 0;
 }

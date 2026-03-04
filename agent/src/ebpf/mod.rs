@@ -544,6 +544,9 @@ pub struct stack_profile_data {
     pub comm: [u8; PACKET_KNAME_MAX_PADDING + 1],
     pub process_name: [u8; PACKET_KNAME_MAX_PADDING + 1], // process name
     pub container_id: [u8; CONTAINER_ID_SIZE],            // container id
+    pub interp_frame_count: u32,                          // number of structured interpreter frames
+    pub interp_frames_ptr: u64,                           // pointer to CSymbolInfo array
+    pub raw_interpreter_data: u8,                         // 1 = has structured interpreter data
     pub stack_data_len: u32,                              // stack data length
 
     /*
@@ -556,6 +559,22 @@ pub struct stack_profile_data {
      * <user space folded stack trace string> + ";" + <kernel space folded stack trace string>
      */
     pub stack_data: *mut c_char,
+}
+
+/// C-compatible interpreter frame info struct.
+/// Must match the C `interp_symbol_info_t` layout defined in extended.h.
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct CInterpreterFrameInfo {
+    pub frame_type: u32,
+    pub function_name: *mut c_char,
+    pub class_name: *mut c_char,
+    pub lineno: u32,
+    pub file_name: *mut c_char,
+    pub sub_type: u32,
+    pub is_jit: u8,
+    pub raw_addr: u64,
+    pub resolve_failed: u8,
 }
 
 extern "C" {

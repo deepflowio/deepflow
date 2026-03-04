@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/ingester/flow_tag"
 	profile_common "github.com/deepflowio/deepflow/server/ingester/profile/common"
 	"github.com/deepflowio/deepflow/server/ingester/profile/dbwriter"
+	"github.com/deepflowio/deepflow/server/ingester/profile/symbolizer"
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	"github.com/deepflowio/deepflow/server/libs/datatype"
 	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
@@ -282,16 +283,32 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 					// adapt agent version before v6.6
 					parser.processTracer.value = uint64(profile.Count)
 				}
-				// for ebpf profiling data, directly write, no need to parse
-				log.Debugf("decode ebpf profile data, compression: %d, data: %v", profile.DataCompressed, profile.Data)
+
+				var stackData []byte
+				var srcCompressed bool
+				if profile.RawInterpreterData && profile.InterpreterStack != nil && len(profile.InterpreterStack.Frames) > 0 {
+					// New-format agent: structured interpreter frames need server-side symbolization
+					frames := convertPBFrames(profile.InterpreterStack.Frames)
+					mergedStack := symbolizer.Symbolize(frames, profile.NativeStackTrace)
+					stackData = []byte(mergedStack)
+					srcCompressed = false // symbolized string is uncompressed
+					log.Debugf("decode ebpf profile data with server-side symbolization, frames=%d, native_len=%d",
+						len(profile.InterpreterStack.Frames), len(profile.NativeStackTrace))
+				} else {
+					// Old-format agent or pure native stack: use profile.Data as-is
+					stackData = profile.Data
+					srcCompressed = profile.DataCompressed
+					log.Debugf("decode ebpf profile data, compression: %v, data_len: %d", profile.DataCompressed, len(profile.Data))
+				}
+
 				err := parser.rawStackToInProcess(
-					profile.Data,
+					stackData,
 					parser.value,
 					metadata.StartTime,
 					metadata.Units.String(),
 					metadata.SpyName,
 					metadata.Key.Labels(),
-					profile.DataCompressed,
+					srcCompressed,
 				)
 				if err != nil {
 					log.Errorf("decode ebpf profile data failed, offset=%d, len=%d, err=%s", decoder.Offset(), len(decoder.Bytes()), err)
@@ -303,6 +320,25 @@ func (d *Decoder) handleProfileData(vtapID uint16, decoder *codec.SimpleDecoder)
 			continue
 		}
 	}
+}
+
+// convertPBFrames converts protobuf InterpreterFrameSymbol messages to symbolizer InterpreterFrame structs.
+func convertPBFrames(pbFrames []*pb.InterpreterFrameSymbol) []*symbolizer.InterpreterFrame {
+	frames := make([]*symbolizer.InterpreterFrame, 0, len(pbFrames))
+	for _, pf := range pbFrames {
+		frames = append(frames, &symbolizer.InterpreterFrame{
+			FrameType:     int32(pf.FrameType),
+			FunctionName:  pf.FunctionName,
+			ClassName:     pf.ClassName,
+			Lineno:        pf.Lineno,
+			FileName:      pf.FileName,
+			SubType:       pf.SubType,
+			IsJIT:         pf.IsJit,
+			RawAddr:       pf.RawAddr,
+			ResolveFailed: pf.ResolveFailed,
+		})
+	}
+	return frames
 }
 
 func (d *Decoder) filleBPFData(profile *pb.Profile) *pb.Profile {

@@ -186,6 +186,9 @@ typedef struct {
 	u8 comm[TASK_COMM_LEN];
 	u8 process_name[TASK_COMM_LEN];
 	u8 container_id[CONTAINER_ID_SIZE];
+	u32 interp_frame_count;	// number of structured interpreter frames
+	u64 interp_frames_ptr;	// pointer to interp_symbol_info_t array
+	u8 raw_interpreter_data;	// 1 = has structured interpreter data
 	u32 data_len;
 	u64 data_ptr;
 	u8 data[0];
