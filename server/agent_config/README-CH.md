@@ -1702,7 +1702,7 @@ inputs:
 '0ns' 表示不开启，除 '0ns' 外不要配置小于 `1s` 的值。
 
 注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
-即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `inputs.proc.socket_info_sync_interval`。
+即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `proc.socket_list`。
 另外，也要注意确认 `inputs.proc.enabled` 已配置为 **true**。
 
 ### 最小活跃时间 {#inputs.proc.min_lifetime}

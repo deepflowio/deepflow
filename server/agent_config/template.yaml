@@ -1196,7 +1196,7 @@ inputs:
     #     '0ns' means disabled, do not configure a value less than `1s` except for 0.
     #
     #     Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
-    #     i.e., `inputs.proc.socket_info_sync_interval` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
+    #     i.e., `proc.socket_list` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
     #     Additionally, ensure `inputs.proc.enabled` is configured to **true**.
     #   ch: |-
     #     进程 Socket 信息的同步周期。
@@ -1204,7 +1204,7 @@ inputs:
     #     '0ns' 表示不开启，除 '0ns' 外不要配置小于 `1s` 的值。
     #
     #     注意：开启此功能时，需要同时在 `inputs.proc.process_matcher` 中进一步指定具体的进程列表，
-    #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `inputs.proc.socket_info_sync_interval`。
+    #     即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `proc.socket_list`。
     #     另外，也要注意确认 `inputs.proc.enabled` 已配置为 **true**。
     # upgrade_from: static_config.os-proc-socket-sync-interval
     socket_info_sync_interval: 0ns
