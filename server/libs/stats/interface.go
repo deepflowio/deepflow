@@ -27,8 +27,7 @@ var (
 type RemoteType = uint8
 
 const (
-	REMOTE_TYPE_INFLUXDB RemoteType = 1 << iota
-	REMOTE_TYPE_STATSD
+	REMOTE_TYPE_STATSD RemoteType = 1 << iota
 	REMOTE_TYPE_DFSTATSD
 )
 
@@ -59,13 +58,6 @@ func SetMinInterval(interval time.Duration) {
 	}
 }
 
-// 指定influxdb远程服务器
-// 只会有其中一个远程服务器会收到统计数据
-// addr格式: "192.168.1.1:20033"
-func SetRemotes(addrs ...string) {
-	setRemotes(addrs...)
-}
-
 // addr格式: "192.168.1.1:20033"
 func SetDFRemote(addr string) {
 	setDFRemote(addr)
@@ -75,7 +67,7 @@ func GetDFRemote() string {
 	return dfRemote
 }
 
-// 指定远程服务器类型，默认influxdb
+// 指定远程服务器类型，默认 REMOTE_TYPE_STATSD
 func SetRemoteType(t RemoteType) {
 	remoteType = t
 }
