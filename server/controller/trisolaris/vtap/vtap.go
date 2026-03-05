@@ -36,6 +36,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	. "github.com/deepflowio/deepflow/server/controller/common"
 	mysql_model "github.com/deepflowio/deepflow/server/controller/db/metadb/model" // FIXME: To avoid ambiguity, name the package either mysql_model or db_model.
+	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
 	. "github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
@@ -1093,6 +1094,7 @@ func (v *VTapInfo) updateCacheToDB() {
 	for _, vtap := range dbVTaps {
 		keytoDBVTap[GetKey(vtap)] = vtap
 	}
+	vtaps := []*mysql_model.VTap{}
 	cacheKeys := v.vTapCaches.List()
 	for _, cacheKey := range cacheKeys {
 		cacheVTap := v.GetVTapCache(cacheKey)
@@ -1202,12 +1204,14 @@ func (v *VTapInfo) updateCacheToDB() {
 		if filterFlag {
 			updateVTaps = append(updateVTaps, dbVTap)
 		}
+		vtaps = append(vtaps, dbVTap)
 	}
 	vTapmgr := dbmgr.DBMgr[mysql_model.VTap](v.db)
 	if len(updateVTaps) > 0 {
 		log.Infof(v.Logf("update vtap count(%d)", len(updateVTaps)))
 		vTapmgr.AgentUpdateBulk(v.ORGID.GetORGID(), updateVTaps)
 	}
+	statsd.AddAgentStateCounters(v.ORGID.GetORGID(), vtaps...)
 }
 
 func (v *VTapInfo) setVTapChangedForPD() {
