@@ -373,19 +373,17 @@ impl L7ProtocolParserInterface for Iso8583Log {
                 self.perf_stats.push(perf_stat);
             }
 
-            if is_00x000(&info.f3) {
-                if info.f25 == "28" {
-                    if info.mti == "0200-金融类请求" || info.mti == "0210-金融类应答" {
-                        info.endpoint = format!(
-                            "0200-金融类:{}-28消费一次性付款类",
-                            take_first_n(&info.f3, 6)
-                        );
-                    }
-                } else if info.f25 == "00" {
-                    if info.mti == "0200-金融类请求" || info.mti == "0210-金融类应答" {
-                        info.endpoint =
-                            format!("0200-金融类:{}-00-代收", take_first_n(&info.f3, 6));
-                    }
+            if info.f25 == "28" {
+                if (is_00x000(&info.f3) && info.mti == "0200-金融类请求")
+                    || info.mti == "0210-金融类应答"
+                {
+                    info.endpoint = "0200-金融类:00x000-28消费一次性付款类".to_string();
+                }
+            } else if info.f25 == "00" {
+                if (is_00x000(&info.f3) && info.mti == "0200-金融类请求")
+                    || info.mti == "0210-金融类应答"
+                {
+                    info.endpoint = "0200-金融类:00x000-00-代收".to_string();
                 }
             }
 
@@ -412,13 +410,6 @@ impl L7ProtocolParserInterface for Iso8583Log {
 
     fn parsable_on_udp(&self) -> bool {
         false
-    }
-}
-
-fn take_first_n(s: &str, n: usize) -> &str {
-    match s.char_indices().nth(n) {
-        Some((idx, _)) => &s[..idx],
-        None => s,
     }
 }
 
