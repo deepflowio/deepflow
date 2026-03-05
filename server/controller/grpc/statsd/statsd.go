@@ -19,6 +19,7 @@ package statsd
 import (
 	"sync/atomic"
 
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 )
@@ -96,6 +97,7 @@ var ApiTypeToName = map[ApiType]string{
 
 var grpcCounters [MaxApiType]*GrpcCounter
 var gpidCounter = NewGPIDCounter()
+var agentAttrCounter = NewAgentAttrCounter()
 
 func AddGrpcCostStatsd(apiType ApiType, cost int) {
 	if apiType >= MaxApiType {
@@ -115,6 +117,10 @@ func AddGPIDSendCounter(count uint64) {
 	gpidCounter.AddSendCount(count)
 }
 
+func AddAgentAttrCounters(orgID int, vtaps ...*model.VTap) {
+	agentAttrCounter.AddAgentAttrCounters(orgID, vtaps...)
+}
+
 func Start() {
 	for apiType, name := range ApiTypeToName {
 		grpcCounters[apiType] = NewGrpcCounter()
@@ -129,6 +135,10 @@ func Start() {
 		log.Error(err)
 	}
 	err = stats.RegisterCountableWithModulePrefix("controller_", "trisolaris", GetPrometheusLabelIDsCounterSingleton(), stats.OptionStatTags{"grpc_type": "GetPrometheusLabelIDsDetail"})
+	if err != nil {
+		log.Error(err)
+	}
+	err = stats.RegisterCountableWithModulePrefix("controller_", "agent", agentAttrCounter, stats.OptionStatTags{"type": "agent"})
 	if err != nil {
 		log.Error(err)
 	}
