@@ -23,7 +23,6 @@ import (
 	"path"
 	"reflect"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -275,7 +274,7 @@ func newStatsdClient(remote string) *statsd.Client {
 
 // sortTagPairs sorts tag names and their corresponding values together by name.
 // Uses insertion sort which is optimal for the small number of tags typical in metrics.
-func sortTagPairs(names, values []string) {
+func sortTagPairs[T any](names []string, values []T) {
 	n := len(names)
 	for i := 1; i < n; i++ {
 		for j := i; j > 0 && names[j] < names[j-1]; j-- {
@@ -309,7 +308,7 @@ func sendStatsd(points []metricPoint) {
 				if !hasHost && key == "host" {
 					hasHost = true
 				}
-				tagsOption = append(tagsOption, key, strings.Replace(value, ":", "-", -1))
+				tagsOption = append(tagsOption, key, strings.ReplaceAll(value, ":", "-"))
 			}
 			if hostname != "" && !hasHost {
 				tagsOption = append(tagsOption, "host", hostname)
@@ -317,12 +316,12 @@ func sendStatsd(points []metricPoint) {
 			statsdClient := statsdClients[i%len(statsdClients)]
 			if statsdClient != nil {
 				statsdClient = statsdClient.Clone(
-					statsd.Prefix(strings.Replace(p.name, "-", "_", -1)),
+					statsd.Prefix(strings.ReplaceAll(p.name, "-", "_")),
 					statsd.Tags(tagsOption...),
 				)
 				for _, fm := range p.fields {
 					for key, value := range fm {
-						statsdClient.Count(strings.Replace(key, "-", "_", -1), value)
+						statsdClient.Count(strings.ReplaceAll(key, "-", "_"), value)
 					}
 				}
 			}
@@ -351,31 +350,48 @@ func sendStatsd(points []metricPoint) {
 			ts := uint64(p.timestamp.Unix())
 
 			for _, fm := range p.fields {
+				// Snapshot base org/team IDs; fm string fields may override per-element.
+				fmOrgId := orgId
+				fmTeamId := teamId
+
 				dfStats := pb.AcquireDFStats()
 				dfStats.Timestamp = ts
 				dfStats.Name = name
-				dfStats.OrgId = orgId
-				dfStats.TeamId = teamId
 				dfStats.TagNames = append(dfStats.TagNames, baseTagNames...)
 				dfStats.TagValues = append(dfStats.TagValues, baseTagValues...)
 
 				for k, v := range fm {
-					switch str := v.(type) {
-					case string:
-						if str != "" {
-							dfStats.TagNames = append(dfStats.TagNames, k)
-							dfStats.TagValues = append(dfStats.TagValues, str)
-						}
-					default:
-						dfStats.MetricsFloatNames = append(dfStats.MetricsFloatNames, k)
-					}
-				}
-				sort.Slice(dfStats.MetricsFloatNames, func(i, j int) bool {
-					return dfStats.MetricsFloatNames[i] < dfStats.MetricsFloatNames[j]
-				})
-				for idx, k := range dfStats.MetricsFloatNames {
 					var value float64
-					switch vt := fm[k].(type) {
+					isTag := false
+					switch vt := v.(type) {
+					case string:
+						isTag = true
+						if vt != "" {
+							switch k {
+							case TENANT_ORG_ID:
+								id, _ := strconv.Atoi(vt)
+								fmOrgId = uint32(id)
+							case TENANT_TEAM_ID:
+								id, _ := strconv.Atoi(vt)
+								fmTeamId = uint32(id)
+							case "host":
+								rewriteHost := false
+								for i := range dfStats.TagNames {
+									if dfStats.TagNames[i] == "host" {
+										dfStats.TagValues[i] = vt
+										rewriteHost = true
+										break
+									}
+								}
+								if !rewriteHost {
+									dfStats.TagNames = append(dfStats.TagNames, k)
+									dfStats.TagValues = append(dfStats.TagValues, vt)
+								}
+							default:
+								dfStats.TagNames = append(dfStats.TagNames, k)
+								dfStats.TagValues = append(dfStats.TagValues, vt)
+							}
+						}
 					case float64:
 						value = vt
 					case uint:
@@ -387,9 +403,15 @@ func sendStatsd(points []metricPoint) {
 					case int64:
 						value = float64(vt)
 					}
-					dfStats.MetricsFloatValues = append(dfStats.MetricsFloatValues, value)
-					dfStats.MetricsFloatNames[idx] = strings.Replace(k, "-", "_", -1)
+					if !isTag {
+						dfStats.MetricsFloatNames = append(dfStats.MetricsFloatNames, strings.ReplaceAll(k, "-", "_"))
+						dfStats.MetricsFloatValues = append(dfStats.MetricsFloatValues, value)
+					}
 				}
+				sortTagPairs(dfStats.MetricsFloatNames, dfStats.MetricsFloatValues)
+
+				dfStats.OrgId = fmOrgId
+				dfStats.TeamId = fmTeamId
 
 				dfStats.Encode(encoder)
 				dfstatsdClient.Write(encoder.Bytes())
@@ -505,7 +527,7 @@ func init() {
 	} else {
 
 	}
-	processName = strings.Replace(processName, "-", "_", -1)
+	processName = strings.ReplaceAll(processName, "-", "_")
 
 	go run()
 }
