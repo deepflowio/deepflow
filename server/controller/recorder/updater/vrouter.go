@@ -32,25 +32,25 @@ import (
 type VRouterMessageFactory struct{}
 
 func (f *VRouterMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedVRouters{}
+	return &message.AddedVrouters{}
 }
 
 func (f *VRouterMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedVRouter{}
+	return &message.UpdatedVrouter{}
 }
 
 func (f *VRouterMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedVRouters{}
+	return &message.DeletedVrouters{}
 }
 
 func (f *VRouterMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedVRouterFields{}
+	return &message.UpdatedVrouterFields{}
 }
 
 type VRouter struct {
 	UpdaterBase[
 		cloudmodel.VRouter,
-		*diffbase.VRouter,
+		*diffbase.Vrouter,
 		*metadbmodel.VRouter,
 		metadbmodel.VRouter,
 	]
@@ -62,7 +62,7 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN,
 			wholeCache,
 			db.NewVRouter().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.VRouters,
+			wholeCache.DiffBases().VRouter().GetAll(),
 			cloudData,
 		),
 	}
@@ -76,7 +76,8 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 }
 
 func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*metadbmodel.VRouter, bool) {
-	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := r.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -97,11 +98,12 @@ func (r *VRouter) generateDBItemToAdd(cloudItem *cloudmodel.VRouter) (*metadbmod
 	return dbItem, true
 }
 
-func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *cloudmodel.VRouter) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedVRouterFields)
+func (r *VRouter) generateUpdateInfo(diffBase *diffbase.Vrouter, cloudItem *cloudmodel.VRouter) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedVrouterFields)
 	mapInfo := make(map[string]interface{})
-	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
-		vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	if diffBase.VpcLcuuid != cloudItem.VPCLcuuid {
+		vpcItem := r.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+		vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -110,8 +112,8 @@ func (r *VRouter) generateUpdateInfo(diffBase *diffbase.VRouter, cloudItem *clou
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID
-		structInfo.VPCID.SetNew(vpcID)
-		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
+		structInfo.VpcId.SetNew(vpcID)
+		structInfo.VpcLcuuid.Set(diffBase.VpcLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

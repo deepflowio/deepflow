@@ -17,7 +17,6 @@
 package event
 
 import (
-	"errors"
 	"fmt"
 
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
@@ -55,14 +54,14 @@ func NewVM(q *queue.OverwriteQueue) *VM {
 func (v *VM) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.VM) {
 		var opts []eventapi.TagFieldOption
-		info, err := md.GetToolDataSet().GetVMInfoByID(item.ID)
-		if err != nil {
-			log.Error(err)
+		vmItem := md.GetToolDataSet().Vm().GetById(item.ID)
+		if !vmItem.IsValid() {
+			log.Errorf("vm(id=%d) not found", item.ID, md.LogPrefixes)
 		} else {
 			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagAZID(info.AZID),
-				eventapi.TagRegionID(info.RegionID),
-				eventapi.TagHostID(info.HostID),
+				eventapi.TagAZID(vmItem.AzId()),
+				eventapi.TagRegionID(vmItem.RegionId()),
+				eventapi.TagHostID(vmItem.HostId()),
 			}...)
 		}
 		opts = append(opts, []eventapi.TagFieldOption{
@@ -83,9 +82,9 @@ func (v *VM) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 }
 
 func (v *VM) OnResourceUpdated(md *message.Metadata, msg interface{}) {
-	updateMsg := msg.(*message.UpdatedVM)
+	updateMsg := msg.(*message.UpdatedVm)
 	dbItemNew := updateMsg.GetNewMetadbItem().(*metadbmodel.VM)
-	updatedFields := updateMsg.GetFields().(*message.UpdatedVMFields)
+	updatedFields := updateMsg.GetFields().(*message.UpdatedVmFields)
 	id := updatedFields.GetID()
 
 	var eType string
@@ -133,23 +132,14 @@ func (v *VM) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 }
 
 func (v *VM) getIPNetworksByID(md *message.Metadata, id int) (networkIDs []uint32, ips []string) {
-	ipNetworkMap, _ := md.GetToolDataSet().EventDataSet.GetVMIPNetworkMapByID(id)
-	for ip, nID := range ipNetworkMap {
-		networkIDs = append(networkIDs, uint32(nID))
-		ips = append(ips, ip.IP)
-	}
-	return
+	return getDeviceIPNetworks(md.GetToolDataSet(), ctrlrcommon.VIF_DEVICE_TYPE_VM, id)
 }
 
 func (v *VM) getVMIDAndNameByLcuuid(md *message.Metadata, lcuuid string) (int, string, error) {
-	id, ok := md.GetToolDataSet().GetVMIDByLcuuid(lcuuid)
-	if !ok {
-		return 0, "", errors.New(nameByIDNotFound(v.resourceType, id))
-	}
-	name, err := md.GetToolDataSet().GetVMNameByID(id)
-	if !ok {
-		return 0, "", err
+	vmItem := md.GetToolDataSet().Vm().GetByLcuuid(lcuuid)
+	if !vmItem.IsValid() {
+		return 0, "", fmt.Errorf("vm(lcuuid=%s) not found", lcuuid)
 	}
 
-	return id, name, nil
+	return vmItem.Id(), vmItem.Name(), nil
 }

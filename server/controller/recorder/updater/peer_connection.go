@@ -61,7 +61,7 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 			ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN,
 			wholeCache,
 			db.NewPeerConnection().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.PeerConnections,
+			wholeCache.DiffBases().PeerConnection().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 }
 
 func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnection) (*metadbmodel.PeerConnection, bool) {
-	remoteVPCID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.RemoteVPCLcuuid)
+	remoteVpcItem := c.cache.Tool().Vpc().GetByLcuuid(cloudItem.RemoteVPCLcuuid)
+	remoteVPCID, exists := remoteVpcItem.Id(), remoteVpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.RemoteVPCLcuuid,
@@ -83,7 +84,8 @@ func (c *PeerConnection) generateDBItemToAdd(cloudItem *cloudmodel.PeerConnectio
 		), c.metadata.LogPrefixes)
 		return nil, false
 	}
-	localVPCID, exists := c.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.LocalVPCLcuuid)
+	localVpcItem := c.cache.Tool().Vpc().GetByLcuuid(cloudItem.LocalVPCLcuuid)
+	localVPCID, exists := localVpcItem.Id(), localVpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.LocalVPCLcuuid,

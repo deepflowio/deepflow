@@ -60,7 +60,7 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 			ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN,
 			wholeCache,
 			db.NewRoutingTable().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.RoutingTables,
+			wholeCache.DiffBases().RoutingTable().GetAll(),
 			cloudData,
 		),
 	}
@@ -74,7 +74,8 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 }
 
 func (t *RoutingTable) generateDBItemToAdd(cloudItem *cloudmodel.RoutingTable) (*metadbmodel.RoutingTable, bool) {
-	vrouterID, exists := t.cache.ToolDataSet.GetVRouterIDByLcuuid(cloudItem.VRouterLcuuid)
+	vrouterItem := t.cache.Tool().Vrouter().GetByLcuuid(cloudItem.VRouterLcuuid)
+	vrouterID, exists := vrouterItem.Id(), vrouterItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, cloudItem.VRouterLcuuid,

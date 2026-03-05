@@ -12,10 +12,10 @@ type PodIngress struct {
 	lcuuid         string
 	id             int
 	name           string
-	regionID       int
-	azID           int
-	podNamespaceID int
-	podClusterID   int
+	regionId       int
+	azId           int
+	podNamespaceId int
+	podClusterId   int
 }
 
 func (t *PodIngress) IsValid() bool {
@@ -26,7 +26,7 @@ func (t *PodIngress) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *PodIngress) ID() int {
+func (t *PodIngress) Id() int {
 	return t.id
 }
 
@@ -34,30 +34,30 @@ func (t *PodIngress) Name() string {
 	return t.name
 }
 
-func (t *PodIngress) RegionID() int {
-	return t.regionID
+func (t *PodIngress) RegionId() int {
+	return t.regionId
 }
 
-func (t *PodIngress) AZID() int {
-	return t.azID
+func (t *PodIngress) AzId() int {
+	return t.azId
 }
 
-func (t *PodIngress) PodNamespaceID() int {
-	return t.podNamespaceID
+func (t *PodIngress) PodNamespaceId() int {
+	return t.podNamespaceId
 }
 
-func (t *PodIngress) PodClusterID() int {
-	return t.podClusterID
+func (t *PodIngress) PodClusterId() int {
+	return t.podClusterId
 }
 
 func (t *PodIngress) reset(dbItem *metadbmodel.PodIngress, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.podNamespaceID = dbItem.PodNamespaceID
-	t.podClusterID = dbItem.PodClusterID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.podNamespaceId = dbItem.PodNamespaceID
+	t.podClusterId = dbItem.PodClusterID
 }
 
 func NewPodIngressCollection(t *Tool) *PodIngressCollection {

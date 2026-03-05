@@ -11,8 +11,8 @@ import (
 type PodGroupConfigMapConnection struct {
 	lcuuid      string
 	id          int
-	configMapID int
-	podGroupID  int
+	configMapId int
+	podGroupId  int
 }
 
 func (t *PodGroupConfigMapConnection) IsValid() bool {
@@ -23,23 +23,23 @@ func (t *PodGroupConfigMapConnection) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *PodGroupConfigMapConnection) ID() int {
+func (t *PodGroupConfigMapConnection) Id() int {
 	return t.id
 }
 
-func (t *PodGroupConfigMapConnection) ConfigMapID() int {
-	return t.configMapID
+func (t *PodGroupConfigMapConnection) ConfigMapId() int {
+	return t.configMapId
 }
 
-func (t *PodGroupConfigMapConnection) PodGroupID() int {
-	return t.podGroupID
+func (t *PodGroupConfigMapConnection) PodGroupId() int {
+	return t.podGroupId
 }
 
 func (t *PodGroupConfigMapConnection) reset(dbItem *metadbmodel.PodGroupConfigMapConnection, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
-	t.configMapID = dbItem.ConfigMapID
-	t.podGroupID = dbItem.PodGroupID
+	t.configMapId = dbItem.ConfigMapID
+	t.podGroupId = dbItem.PodGroupID
 }
 
 func NewPodGroupConfigMapConnectionCollection(t *Tool) *PodGroupConfigMapConnectionCollection {

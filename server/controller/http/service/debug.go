@@ -93,19 +93,19 @@ func GetRecorderDomainCache(domainLcuuid, subDomainLcuuid string, m *manager.Man
 	}
 }
 
-func GetRecorderCacheDiffBaseDataSet(domainLcuuid, subDomainLcuuid string, m *manager.Manager) (resp diffbase.DataSet, err error) {
+func GetRecorderCacheDiffBaseDataSet(domainLcuuid, subDomainLcuuid string, m *manager.Manager) (resp *diffbase.DiffBases, err error) {
 	if recorder, err := m.GetRecorder(domainLcuuid); err == nil {
-		return *recorder.GetCache(domainLcuuid, subDomainLcuuid).DiffBaseDataSet, nil
+		return recorder.GetCache(domainLcuuid, subDomainLcuuid).DiffBases(), nil
 	} else {
-		return diffbase.DataSet{}, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
+		return nil, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
 	}
 }
 
-func GetRecorderCacheToolDataSet(domainLcuuid, subDomainLcuuid string, m *manager.Manager) (resp tool.DataSet, err error) {
+func GetRecorderCacheToolDataSet(domainLcuuid, subDomainLcuuid string, m *manager.Manager) (resp *tool.Tool, err error) {
 	if recorder, err := m.GetRecorder(domainLcuuid); err == nil {
-		return *recorder.GetCache(domainLcuuid, subDomainLcuuid).ToolDataSet, nil
+		return recorder.GetCache(domainLcuuid, subDomainLcuuid).Tool(), nil
 	} else {
-		return tool.DataSet{}, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
+		return nil, response.ServiceError(httpcommon.RESOURCE_NOT_FOUND, err.Error())
 	}
 }
 

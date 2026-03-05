@@ -66,9 +66,9 @@ func (c *ChPodK8sEnv) onResourceUpdated(md *message.Metadata, updateMessage *mes
 	keysToDelete := make([]IDKeyKey, 0)
 	targetsToDelete := make([]metadbmodel.ChPodK8sEnv, 0)
 
-	if fieldsUpdate.ENV.IsDifferent() {
-		_, new := StrToJsonAndMap(fieldsUpdate.ENV.GetNew())
-		_, old := StrToJsonAndMap(fieldsUpdate.ENV.GetOld())
+	if fieldsUpdate.Env.IsDifferent() {
+		_, new := StrToJsonAndMap(fieldsUpdate.Env.GetNew())
+		_, old := StrToJsonAndMap(fieldsUpdate.Env.GetOld())
 
 		for k := range old {
 			if _, ok := new[k]; !ok {

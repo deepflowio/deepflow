@@ -13,11 +13,11 @@ type Process struct {
 	id         int
 	name       string
 	deviceType int
-	deviceID   int
-	podGroupID int
-	podNodeID  int
-	vmID       int
-	vpcID      int
+	deviceId   int
+	podGroupId int
+	podNodeId  int
+	vmId       int
+	vpcId      int
 }
 
 func (t *Process) IsValid() bool {
@@ -28,7 +28,7 @@ func (t *Process) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *Process) ID() int {
+func (t *Process) Id() int {
 	return t.id
 }
 
@@ -40,24 +40,24 @@ func (t *Process) DeviceType() int {
 	return t.deviceType
 }
 
-func (t *Process) DeviceID() int {
-	return t.deviceID
+func (t *Process) DeviceId() int {
+	return t.deviceId
 }
 
-func (t *Process) PodGroupID() int {
-	return t.podGroupID
+func (t *Process) PodGroupId() int {
+	return t.podGroupId
 }
 
-func (t *Process) PodNodeID() int {
-	return t.podNodeID
+func (t *Process) PodNodeId() int {
+	return t.podNodeId
 }
 
-func (t *Process) VMID() int {
-	return t.vmID
+func (t *Process) VmId() int {
+	return t.vmId
 }
 
-func (t *Process) VPCID() int {
-	return t.vpcID
+func (t *Process) VpcId() int {
+	return t.vpcId
 }
 
 func (t *Process) reset(dbItem *metadbmodel.Process, tool *Tool) {
@@ -65,11 +65,11 @@ func (t *Process) reset(dbItem *metadbmodel.Process, tool *Tool) {
 	t.id = dbItem.ID
 	t.name = dbItem.Name
 	t.deviceType = dbItem.DeviceType
-	t.deviceID = dbItem.DeviceID
-	t.podGroupID = dbItem.PodGroupID
-	t.podNodeID = dbItem.PodNodeID
-	t.vmID = dbItem.VMID
-	t.vpcID = dbItem.VPCID
+	t.deviceId = dbItem.DeviceID
+	t.podGroupId = dbItem.PodGroupID
+	t.podNodeId = dbItem.PodNodeID
+	t.vmId = dbItem.VMID
+	t.vpcId = dbItem.VPCID
 }
 
 func NewProcessCollection(t *Tool) *ProcessCollection {

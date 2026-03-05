@@ -7,56 +7,56 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// WANIP defines cache data structure.
-type WANIP struct {
+// WanIp defines cache data structure.
+type WanIp struct {
 	lcuuid       string
 	id           int
 	ip           string
-	vInterfaceID int
+	vinterfaceId int
 }
 
-func (t *WANIP) IsValid() bool {
+func (t *WanIp) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *WANIP) Lcuuid() string {
+func (t *WanIp) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *WANIP) ID() int {
+func (t *WanIp) Id() int {
 	return t.id
 }
 
-func (t *WANIP) IP() string {
+func (t *WanIp) Ip() string {
 	return t.ip
 }
 
-func (t *WANIP) VInterfaceID() int {
-	return t.vInterfaceID
+func (t *WanIp) VinterfaceId() int {
+	return t.vinterfaceId
 }
 
-func (t *WANIP) reset(dbItem *metadbmodel.WANIP, tool *Tool) {
+func (t *WanIp) reset(dbItem *metadbmodel.WANIP, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.ip = dbItem.IP
-	t.vInterfaceID = dbItem.VInterfaceID
+	t.vinterfaceId = dbItem.VInterfaceID
 }
 
-func NewWANIPCollection(t *Tool) *WANIPCollection {
-	c := new(WANIPCollection)
+func NewWanIpCollection(t *Tool) *WanIpCollection {
+	c := new(WanIpCollection)
 	c.resetExt()
-	c.collection = newCollectionBuilder[*WANIP]().
+	c.collection = newCollectionBuilder[*WanIp]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.WANIP { return new(metadbmodel.WANIP) }).
-		withCacheItemFactory(func() *WANIP { return new(WANIP) }).
+		withCacheItemFactory(func() *WanIp { return new(WanIp) }).
 		withExtender(c).
 		build()
 	return c
 }
 
-// WANIPCollection defines a collection that maps individual fields to the WANIP cache data structure.
-type WANIPCollection struct {
-	collection[*WANIP, *metadbmodel.WANIP]
-	WANIPCollectionExt
+// WanIpCollection defines a collection that maps individual fields to the WanIp cache data structure.
+type WanIpCollection struct {
+	collection[*WanIp, *metadbmodel.WANIP]
+	WanIpCollectionExt
 }

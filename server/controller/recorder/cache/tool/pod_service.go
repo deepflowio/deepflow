@@ -12,11 +12,11 @@ type PodService struct {
 	lcuuid         string
 	id             int
 	name           string
-	regionID       int
-	azID           int
-	vpcID          int
-	podClusterID   int
-	podNamespaceID int
+	regionId       int
+	azId           int
+	vpcId          int
+	podClusterId   int
+	podNamespaceId int
 }
 
 func (t *PodService) IsValid() bool {
@@ -27,7 +27,7 @@ func (t *PodService) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *PodService) ID() int {
+func (t *PodService) Id() int {
 	return t.id
 }
 
@@ -35,35 +35,35 @@ func (t *PodService) Name() string {
 	return t.name
 }
 
-func (t *PodService) RegionID() int {
-	return t.regionID
+func (t *PodService) RegionId() int {
+	return t.regionId
 }
 
-func (t *PodService) AZID() int {
-	return t.azID
+func (t *PodService) AzId() int {
+	return t.azId
 }
 
-func (t *PodService) VPCID() int {
-	return t.vpcID
+func (t *PodService) VpcId() int {
+	return t.vpcId
 }
 
-func (t *PodService) PodClusterID() int {
-	return t.podClusterID
+func (t *PodService) PodClusterId() int {
+	return t.podClusterId
 }
 
-func (t *PodService) PodNamespaceID() int {
-	return t.podNamespaceID
+func (t *PodService) PodNamespaceId() int {
+	return t.podNamespaceId
 }
 
 func (t *PodService) reset(dbItem *metadbmodel.PodService, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.vpcID = dbItem.VPCID
-	t.podClusterID = dbItem.PodClusterID
-	t.podNamespaceID = dbItem.PodNamespaceID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.vpcId = dbItem.VPCID
+	t.podClusterId = dbItem.PodClusterID
+	t.podNamespaceId = dbItem.PodNamespaceID
 }
 
 func NewPodServiceCollection(t *Tool) *PodServiceCollection {

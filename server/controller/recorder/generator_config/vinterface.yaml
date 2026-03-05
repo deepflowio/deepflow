@@ -1,47 +1,115 @@
 name: vinterface
-public_name: VInterface
+orm_name: VInterface
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: type
+      orm_name: Type
+      type: int
+    - name: tap_mac
+      orm_name: TapMac
+      type: string
+    - name: netns_id
+      orm_name: NetnsID
+      type: uint32
+    - name: vtap_id
+      orm_name: VtapID
+      type: uint32
+    - name: vpc_id
+      orm_name: VPCID
+      type: int
+    - name: device_type
+      orm_name: DeviceType
+      type: int
+    - name: device_lcuuid
+      orm_name: DeviceLcuuid
+      type: string
+      is_extension: true
+    - name: network_lcuuid
+      orm_name: NetworkID
+      type: string
+      ref:
+        resource: network
+        lookup_by: id
+        target: lcuuid
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+  extensions:
+    - struct
+
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: ifType
-    public_name: Type
+  - name: if_type
+    orm_name: Type
     type: int
   - name: index
-    public_name: Index
+    orm_name: Index
     type: int
   - name: mac
-    public_name: Mac
+    orm_name: Mac
     type: string
-  - name: regionID
-    public_name: RegionID
+  - name: region_id
+    orm_name: Region
     type: int
-    ref: Region
-    db_field_name: Region
-  - name: networkID
-    public_name: NetworkID
+    ref:
+      resource: region
+      lookup_by: lcuuid
+      target: id
+  - name: network_id
+    orm_name: NetworkID
     type: int
-  - name: vpcID
-    public_name: VPCID
+  - name: vpc_id
+    orm_name: VPCID
     type: int
-  - name: deviceType
-    public_name: DeviceType
+  - name: device_type
+    orm_name: DeviceType
     type: int
-  - name: deviceID
-    public_name: DeviceID
+  - name: device_id
+    orm_name: DeviceID
     type: int
-  - name: deviceName
-    public_name: DeviceName
+  - name: device_name
     type: string
-    is_custom: true
-  has_extension: true
-  collection_extension: true
+    is_extension: true
+  extensions:
+    - collection
+    - struct
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: tap_mac
+        type: string
+      - name: type
+        type: int
+      - name: netns_id
+        type: uint32
+      - name: vtap_id
+        type: uint32
+      - name: network_id
+        type: int
+      - name: network_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string

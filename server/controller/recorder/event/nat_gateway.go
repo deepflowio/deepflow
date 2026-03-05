@@ -43,13 +43,13 @@ func NewNATGateway(q *queue.OverwriteQueue) *NATGateway {
 func (n *NATGateway) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.NATGateway) {
 		var opts []eventapi.TagFieldOption
-		info, err := md.GetToolDataSet().GetNATGatewayInfoByID(item.ID)
-		if err != nil {
-			log.Error(err)
+		ngItem := md.GetToolDataSet().NatGateway().GetById(item.ID)
+		if !ngItem.IsValid() {
+			log.Errorf("nat_gateway(id=%d) not found", item.ID, md.LogPrefixes)
 		} else {
 			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagAZID(info.AZID),
-				eventapi.TagRegionID(info.RegionID),
+				eventapi.TagAZID(ngItem.AzId()),
+				eventapi.TagRegionID(ngItem.RegionId()),
 			}...)
 		}
 		opts = append(opts, []eventapi.TagFieldOption{

@@ -31,25 +31,25 @@ import (
 type RDSInstanceMessageFactory struct{}
 
 func (f *RDSInstanceMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedRDSInstances{}
+	return &message.AddedRdsInstances{}
 }
 
 func (f *RDSInstanceMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedRDSInstance{}
+	return &message.UpdatedRdsInstance{}
 }
 
 func (f *RDSInstanceMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedRDSInstances{}
+	return &message.DeletedRdsInstances{}
 }
 
 func (f *RDSInstanceMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedRDSInstanceFields{}
+	return &message.UpdatedRdsInstanceFields{}
 }
 
 type RDSInstance struct {
 	UpdaterBase[
 		cloudmodel.RDSInstance,
-		*diffbase.RDSInstance,
+		*diffbase.RdsInstance,
 		*metadbmodel.RDSInstance,
 		metadbmodel.RDSInstance,
 	]
@@ -61,7 +61,7 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 			ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			wholeCache,
 			db.NewRDSInstance().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.RDSInstances,
+			wholeCache.DiffBases().RDSInstance().GetAll(),
 			cloudData,
 		),
 	}
@@ -76,7 +76,8 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 
 // Implement DataGenerator interface
 func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*metadbmodel.RDSInstance, bool) {
-	vpcID, exists := r.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := r.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -102,8 +103,8 @@ func (r *RDSInstance) generateDBItemToAdd(cloudItem *cloudmodel.RDSInstance) (*m
 	return dbItem, true
 }
 
-func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudItem *cloudmodel.RDSInstance) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedRDSInstanceFields)
+func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RdsInstance, cloudItem *cloudmodel.RDSInstance) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedRdsInstanceFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -125,9 +126,9 @@ func (r *RDSInstance) generateUpdateInfo(diffBase *diffbase.RDSInstance, cloudIt
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	if diffBase.AzLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AzLcuuid, cloudItem.AZLcuuid)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

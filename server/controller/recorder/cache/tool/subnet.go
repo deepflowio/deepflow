@@ -12,7 +12,7 @@ type Subnet struct {
 	lcuuid    string
 	id        int
 	name      string
-	networkID int
+	networkId int
 }
 
 func (t *Subnet) IsValid() bool {
@@ -23,7 +23,7 @@ func (t *Subnet) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *Subnet) ID() int {
+func (t *Subnet) Id() int {
 	return t.id
 }
 
@@ -31,15 +31,15 @@ func (t *Subnet) Name() string {
 	return t.name
 }
 
-func (t *Subnet) NetworkID() int {
-	return t.networkID
+func (t *Subnet) NetworkId() int {
+	return t.networkId
 }
 
 func (t *Subnet) reset(dbItem *metadbmodel.Subnet, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.networkID = dbItem.NetworkID
+	t.networkId = dbItem.NetworkID
 }
 
 func NewSubnetCollection(t *Tool) *SubnetCollection {

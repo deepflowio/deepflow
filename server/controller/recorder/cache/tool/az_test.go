@@ -34,27 +34,27 @@ func TestAZ(t *testing.T) {
 	}
 
 	t.Run("reset", func(t *testing.T) {
-		a := &AZ{}
+		a := &Az{}
 		a.reset(dbItem, nil)
 		assert.Equal(t, dbItem.Lcuuid, a.Lcuuid())
-		assert.Equal(t, dbItem.ID, a.ID())
+		assert.Equal(t, dbItem.ID, a.Id())
 		assert.Equal(t, "", a.Name())
 		assert.True(t, a.IsValid())
 	})
 
 	t.Run("invalid", func(t *testing.T) {
-		a := &AZ{}
+		a := &Az{}
 		assert.False(t, a.IsValid())
 	})
 }
 
 func TestNewAZCollection(t *testing.T) {
-	assert.NotNil(t, NewAZCollection(nil))
+	assert.NotNil(t, NewAzCollection(nil))
 }
 
-func TestAZCollection(t *testing.T) {
+func TestAzCollection(t *testing.T) {
 	tool := NewTool(&common.Metadata{})
-	c := NewAZCollection(tool)
+	c := NewAzCollection(tool)
 	dbItem := &model.AZ{
 		Base: model.Base{
 			ID:     1,
@@ -67,11 +67,11 @@ func TestAZCollection(t *testing.T) {
 		c.Add(dbItem)
 		item := c.GetByLcuuid(dbItem.Lcuuid)
 		assert.Equal(t, dbItem.Lcuuid, item.Lcuuid())
-		assert.Equal(t, dbItem.ID, item.ID())
+		assert.Equal(t, dbItem.ID, item.Id())
 
-		itemByID := c.GetByID(dbItem.ID)
+		itemByID := c.GetById(dbItem.ID)
 		assert.Equal(t, dbItem.Lcuuid, itemByID.Lcuuid())
-		assert.Equal(t, dbItem.ID, itemByID.ID())
+		assert.Equal(t, dbItem.ID, itemByID.Id())
 	})
 
 	t.Run("update", func(t *testing.T) {
@@ -86,7 +86,7 @@ func TestAZCollection(t *testing.T) {
 		item := c.GetByLcuuid(dbItem.Lcuuid)
 		assert.False(t, item.IsValid())
 
-		itemByID := c.GetByID(dbItem.ID)
+		itemByID := c.GetById(dbItem.ID)
 		assert.False(t, itemByID.IsValid())
 	})
 
@@ -94,7 +94,7 @@ func TestAZCollection(t *testing.T) {
 		item := c.GetByLcuuid("non-existent")
 		assert.False(t, item.IsValid())
 
-		itemByID := c.GetByID(999)
+		itemByID := c.GetById(999)
 		assert.False(t, itemByID.IsValid())
 	})
 }

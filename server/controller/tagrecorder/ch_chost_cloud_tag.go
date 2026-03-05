@@ -25,12 +25,12 @@ import (
 
 type ChChostCloudTag struct {
 	SubscriberComponent[
-		*message.AddedVMs,
-		message.AddedVMs,
-		*message.UpdatedVM,
-		message.UpdatedVM,
-		*message.DeletedVMs,
-		message.DeletedVMs,
+		*message.AddedVms,
+		message.AddedVms,
+		*message.UpdatedVm,
+		message.UpdatedVm,
+		*message.DeletedVms,
+		message.DeletedVms,
 		metadbmodel.VM,
 		metadbmodel.ChChostCloudTag,
 		IDKeyKey,
@@ -40,12 +40,12 @@ type ChChostCloudTag struct {
 func NewChChostCloudTag() *ChChostCloudTag {
 	mng := &ChChostCloudTag{
 		newSubscriberComponent[
-			*message.AddedVMs,
-			message.AddedVMs,
-			*message.UpdatedVM,
-			message.UpdatedVM,
-			*message.DeletedVMs,
-			message.DeletedVMs,
+			*message.AddedVms,
+			message.AddedVms,
+			*message.UpdatedVm,
+			message.UpdatedVm,
+			*message.DeletedVms,
+			message.DeletedVms,
 			metadbmodel.VM,
 			metadbmodel.ChChostCloudTag,
 			IDKeyKey,
@@ -58,9 +58,9 @@ func NewChChostCloudTag() *ChChostCloudTag {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTag) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
+func (c *ChChostCloudTag) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVm) {
 	db := md.GetDB()
-	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVMFields)
+	fieldsUpdate := updateMessage.GetFields().(*message.UpdatedVmFields)
 	newSource := updateMessage.GetNewMetadbItem().(*metadbmodel.VM)
 	sourceID := newSource.ID
 	new := map[string]string{}

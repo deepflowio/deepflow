@@ -43,13 +43,13 @@ func NewRedisInstance(q *queue.OverwriteQueue) *RedisInstance {
 func (r *RedisInstance) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.RedisInstance) {
 		var opts []eventapi.TagFieldOption
-		info, err := md.GetToolDataSet().GetRedisInstanceInfoByID(item.ID)
-		if err != nil {
-			log.Error(err)
+		riItem := md.GetToolDataSet().RedisInstance().GetById(item.ID)
+		if !riItem.IsValid() {
+			log.Errorf("redis_instance(id=%d) not found", item.ID, md.LogPrefixes)
 		} else {
 			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagAZID(info.AZID),
-				eventapi.TagRegionID(info.RegionID),
+				eventapi.TagAZID(riItem.AzId()),
+				eventapi.TagRegionID(riItem.RegionId()),
 			}...)
 		}
 		opts = append(opts, []eventapi.TagFieldOption{

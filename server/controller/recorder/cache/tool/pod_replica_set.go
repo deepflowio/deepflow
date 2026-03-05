@@ -12,11 +12,11 @@ type PodReplicaSet struct {
 	lcuuid         string
 	id             int
 	name           string
-	regionID       int
-	azID           int
-	podGroupID     int
-	podNamespaceID int
-	podClusterID   int
+	regionId       int
+	azId           int
+	podGroupId     int
+	podNamespaceId int
+	podClusterId   int
 }
 
 func (t *PodReplicaSet) IsValid() bool {
@@ -27,7 +27,7 @@ func (t *PodReplicaSet) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *PodReplicaSet) ID() int {
+func (t *PodReplicaSet) Id() int {
 	return t.id
 }
 
@@ -35,35 +35,35 @@ func (t *PodReplicaSet) Name() string {
 	return t.name
 }
 
-func (t *PodReplicaSet) RegionID() int {
-	return t.regionID
+func (t *PodReplicaSet) RegionId() int {
+	return t.regionId
 }
 
-func (t *PodReplicaSet) AZID() int {
-	return t.azID
+func (t *PodReplicaSet) AzId() int {
+	return t.azId
 }
 
-func (t *PodReplicaSet) PodGroupID() int {
-	return t.podGroupID
+func (t *PodReplicaSet) PodGroupId() int {
+	return t.podGroupId
 }
 
-func (t *PodReplicaSet) PodNamespaceID() int {
-	return t.podNamespaceID
+func (t *PodReplicaSet) PodNamespaceId() int {
+	return t.podNamespaceId
 }
 
-func (t *PodReplicaSet) PodClusterID() int {
-	return t.podClusterID
+func (t *PodReplicaSet) PodClusterId() int {
+	return t.podClusterId
 }
 
 func (t *PodReplicaSet) reset(dbItem *metadbmodel.PodReplicaSet, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.podGroupID = dbItem.PodGroupID
-	t.podNamespaceID = dbItem.PodNamespaceID
-	t.podClusterID = dbItem.PodClusterID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.podGroupId = dbItem.PodGroupID
+	t.podNamespaceId = dbItem.PodNamespaceID
+	t.podClusterId = dbItem.PodClusterID
 }
 
 func NewPodReplicaSetCollection(t *Tool) *PodReplicaSetCollection {

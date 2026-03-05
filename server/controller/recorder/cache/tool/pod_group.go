@@ -13,10 +13,10 @@ type PodGroup struct {
 	id             int
 	name           string
 	gType          int
-	regionID       int
-	azID           int
-	podNamespaceID int
-	podClusterID   int
+	regionId       int
+	azId           int
+	podNamespaceId int
+	podClusterId   int
 }
 
 func (t *PodGroup) IsValid() bool {
@@ -27,7 +27,7 @@ func (t *PodGroup) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *PodGroup) ID() int {
+func (t *PodGroup) Id() int {
 	return t.id
 }
 
@@ -35,24 +35,24 @@ func (t *PodGroup) Name() string {
 	return t.name
 }
 
-func (t *PodGroup) Type() int {
+func (t *PodGroup) GType() int {
 	return t.gType
 }
 
-func (t *PodGroup) RegionID() int {
-	return t.regionID
+func (t *PodGroup) RegionId() int {
+	return t.regionId
 }
 
-func (t *PodGroup) AZID() int {
-	return t.azID
+func (t *PodGroup) AzId() int {
+	return t.azId
 }
 
-func (t *PodGroup) PodNamespaceID() int {
-	return t.podNamespaceID
+func (t *PodGroup) PodNamespaceId() int {
+	return t.podNamespaceId
 }
 
-func (t *PodGroup) PodClusterID() int {
-	return t.podClusterID
+func (t *PodGroup) PodClusterId() int {
+	return t.podClusterId
 }
 
 func (t *PodGroup) reset(dbItem *metadbmodel.PodGroup, tool *Tool) {
@@ -60,10 +60,10 @@ func (t *PodGroup) reset(dbItem *metadbmodel.PodGroup, tool *Tool) {
 	t.id = dbItem.ID
 	t.name = dbItem.Name
 	t.gType = dbItem.Type
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.podNamespaceID = dbItem.PodNamespaceID
-	t.podClusterID = dbItem.PodClusterID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.podNamespaceId = dbItem.PodNamespaceID
+	t.podClusterId = dbItem.PodClusterID
 }
 
 func NewPodGroupCollection(t *Tool) *PodGroupCollection {

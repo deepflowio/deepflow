@@ -43,12 +43,12 @@ func NewLB(q *queue.OverwriteQueue) *LB {
 func (l *LB) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.LB) {
 		var opts []eventapi.TagFieldOption
-		info, err := md.GetToolDataSet().GetLBInfoByID(item.ID)
-		if err != nil {
-			log.Error(err)
+		lbItem := md.GetToolDataSet().Lb().GetById(item.ID)
+		if !lbItem.IsValid() {
+			log.Errorf("lb(id=%d) not found", item.ID, md.LogPrefixes)
 		} else {
 			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagRegionID(info.RegionID),
+				eventapi.TagRegionID(lbItem.RegionId()),
 			}...)
 		}
 		opts = append(opts, []eventapi.TagFieldOption{

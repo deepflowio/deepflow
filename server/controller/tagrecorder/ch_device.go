@@ -30,12 +30,12 @@ import (
 
 type ChVMDevice struct {
 	SubscriberComponent[
-		*message.AddedVMs,
-		message.AddedVMs,
-		*message.UpdatedVM,
-		message.UpdatedVM,
-		*message.DeletedVMs,
-		message.DeletedVMs,
+		*message.AddedVms,
+		message.AddedVms,
+		*message.UpdatedVm,
+		message.UpdatedVm,
+		*message.DeletedVms,
+		message.DeletedVms,
 		metadbmodel.VM,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -46,12 +46,12 @@ type ChVMDevice struct {
 func NewChVMDevice(resourceTypeToIconID map[IconKey]int) *ChVMDevice {
 	mng := &ChVMDevice{
 		newSubscriberComponent[
-			*message.AddedVMs,
-			message.AddedVMs,
-			*message.UpdatedVM,
-			message.UpdatedVM,
-			*message.DeletedVMs,
-			message.DeletedVMs,
+			*message.AddedVms,
+			message.AddedVms,
+			*message.UpdatedVm,
+			message.UpdatedVm,
+			*message.DeletedVms,
+			message.DeletedVms,
 			metadbmodel.VM,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -93,7 +93,7 @@ func (c *ChVMDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.VM
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChVMDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
+func (c *ChVMDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVm) {
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -182,12 +182,12 @@ func (c *ChHostDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice,
 
 type ChVRouterDevice struct {
 	SubscriberComponent[
-		*message.AddedVRouters,
-		message.AddedVRouters,
-		*message.UpdatedVRouter,
-		message.UpdatedVRouter,
-		*message.DeletedVRouters,
-		message.DeletedVRouters,
+		*message.AddedVrouters,
+		message.AddedVrouters,
+		*message.UpdatedVrouter,
+		message.UpdatedVrouter,
+		*message.DeletedVrouters,
+		message.DeletedVrouters,
 		metadbmodel.VRouter,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -198,12 +198,12 @@ type ChVRouterDevice struct {
 func NewChVRouterDevice(resourceTypeToIconID map[IconKey]int) *ChVRouterDevice {
 	mng := &ChVRouterDevice{
 		newSubscriberComponent[
-			*message.AddedVRouters,
-			message.AddedVRouters,
-			*message.UpdatedVRouter,
-			message.UpdatedVRouter,
-			*message.DeletedVRouters,
-			message.DeletedVRouters,
+			*message.AddedVrouters,
+			message.AddedVrouters,
+			*message.UpdatedVrouter,
+			message.UpdatedVrouter,
+			*message.DeletedVrouters,
+			message.DeletedVrouters,
 			metadbmodel.VRouter,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -241,7 +241,7 @@ func (c *ChVRouterDevice) sourceToTarget(md *message.Metadata, source *metadbmod
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChVRouterDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVRouter) {
+func (c *ChVRouterDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVrouter) {
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -254,12 +254,12 @@ func (c *ChVRouterDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevi
 
 type ChDHCPPortDevice struct {
 	SubscriberComponent[
-		*message.AddedDHCPPorts,
-		message.AddedDHCPPorts,
-		*message.UpdatedDHCPPort,
-		message.UpdatedDHCPPort,
-		*message.DeletedDHCPPorts,
-		message.DeletedDHCPPorts,
+		*message.AddedDhcpPorts,
+		message.AddedDhcpPorts,
+		*message.UpdatedDhcpPort,
+		message.UpdatedDhcpPort,
+		*message.DeletedDhcpPorts,
+		message.DeletedDhcpPorts,
 		metadbmodel.DHCPPort,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -270,12 +270,12 @@ type ChDHCPPortDevice struct {
 func NewChDHCPPortDevice(resourceTypeToIconID map[IconKey]int) *ChDHCPPortDevice {
 	mng := &ChDHCPPortDevice{
 		newSubscriberComponent[
-			*message.AddedDHCPPorts,
-			message.AddedDHCPPorts,
-			*message.UpdatedDHCPPort,
-			message.UpdatedDHCPPort,
-			*message.DeletedDHCPPorts,
-			message.DeletedDHCPPorts,
+			*message.AddedDhcpPorts,
+			message.AddedDhcpPorts,
+			*message.UpdatedDhcpPort,
+			message.UpdatedDhcpPort,
+			*message.DeletedDhcpPorts,
+			message.DeletedDhcpPorts,
 			metadbmodel.DHCPPort,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -313,7 +313,7 @@ func (c *ChDHCPPortDevice) sourceToTarget(md *message.Metadata, source *metadbmo
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChDHCPPortDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedDHCPPort) {
+func (c *ChDHCPPortDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedDhcpPort) {
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -326,12 +326,12 @@ func (c *ChDHCPPortDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDev
 
 type ChNATGatewayDevice struct {
 	SubscriberComponent[
-		*message.AddedNATGateways,
-		message.AddedNATGateways,
-		*message.UpdatedNATGateway,
-		message.UpdatedNATGateway,
-		*message.DeletedNATGateways,
-		message.DeletedNATGateways,
+		*message.AddedNatGateways,
+		message.AddedNatGateways,
+		*message.UpdatedNatGateway,
+		message.UpdatedNatGateway,
+		*message.DeletedNatGateways,
+		message.DeletedNatGateways,
 		metadbmodel.NATGateway,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -342,12 +342,12 @@ type ChNATGatewayDevice struct {
 func NewChNATGatewayDevice(resourceTypeToIconID map[IconKey]int) *ChNATGatewayDevice {
 	mng := &ChNATGatewayDevice{
 		newSubscriberComponent[
-			*message.AddedNATGateways,
-			message.AddedNATGateways,
-			*message.UpdatedNATGateway,
-			message.UpdatedNATGateway,
-			*message.DeletedNATGateways,
-			message.DeletedNATGateways,
+			*message.AddedNatGateways,
+			message.AddedNatGateways,
+			*message.UpdatedNatGateway,
+			message.UpdatedNatGateway,
+			*message.DeletedNatGateways,
+			message.DeletedNatGateways,
 			metadbmodel.NATGateway,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -386,7 +386,7 @@ func (c *ChNATGatewayDevice) sourceToTarget(md *message.Metadata, source *metadb
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChNATGatewayDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedNATGateway) {
+func (c *ChNATGatewayDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedNatGateway) {
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -399,12 +399,12 @@ func (c *ChNATGatewayDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChD
 
 type ChLBDevice struct {
 	SubscriberComponent[
-		*message.AddedLBs,
-		message.AddedLBs,
-		*message.UpdatedLB,
-		message.UpdatedLB,
-		*message.DeletedLBs,
-		message.DeletedLBs,
+		*message.AddedLbs,
+		message.AddedLbs,
+		*message.UpdatedLb,
+		message.UpdatedLb,
+		*message.DeletedLbs,
+		message.DeletedLbs,
 		metadbmodel.LB,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -415,12 +415,12 @@ type ChLBDevice struct {
 func NewChLBDevice(resourceTypeToIconID map[IconKey]int) *ChLBDevice {
 	mng := &ChLBDevice{
 		newSubscriberComponent[
-			*message.AddedLBs,
-			message.AddedLBs,
-			*message.UpdatedLB,
-			message.UpdatedLB,
-			*message.DeletedLBs,
-			message.DeletedLBs,
+			*message.AddedLbs,
+			message.AddedLbs,
+			*message.UpdatedLb,
+			message.UpdatedLb,
+			*message.DeletedLbs,
+			message.DeletedLbs,
 			metadbmodel.LB,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -459,7 +459,7 @@ func (c *ChLBDevice) sourceToTarget(md *message.Metadata, source *metadbmodel.LB
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChLBDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedLB) {
+func (c *ChLBDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedLb) {
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
@@ -471,12 +471,12 @@ func (c *ChLBDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, d
 }
 
 type ChRDSInstanceDevice struct {
-	SubscriberComponent[*message.AddedRDSInstances,
-		message.AddedRDSInstances,
-		*message.UpdatedRDSInstance,
-		message.UpdatedRDSInstance,
-		*message.DeletedRDSInstances,
-		message.DeletedRDSInstances,
+	SubscriberComponent[*message.AddedRdsInstances,
+		message.AddedRdsInstances,
+		*message.UpdatedRdsInstance,
+		message.UpdatedRdsInstance,
+		*message.DeletedRdsInstances,
+		message.DeletedRdsInstances,
 		metadbmodel.RDSInstance,
 		metadbmodel.ChDevice,
 		DeviceKey,
@@ -486,12 +486,12 @@ type ChRDSInstanceDevice struct {
 
 func NewChRDSInstanceDevice(resourceTypeToIconID map[IconKey]int) *ChRDSInstanceDevice {
 	mng := &ChRDSInstanceDevice{
-		newSubscriberComponent[*message.AddedRDSInstances,
-			message.AddedRDSInstances,
-			*message.UpdatedRDSInstance,
-			message.UpdatedRDSInstance,
-			*message.DeletedRDSInstances,
-			message.DeletedRDSInstances,
+		newSubscriberComponent[*message.AddedRdsInstances,
+			message.AddedRdsInstances,
+			*message.UpdatedRdsInstance,
+			message.UpdatedRdsInstance,
+			*message.DeletedRdsInstances,
+			message.DeletedRdsInstances,
 			metadbmodel.RDSInstance,
 			metadbmodel.ChDevice,
 			DeviceKey,
@@ -530,7 +530,7 @@ func (c *ChRDSInstanceDevice) sourceToTarget(md *message.Metadata, source *metad
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChRDSInstanceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedRDSInstance) {
+func (c *ChRDSInstanceDevice) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedRdsInstance) {
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
