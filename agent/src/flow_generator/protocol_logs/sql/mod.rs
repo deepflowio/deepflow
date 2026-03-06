@@ -31,12 +31,14 @@ mod postgresql;
 mod redis;
 mod sql_check;
 mod sql_obfuscate;
+mod sql_server;
 
 pub use memcached::{MemcachedInfo, MemcachedLog};
 pub use mongo::{MongoDBInfo, MongoDBLog};
 pub use mysql::{MysqlInfo, MysqlLog};
 pub use postgresql::{PostgreInfo, PostgresqlLog};
 pub use redis::{RedisInfo, RedisLog};
+pub use sql_server::{SqlServerInfo, SqlServerLog};
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
