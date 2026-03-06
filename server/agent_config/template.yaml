@@ -3856,6 +3856,344 @@ inputs:
         nodejs_disabled: false
     # type: section
     # name:
+    #   en: Network
+    #   ch: 网络
+    # description:
+    network:
+      # type: bool
+      # name: NIC optimization Enabled
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Whether to enable NIC optimization for enhanced multi-core packet
+      #     processing and burst traffic resilience.
+      #
+      #     When enabled, the system applies a combination of:
+      #       - RSS hardware queue configuration
+      #       - RX ring descriptor size tuning
+      #       - IRQ (interrupt) CPU affinity binding
+      #       - Optional XDP CPUMAP-based CPU redirection
+      #
+      #     This optimization mitigates scenarios where RSS hardware cannot hash
+      #     inner headers of encapsulated traffic (e.g., GRE, Double VLAN,
+      #     VXLAN, ERSPAN), which may otherwise cause traffic to be concentrated
+      #     on a single CPU core and lead to packet drops or performance bottlenecks.
+      #
+      #     RX ring tuning improves burst handling capability by increasing
+      #     the number of descriptors available for packet reception, reducing
+      #     the likelihood of ring overflow under high traffic conditions.
+      #
+      #     When XDP CPU redirect is enabled, packets are redistributed in
+      #     software across multiple CPU cores after initial reception,
+      #     providing better load balancing beyond hardware RSS capabilities.
+      #
+      #     Recommended to enable this feature when:
+      #       1) Traffic on the interface consists primarily of encapsulated
+      #          packets (e.g., verified via tcpdump showing GRE, Double VLAN,
+      #          VXLAN, etc.).
+      #       2) One CPU core shows near 100% softirq utilization (e.g.,
+      #          observed via `top` with per-CPU view), while other CPUs
+      #          remain underutilized.
+      #
+      #     For optimal performance, IRQ CPUs and XDP redirect CPUs should be
+      #     configured on the same NUMA node as the physical NIC.
+      #
+      #   ch: |-
+      #     是否启用网卡优化功能，用于提升多核环境下的网络包处理能力
+      #     以及突发流量承载能力。
+      #
+      #     开启后将综合进行以下优化：
+      #       - RSS 硬件队列数量配置
+      #       - RX ring 描述符数量调优
+      #       - 硬件中断与 CPU 亲和性绑定（IRQ 绑核）
+      #       - 可选的 XDP CPUMAP 软件重定向分发
+      #
+      #     该优化主要解决 RSS 硬件无法基于封装报文内层头部
+      #     （如 GRE、Double VLAN、VXLAN、ERSPAN）进行哈希分摊的问题，
+      #     避免流量集中在单个 CPU 上造成过载和丢包。
+      #
+      #     通过调整 RX ring 描述符数量，可提升突发流量场景下的
+      #     接收缓存能力，降低 ring 满导致的丢包风险。
+      #
+      #     在启用 XDP CPU Redirect 时，数据包会在接收后通过
+      #     CPUMAP 在多个 CPU 核心之间进行软件层重分发，
+      #     从而突破硬件 RSS 的能力限制，实现更均衡的负载分布。
+      #
+      #     建议在以下场景开启该功能：
+      #       1）使用 tcpdump 抓包发现该接口流量主要为 GRE、
+      #          Double VLAN、VXLAN 等封装报文；
+      #       2）通过 `top`（按 1）观察各 CPU 软中断占用率时，
+      #          发现某一个 CPU 的 softirq 接近 100%，
+      #          而其他 CPU 软中断占用率明显偏低。
+      #
+      #     为获得最佳性能，建议将中断 CPU 和 XDP 重定向 CPU
+      #     配置在与物理网卡相同的 NUMA 节点上。
+      nic_opt_enabled: false
+      # type: dict
+      # name:
+      #   en: NIC Optimize
+      #   ch: 网卡优化配置
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Configure NIC-level performance optimizations for specific interfaces.
+      #
+      #     This feature improves packet processing scalability and burst handling
+      #     by tuning hardware RSS queues, interrupt CPU affinity, RX ring size,
+      #     and optional XDP CPUMAP-based CPU redirection.
+      #
+      #     Recommended when:
+      #       - Traffic is primarily encapsulated (GRE, Double VLAN, VXLAN, ERSPAN).
+      #       - One CPU shows near 100% softirq usage while others are idle.
+      #
+      #     To achieve better performance, the program will automatically disable the
+      #     irqbalance service to prevent network interface interrupts from migrating
+      #     between CPUs.
+      #
+      #     Multiple NIC optimize entries can be configured for different interfaces.
+      #
+      #     Example:
+      #     ```yaml
+      #     inputs:
+      #       eppf:
+      #         network:
+      #           nic_opt_enabled: true
+      #           nic_optimize:
+      #           - interface: eth0
+      #             rx_ring_size: 4096
+      #             rss_channel_count: 2
+      #             irq_cpu_list: 1,2
+      #             xdp_cpu_redirect: true
+      #             xdp_queue_size: 2048
+      #             xdp_cpu_redirect_list: 4,5,6,7
+      #           - interface: eth1
+      #             rx_ring_size: 4096
+      #             rss_channel_count: 2
+      #             irq_cpu_list: 1,2
+      #             xdp_cpu_redirect: true
+      #             xdp_queue_size: 2048
+      #             xdp_cpu_redirect_list: 4,5,6,7
+      #     ```
+      #
+      #   ch: |-
+      #     针对指定网卡接口进行性能优化配置。
+      #
+      #     该功能通过调优 RSS 队列、中断绑核、RX ring 大小、
+      #     以及可选的 XDP CPUMAP 重定向机制，提升多核扩展能力
+      #     和突发流量承载能力。
+      #
+      #     建议在以下场景开启：
+      #       - 接口流量主要为 GRE、Double VLAN、VXLAN、ERSPAN 等封装报文；
+      #       - 某个 CPU 的 softirq 占用率接近 100%，而其他 CPU 空闲。
+      #
+      #     为了获得更好的性能，程序会自动停用 irqbalance 服务，以防止网卡中断在 CPU 之间迁移。
+      #
+      #     可为多个接口分别配置优化策略。
+      #
+      #     样例:
+      #     ```yaml
+      #     inputs:
+      #       eppf:
+      #         network:
+      #           nic_opt_enabled: true
+      #           nic_optimize:
+      #           - interface: eth0
+      #             rx_ring_size: 4096
+      #             rss_channel_count: 2
+      #             irq_cpu_list: 1,2
+      #             xdp_cpu_redirect: true
+      #             xdp_queue_size: 2048
+      #             xdp_cpu_redirect_list: 4,5,6,7
+      #           - interface: eth1
+      #             rx_ring_size: 4096
+      #             rss_channel_count: 2
+      #             irq_cpu_list: 1,2
+      #             xdp_cpu_redirect: true
+      #             xdp_queue_size: 2048
+      #             xdp_cpu_redirect_list: 4,5,6,7
+      #     ```
+      # upgrade_from:
+      # ---
+      # type: string
+      # name:
+      #   en: Interface
+      #   ch: 网卡接口
+      # description:
+      #   en: |-
+      #     Name of the network interface to optimize.
+      #
+      #   ch: |-
+      #     需要进行优化的网卡接口名称。
+      # ---
+      # interface: ""
+      # ---
+      # type: int
+      # name:
+      #   en: RX Ring Size
+      #   ch: RX Ring 描述符数量
+      # description:
+      #   en: |-
+      #     Number of RX descriptors in NIC receive ring.
+      #
+      #     Increasing this value improves burst traffic buffering
+      #     and reduces packet drops caused by ring overflow.
+      #     Specifically, use `ethtool -g <iface>` to check the current configuration.
+      #
+      #     0 (default) means keep the original state and ignore this setting.
+      #
+      #   ch: |-
+      #     网卡接收环（RX ring）的描述符数量。
+      #
+      #     增大该值可提升突发流量场景下的缓存能力，
+      #     降低因 ring 满导致的丢包风险。
+      #     具体使用`ethtool -g <iface>` 查看当前配置情况。
+      #
+      #     默认值为 0 表示保持原状忽略此项配置。
+      # ---
+      # rx_ring_size: 0
+      # ---
+      # type: int
+      # name:
+      #   en: RSS Channel Count
+      #   ch: RSS 队列数量
+      # description:
+      #   en: |-
+      #     Number of hardware RSS queues.
+      #     Determines how many queues packets are distributed to after
+      #     hardware hash calculation.
+      #
+      #     Maximum supported value is typically 16 and must not exceed
+      #     the number of logical CPU cores.
+      #     Specifically, use `ethtool -l <iface>` to check the current configuration.
+      #
+      #     When XDP CPU redirect is enabled, it is recommended to set this to 1.
+      #     0 (default) means keep the original state and ignore this setting.
+      #
+      #   ch: |-
+      #     RSS 硬件队列数量。
+      #     数据包在物理网卡完成哈希后，将分发到指定数量的队列并触发中断。
+      #
+      #     最大一般支持 16，且不要超过逻辑 CPU 核数。
+      #     具体使用`ethtool -l <iface>` 查看当前配置情况。
+      #
+      #     当启用 XDP CPU Redirect 时建议设置为 1。
+      #     默认值为 0 表示保持原状忽略此项配置。
+      # ---
+      # rss_channel_count: 0
+      # ---
+      # type: string
+      # name:
+      #   en: Hardware IRQ CPU List
+      #   ch: 硬件中断 CPU 列表
+      # description:
+      #   en: |-
+      #     CPU ID or comma-separated CPU list used for handling NIC interrupts.
+      #
+      #     Recommended to match the number of RSS queues.
+      #     If XDP CPU redirect is enabled, only one CPU is required.
+      #
+      #     Value can be:
+      #       - Specific CPU list (e.g., 2,4,6)
+      #       - "local" (auto match CPUs in local NUMA node)
+      #
+      #     CPUs should be located on the same NUMA node as the NIC.
+      #
+      #   ch: |-
+      #     用于处理网卡硬件中断的 CPU ID 或 CPU 列表。
+      #
+      #     数量建议与 RSS 队列数量一致。
+      #     若启用 XDP CPU Redirect，仅需指定一个 CPU。
+      #
+      #     可设置为：
+      #       - 指定 CPU 列表（如 2,4,6）
+      #       - local（自动匹配本地 NUMA 节点 CPU）
+      #
+      #     建议所选 CPU 与物理网卡位于同一 NUMA 节点。
+      # ---
+      # irq_cpu_list: ""
+      # ---
+      # type: bool
+      # name:
+      #   en: Enable XDP CPU Redirect
+      #   ch: 启用 XDP CPU 重定向
+      # description:
+      #   en: |-
+      #     Enable XDP CPUMAP redirect to redistribute packets across CPUs
+      #     in software.
+      #
+      #     Useful when hardware RSS cannot distribute encapsulated traffic
+      #     (e.g., Double VLAN, ERSPAN) evenly across CPUs, resulting in
+      #     single-core overload and packet drops.
+      #
+      #   ch: |-
+      #     是否启用 XDP CPUMAP 重定向分发。
+      #
+      #     用于解决硬件 RSS 无法对封装报文
+      #     （如 Double VLAN、ERSPAN 等）进行均匀分摊，
+      #     导致单核过载和丢包的问题。
+      # ---
+      # xdp_cpu_redirect: false
+      # ---
+      # type: int
+      # name:
+      #   en: XDP Queue Size
+      #   ch: XDP 队列大小
+      # description:
+      #   en: |-
+      #     Size of the XDP CPUMAP queue.
+      #
+      #     Larger values improve burst tolerance but consume more memory.
+      #
+      #   ch: |-
+      #     XDP CPUMAP 队列大小。
+      #
+      #     增大可提升突发流量承载能力，但会占用更多内存。
+      # ---
+      # xdp_queue_size: 2048
+      # ---
+      # type: string
+      # name:
+      #   en: XDP Redirect CPU List
+      #   ch: XDP 重定向 CPU 列表
+      # description:
+      #   en: |-
+      #     CPU list used for processing packets after XDP redirection.
+      #
+      #     Only valid when xdp_cpu_redirect is true.
+      #
+      #     Recommended to:
+      #       - Use isolated CPUs (via isolcpus)
+      #       - Ensure CPUs are on the same NUMA node as the NIC
+      #
+      #   ch: |-
+      #     XDP 重定向后用于处理数据包的 CPU 列表。
+      #
+      #     仅在 xdp_cpu_redirect: true 时有效。
+      #
+      #     建议：
+      #       - 使用 isolcpus 隔离物理核心
+      #       - 确保与物理网卡处于同一 NUMA 节点
+      # ---
+      # xdp_cpu_redirect_list: ""
+      #
+      nic_optimize:
+        - interface: ""
+          rx_ring_size: 0
+          rss_channel_count: 0
+          irq_cpu_list: ""
+          xdp_cpu_redirect: false
+          xdp_queue_size: 2048
+          xdp_cpu_redirect_list: ""
+    # type: section
+    # name:
     #   en: Tunning
     #   ch: 调优
     # description:

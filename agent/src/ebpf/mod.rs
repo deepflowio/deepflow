@@ -941,6 +941,57 @@ extern "C" {
                 */
                 pub fn set_tcp_option_tracing_enabled(enabled: bool) -> c_int;
                 pub fn set_tcp_option_tracing_sample_window(bytes: c_uint) -> c_int;
+
+                /**
+                 * @brief Enable or disable NIC optimization.
+                 *
+                 * This function sets the NIC optimization feature on or off. When enabled,
+                 * the system may adjust RX ring sizes, RSS channels, and CPU affinities
+                 * to improve packet processing performance.
+                 *
+                 * @param enabled Set to 1 to enable, or 0 to disable. On the Rust side,
+                 *                this can be converted from a bool.
+                 *
+                 * @return 0 on success, non-zero on failure.
+                 *
+                 * @note Corresponding C function: `int set_nic_optimization(bool enabled)`
+                 */
+                pub fn set_nic_optimization(enabled: bool) -> c_int;
+
+                /**
+                 * @brief Configure optimization parameters for a single NIC.
+                 *
+                 * This function applies NIC-specific optimization settings, including
+                 * RX ring size, RSS channel count, IRQ CPU binding, and XDP CPU redirection.
+                 * It allows fine-grained performance tuning for each network interface.
+                 *
+                 * @param nic_name The name of the network interface (C string).
+                 * @param rx_ring_size The size of the RX ring buffer.
+                 * @param rss_channel_count Number of RSS channels to use.
+                 * @param irq_cpu_list Comma-separated list of CPU IDs for IRQ binding.
+                 * @param xdp_cpu_redirect Set to 1 to enable XDP CPU redirect, 0 to disable.
+                 * @param xdp_queue_size The size of the XDP queue.
+                 * @param xdp_cpu_list Comma-separated list of CPU IDs for XDP processing.
+                 *
+                 * @return 0 on success, non-zero on failure.
+                 *
+                 * @note Corresponding C function:
+                 * ```c
+                 * int nic_optimize_config(const char* nic_name, int rx_ring_size,
+                 *                         int rss_channel_count, const char* irq_cpu_list,
+                 *                         bool xdp_cpu_redirect, int xdp_queue_size,
+                 *                         const char* xdp_cpu_list);
+                 * ```
+                 */
+                pub fn nic_optimize_config(
+                    nic_name: *const c_char,
+                    rx_ring_size: c_int,
+                    rss_channel_count: c_int,
+                    irq_cpu_list: *const c_char,
+                    xdp_cpu_redirect: bool,
+                    xdp_queue_size: c_int,
+                    xdp_cpu_list: *const c_char,
+                ) -> c_int;
         }
     }
 }

@@ -60,7 +60,7 @@ FINAL_TARGET = -emit-llvm -D__TARGET_ARCH_$(ARCH) -o ${@:.elf=.ll} -c $^ && $(LL
 
 all: $(TAEGET_KERN_ELF)
 
-EBPF_CLAGS ?= -I. -Ivmlinux -Iinclude -I../../../crates/trace-utils/src \
+EBPF_CLAGS ?= -I. -Ivmlinux -Iinclude -I../user/extended/bpf/include -I../../../crates/trace-utils/src \
         -D__BPF_TRACING__ -D GROUP_LEADER_OFFSET_OVERRIDE=0 \
         -DSTART_BOOTTIME_OFFSET_OVERRIDE=0      \
         -DSTART_BOOTTIME_VARNAME=real_start_time

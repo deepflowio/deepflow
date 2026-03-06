@@ -755,4 +755,41 @@ struct ebpf_object *create_ebpf_object(const void *bpf_code,
  * @return 0 on success, or a non-zero value on error.
  */
 int load_ebpf_object(struct ebpf_object *obj);
+
+/**
+ * tracepoint_attach - Attach an eBPF program to a tracepoint
+ * @tp: Pointer to tracepoint descriptor
+ *
+ * This function attaches the eBPF program referenced by @tp->prog
+ * to its corresponding tracepoint and stores the returned link
+ * object into @tp->link.
+ *
+ * Return:
+ *   ETR_OK        - Attach success
+ *   ETR_EXIST     - Tracepoint already attached
+ *   ETR_INVAL     - Attach failed
+ *
+ * Notes:
+ *   - This function is NOT fully thread-safe. Caller must ensure
+ *     proper synchronization if called concurrently.
+ *   - On failure, attach_failed_count will be incremented.
+ */
+int tracepoint_attach(struct tracepoint *tp);
+
+/**
+ * tracepoint_detach - Detach an eBPF program from a tracepoint
+ * @tp: Pointer to tracepoint descriptor
+ *
+ * This function detaches the eBPF program associated with the
+ * given tracepoint and releases the link object.
+ *
+ * Return:
+ *   ETR_OK         - Detach success
+ *   ETR_NOTEXIST   - Tracepoint not attached
+ *
+ * Notes:
+ *   - Safe to call even if detach callback is NULL.
+ *   - Caller must ensure no concurrent attach/detach.
+ */
+int tracepoint_detach(struct tracepoint *tp);
 #endif /* DF_USER_TRACER_H */

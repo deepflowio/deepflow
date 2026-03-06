@@ -140,7 +140,6 @@ pthread_mutex_t match_pids_lock;
 // Used to store process IDs for matching various features
 pids_match_hash_t pids_match_hash;
 
-static int tracepoint_attach(struct tracepoint *tp);
 static int perf_reader_setup(struct bpf_perf_reader *perf_readerm,
 			     int thread_nr);
 static void perf_reader_release(struct bpf_perf_reader *perf_reader);
@@ -1020,7 +1019,7 @@ int probe_detach(struct probe *p)
 	return ret;
 }
 
-static int tracepoint_attach(struct tracepoint *tp)
+int tracepoint_attach(struct tracepoint *tp)
 {
 	if (tp->link) {
 		return ETR_EXIST;
@@ -1039,7 +1038,7 @@ static int tracepoint_attach(struct tracepoint *tp)
 	return ETR_OK;
 }
 
-static int tracepoint_detach(struct tracepoint *tp)
+int tracepoint_detach(struct tracepoint *tp)
 {
 	if (tp->link == NULL) {
 		return ETR_NOTEXIST;

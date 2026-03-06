@@ -1237,6 +1237,39 @@ impl Default for EbpfTunning {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
+pub struct NicOptimizeConfig {
+    pub interface: String,
+    pub rx_ring_size: u64,
+    pub rss_channel_count: u64,
+    pub irq_cpu_list: String,
+    pub xdp_cpu_redirect: bool,
+    pub xdp_queue_size: u64,
+    pub xdp_cpu_redirect_list: String,
+}
+
+impl Default for NicOptimizeConfig {
+    fn default() -> Self {
+        Self {
+            interface: "".to_string(),
+            rx_ring_size: 0,
+            rss_channel_count: 0,
+            irq_cpu_list: "".to_string(),
+            xdp_cpu_redirect: false,
+            xdp_queue_size: 2048,
+            xdp_cpu_redirect_list: "".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfNetwork {
+    pub nic_opt_enabled: bool,
+    pub nic_optimize: Vec<NicOptimizeConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct EbpfSocketPreprocess {
     pub out_of_order_reassembly_cache_size: usize,
     pub out_of_order_reassembly_protocols: Vec<String>,
@@ -1285,6 +1318,7 @@ pub struct Ebpf {
     pub file: EbpfFile,
     pub profile: EbpfProfile,
     pub tunning: EbpfTunning,
+    pub network: EbpfNetwork,
     #[serde(skip)]
     pub java_symbol_file_refresh_defer_interval: i32,
 }
@@ -1297,6 +1331,7 @@ impl Default for Ebpf {
             file: EbpfFile::default(),
             profile: EbpfProfile::default(),
             tunning: EbpfTunning::default(),
+            network: EbpfNetwork::default(),
             java_symbol_file_refresh_defer_interval: 60,
         }
     }
