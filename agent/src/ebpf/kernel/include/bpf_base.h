@@ -30,7 +30,6 @@
 #include <errno.h>
 #include <stddef.h>
 #include <bcc/compat/linux/bpf.h>
-#include "utils.h"
 
 struct task_struct;
 

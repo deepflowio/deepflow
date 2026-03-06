@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 
+#include <arpa/inet.h>
 #include <linux/bpf_perf_event.h>
 #include "config.h"
 #include "bpf_base.h"
