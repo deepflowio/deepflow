@@ -157,6 +157,10 @@ impl L7ProtocolInfoInterface for Iso8583Info {
         }
         Some(self.endpoint.clone())
     }
+
+    fn is_reversed(&self) -> bool {
+        self.is_reversed
+    }
 }
 
 impl From<Iso8583Info> for L7ProtocolSendLog {
