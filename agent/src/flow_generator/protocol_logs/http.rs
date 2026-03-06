@@ -30,7 +30,8 @@ use super::{
     pb_adapter::{
         ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal, TraceInfo,
     },
-    value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType, PrioField,
+    serialize_attributes, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType,
+    PrioField,
 };
 
 use crate::{
@@ -296,7 +297,10 @@ pub struct HttpInfo {
 
     biz_type: u8,
 
-    #[serde(skip)]
+    #[serde(
+        serialize_with = "serialize_attributes",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     attributes: Vec<KeyVal>,
 
     #[serde(skip)]
