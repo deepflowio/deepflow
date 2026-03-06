@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/db/redis"
 	"github.com/deepflowio/deepflow/server/controller/election"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
@@ -59,7 +60,7 @@ var log = logging.MustGetLogger("controller")
 
 type Controller struct{}
 
-func Start(ctx context.Context, configPath, serverLogFile string, shared *servercommon.ControllerIngesterShared) {
+func Start(ctx context.Context, revision, configPath, serverLogFile string, shared *servercommon.ControllerIngesterShared) {
 	common.InitEnvData()
 	flag.Parse()
 
@@ -95,6 +96,28 @@ func Start(ctx context.Context, configPath, serverLogFile string, shared *server
 		log.Errorf("init metadb failed: %s", err.Error())
 		time.Sleep(time.Second)
 		os.Exit(0)
+	}
+
+	if isMasterController && revision != "" {
+		var masterSysConfig model.SysConfiguration
+		err := metadb.DefaultDB.
+			Where(model.SysConfiguration{ParamName: common.SYS_CONFIG_MASTER_COMMIT_ID}).
+			Assign(model.SysConfiguration{Value: revision}).
+			FirstOrCreate(&masterSysConfig).Error
+		if err != nil {
+			log.Warningf("upsert master sys config param (%s:%s) failed: %s", common.SYS_CONFIG_MASTER_COMMIT_ID, revision, err.Error())
+		}
+	} else if !IsMasterRegion(cfg) {
+		var masterSysConfig model.SysConfiguration
+		err := metadb.DefaultDB.Where(model.SysConfiguration{ParamName: common.SYS_CONFIG_MASTER_COMMIT_ID}).First(&masterSysConfig).Error
+		if err != nil {
+			log.Warningf("get master sys config param (%s) failed: %s", common.SYS_CONFIG_MASTER_COMMIT_ID, err.Error())
+		} else {
+			if revision != masterSysConfig.Value {
+				log.Errorf("current commit id (%s) is different from master commit id (%s)", revision, masterSysConfig.Value)
+				os.Exit(0)
+			}
+		}
 	}
 
 	// 启动资源ID管理器
