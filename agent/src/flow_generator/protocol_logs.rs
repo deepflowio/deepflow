@@ -282,6 +282,21 @@ where
     t == &T::default()
 }
 
+pub fn serialize_attributes<S>(
+    attrs: &[pb_adapter::KeyVal],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeMap;
+    let mut map = serializer.serialize_map(Some(attrs.len()))?;
+    for kv in attrs {
+        map.serialize_entry(&kv.key, &kv.val)?;
+    }
+    map.end()
+}
+
 pub fn value_is_negative<T>(t: &T) -> bool
 where
     T: Default + std::cmp::PartialEq + std::cmp::PartialOrd,

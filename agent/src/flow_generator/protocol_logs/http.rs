@@ -36,7 +36,7 @@ use super::{
     pb_adapter::{
         ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal, TraceInfo,
     },
-    value_is_default, AppProtoHead, L7ResponseStatus, PrioField,
+    serialize_attributes, value_is_default, AppProtoHead, L7ResponseStatus, PrioField,
 };
 
 #[cfg(feature = "libtrace")]
@@ -330,7 +330,10 @@ pub struct HttpInfo {
     #[serde(skip_serializing_if = "value_is_default")]
     biz_response_code: String,
 
-    #[serde(skip)]
+    #[serde(
+        serialize_with = "serialize_attributes",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     attributes: Vec<KeyVal>,
 
     #[serde(skip)]
