@@ -370,9 +370,19 @@ static __inline int trace_io_event_common(void *ctx,
 		latency = TIME_ROLLBACK_DEFAULT_LATENCY_NS;
 	}
 
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+	if (is_ai_agent_process(pid_tgid)) {
+		goto skip_latency_filter;
+	}
+#endif
+
 	if (latency < tracer_ctx->io_event_minimal_duration) {
 		return -1;
 	}
+
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+skip_latency_filter:
+#endif
 
 	struct __io_event_buffer *buffer = io_event_buffer__lookup(&k0);
 	if (!buffer) {
@@ -382,6 +392,12 @@ static __inline int trace_io_event_common(void *ctx,
 	buffer->bytes_count = data_args->bytes_count;
 	buffer->latency = latency;
 	buffer->operation = direction;
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+	buffer->access_permission =
+	    ai_agent_get_access_permission(pid_tgid, data_args->fd, offset);
+#else
+	buffer->access_permission = 0;
+#endif
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
