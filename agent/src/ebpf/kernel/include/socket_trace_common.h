@@ -290,6 +290,9 @@ struct __io_event_buffer {
 	// Mount namespace ID of the file’s mount
 	__u32 mntns_id;
 
+	// File access permission bits (inode->i_mode & 0xFFF)
+	__u16 access_permission;
+
 	// filename length
 	__u32 len;
 
