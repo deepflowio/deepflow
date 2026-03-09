@@ -3968,6 +3968,7 @@ mod tests {
             os_app_tags: vec![],
             netns_id: 0,
             container_id: "".to_string(),
+            biz_type: 0,
         }
     }
 
