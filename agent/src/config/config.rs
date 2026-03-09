@@ -17,6 +17,7 @@
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::env;
+use std::ffi::CString;
 use std::fs;
 use std::io;
 use std::net::{IpAddr, ToSocketAddrs};
@@ -25,7 +26,8 @@ use std::time::Duration;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use envmnt::{ExpandOptions, ExpansionType};
-use log::{debug, error, info};
+use libc::c_int;
+use log::{debug, error, info, warn};
 use md5::{Digest, Md5};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use procfs::process::Process;
@@ -39,6 +41,7 @@ use tokio::runtime::Runtime;
 
 use crate::common::l7_protocol_log::{L7ProtocolBitmap, L7ProtocolParser};
 use crate::dispatcher::recv_engine::DEFAULT_BLOCK_SIZE;
+use crate::ebpf;
 use crate::flow_generator::{DnsLog, MemcachedLog};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::platform::{OsAppTag, ProcessData};
@@ -1257,6 +1260,38 @@ impl Default for NicOptimizeConfig {
             xdp_cpu_redirect: false,
             xdp_queue_size: 2048,
             xdp_cpu_redirect_list: "".to_string(),
+        }
+    }
+}
+
+impl NicOptimizeConfig {
+    pub fn apply(&self) {
+        let nic_name = CString::new(self.interface.as_str()).unwrap();
+        let irq_cpu = CString::new(self.irq_cpu_list.as_str()).unwrap();
+        let xdp_cpu = CString::new(self.xdp_cpu_redirect_list.as_str()).unwrap();
+
+        let ret = ebpf::nic_optimize_config(
+            nic_name.as_ptr(),
+            self.rx_ring_size as c_int,
+            self.rss_channel_count as c_int,
+            irq_cpu.as_ptr(),
+            self.xdp_cpu_redirect,
+            self.xdp_queue_size as c_int,
+            xdp_cpu.as_ptr(),
+        );
+
+        if ret != 0 {
+            warn!(
+                "Failed to configure NIC optimization for interface '{}' \
+                (ret={}, rx_ring_size={}, rss_channel_count={}, \
+                xdp_cpu_redirect={}, xdp_queue_size={})",
+                self.interface,
+                ret,
+                self.rx_ring_size,
+                self.rss_channel_count,
+                self.xdp_cpu_redirect,
+                self.xdp_queue_size,
+            );
         }
     }
 }

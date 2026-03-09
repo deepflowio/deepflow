@@ -1059,33 +1059,7 @@ impl EbpfCollector {
             }
 
             for nic in &config.ebpf.network.nic_optimize {
-                let nic_name_c = CString::new(nic.interface.as_str()).unwrap();
-                let irq_cpu_c = CString::new(nic.irq_cpu_list.as_str()).unwrap();
-                let xdp_cpu_c = CString::new(nic.xdp_cpu_redirect_list.as_str()).unwrap();
-
-                let ret = ebpf::nic_optimize_config(
-                    nic_name_c.as_ptr(),
-                    nic.rx_ring_size as c_int,
-                    nic.rss_channel_count as c_int,
-                    irq_cpu_c.as_ptr(),
-                    nic.xdp_cpu_redirect,
-                    nic.xdp_queue_size as c_int,
-                    xdp_cpu_c.as_ptr(),
-                );
-
-                if ret != 0 {
-                    warn!(
-                        "Failed to configure NIC optimization for interface '{}' \
-                        (ret={}, rx_ring_size={}, rss_channel_count={}, \
-                        xdp_cpu_redirect={}, xdp_queue_size={})",
-                        nic.interface,
-                        ret,
-                        nic.rx_ring_size,
-                        nic.rss_channel_count,
-                        nic.xdp_cpu_redirect,
-                        nic.xdp_queue_size,
-                    );
-                }
+                nic.apply();
             }
         }
 
@@ -1574,33 +1548,7 @@ impl EbpfCollector {
                 }
 
                 for nic in &config.ebpf.network.nic_optimize {
-                    let nic_name_c = CString::new(nic.interface.as_str()).unwrap();
-                    let irq_cpu_c = CString::new(nic.irq_cpu_list.as_str()).unwrap();
-                    let xdp_cpu_c = CString::new(nic.xdp_cpu_redirect_list.as_str()).unwrap();
-
-                    let ret = ebpf::nic_optimize_config(
-                        nic_name_c.as_ptr(),
-                        nic.rx_ring_size as c_int,
-                        nic.rss_channel_count as c_int,
-                        irq_cpu_c.as_ptr(),
-                        nic.xdp_cpu_redirect,
-                        nic.xdp_queue_size as c_int,
-                        xdp_cpu_c.as_ptr(),
-                    );
-
-                    if ret != 0 {
-                        warn!(
-                            "Failed to configure NIC optimization for interface '{}' \
-                            (ret={}, rx_ring_size={}, rss_channel_count={}, \
-                            xdp_cpu_redirect={}, xdp_queue_size={})",
-                            nic.interface,
-                            ret,
-                            nic.rx_ring_size,
-                            nic.rss_channel_count,
-                            nic.xdp_cpu_redirect,
-                            nic.xdp_queue_size,
-                        );
-                    }
+                    nic.apply();
                 }
             }
         }
