@@ -24,6 +24,8 @@ use std::sync::{
 };
 use std::time::Duration;
 
+use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
+
 use enum_dispatch::enum_dispatch;
 use log::debug;
 use lru::LruCache;

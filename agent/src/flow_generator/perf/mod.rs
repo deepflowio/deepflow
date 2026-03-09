@@ -341,14 +341,8 @@ impl FlowLog {
                         self.is_ai_agent = true;
                         // Register PID in the global AI Agent registry
                         if packet.process_id > 0 {
-                            if let Some(registry) =
-                                enterprise_utils::ai_agent::global_registry()
-                            {
-                                registry.register(
-                                    packet.process_id,
-                                    "",
-                                    get_timestamp(0),
-                                );
+                            if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
+                                registry.register(packet.process_id, "", get_timestamp(0));
                             }
                         }
                     }
