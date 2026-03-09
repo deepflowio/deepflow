@@ -434,3 +434,56 @@ pub mod rpc {
         }
     }
 }
+
+pub mod ai_agent {
+    use std::time::Duration;
+
+    #[derive(Debug, Clone, Default)]
+    pub struct AgentMeta {
+        pub first_seen: Duration,
+        pub last_seen: Duration,
+        pub matched_endpoint: String,
+    }
+
+    #[derive(Debug, Clone, Default)]
+    pub struct AiAgentRegistry;
+
+    impl AiAgentRegistry {
+        pub fn new() -> Self {
+            AiAgentRegistry
+        }
+
+        pub fn register(&self, _pid: u32, _endpoint: &str, _now: Duration) -> bool {
+            false
+        }
+
+        pub fn is_ai_agent(&self, _pid: u32) -> bool {
+            false
+        }
+
+        pub fn get_all_pids(&self) -> Vec<u32> {
+            vec![]
+        }
+
+        pub fn cleanup_dead_pids(&self, _alive_pids: &[u32]) -> Vec<u32> {
+            vec![]
+        }
+
+        pub fn len(&self) -> usize {
+            0
+        }
+
+        pub fn is_empty(&self) -> bool {
+            true
+        }
+
+        pub fn sync_bpf_map_add(&self, _pid: u32) {}
+
+        pub fn sync_bpf_map_remove(&self, _pid: u32) {}
+    }
+
+    /// Check if a URL path matches an AI Agent endpoint pattern.
+    pub fn match_ai_agent_endpoint(_endpoints: &[String], _path: &str) -> Option<String> {
+        None
+    }
+}
