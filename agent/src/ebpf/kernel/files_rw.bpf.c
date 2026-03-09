@@ -382,6 +382,7 @@ static __inline int trace_io_event_common(void *ctx,
 
 #ifdef EXTENDED_AI_AGENT_FILE_IO
 skip_latency_filter:
+	; /* null statement - labels cannot be followed by declarations in C */
 #endif
 
 	struct __io_event_buffer *buffer = io_event_buffer__lookup(&k0);
