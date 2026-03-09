@@ -1150,6 +1150,8 @@ pub struct LogParserConfig {
     pub unconcerned_dns_nxdomain_trie: DomainNameTrie,
     pub mysql_decompress_payload: bool,
     pub custom_app: CustomAppConfig,
+    pub ai_agent_endpoints: Vec<String>,
+    pub ai_agent_max_payload_size: usize,
 }
 
 impl Default for LogParserConfig {
@@ -1169,6 +1171,11 @@ impl Default for LogParserConfig {
             unconcerned_dns_nxdomain_trie: DomainNameTrie::default(),
             mysql_decompress_payload: true,
             custom_app: CustomAppConfig::default(),
+            ai_agent_endpoints: vec![
+                "/v1/chat/completions".to_string(),
+                "/v1/embeddings".to_string(),
+            ],
+            ai_agent_max_payload_size: 1_048_576,
         }
     }
 }
@@ -1215,6 +1222,8 @@ impl fmt::Debug for LogParserConfig {
             )
             .field("mysql_decompress_payload", &self.mysql_decompress_payload)
             .field("custom_app", &self.custom_app)
+            .field("ai_agent_endpoints", &self.ai_agent_endpoints)
+            .field("ai_agent_max_payload_size", &self.ai_agent_max_payload_size)
             .finish()
     }
 }
@@ -2335,6 +2344,8 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                         None
                     },
                 },
+                ai_agent_endpoints: conf.inputs.proc.ai_agent.http_endpoints.clone(),
+                ai_agent_max_payload_size: conf.inputs.proc.ai_agent.max_payload_size,
             },
             debug: DebugConfig {
                 agent_id: conf.global.common.agent_id as u16,
