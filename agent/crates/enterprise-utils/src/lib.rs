@@ -511,6 +511,7 @@ pub mod rpc {
 }
 
 pub mod ai_agent {
+    use std::sync::Arc;
     use std::time::Duration;
 
     #[derive(Debug, Clone, Default)]
@@ -559,6 +560,18 @@ pub mod ai_agent {
 
     /// Check if a URL path matches an AI Agent endpoint pattern.
     pub fn match_ai_agent_endpoint(_endpoints: &[String], _path: &str) -> Option<String> {
+        None
+    }
+
+    /// Initialize the global AI Agent registry. Returns the registry Arc.
+    /// Stub: returns a no-op registry.
+    pub fn init_global_registry() -> Arc<AiAgentRegistry> {
+        Arc::new(AiAgentRegistry::new())
+    }
+
+    /// Get a reference to the global AI Agent registry.
+    /// Stub: always returns None.
+    pub fn global_registry() -> Option<&'static Arc<AiAgentRegistry>> {
         None
     }
 }
