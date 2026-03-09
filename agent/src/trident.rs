@@ -920,6 +920,12 @@ impl Trident {
         #[cfg(feature = "enterprise")]
         Trident::kernel_version_check(&state, &exception_handler);
 
+        #[cfg(feature = "enterprise")]
+        {
+            let _ai_agent_registry = enterprise_utils::ai_agent::init_global_registry();
+            info!("AI Agent governance registry initialized");
+        }
+
         let mut components: Option<Components> = None;
         let mut first_run = true;
         let mut config_initialized = false;
