@@ -16,12 +16,12 @@
 
 use super::ProcessData;
 
-pub fn proc_scan_hook(process_datas: &mut Vec<ProcessData>) {
+pub fn proc_scan_hook(_process_datas: &mut Vec<ProcessData>) {
     // Enterprise: mark AI Agent processes with biz_type
     #[cfg(feature = "enterprise")]
     {
         if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
-            for pd in process_datas.iter_mut() {
+            for pd in _process_datas.iter_mut() {
                 if registry.is_ai_agent(pd.pid as u32) {
                     pd.biz_type = crate::common::flow::BIZ_TYPE_AI_AGENT;
                 }
