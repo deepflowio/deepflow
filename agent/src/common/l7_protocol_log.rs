@@ -248,6 +248,16 @@ impl L7ParseResult {
             L7ParseResult::None => panic!("parse result is none but unwrap multi"),
         }
     }
+
+    /// Check if any parsed result has the given biz_type.
+    /// Used to detect AI Agent flows after parsing.
+    pub fn has_biz_type(&self, biz_type: u8) -> bool {
+        match self {
+            L7ParseResult::Single(info) => info.get_biz_type() == biz_type,
+            L7ParseResult::Multi(infos) => infos.iter().any(|i| i.get_biz_type() == biz_type),
+            L7ParseResult::None => false,
+        }
+    }
 }
 
 #[enum_dispatch]
@@ -811,7 +821,13 @@ impl<'a> ParseParam<'a> {
     }
 
     pub fn set_buf_size(&mut self, buf_size: usize) {
-        self.buf_size = buf_size as u16;
+        // Saturate to u16::MAX to avoid overflow when AI Agent flows use larger payload sizes.
+        // buf_size is informational for plugins; actual payload truncation uses the usize value directly.
+        self.buf_size = if buf_size > u16::MAX as usize {
+            u16::MAX
+        } else {
+            buf_size as u16
+        };
     }
 
     pub fn set_captured_byte(&mut self, captured_byte: usize) {
