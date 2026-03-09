@@ -5481,6 +5481,8 @@ inputs:
 
 XDP CPUMAP 队列大小。
 
+取值范围：[512, 8192]，建议配置为 2 的幂。
+
 增大可提升突发流量承载能力，但会占用更多内存。
 
 ##### XDP 重定向 CPU 列表 {#inputs.ebpf.network.nic_optimize.xdp_cpu_redirect_list}
@@ -5511,11 +5513,7 @@ inputs:
 
 XDP 重定向后用于处理数据包的 CPU 列表。
 
-仅在 xdp_cpu_redirect: true 时有效。
-
-建议：
-  - 使用 isolcpus 隔离物理核心
-  - 确保与物理网卡处于同一 NUMA 节点
+填写样式如：4,6,8
 
 ### 调优 {#inputs.ebpf.tunning}
 
@@ -11308,4 +11306,3 @@ dev:
 **详细描述**:
 
 未发布的采集器特性可以通过该选项开启。
-

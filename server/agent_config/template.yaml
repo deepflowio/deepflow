@@ -4045,7 +4045,8 @@ inputs:
       #
       #     Increasing this value improves burst traffic buffering
       #     and reduces packet drops caused by ring overflow.
-      #     Specifically, use `ethtool -g <iface>` to check the current configuration.
+      #     Specifically, use `ethtool -g <iface>` to check the current
+      #     configuration, and adjust to an appropriate value based on your workload.
       #
       #     0 (default) means keep the original state and ignore this setting.
       #
@@ -4054,7 +4055,7 @@ inputs:
       #
       #     增大该值可提升突发流量场景下的缓存能力，
       #     降低因 ring 满导致的丢包风险。
-      #     具体使用`ethtool -g <iface>` 查看当前配置情况。
+      #     具体使用`ethtool -g <iface>` 查看当前配置，根据实际情况调整到合适的值。
       #
       #     默认值为 0 表示保持原状忽略此项配置。
       # ---
@@ -4072,7 +4073,8 @@ inputs:
       #
       #     Maximum supported value is typically 16 and must not exceed
       #     the number of logical CPU cores.
-      #     Specifically, use `ethtool -l <iface>` to check the current configuration.
+      #     Specifically, use `ethtool -l <iface>` to check the current configuration
+      #     and adjust to an appropriate value based on your workload.
       #
       #     When XDP CPU redirect is enabled, it is recommended to set this to 1.
       #     0 (default) means keep the original state and ignore this setting.
@@ -4082,7 +4084,7 @@ inputs:
       #     数据包在物理网卡完成哈希后，将分发到指定数量的队列并触发中断。
       #
       #     最大一般支持 16，且不要超过逻辑 CPU 核数。
-      #     具体使用`ethtool -l <iface>` 查看当前配置情况。
+      #     具体使用`ethtool -l <iface>` 查看当前配置，根据实际情况调整到合适的值。
       #
       #     当启用 XDP CPU Redirect 时建议设置为 1。
       #     默认值为 0 表示保持原状忽略此项配置。
@@ -4150,10 +4152,14 @@ inputs:
       #   en: |-
       #     Size of the XDP CPUMAP queue.
       #
+      #     Valid range: [512, 8192]. Powers of two are recommended.
+      #
       #     Larger values improve burst tolerance but consume more memory.
       #
       #   ch: |-
       #     XDP CPUMAP 队列大小。
+      #
+      #     取值范围：[512, 8192]，建议配置为 2 的幂。
       #
       #     增大可提升突发流量承载能力，但会占用更多内存。
       # ---
@@ -4167,20 +4173,12 @@ inputs:
       #   en: |-
       #     CPU list used for processing packets after XDP redirection.
       #
-      #     Only valid when xdp_cpu_redirect is true.
-      #
-      #     Recommended to:
-      #       - Use isolated CPUs (via isolcpus)
-      #       - Ensure CPUs are on the same NUMA node as the NIC
+      #     Format example: 4,6,8
       #
       #   ch: |-
       #     XDP 重定向后用于处理数据包的 CPU 列表。
       #
-      #     仅在 xdp_cpu_redirect: true 时有效。
-      #
-      #     建议：
-      #       - 使用 isolcpus 隔离物理核心
-      #       - 确保与物理网卡处于同一 NUMA 节点
+      #     填写样式如：4,6,8
       # ---
       # xdp_cpu_redirect_list: ""
       #

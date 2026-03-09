@@ -17,17 +17,22 @@
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::env;
-use std::ffi::CString;
 use std::fs;
 use std::io;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::Path;
 use std::time::Duration;
 
+#[cfg(feature = "extended_observability")]
+use std::ffi::CString;
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use envmnt::{ExpandOptions, ExpansionType};
+#[cfg(feature = "extended_observability")]
 use libc::c_int;
-use log::{debug, error, info, warn};
+#[cfg(feature = "extended_observability")]
+use log::warn;
+use log::{debug, error, info};
 use md5::{Digest, Md5};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use procfs::process::Process;
@@ -41,6 +46,7 @@ use tokio::runtime::Runtime;
 
 use crate::common::l7_protocol_log::{L7ProtocolBitmap, L7ProtocolParser};
 use crate::dispatcher::recv_engine::DEFAULT_BLOCK_SIZE;
+#[cfg(feature = "extended_observability")]
 use crate::ebpf;
 use crate::flow_generator::{DnsLog, MemcachedLog};
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -1250,6 +1256,9 @@ pub struct NicOptimizeConfig {
     pub xdp_cpu_redirect_list: String,
 }
 
+const XDP_QUEUE_SIZE_MIN: u64 = 512;
+const XDP_QUEUE_SIZE_MAX: u64 = 8192;
+
 impl Default for NicOptimizeConfig {
     fn default() -> Self {
         Self {
@@ -1265,6 +1274,7 @@ impl Default for NicOptimizeConfig {
 }
 
 impl NicOptimizeConfig {
+    #[cfg(feature = "extended_observability")]
     pub fn apply(&self) {
         let nic_name = CString::new(self.interface.as_str()).unwrap();
         let irq_cpu = CString::new(self.irq_cpu_list.as_str()).unwrap();
@@ -3287,6 +3297,15 @@ impl UserConfig {
                 "invalid data_socket_type {:?}",
                 self.outputs.socket.data_socket_type
             )));
+        }
+
+        for nic in &self.inputs.ebpf.network.nic_optimize {
+            if !(XDP_QUEUE_SIZE_MIN..=XDP_QUEUE_SIZE_MAX).contains(&nic.xdp_queue_size) {
+                return Err(ConfigError::RuntimeConfigInvalid(format!(
+                    "xdp_queue_size {} for interface {} not in [{}, {}]",
+                    nic.xdp_queue_size, nic.interface, XDP_QUEUE_SIZE_MIN, XDP_QUEUE_SIZE_MAX,
+                )));
+            }
         }
 
         Ok(())

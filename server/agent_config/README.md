@@ -5628,6 +5628,8 @@ inputs:
 
 Size of the XDP CPUMAP queue.
 
+Valid range: [512, 8192]. Powers of two are recommended.
+
 Larger values improve burst tolerance but consume more memory.
 
 ##### XDP Redirect CPU List {#inputs.ebpf.network.nic_optimize.xdp_cpu_redirect_list}
@@ -5658,11 +5660,7 @@ inputs:
 
 CPU list used for processing packets after XDP redirection.
 
-Only valid when xdp_cpu_redirect is true.
-
-Recommended to:
-  - Use isolated CPUs (via isolcpus)
-  - Ensure CPUs are on the same NUMA node as the NIC
+Format example: 4,6,8
 
 ### Tunning {#inputs.ebpf.tunning}
 
@@ -11571,4 +11569,3 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
-
