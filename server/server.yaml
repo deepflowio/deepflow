@@ -504,8 +504,10 @@ querier:
     debug_sql_len_max: 1000
     # 多 trace_id 场景下，允许迭代找出互相关联的 trace_id 的最大迭代次数，注意区别上面的 trace_id_query_iterations
     multi_trace_id_max_iterations: 30
-	# 检测请求距离现在的时间，如果小于这个时间不要记录 TraceTree (目前用于 async flow 上报了请求还没响应的场景), unit: s
+	  # 检测请求距离现在的时间，如果小于这个时间不要记录 TraceTree (目前用于 async flow 上报了请求还没响应的场景), unit: s
     trace_tree_cache_delay: 120
+    # 在 TraceMap 中，如果追踪结果的叶子节点（最后一跳）是客户端侧 Span，则会尝试推断它的服务侧信息生成拓扑节点；此配置控制生成行为；default: false
+    infer_remote_service: false
 
   # deepflow-app相关配置
   deepflow-app:

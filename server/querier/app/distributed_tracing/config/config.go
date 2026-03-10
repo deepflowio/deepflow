@@ -44,6 +44,7 @@ type TraceMapConfig struct {
 	Querier                   Querier `yaml:"querier"`
 	DebugSqlLenMax            int     `default:"1000" yaml:"debug_sql_len_max"`
 	MultiTraceIdMaxIterations int     `default:"30" yaml:"multi_trace_id_max_iterations"`
+	InferRemoteService        bool    `default:"false" yaml:"infer_remote_service"` // infer remote service when [trace_map] gets a single client-side span at leaf
 }
 
 type Querier struct {
