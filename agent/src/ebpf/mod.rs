@@ -574,6 +574,7 @@ extern "C" {
      * @return the set maximum buffer size value on success, < 0 on failure.
      */
     pub fn set_data_limit_max(limit_size: c_int) -> c_int;
+    pub fn set_ai_agent_data_limit_max(limit_size: c_int) -> c_int;
     pub fn set_go_tracing_timeout(timeout: c_int) -> c_int;
     pub fn set_io_event_collect_mode(mode: c_int) -> c_int;
     pub fn set_io_event_minimal_duration(duration: c_ulonglong) -> c_int;

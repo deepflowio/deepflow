@@ -3942,6 +3942,12 @@ static __inline void check_and_set_data_reassembly(struct conn_info_s
 				    tracer_ctx_map__lookup(&k0);
 				if (tracer_ctx == NULL)
 					return;
+				__u32 data_limit_max = tracer_ctx->data_limit_max;
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+				if (conn_info->socket_info_ptr->is_ai_agent)
+					data_limit_max =
+					    tracer_ctx->ai_agent_data_limit_max;
+#endif
 				/*
 				 * Here, the length is checked, and if it has already reached
 				 * the configured limit, assembly will not proceed.
@@ -3956,9 +3962,9 @@ static __inline void check_and_set_data_reassembly(struct conn_info_s
 				 * reassembly is needed (whether to decide to push to the upper layer
 				 * for reassembly).
 				 */
-				if (conn_info->socket_info_ptr->reasm_bytes >=
-				    tracer_ctx->data_limit_max
-				    || conn_info->prev_count > 0)
+				if ((data_limit_max > 0 &&
+				     conn_info->socket_info_ptr->reasm_bytes >=
+				     data_limit_max) || conn_info->prev_count > 0)
 					conn_info->enable_reasm = false;
 			} else {
 				conn_info->enable_reasm = false;

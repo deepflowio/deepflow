@@ -34,6 +34,7 @@ func (b *DataSet) AddProcess(dbItem *metadbmodel.Process, seq int) {
 		ContainerID: dbItem.ContainerID,
 		DeviceType:  dbItem.DeviceType,
 		DeviceID:    dbItem.DeviceID,
+		BizType:     dbItem.BizType,
 	}
 	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, b.Process[dbItem.Lcuuid]), b.metadata.LogPrefixes)
 }
@@ -50,12 +51,14 @@ type Process struct {
 	ContainerID string `json:"container_id"`
 	DeviceType  int    `json:"device_type"`
 	DeviceID    int    `json:"device_id"`
+	BizType     int    `json:"biz_type"`
 }
 
 func (p *Process) Update(cloudItem *cloudmodel.Process, toolDataSet *tool.DataSet) {
 	p.Name = cloudItem.Name
 	p.OSAPPTags = cloudItem.OSAPPTags
 	p.ContainerID = cloudItem.ContainerID
+	p.BizType = cloudItem.BizType
 	deviceType, deviceID := toolDataSet.GetProcessDeviceTypeAndID(cloudItem.ContainerID, cloudItem.VTapID)
 	if p.DeviceType != deviceType || p.DeviceID != deviceID {
 		p.DeviceType = deviceType

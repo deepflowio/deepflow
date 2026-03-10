@@ -39,6 +39,10 @@
 
 #define __user
 
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+static __inline int is_ai_agent_process(__u64 pid_tgid);
+#endif
+
 /* *INDENT-OFF* */
 /***********************************************************
  * map definitions
@@ -1364,6 +1368,14 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	 * so they are saved here.
 	 */
 	int data_max_sz = tracer_ctx->data_limit_max;
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+	bool is_ai_agent = is_ai_agent_process(pid_tgid);
+	if (is_ai_agent) {
+		__u32 ai_limit = tracer_ctx->ai_agent_data_limit_max;
+		data_max_sz = ai_limit == 0 ?
+			      AI_AGENT_DATA_LIMIT_MAX_UNLIMITED : ai_limit;
+	}
+#endif
 
 	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 	if (trace_stats == NULL)
@@ -1443,6 +1455,9 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			    syscall_len >
 			    data_max_sz ? data_max_sz : syscall_len;
 		}
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+		sk_info->is_ai_agent = is_ai_agent;
+#endif
 		sk_info->direction = conn_info->direction;
 		sk_info->pre_direction = conn_info->direction;
 		sk_info->role = conn_info->role;
@@ -1525,6 +1540,9 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info->uid = socket_info_ptr->uid;
 		sk_info->allow_reassembly = socket_info_ptr->allow_reassembly;
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+		socket_info_ptr->is_ai_agent = is_ai_agent;
+#endif
 
 		/*
 		 * The kernel syscall interface determines that it is the TLS
@@ -2870,6 +2888,13 @@ static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 	if (tracer_ctx == NULL)
 		return;
 	int data_max_sz = tracer_ctx->data_limit_max;
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+	if (is_ai_agent_process(pid_tgid)) {
+		__u32 ai_limit = tracer_ctx->ai_agent_data_limit_max;
+		data_max_sz = ai_limit == 0 ?
+			      AI_AGENT_DATA_LIMIT_MAX_UNLIMITED : ai_limit;
+	}
+#endif
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
