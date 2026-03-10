@@ -196,6 +196,25 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.MountPoint = string(ioData.MountPoint)
 		s.Bytes = ioData.BytesCount
 		s.Duration = uint64(s.EndTime - s.StartTime)
+	} else if e.FileOpEventData != nil {
+		d := e.FileOpEventData
+		s.EventType = strings.ToLower(d.OpType.String())
+		s.ProcessKName = string(e.ProcessKname)
+		s.FileName = string(d.Filename)
+		s.SyscallThread = e.ThreadId
+		s.SyscallCoroutine = e.CoroutineId
+	} else if e.PermOpEventData != nil {
+		d := e.PermOpEventData
+		s.EventType = strings.ToLower(d.OpType.String())
+		s.ProcessKName = string(e.ProcessKname)
+		s.SyscallThread = e.ThreadId
+		s.SyscallCoroutine = e.CoroutineId
+	} else if e.ProcLifecycleEventData != nil {
+		d := e.ProcLifecycleEventData
+		s.EventType = strings.ToLower(d.LifecycleType.String())
+		s.ProcessKName = string(d.Comm)
+		s.SyscallThread = e.ThreadId
+		s.SyscallCoroutine = e.CoroutineId
 	}
 	s.VTAPID = vtapId
 	s.L3EpcID = d.platformData.QueryVtapEpc0(s.OrgId, vtapId)
