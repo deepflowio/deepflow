@@ -1666,6 +1666,59 @@ inputs:
         enabled_features: [proc.gprocess_info]
     # type: section
     # name:
+    #   en: AI Agent
+    #   ch: 智能体治理
+    # description:
+    ai_agent:
+      # type: string
+      # name:
+      #   en: HTTP Endpoints
+      #   ch: HTTP 端点
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     HTTP endpoints for AI agent recognition. Requests that match any prefix will mark the process as AI Agent.
+      #   ch: |-
+      #     用于识别智能体的 HTTP 端点前缀，命中后会标记进程为 AI Agent。
+      http_endpoints:
+        - /v1/chat/completions
+        - /v1/embeddings
+      # type: int
+      # name:
+      #   en: Max Payload Size
+      #   ch: 最大载荷大小
+      # unit: byte
+      # range: [0, 2147483647]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Maximum payload size for AI agent reassembly. 0 means unlimited.
+      #   ch: |-
+      #     AI Agent 流重组最大载荷大小，0 表示不限。
+      max_payload_size: 0
+      # type: bool
+      # name:
+      #   en: File IO Enabled
+      #   ch: 文件 IO 事件
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Whether to enable AI Agent file IO event collection.
+      #   ch: |-
+      #     是否开启 AI Agent 文件 IO 事件采集。
+      file_io_enabled: true
+    # type: section
+    # name:
     #   en: Symbol Table
     #   ch: 符号表
     # description:
