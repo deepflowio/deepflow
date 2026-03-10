@@ -1346,6 +1346,7 @@ pub struct EbpfConfig {
     pub agent_id: u16,
     pub epc_id: u32,
     pub l7_log_packet_size: usize,
+    pub ai_agent_max_payload_size: usize,
     // 静态配置
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
@@ -1371,6 +1372,7 @@ impl fmt::Debug for EbpfConfig {
             .field("agent_id", &self.agent_id)
             .field("epc_id", &self.epc_id)
             .field("l7_log_packet_size", &self.l7_log_packet_size)
+            .field("ai_agent_max_payload_size", &self.ai_agent_max_payload_size)
             .field(
                 "l7_protocol_inference_max_fail_count",
                 &self.l7_protocol_inference_max_fail_count,
@@ -2444,6 +2446,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 epc_id: conf.global.common.vpc_id,
                 l7_log_packet_size: crate::ebpf::CAP_LEN_MAX
                     .min(conf.processors.request_log.tunning.payload_truncation as usize),
+                ai_agent_max_payload_size: conf.inputs.proc.ai_agent.max_payload_size,
                 l7_log_tap_types: generate_tap_types_array(
                     &conf.outputs.flow_log.filters.l7_capture_network_types,
                 ),

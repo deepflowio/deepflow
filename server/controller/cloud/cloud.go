@@ -693,6 +693,7 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 			PID:         sProcess.PID,
 			NetnsID:     sProcess.NetnsID,
 			ProcessName: processName,
+			BizType:     sProcess.BizType,
 			CommandLine: sProcess.CMDLine,
 			UserName:    sProcess.UserName,
 			ContainerID: sProcess.ContainerID,

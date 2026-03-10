@@ -22,6 +22,7 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include <limits.h>
 #include <bcc/perf_reader.h>
 #include <linux/version.h>
 #include "clib.h"
@@ -117,6 +118,7 @@ static pthread_mutex_t datadump_mutex;
  * Set by set_data_limit_max()
  */
 static uint32_t socket_data_limit_max;
+static uint32_t ai_agent_data_limit_max;
 
 static uint32_t go_tracing_timeout = GO_TRACING_TIMEOUT_DEFAULT;
 
@@ -2305,6 +2307,25 @@ static inline int __set_data_limit_max(int limit_size)
 	return socket_data_limit_max;
 }
 
+static inline int __set_ai_agent_data_limit_max(int limit_size)
+{
+	if (limit_size < 0) {
+		ebpf_warning("ai_agent limit_size cannot be negative\n");
+		return ETR_INVAL;
+	} else if (limit_size == 0) {
+		ai_agent_data_limit_max = 0;
+	} else if (limit_size > INT_MAX) {
+		ai_agent_data_limit_max = INT_MAX;
+	} else {
+		ai_agent_data_limit_max = limit_size;
+	}
+
+	ebpf_info("Received ai_agent limit_size (%d), the final value is set to '%u'\n",
+		  limit_size, ai_agent_data_limit_max);
+
+	return ai_agent_data_limit_max;
+}
+
 /**
  * Set maximum amount of data passed to the agent by eBPF programe.
  * @limit_size : The maximum length of data. If @limit_size exceeds 16384,
@@ -2349,6 +2370,44 @@ int set_data_limit_max(int limit_size)
 	}
 
 	tracer->data_limit_max = set_val;
+
+	return set_val;
+}
+
+int set_ai_agent_data_limit_max(int limit_size)
+{
+	int set_val = __set_ai_agent_data_limit_max(limit_size);
+	if (set_val < 0)
+		return set_val;
+
+	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
+	if (tracer == NULL) {
+		/*
+		 * Called before running_socket_tracer(),
+		 * no need to update config map
+		 */
+		return set_val;
+	}
+
+	int cpu;
+	int nr_cpus = get_num_possible_cpus();
+	struct tracer_ctx_s values[nr_cpus];
+	memset(values, 0, sizeof(values));
+
+	if (!bpf_table_get_value(tracer, MAP_TRACER_CTX_NAME, 0, values)) {
+		ebpf_warning("Get map '%s' failed.\n", MAP_TRACER_CTX_NAME);
+		return ETR_NOTEXIST;
+	}
+
+	for (cpu = 0; cpu < nr_cpus; cpu++) {
+		values[cpu].ai_agent_data_limit_max = set_val;
+	}
+
+	if (!bpf_table_set_value
+	    (tracer, MAP_TRACER_CTX_NAME, 0, (void *)&values)) {
+		ebpf_warning("Set '%s' failed\n", MAP_TRACER_CTX_NAME);
+		return ETR_UPDATE_MAP_FAILD;
+	}
 
 	return set_val;
 }
@@ -3039,6 +3098,8 @@ int running_socket_tracer(tracer_callback_t handle,
 	// Set default maximum amount of data passed to the agent by eBPF.
 	if (socket_data_limit_max == 0)
 		__set_data_limit_max(0);
+	if (ai_agent_data_limit_max == 0)
+		__set_ai_agent_data_limit_max(0);
 
 	uint64_t uid_base = (gettime(CLOCK_REALTIME, TIME_TYPE_NAN) / 100) &
 	    0xffffffffffffffULL;
@@ -3053,6 +3114,7 @@ int running_socket_tracer(tracer_callback_t handle,
 		t_conf[cpu].coroutine_trace_id = t_conf[cpu].socket_id;
 		t_conf[cpu].thread_trace_id = t_conf[cpu].socket_id;
 		t_conf[cpu].data_limit_max = socket_data_limit_max;
+		t_conf[cpu].ai_agent_data_limit_max = ai_agent_data_limit_max;
 		t_conf[cpu].io_event_collect_mode = io_event_collect_mode;
 		t_conf[cpu].io_event_minimal_duration =
 		    io_event_minimal_duration;
@@ -3067,6 +3129,7 @@ int running_socket_tracer(tracer_callback_t handle,
 		return -EINVAL;
 
 	ebpf_info("Config socket_data_limit_max: %d\n", socket_data_limit_max);
+	ebpf_info("Config ai_agent_data_limit_max: %u\n", ai_agent_data_limit_max);
 	ebpf_info("Config io_event_collect_mode: %d\n", io_event_collect_mode);
 	ebpf_info("Config io_event_minimal_duration: %llu ns\n", io_event_minimal_duration);
 	ebpf_info("Config virtual_file_collect_enable: %d\n", virtual_file_collect_enable);
