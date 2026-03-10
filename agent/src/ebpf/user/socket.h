@@ -416,6 +416,7 @@ prefetch_and_process_data(struct bpf_tracer *t, int id, int nb_rx, void **datas_
 }
 
 int set_data_limit_max(int limit_size);
+int set_ai_agent_data_limit_max(int limit_size);
 int set_go_tracing_timeout(int timeout);
 int set_io_event_collect_mode(uint32_t mode);
 int set_io_event_minimal_duration(uint64_t duration);

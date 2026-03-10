@@ -94,6 +94,7 @@ fn get_req_param<'a>(
         web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
         net_sign_parse_conf: NetSignParseConfig::default(),
         icmp_data: None,
+        process_id: 0,
     }
 }
 
@@ -136,6 +137,7 @@ fn get_resp_param<'a>(
         web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
         net_sign_parse_conf: NetSignParseConfig::default(),
         icmp_data: None,
+        process_id: 0,
     }
 }
 
