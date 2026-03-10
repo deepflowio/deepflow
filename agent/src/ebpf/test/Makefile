@@ -24,12 +24,17 @@ ARCH ?= $(shell uname -m)
 CC ?= gcc
 CFLAGS ?= -std=gnu99 --static -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 
-EXECS := test_symbol test_offset test_insns_cnt test_bihash test_vec test_fetch_container_id test_parse_range test_set_ports_bitmap test_pid_check test_match_pids
+EXECS := test_symbol test_offset test_insns_cnt test_bihash test_vec test_fetch_container_id test_parse_range test_set_ports_bitmap test_pid_check test_match_pids test_bpf_load
+ifneq ($(wildcard ./libtrace_utils_interp.a),)
+        RUST_LIBS := ./libtrace_utils_interp.a
+else
+        RUST_LIBS := ./libtrace_utils.a
+endif
 ifeq ($(ARCH), x86_64)
 #-lbcc -lstdc++
-        LDLIBS += ../libtrace.a ./libtrace_utils.a -ljattach -lbcc_bpf -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread -lbcc -lstdc++ -ldl -lm
+        LDLIBS += ../libtrace.a $(RUST_LIBS) -ljattach -lbcc_bpf -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread -lbcc -lstdc++ -ldl -lm
 else ifeq ($(ARCH), aarch64)
-        LDLIBS += ../libtrace.a ./libtrace_utils.a -ljattach -lGoReSym -lbcc_bpf -ldwarf -lelf -lz -lpthread -lbcc -lstdc++ -ldl -lm
+        LDLIBS += ../libtrace.a $(RUST_LIBS) -ljattach -lGoReSym -lbcc_bpf -ldwarf -lelf -lz -lpthread -lbcc -lstdc++ -ldl -lm
 endif
 
 all: $(EXECS) libtrace_utils.a
@@ -41,8 +46,8 @@ all: $(EXECS) libtrace_utils.a
 #	$(Q)./$@
 
 libtrace_utils.a:
-	$(Q)cargo rustc -p trace-utils --crate-type=staticlib
-	$(Q)cp ../../../target/debug/libtrace_utils.a .
+	$(Q)CARGO_TARGET_DIR=./target cargo rustc -p trace-utils --crate-type=staticlib
+	$(Q)cp ./target/debug/libtrace_utils.a .
 
 clean:
 	$(Q)rm -rf $(EXECS)

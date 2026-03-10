@@ -469,6 +469,14 @@ graph LR
 - 14.2.5 update_go_offsets_to_map
   - Update proc_info_map
 
+# Verify BPF prog loading on various kernel versions
+
+To verify that BPF programs can be loaded correctly across different kernel versions, run:
+
+```bash
+make libtrace.a -j && make -C test test_bpf_load && ./test/test_bpf_load
+```
+
 # Tested kernel version
 
 - 4.14.x

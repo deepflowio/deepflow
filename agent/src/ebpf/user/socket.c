@@ -2727,7 +2727,7 @@ static int check_dependencies(void)
 	return 0;
 }
 
-static int select_bpf_binary(char load_name[NAME_LEN], void **bin_buffer,
+int select_socket_bpf_binary(char load_name[NAME_LEN], void **bin_buffer,
 			     int *bin_buf_size, bool skip_kfunc,
 			     bool skip_k_5_2)
 {
@@ -2896,7 +2896,7 @@ int running_socket_tracer(tracer_callback_t handle,
 		return -EINVAL;
 	}
 
-	select_bpf_binary(bpf_load_buffer_name, &bpf_bin_buffer, &buffer_sz,
+	select_socket_bpf_binary(bpf_load_buffer_name, &bpf_bin_buffer, &buffer_sz,
 			  !use_kfunc_bin, false);
 
 	/*
@@ -2968,7 +2968,7 @@ int running_socket_tracer(tracer_callback_t handle,
 		if (!has_attempted) {
 			if (g_k_type == K_TYPE_KFUNC) {
 				has_attempted = true;
-				select_bpf_binary(bpf_load_buffer_name,
+				select_socket_bpf_binary(bpf_load_buffer_name,
 						  &bpf_bin_buffer, &buffer_sz,
 						  true, false);
 				reconfig_load_resources(tracer,
@@ -2980,7 +2980,7 @@ int running_socket_tracer(tracer_callback_t handle,
 
 			if (g_k_type == K_TYPE_VER_5_2_PLUS) {
 				has_attempted = true;
-				select_bpf_binary(bpf_load_buffer_name,
+				select_socket_bpf_binary(bpf_load_buffer_name,
 						  &bpf_bin_buffer, &buffer_sz,
 						  true, true);
 				reconfig_load_resources(tracer,

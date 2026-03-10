@@ -17,6 +17,7 @@
 #ifndef DF_USER_SOCKET_H
 #define DF_USER_SOCKET_H
 #include "config.h"
+#include "tracer.h"
 
 #ifndef CACHE_LINE_SIZE
 #define CACHE_LINE_SIZE 64
@@ -48,6 +49,7 @@
 enum linux_kernel_type {
 	K_TYPE_COMM,
 	K_TYPE_KYLIN,
+	K_TYPE_VER_5_15_PLUS,
 	K_TYPE_VER_5_2_PLUS,
 	K_TYPE_VER_3_10,
 	K_TYPE_KFUNC,
@@ -500,4 +502,7 @@ void insert_adapt_kern_data_to_map(struct bpf_tracer *tracer,
  */
 int set_virtual_file_collect(bool enabled);
 bool is_pure_kprobe_ebpf(void);
+int select_socket_bpf_binary(char load_name[NAME_LEN], void **bin_buffer,
+			     int *bin_buf_size, bool skip_kfunc,
+			     bool skip_k_5_2);
 #endif /* DF_USER_SOCKET_H */

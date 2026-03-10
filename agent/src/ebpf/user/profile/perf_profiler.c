@@ -742,6 +742,39 @@ void build_prog_jump_tables(struct bpf_tracer *tracer)
  * @returns 0 on success, < 0 on error
  */
 
+enum linux_kernel_type select_profiler_bpf_binary(char load_name[NAME_LEN],
+						   void **bin_buffer,
+						   int *bin_buf_size)
+{
+	void *bpf_bin_buffer;
+	int buffer_sz;
+	enum linux_kernel_type k_type;
+
+	if (major > 5 || (major == 5 && minor >= 15)) {
+		snprintf(load_name, NAME_LEN,
+			 "continuous-profiler-5.15_plus");
+		bpf_bin_buffer = (void *)perf_profiler_5_15_plus_ebpf_data;
+		buffer_sz = sizeof(perf_profiler_5_15_plus_ebpf_data);
+		k_type = K_TYPE_VER_5_15_PLUS;
+	} else if (major > 5 || (major == 5 && minor >= 2)) {
+		snprintf(load_name, NAME_LEN,
+			 "continuous-profiler-5.2_plus");
+		bpf_bin_buffer = (void *)perf_profiler_5_2_plus_ebpf_data;
+		buffer_sz = sizeof(perf_profiler_5_2_plus_ebpf_data);
+		k_type = K_TYPE_VER_5_2_PLUS;
+	} else {
+		snprintf(load_name, NAME_LEN,
+			 "continuous-profiler-common");
+		bpf_bin_buffer = (void *)perf_profiler_common_ebpf_data;
+		buffer_sz = sizeof(perf_profiler_common_ebpf_data);
+		k_type = K_TYPE_COMM;
+	}
+
+	*bin_buffer = bpf_bin_buffer;
+	*bin_buf_size = buffer_sz;
+	return k_type;
+}
+
 int start_continuous_profiler(int freq, int java_syms_update_delay,
 			      tracer_callback_t callback,
 			      void *cb_ctx[PROFILER_CTX_NUM])
@@ -796,30 +829,9 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 	if (java_libs_and_tools_install() != 0)
 		return (-1);
 
-	enum linux_kernel_type k_type;
-	bool tried_5_15 = false;
-	bool tried_5_2 = false;
-	if (major > 5 || (major == 5 && minor >= 15)) {
-		k_type = K_TYPE_VER_5_2_PLUS;
-		snprintf(bpf_load_buffer_name, NAME_LEN,
-			 "continuous-profiler-5.15_plus");
-		bpf_bin_buffer = (void *)perf_profiler_5_15_plus_ebpf_data;
-		buffer_sz = sizeof(perf_profiler_5_15_plus_ebpf_data);
-		tried_5_15 = true;
-	} else if (major > 5 || (major == 5 && minor >= 2)) {
-		k_type = K_TYPE_VER_5_2_PLUS;
-		snprintf(bpf_load_buffer_name, NAME_LEN,
-			 "continuous-profiler-5.2_plus");
-		bpf_bin_buffer = (void *)perf_profiler_5_2_plus_ebpf_data;
-		buffer_sz = sizeof(perf_profiler_5_2_plus_ebpf_data);
-		tried_5_2 = true;
-	} else {
-		k_type = K_TYPE_COMM;
-		snprintf(bpf_load_buffer_name, NAME_LEN,
-			 "continuous-profiler-common");
-		bpf_bin_buffer = (void *)perf_profiler_common_ebpf_data;
-		buffer_sz = sizeof(perf_profiler_common_ebpf_data);
-	}
+	enum linux_kernel_type k_type = select_profiler_bpf_binary(bpf_load_buffer_name,
+					                           &bpf_bin_buffer,
+					                           (int *)&buffer_sz);
 
 	struct tracer_probes_conf *tps =
 	    malloc(sizeof(struct tracer_probes_conf));
@@ -837,10 +849,10 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 			     bpf_bin_buffer, buffer_sz, tps,
 			     0, release_profiler, create_profiler,
 			     (void *)callback, cb_ctx, freq);
-	if (tracer == NULL && tried_5_15) {
+	if (tracer == NULL && k_type == K_TYPE_VER_5_15_PLUS) {
 		ebpf_warning
 		    ("[CP] 5.15+ profiler load failed, retrying 5.2+ binary.\n");
-		tried_5_2 = true;
+		k_type = K_TYPE_VER_5_2_PLUS;
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "continuous-profiler-5.2_plus");
 		bpf_bin_buffer = (void *)perf_profiler_5_2_plus_ebpf_data;
@@ -850,7 +862,7 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 					  0, release_profiler, create_profiler,
 					  (void *)callback, cb_ctx, freq);
 	}
-	if (tracer == NULL && tried_5_2) {
+	if (tracer == NULL && k_type == K_TYPE_VER_5_2_PLUS) {
 		/* Fallback: 5.2+ variant too complex for verifier, try common binary */
 		ebpf_warning
 		    ("[CP] 5.2+ DWARF profiler load failed, falling back to common (no DWARF/unwind).\n");
@@ -868,7 +880,7 @@ int start_continuous_profiler(int freq, int java_syms_update_delay,
 	if (tracer == NULL)
 		return (-1);
 
-	if (k_type == K_TYPE_VER_5_2_PLUS) {
+	if (k_type == K_TYPE_VER_5_15_PLUS || k_type == K_TYPE_VER_5_2_PLUS) {
 		if (unwind_tracer_init(tracer) != 0) {
 			return -1;
 		}

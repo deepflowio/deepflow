@@ -212,4 +212,7 @@ bool oncpu_profiler_enabled(void);
 void print_cp_tracer_status(void);
 void output_profiler_status(struct bpf_tracer *t, void *context);
 void profiler_match_pid_handle(int feat, int pid, enum match_pids_act act);
+enum linux_kernel_type select_profiler_bpf_binary(char load_name[NAME_LEN],
+						   void **bin_buffer,
+						   int *bin_buf_size);
 #endif /* DF_USER_PERF_PROFILER_H */
