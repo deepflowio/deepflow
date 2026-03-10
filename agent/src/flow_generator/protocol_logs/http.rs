@@ -1263,9 +1263,12 @@ impl HttpLog {
             // Priority chain: WASM/biz_field > AI Agent detection > http_endpoint Trie
             #[cfg(feature = "enterprise")]
             let ai_agent_matched = if !_endpoint_already_set {
-                if let Some(matched_path) =
-                    match_ai_agent_endpoint(&config.ai_agent_endpoints, &path)
-                {
+                if let Some(matched_path) = match_ai_agent_endpoint(
+                    &config.ai_agent_endpoints,
+                    &path,
+                    param.process_id,
+                    std::time::Duration::from_micros(param.time),
+                ) {
                     info.endpoint = Some(matched_path);
                     info.biz_type = BIZ_TYPE_AI_AGENT;
                     info.protocol_str = Some("LLM".to_string());

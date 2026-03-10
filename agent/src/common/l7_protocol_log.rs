@@ -708,6 +708,7 @@ pub struct ParseParam<'a> {
     pub iso8583_parse_conf: Iso8583ParseConfig,
     pub web_sphere_mq_parse_conf: WebSphereMqParseConfig,
     pub net_sign_parse_conf: NetSignParseConfig,
+    pub process_id: u32,
 }
 
 impl<'a> fmt::Debug for ParseParam<'a> {
@@ -741,6 +742,7 @@ impl<'a> fmt::Debug for ParseParam<'a> {
             .field("iso8583_parse_conf", &self.iso8583_parse_conf)
             .field("web_sphere_mq_parse_conf", &self.web_sphere_mq_parse_conf)
             .field("net_sign_parse_conf", &self.net_sign_parse_conf)
+            .field("process_id", &self.process_id)
             .finish()
     }
 }
@@ -815,6 +817,7 @@ impl<'a> ParseParam<'a> {
             iso8583_parse_conf: Iso8583ParseConfig::default(),
             web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
             net_sign_parse_conf: NetSignParseConfig::default(),
+            process_id: packet.process_id,
         }
     }
 }

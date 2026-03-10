@@ -556,10 +556,24 @@ pub mod ai_agent {
         pub fn sync_bpf_map_add(&self, _pid: u32) {}
 
         pub fn sync_bpf_map_remove(&self, _pid: u32) {}
+
+        #[cfg(target_os = "linux")]
+        pub fn set_bpf_map_fd(&self, _fd: i32) {}
+
+        pub fn set_file_io_enabled(&self, _enabled: bool) {}
+
+        pub fn record_endpoint_hit(&self, _pid: u32, _endpoint: &str, _now: Duration) -> bool {
+            false
+        }
     }
 
     /// Check if a URL path matches an AI Agent endpoint pattern.
-    pub fn match_ai_agent_endpoint(_endpoints: &[String], _path: &str) -> Option<String> {
+    pub fn match_ai_agent_endpoint(
+        _endpoints: &[String],
+        _path: &str,
+        _pid: u32,
+        _now: Duration,
+    ) -> Option<String> {
         None
     }
 

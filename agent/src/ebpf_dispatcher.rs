@@ -1309,6 +1309,22 @@ impl EbpfCollector {
 
         ebpf::bpf_tracer_finish();
 
+        // Wire AI Agent PID → BPF map fd after all tracers are loaded
+        #[cfg(feature = "enterprise")]
+        {
+            use enterprise_utils::ai_agent::global_registry;
+            let fd = unsafe {
+                ebpf::bpf_table_get_map_fd(c"socket-trace".as_ptr(), c"__ai_agent_pids".as_ptr())
+            };
+            if fd >= 0 {
+                if let Some(registry) = global_registry() {
+                    registry.set_bpf_map_fd(fd);
+                }
+            } else {
+                warn!("AI Agent: could not find __ai_agent_pids BPF map (fd={}), file I/O monitoring will not work", fd);
+            }
+        }
+
         Ok(handle)
     }
 
