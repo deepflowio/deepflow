@@ -496,6 +496,7 @@ impl CustomInfo {
             _ => (),
         }
         if let Some(t) = pb_info.trace {
+            log::warn!("trace ids {:?}", t.trace_ids);
             info.trace = CustomInfoTrace {
                 trace_ids: t.trace_ids,
                 span_id: t.span_id,
@@ -509,6 +510,7 @@ impl CustomInfo {
                     info.trace.trace_ids.push(trace_id.to_string());
                 }
             }
+            log::warn!("trace ids {:?}", info.trace.trace_ids);
             match dir {
                 PacketDirection::ClientToServer => {
                     info.trace.x_request_id_0 = t.x_request_id;
@@ -603,7 +605,10 @@ impl L7ProtocolInfoInterface for CustomInfo {
             self.captured_response_byte += w.captured_response_byte;
 
             // trace merge
+            log::warn!("self trace ids {:?}", self.trace.trace_ids);
+            log::warn!("w trace ids {:?}", w.trace.trace_ids);
             merge_trace_ids(&mut self.trace.trace_ids, &w.trace.trace_ids);
+            log::warn!("after merge self trace ids {:?}", self.trace.trace_ids);
             swap_if!(self.trace, span_id, is_none, w.trace);
             swap_if!(self.trace, parent_span_id, is_none, w.trace);
             swap_if!(self.trace, x_request_id_0, is_none, w.trace);
@@ -675,6 +680,7 @@ impl From<CustomInfo> for L7ProtocolSendLog {
                 || w.trace.span_id.is_some()
                 || w.trace.parent_span_id.is_some()
             {
+                log::warn!("w.trace.trace_ids {:?}", w.trace.trace_ids);
                 Some(TraceInfo {
                     trace_ids: w.trace.trace_ids,
                     span_id: w.trace.span_id,
