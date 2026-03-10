@@ -573,7 +573,7 @@ impl Default for AiAgentConfig {
                 "/v1/chat/completions".to_string(),
                 "/v1/embeddings".to_string(),
             ],
-            max_payload_size: 1_048_576, // 1MB
+            max_payload_size: 0, // 0 means unlimited
             file_io_enabled: true,
         }
     }

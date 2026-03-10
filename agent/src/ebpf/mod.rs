@@ -157,6 +157,12 @@ pub const DATA_SOURCE_OPENSSL_UPROBE: u8 = 3;
 #[allow(dead_code)]
 pub const DATA_SOURCE_IO_EVENT: u8 = 4;
 #[allow(dead_code)]
+pub const DATA_SOURCE_FILE_OP_EVENT: u8 = 9;
+#[allow(dead_code)]
+pub const DATA_SOURCE_PERM_OP_EVENT: u8 = 10;
+#[allow(dead_code)]
+pub const DATA_SOURCE_PROC_LIFECYCLE_EVENT: u8 = 11;
+#[allow(dead_code)]
 pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
 #[allow(dead_code)]
 pub const DATA_SOURCE_UNIX_SOCKET: u8 = 8;
@@ -835,6 +841,16 @@ extern "C" {
     pub fn disable_fentry();
     pub fn enable_fentry();
     pub fn set_virtual_file_collect(enabled: bool) -> c_int;
+
+    // BPF map helpers for u32-key maps (used by AI Agent PID tracking)
+    pub fn bpf_table_get_map_fd(tracer_name: *const c_char, map_name: *const c_char) -> c_int;
+    pub fn bpf_table_update_u32_key(
+        map_fd: c_int,
+        key: c_uint,
+        val_buf: *const c_void,
+        val_size: c_int,
+    ) -> c_int;
+    pub fn bpf_table_delete_u32_key(map_fd: c_int, key: c_uint) -> c_int;
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_observability")] {

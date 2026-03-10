@@ -1152,6 +1152,7 @@ pub struct LogParserConfig {
     pub custom_app: CustomAppConfig,
     pub ai_agent_endpoints: Vec<String>,
     pub ai_agent_max_payload_size: usize,
+    pub ai_agent_file_io_enabled: bool,
 }
 
 impl Default for LogParserConfig {
@@ -1175,7 +1176,8 @@ impl Default for LogParserConfig {
                 "/v1/chat/completions".to_string(),
                 "/v1/embeddings".to_string(),
             ],
-            ai_agent_max_payload_size: 1_048_576,
+            ai_agent_max_payload_size: usize::MAX, // default: unlimited (config 0 → usize::MAX)
+            ai_agent_file_io_enabled: true,
         }
     }
 }
@@ -2345,7 +2347,12 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     },
                 },
                 ai_agent_endpoints: conf.inputs.proc.ai_agent.http_endpoints.clone(),
-                ai_agent_max_payload_size: conf.inputs.proc.ai_agent.max_payload_size,
+                ai_agent_max_payload_size: if conf.inputs.proc.ai_agent.max_payload_size == 0 {
+                    usize::MAX // 0 means unlimited
+                } else {
+                    conf.inputs.proc.ai_agent.max_payload_size
+                },
+                ai_agent_file_io_enabled: conf.inputs.proc.ai_agent.file_io_enabled,
             },
             debug: DebugConfig {
                 agent_id: conf.global.common.agent_id as u16,
@@ -5659,6 +5666,15 @@ impl ConfigHandler {
                 },
                 ..new_config.log_parser.clone()
             };
+
+            // Propagate file_io_enabled toggle to AiAgentRegistry
+            #[cfg(feature = "enterprise")]
+            {
+                if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
+                    registry
+                        .set_file_io_enabled(candidate_config.log_parser.ai_agent_file_io_enabled);
+                }
+            }
         }
 
         if candidate_config.synchronizer != new_config.synchronizer {

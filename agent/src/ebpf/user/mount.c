@@ -792,6 +792,7 @@ copy_event:
 	u_event->file_type = file_type;
 	u_event->mnt_id = event->mnt_id;
 	u_event->mntns_id = event->mntns_id;
+	u_event->access_permission = event->access_permission;
 	strcpy_s_inline(u_event->mount_source, sizeof(u_event->mount_source),
 			mount_source, strlen(mount_source));
 	fast_strncat_trunc(mntns_str, mount_point, u_event->mount_point,
