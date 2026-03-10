@@ -60,9 +60,13 @@ func (p *ChAlarmPolicy) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.Ch
 			log.Errorf("marshal alarm policy info failed: %v, %s", err, db.LogPrefixORGID)
 			return nil, false
 		}
+		name := alarmPolicy.Name
+		if alarmPolicy.DeletedAt.Valid {
+			name += " (deleted)"
+		}
 		keyToItem[IDKey{ID: alarmPolicy.ID}] = metadbmodel.ChAlarmPolicy{
 			ID:     alarmPolicy.ID,
-			Name:   alarmPolicy.Name,
+			Name:   name,
 			Info:   string(infoBytes),
 			UserID: alarmPolicy.UserID,
 			TeamID: alarmPolicy.TeamID,

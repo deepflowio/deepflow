@@ -116,6 +116,11 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 			nameNoPrefix := strings.TrimPrefix(nameNoBackQuote, "custom_tag.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPrefix, nameNoPrefix)
 			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
+		} else if strings.Contains(nameNoBackQuote, ".") {
+			// Handle other tag types that contain dots
+			tagItem, ok = tag.GetTag("tag_string.", db, table, "default")
+			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoBackQuote, nameNoBackQuote)
+			stmts = append(stmts, &SelectTag{Value: TagTranslatorStr, Alias: selectTag})
 		} else {
 			stmts = append(stmts, &SelectTag{Value: name, Alias: alias})
 		}
