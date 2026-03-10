@@ -321,6 +321,7 @@ struct user_io_event_buffer {
 	char file_dir[FILE_PATH_SZ];
 	int mnt_id;
 	__u32 mntns_id;
+	__u16 access_permission;
 } __attribute__ ((packed));
 
 // struct ebpf_proc_info -> offsets[]  arrays index.

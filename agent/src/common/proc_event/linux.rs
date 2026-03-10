@@ -21,7 +21,7 @@ use std::{
 
 use prost::Message;
 use public::{
-    bytes::{read_u32_le, read_u64_le},
+    bytes::{read_u16_le, read_u32_le, read_u64_le},
     proto::metric,
     sender::{SendMessageType, Sendable},
 };
@@ -40,7 +40,10 @@ const IO_FILE_NAME_OFFSET: usize = 28;
 const IO_MOUNT_SOURCE_OFFSET: usize = 284;
 const IO_MOUNT_POINT_OFFSET: usize = 796;
 const IO_FILE_DIR_OFFSET: usize = 1052;
-const IO_EVENT_BUFF_SIZE: usize = 1564;
+const IO_MNT_ID_OFFSET: usize = 1564;
+const IO_MNTNS_ID_OFFSET: usize = 1568;
+const IO_ACCESS_PERMISSION_OFFSET: usize = 1572;
+const IO_EVENT_BUFF_SIZE: usize = 1574;
 struct IoEventData {
     bytes_count: u32, // Number of bytes read and written
     operation: u32,   // 0: write 1: read
@@ -51,6 +54,7 @@ struct IoEventData {
     mount_source: Vec<u8>,
     mount_point: Vec<u8>,
     file_dir: Vec<u8>,
+    access_permission: u16, // File permission bits (inode->i_mode & 0xFFF)
 }
 
 impl TryFrom<&[u8]> for IoEventData {
@@ -79,6 +83,7 @@ impl TryFrom<&[u8]> for IoEventData {
             mount_source: parse_cstring_slice(&raw_data[IO_MOUNT_SOURCE_OFFSET..]),
             mount_point: parse_cstring_slice(&raw_data[IO_MOUNT_POINT_OFFSET..]),
             file_dir: parse_cstring_slice(&raw_data[IO_FILE_DIR_OFFSET..]),
+            access_permission: read_u16_le(&raw_data[IO_ACCESS_PERMISSION_OFFSET..]),
         };
         Ok(io_event_data)
     }
@@ -96,6 +101,7 @@ impl From<IoEventData> for metric::IoEventData {
             mount_point: io_event_data.mount_point,
             file_dir: io_event_data.file_dir,
             file_type: io_event_data.file_type as i32,
+            access_permission: io_event_data.access_permission as u32,
         }
     }
 }
@@ -125,6 +131,9 @@ impl Debug for EventData {
 pub enum EventType {
     OtherEvent = 0,
     IoEvent = 1,
+    FileOpEvent = 2,
+    PermOpEvent = 3,
+    ProcLifecycleEvent = 4,
 }
 
 impl From<u8> for EventType {
@@ -147,6 +156,9 @@ impl fmt::Display for EventType {
         match self {
             Self::OtherEvent => write!(f, "other_event"),
             Self::IoEvent => write!(f, "io_event"),
+            Self::FileOpEvent => write!(f, "file_op_event"),
+            Self::PermOpEvent => write!(f, "perm_op_event"),
+            Self::ProcLifecycleEvent => write!(f, "proc_lifecycle_event"),
         }
     }
 }
