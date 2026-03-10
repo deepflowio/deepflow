@@ -1076,7 +1076,7 @@ impl EbpfCollector {
             return Err(Error::EbpfRunningError);
         }
 
-        Self::ebpf_on_config_change(config.l7_log_packet_size);
+        Self::ebpf_on_config_change(config.l7_log_packet_size, config.ai_agent_max_payload_size);
 
         let ebpf_conf = &config.ebpf;
         let on_cpu = &ebpf_conf.profile.on_cpu;
@@ -1310,7 +1310,7 @@ impl EbpfCollector {
         Ok(handle)
     }
 
-    fn ebpf_on_config_change(l7_log_packet_size: usize) {
+    fn ebpf_on_config_change(l7_log_packet_size: usize, ai_agent_max_payload_size: usize) {
         unsafe {
             let n = ebpf::set_data_limit_max(l7_log_packet_size as c_int);
             if n < 0 {
@@ -1322,6 +1322,24 @@ impl EbpfCollector {
                 info!(
                     "ebpf set l7_log_packet_size to {}, actual effective configuration is {}.",
                     l7_log_packet_size, n
+                );
+            }
+
+            let ai_agent_limit = if ai_agent_max_payload_size == 0 {
+                0
+            } else {
+                ai_agent_max_payload_size.min(i32::MAX as usize) as c_int
+            };
+            let n = ebpf::set_ai_agent_data_limit_max(ai_agent_limit);
+            if n < 0 {
+                warn!(
+                    "ebpf set ai_agent_max_payload_size({}) failed.",
+                    ai_agent_max_payload_size
+                );
+            } else if ai_agent_limit != 0 && n != ai_agent_limit {
+                info!(
+                    "ebpf set ai_agent_max_payload_size to {}, actual effective configuration is {}.",
+                    ai_agent_max_payload_size, n
                 );
             }
         }
@@ -1532,7 +1550,10 @@ impl EbpfCollector {
                 }
             }
 
-            Self::ebpf_on_config_change(config.l7_log_packet_size);
+            Self::ebpf_on_config_change(
+                config.l7_log_packet_size,
+                config.ai_agent_max_payload_size,
+            );
 
             #[cfg(feature = "extended_observability")]
             {
