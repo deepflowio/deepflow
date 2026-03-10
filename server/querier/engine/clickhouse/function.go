@@ -638,9 +638,9 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 				if strings.Contains(dbField, "/") {
 					if strings.HasPrefix(dbField, "1 - ") {
 						dbFieldNoPrefix := strings.TrimPrefix(dbField, "1 - ")
-						f.Metrics.DBField = "1 - " + fmt.Sprintf("least(%s, 1)", dbFieldNoPrefix)
+						f.Metrics.DBField = "1 - " + fmt.Sprintf("if(%s>=0, least(%s, 1), null)", dbFieldNoPrefix, dbFieldNoPrefix)
 					} else {
-						f.Metrics.DBField = fmt.Sprintf("least(%s, 1)", dbField)
+						f.Metrics.DBField = fmt.Sprintf("if(%s>=0, least(%s, 1), null)", dbField, dbField)
 					}
 				}
 			}

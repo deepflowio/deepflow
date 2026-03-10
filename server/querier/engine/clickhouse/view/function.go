@@ -767,10 +767,7 @@ type DivFunction struct {
 	DivType int
 }
 
-func (f *DivFunction) WriteTo(buf *bytes.Buffer) {
-	if f.IsLeast {
-		buf.WriteString("least(")
-	}
+func (f *DivFunction) writeField(buf *bytes.Buffer) {
 	if f.DivType == FUNCTION_DIV_TYPE_DEFAULT {
 		buf.WriteString("divide(")
 		f.Fields[0].WriteTo(buf)
@@ -794,8 +791,17 @@ func (f *DivFunction) WriteTo(buf *bytes.Buffer) {
 		buf.WriteString(FormatField(f.Fields[1].(Function).GetDefaultAlias(true)))
 		buf.WriteString("`")
 	}
+}
+
+func (f *DivFunction) WriteTo(buf *bytes.Buffer) {
 	if f.IsLeast {
-		buf.WriteString(", 1)")
+		buf.WriteString("if(")
+		f.writeField(buf)
+		buf.WriteString(">=0, least(")
+		f.writeField(buf)
+		buf.WriteString(", 1), null)")
+	} else {
+		f.writeField(buf)
 	}
 	buf.WriteString(f.Math)
 	if !f.Nest && f.Alias != "" {
@@ -811,7 +817,7 @@ func (f *DivFunction) GetWiths() []Node {
 	f.Withs = append(f.Withs, f.Fields[1].GetWiths()...)
 	divFunctionStr := fmt.Sprintf("divide(%s, %s)", f.Fields[0].ToString(), f.Fields[1].ToString())
 	if f.IsLeast {
-		divFunctionStr = fmt.Sprintf("least(%s, 1)", divFunctionStr)
+		divFunctionStr = fmt.Sprintf("if(%s>=0, least(%s, 1), null)", divFunctionStr, divFunctionStr)
 	}
 	if f.DivType == FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL {
 		with := fmt.Sprintf(
