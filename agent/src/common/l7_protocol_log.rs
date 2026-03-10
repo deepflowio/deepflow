@@ -697,6 +697,8 @@ pub struct ParseParam<'a> {
     pub oracle_parse_conf: OracleConfig,
     pub iso8583_parse_conf: Iso8583ParseConfig,
     pub web_sphere_mq_parse_conf: WebSphereMqParseConfig,
+
+    pub process_id: u32,
 }
 
 impl<'a> fmt::Debug for ParseParam<'a> {
@@ -802,6 +804,8 @@ impl<'a> ParseParam<'a> {
             oracle_parse_conf: OracleConfig::default(),
             iso8583_parse_conf: Iso8583ParseConfig::default(),
             web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
+
+            process_id: packet.process_id,
         }
     }
 }
