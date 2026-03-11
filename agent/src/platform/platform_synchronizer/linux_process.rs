@@ -368,7 +368,7 @@ pub(crate) fn get_all_process_in(conf: &OsProcScanConfig, ret: &mut Vec<ProcessD
         ret.push(process_data);
     }
     fill_child_proc_tag_by_parent(ret.as_mut());
-    proc_scan_hook(ret);
+    proc_scan_hook(proc_root, ret);
 }
 
 pub(super) fn get_self_proc() -> ProcResult<ProcessData> {
