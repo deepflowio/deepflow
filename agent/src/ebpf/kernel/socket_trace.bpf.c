@@ -1357,7 +1357,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	if (tracer_ctx == NULL)
 		return SUBMIT_INVALID;
 
-	__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	__u32 tgid = (__u32) (pid_tgid >> 32);
 	__u64 conn_key = gen_conn_key_id((__u64) tgid, (__u64) conn_info->fd);
 	if (conn_info->message_type == MSG_CLEAR) {
 		delete_socket_info(conn_key, conn_info->socket_info_ptr);
