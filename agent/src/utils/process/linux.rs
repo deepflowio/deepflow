@@ -476,9 +476,14 @@ impl ProcessListener {
         process_data_cache.retain(|pid, _| alive_pids.contains(pid));
 
         for (key, value) in features.iter_mut() {
-            if (value.process_matcher.is_empty() && value.pids.is_empty())
-                || value.callback.is_none()
-            {
+            let ai_agent_pids = fetch_ai_agent_pids(key.as_str());
+
+            if should_skip_feature(
+                value.process_matcher.is_empty(),
+                value.pids.is_empty(),
+                ai_agent_pids.is_empty(),
+                value.callback.is_none(),
+            ) {
                 continue;
             }
 
@@ -500,6 +505,15 @@ impl ProcessListener {
                         }
                     }
                 }
+            }
+
+            if !ai_agent_pids.is_empty() {
+                merge_ai_agent_processes(
+                    process_data_cache,
+                    &ai_agent_pids,
+                    &mut pids,
+                    &mut process_datas,
+                );
             }
 
             pids.sort();
@@ -561,5 +575,103 @@ impl ProcessListener {
     pub fn notify_stop(&self) -> Option<JoinHandle<()>> {
         self.running.store(false, Relaxed);
         self.thread_handle.lock().unwrap().take()
+    }
+}
+
+fn should_skip_feature(
+    process_matcher_empty: bool,
+    previous_pids_empty: bool,
+    ai_agent_pids_empty: bool,
+    callback_missing: bool,
+) -> bool {
+    if callback_missing {
+        return true;
+    }
+    !(!process_matcher_empty || !previous_pids_empty || !ai_agent_pids_empty)
+}
+
+#[cfg(feature = "enterprise")]
+fn fetch_ai_agent_pids(feature: &str) -> Vec<u32> {
+    if feature == "proc.gprocess_info" {
+        if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
+            return registry.get_all_pids();
+        }
+    }
+    Vec::new()
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn fetch_ai_agent_pids(_feature: &str) -> Vec<u32> {
+    Vec::new()
+}
+
+fn merge_ai_agent_processes(
+    process_data_cache: &HashMap<i32, ProcessData>,
+    ai_agent_pids: &[u32],
+    pids: &mut Vec<u32>,
+    process_datas: &mut Vec<ProcessData>,
+) {
+    let mut existing_pids: HashSet<u32> = pids.iter().copied().collect();
+    for pid in ai_agent_pids {
+        if existing_pids.contains(pid) {
+            continue;
+        }
+        if let Some(process_data) = process_data_cache.get(&(*pid as i32)) {
+            pids.push(*pid);
+            process_datas.push(process_data.clone());
+            existing_pids.insert(*pid);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn make_process_data(pid: u64) -> ProcessData {
+        ProcessData {
+            name: format!("proc-{pid}"),
+            pid,
+            ppid: 1,
+            process_name: format!("proc-{pid}"),
+            cmd: format!("/proc/{pid}"),
+            cmd_with_args: vec![format!("/proc/{pid}")],
+            user_id: 0,
+            user: "root".to_string(),
+            start_time: Duration::from_secs(0),
+            os_app_tags: vec![],
+            netns_id: 0,
+            container_id: String::new(),
+            biz_type: 0,
+        }
+    }
+
+    #[test]
+    fn merge_ai_agent_processes_adds_missing_pids() {
+        let mut process_data_cache = HashMap::new();
+        process_data_cache.insert(1001, make_process_data(1001));
+        process_data_cache.insert(1002, make_process_data(1002));
+
+        let ai_agent_pids = vec![1002];
+        let mut pids = vec![1001];
+        let mut process_datas = vec![make_process_data(1001)];
+
+        merge_ai_agent_processes(
+            &process_data_cache,
+            &ai_agent_pids,
+            &mut pids,
+            &mut process_datas,
+        );
+
+        pids.sort();
+        assert_eq!(pids, vec![1001, 1002]);
+        assert!(process_datas.iter().any(|pd| pd.pid == 1002));
+    }
+
+    #[test]
+    fn should_skip_feature_allows_ai_agent_without_matcher() {
+        let skip = should_skip_feature(true, true, false, false);
+        assert!(!skip);
     }
 }

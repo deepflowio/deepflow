@@ -25,8 +25,7 @@ pub fn proc_scan_hook(_proc_root: &str, _process_datas: &mut Vec<ProcessData>) {
         if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
             // Use a full /proc scan for cleanup to avoid filtering out short-lived processes
             // that are not yet eligible for os_proc_socket_min_lifetime.
-            let alive_pids: Vec<u32> =
-                match procfs::process::all_processes_with_root(_proc_root) {
+            let alive_pids: Vec<u32> = match procfs::process::all_processes_with_root(_proc_root) {
                 Ok(procs) => procs
                     .into_iter()
                     .filter_map(|p| p.ok())
