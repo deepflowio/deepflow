@@ -622,6 +622,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 	for _, p := range gSyncData.Processes {
 		pData := p
 		pStartTime := pData.StartTime.Format(controllercommon.GO_BIRTHDAY)
+		bizType := uint32(pData.BizType)
 		gProcess := &controller.GenesisSyncProcess{
 			VtapId:      &pData.VtapID,
 			Pid:         &pData.PID,
@@ -629,6 +630,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *co
 			NetnsId:     &pData.NetnsID,
 			Name:        &pData.Name,
 			ProcessName: &pData.ProcessName,
+			BizType:     &bizType,
 			CmdLine:     &pData.CMDLine,
 			User:        &pData.UserName,
 			ContainerId: &pData.ContainerID,
