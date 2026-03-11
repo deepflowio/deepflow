@@ -34,6 +34,7 @@ use log::{debug, error, info, trace};
 use nix::sys::utsname::uname;
 use procfs::process::all_processes_with_root;
 
+use crate::common::flow::BIZ_TYPE_AI_AGENT;
 use crate::config::ProcessMatcher;
 use crate::platform::{get_os_app_tag_by_exec, ProcessData, ProcessDataOp};
 
@@ -612,13 +613,21 @@ fn merge_ai_agent_processes(
     process_datas: &mut Vec<ProcessData>,
 ) {
     let mut existing_pids: HashSet<u32> = pids.iter().copied().collect();
+    let ai_agent_set: HashSet<u32> = ai_agent_pids.iter().copied().collect();
+    for process_data in process_datas.iter_mut() {
+        if ai_agent_set.contains(&(process_data.pid as u32)) {
+            process_data.biz_type = BIZ_TYPE_AI_AGENT;
+        }
+    }
     for pid in ai_agent_pids {
         if existing_pids.contains(pid) {
             continue;
         }
         if let Some(process_data) = process_data_cache.get(&(*pid as i32)) {
+            let mut process_data = process_data.clone();
+            process_data.biz_type = BIZ_TYPE_AI_AGENT;
             pids.push(*pid);
-            process_datas.push(process_data.clone());
+            process_datas.push(process_data);
             existing_pids.insert(*pid);
         }
     }
@@ -667,6 +676,32 @@ mod tests {
         pids.sort();
         assert_eq!(pids, vec![1001, 1002]);
         assert!(process_datas.iter().any(|pd| pd.pid == 1002));
+    }
+
+    #[test]
+    fn merge_ai_agent_processes_sets_biz_type() {
+        use crate::common::flow::BIZ_TYPE_AI_AGENT;
+
+        let mut process_data_cache = HashMap::new();
+        process_data_cache.insert(2001, make_process_data(2001));
+        process_data_cache.insert(2002, make_process_data(2002));
+
+        let ai_agent_pids = vec![2002];
+        let mut pids = vec![2002];
+        let mut process_datas = vec![make_process_data(2002)];
+
+        merge_ai_agent_processes(
+            &process_data_cache,
+            &ai_agent_pids,
+            &mut pids,
+            &mut process_datas,
+        );
+
+        let ai_agent = process_datas
+            .iter()
+            .find(|pd| pd.pid == 2002)
+            .expect("ai agent process missing");
+        assert_eq!(ai_agent.biz_type, BIZ_TYPE_AI_AGENT);
     }
 
     #[test]
