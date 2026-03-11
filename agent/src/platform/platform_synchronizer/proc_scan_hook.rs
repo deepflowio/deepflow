@@ -16,13 +16,21 @@
 
 use super::ProcessData;
 
-pub fn proc_scan_hook(_process_datas: &mut Vec<ProcessData>) {
+pub fn proc_scan_hook(proc_root: &str, _process_datas: &mut Vec<ProcessData>) {
     // Enterprise: clean dead AI Agent PIDs and mark alive ones with biz_type
     #[cfg(feature = "enterprise")]
     {
         if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
-            // Collect alive PIDs from proc scan to clean stale entries
-            let alive_pids: Vec<u32> = _process_datas.iter().map(|pd| pd.pid as u32).collect();
+            // Use a full /proc scan for cleanup to avoid filtering out short-lived processes
+            // that are not yet eligible for os_proc_socket_min_lifetime.
+            let alive_pids: Vec<u32> = match procfs::process::all_processes_with_root(proc_root) {
+                Ok(procs) => procs
+                    .into_iter()
+                    .filter_map(|p| p.ok())
+                    .map(|p| p.pid as u32)
+                    .collect(),
+                Err(_) => _process_datas.iter().map(|pd| pd.pid as u32).collect(),
+            };
             registry.cleanup_dead_pids(&alive_pids);
 
             for pd in _process_datas.iter_mut() {
