@@ -274,6 +274,28 @@ static inline void config_probes_for_proc_event(struct tracer_probes_conf *tps)
 	}
 }
 
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+static inline void config_probes_for_ai_agent(struct tracer_probes_conf *tps)
+{
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_openat");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_unlinkat");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_fchmodat");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_fchownat");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setuid");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setgid");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setreuid");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setregid");
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_fork");
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
+}
+#else
+static inline void config_probes_for_ai_agent(struct tracer_probes_conf *tps)
+{
+	(void)tps;
+}
+#endif
+
 static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 {
 	kfunc_set_sym_for_entry_and_exit(tps, "ksys_write");
@@ -294,6 +316,7 @@ static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 	kfunc_set_symbol(tps, "__sys_accept4", true);
 	kfunc_set_symbol(tps, "__sys_connect", false);
 	config_probes_for_proc_event(tps);
+	config_probes_for_ai_agent(tps);
 
 	/*
 	 * On certain kernels, such as 5.15.0-127-generic and 5.10.134-18.al8.x86_64,
@@ -412,6 +435,7 @@ static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 		tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pwritev2");
 		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_pwritev2");
 	}
+	config_probes_for_ai_agent(tps);
 }
 
 static inline void __config_kprobe(struct tracer_probes_conf *tps,
@@ -477,6 +501,7 @@ static void config_probes_for_kprobe(struct tracer_probes_conf *tps)
 	probes_set_enter_symbol(tps, "__close_fd");
 	probes_set_exit_symbol(tps, "__sys_socket");
 	probes_set_enter_symbol(tps, "__sys_connect");
+	config_probes_for_ai_agent(tps);
 }
 
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)

@@ -40,7 +40,22 @@
 #define __user
 
 #ifdef EXTENDED_AI_AGENT_FILE_IO
+#ifndef AI_AGENT_PROC_FORK
+#define AI_AGENT_PROC_FORK  1
+#define AI_AGENT_PROC_EXEC  2
+#define AI_AGENT_PROC_EXIT  3
+#endif
+
 static __inline int is_ai_agent_process(__u64 pid_tgid);
+static __inline int ai_agent_submit_event(void *ctx, __u8 source,
+					  void *event, __u32 event_sz,
+					  __u64 pid_tgid);
+static __inline int ai_agent_emit_proc_event(void *ctx, __u8 event_type,
+					     __u32 pid, __u32 parent_pid,
+					     __u64 pid_tgid);
+static __inline void ai_agent_cleanup_proc_pid(__u32 tgid);
+static __inline int ai_agent_on_fork(void *ctx, __u32 parent_tgid,
+				     __u32 child_tgid);
 #endif
 
 /* *INDENT-OFF* */
