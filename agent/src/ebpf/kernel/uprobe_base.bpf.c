@@ -636,6 +636,13 @@ static __inline int do_process_exit(void *ctx)
 		bpf_get_current_comm(data.name, sizeof(data.name));
 		bpf_perf_event_output(ctx, &NAME(socket_data),
 				      BPF_F_CURRENT_CPU, &data, sizeof(data));
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+		if (is_ai_agent_process(id)) {
+			ai_agent_emit_proc_event(ctx, AI_AGENT_PROC_EXIT,
+						 pid, 0, id);
+			ai_agent_cleanup_proc_pid(pid);
+		}
+#endif
 	}
 
 	bpf_map_delete_elem(&goroutines_map, &id);
@@ -747,6 +754,11 @@ static __inline int __process_exec(void *ctx)
 		bpf_perf_event_output(ctx, &NAME(socket_data),
 				      BPF_F_CURRENT_CPU, &data, sizeof(data));
 	}
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+	if (is_ai_agent_process(id)) {
+		ai_agent_emit_proc_event(ctx, AI_AGENT_PROC_EXEC, pid, 0, id);
+	}
+#endif
 
 	return 0;
 }
