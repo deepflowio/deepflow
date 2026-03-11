@@ -1692,6 +1692,7 @@ inputs:
       http_endpoints:
         - /v1/chat/completions
         - /v1/embeddings
+        - /v1/responses
       # type: int
       # name:
       #   en: Max Payload Size
