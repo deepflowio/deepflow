@@ -222,6 +222,7 @@ const (
 		"    `icon_id` Int64,\n" +
 		"    `chost_id` Int64,\n" +
 		"    `l3_epc_id` Int64,\n" +
+		"    `biz_type` UInt64,\n" +
 		"    `team_id` UInt64,\n" +
 		"    `domain_id` UInt64,\n" +
 		"    `sub_domain_id` UInt64\n" +

@@ -1782,6 +1782,7 @@ CREATE TABLE IF NOT EXISTS ch_gprocess (
     icon_id                 INTEGER,
     chost_id                INTEGER,
     l3_epc_id               INTEGER,
+    biz_type                INTEGER,
     team_id                 INTEGER,
     domain_id               INTEGER,
     sub_domain_id           INTEGER,
