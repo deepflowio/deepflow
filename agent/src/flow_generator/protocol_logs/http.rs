@@ -1256,16 +1256,17 @@ impl HttpLog {
         if !config.http_endpoint_disabled && info.path.len() > 0 {
             // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
             let _endpoint_already_set = matches!(info.endpoint.as_ref(), Some(p) if !p.is_empty());
-            let path_ref = match info.endpoint.as_ref() {
-                Some(p) if !p.is_empty() => p.as_str(),
-                _ => info.path.as_str(),
+            let path_owned = if let Some(p) = info.endpoint.as_ref().filter(|p| !p.is_empty()) {
+                p.clone()
+            } else {
+                info.path.clone()
             };
             // Priority chain: WASM/biz_field > AI Agent detection > http_endpoint Trie
             #[cfg(feature = "enterprise")]
             let ai_agent_matched = if !_endpoint_already_set {
                 if let Some(matched_path) = match_ai_agent_endpoint(
                     &config.ai_agent_endpoints,
-                    path_ref,
+                    path_owned.as_str(),
                     param.process_id,
                     std::time::Duration::from_micros(param.time),
                 ) {
@@ -1282,7 +1283,6 @@ impl HttpLog {
             #[cfg(not(feature = "enterprise"))]
             let ai_agent_matched = false;
             if !ai_agent_matched {
-                let path_owned = path_ref.to_string();
                 info.endpoint = Some(handle_endpoint(config, &path_owned));
             }
         }
