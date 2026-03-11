@@ -195,6 +195,7 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.MountSource = string(ioData.MountSource)
 		s.MountPoint = string(ioData.MountPoint)
 		s.Bytes = ioData.BytesCount
+		s.AccessPermission = ioData.AccessPermission
 		s.Duration = uint64(s.EndTime - s.StartTime)
 	} else if e.FileOpEventData != nil {
 		d := e.FileOpEventData

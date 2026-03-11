@@ -72,6 +72,7 @@ type EventBlock struct {
 	ColMountSource      *proto.ColLowCardinality[string]
 	ColMountPoint       *proto.ColLowCardinality[string]
 	ColFileDir          proto.ColStr
+	ColAccessPermission proto.ColUInt32
 
 	*nativetag.NativeTagsBlock
 }
@@ -122,6 +123,7 @@ func (b *EventBlock) Reset() {
 	b.ColMountSource.Reset()
 	b.ColMountPoint.Reset()
 	b.ColFileDir.Reset()
+	b.ColAccessPermission.Reset()
 	if b.NativeTagsBlock != nil {
 		b.NativeTagsBlock.Reset()
 	}
@@ -177,6 +179,7 @@ func (b *EventBlock) ToInput(input proto.Input) proto.Input {
 			proto.InputColumn{Name: ckdb.COLUMN_MOUNT_SOURCE, Data: b.ColMountSource},
 			proto.InputColumn{Name: ckdb.COLUMN_MOUNT_POINT, Data: b.ColMountPoint},
 			proto.InputColumn{Name: ckdb.COLUMN_FILE_DIR, Data: &b.ColFileDir},
+			proto.InputColumn{Name: ckdb.COLUMN_ACCESS_PERMISSION, Data: &b.ColAccessPermission},
 		)
 	}
 	if b.NativeTagsBlock != nil {
@@ -249,6 +252,7 @@ func (n *EventStore) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColMountSource.Append(n.MountSource)
 	block.ColMountPoint.Append(n.MountPoint)
 	block.ColFileDir.Append(n.FileDir)
+	block.ColAccessPermission.Append(n.AccessPermission)
 
 	if block.NativeTagsBlock != nil {
 		block.NativeTagsBlock.AppendToColumnBlock(n.AttributeNames, n.AttributeValues, nil, nil)

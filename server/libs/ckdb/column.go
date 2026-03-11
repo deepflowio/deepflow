@@ -32,6 +32,7 @@ func init() {
 const (
 	COLUMN_ACL_GID                    = "acl_gid"
 	COLUMN_ACL_GIDS                   = "acl_gids"
+	COLUMN_ACCESS_PERMISSION          = "access_permission"
 	COLUMN_AGENT_ID                   = "agent_id"
 	COLUMN_ALERT_POLICY               = "alert_policy"
 	COLUMN_APP_INSTANCE               = "app_instance"

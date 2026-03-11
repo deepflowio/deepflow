@@ -113,6 +113,7 @@ type EventStore struct {
 	MountSource      string `json:"mount_source" category:"$tag" sub:"event_info"`
 	MountPoint       string `json:"mount_point" category:"$tag" sub:"event_info"`
 	FileDir          string `json:"file_dir" category:"$tag" sub:"event_info"`
+	AccessPermission uint32 `json:"access_permission" category:"$tag" sub:"event_info"`
 }
 
 func (e *EventStore) NativeTagVersion() uint32 {
@@ -238,6 +239,7 @@ func EventColumns(isFileEvent bool) []*ckdb.Column {
 			ckdb.NewColumn("mount_source", ckdb.LowCardinalityString).SetGroupBy(),
 			ckdb.NewColumn("mount_point", ckdb.LowCardinalityString).SetGroupBy(),
 			ckdb.NewColumn("file_dir", ckdb.String).SetGroupBy(),
+			ckdb.NewColumn("access_permission", ckdb.UInt32).SetComment("文件权限位").SetIgnoredInAggrTable(),
 		)
 	}
 	return columns
