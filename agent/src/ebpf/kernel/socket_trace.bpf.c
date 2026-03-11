@@ -1384,10 +1384,12 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	 */
 	int data_max_sz = tracer_ctx->data_limit_max;
 #ifdef EXTENDED_AI_AGENT_FILE_IO
+	__u8 is_ai_agent = 0;
 	if (is_ai_agent_process(((__u64)tgid) << 32)) {
 		__u32 ai_limit = tracer_ctx->ai_agent_data_limit_max;
 		data_max_sz = ai_limit == 0 ?
 			      AI_AGENT_DATA_LIMIT_MAX_UNLIMITED : ai_limit;
+		is_ai_agent = 1;
 	}
 #endif
 
