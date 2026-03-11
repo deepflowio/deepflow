@@ -1357,8 +1357,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	if (tracer_ctx == NULL)
 		return SUBMIT_INVALID;
 
-	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	__u32 tgid = (__u32) (pid_tgid >> 32);
+	__u32 tgid = (__u32) (bpf_get_current_pid_tgid() >> 32);
 	__u64 conn_key = gen_conn_key_id((__u64) tgid, (__u64) conn_info->fd);
 	if (conn_info->message_type == MSG_CLEAR) {
 		delete_socket_info(conn_key, conn_info->socket_info_ptr);
@@ -1385,8 +1384,7 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	 */
 	int data_max_sz = tracer_ctx->data_limit_max;
 #ifdef EXTENDED_AI_AGENT_FILE_IO
-	bool is_ai_agent = is_ai_agent_process(pid_tgid);
-	if (is_ai_agent) {
+	if (is_ai_agent_process(((__u64)tgid) << 32)) {
 		__u32 ai_limit = tracer_ctx->ai_agent_data_limit_max;
 		data_max_sz = ai_limit == 0 ?
 			      AI_AGENT_DATA_LIMIT_MAX_UNLIMITED : ai_limit;
