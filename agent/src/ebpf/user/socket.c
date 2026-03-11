@@ -279,8 +279,11 @@ static inline void config_probes_for_ai_agent(struct tracer_probes_conf *tps)
 {
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_openat");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_unlinkat");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_unlink");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_fchmodat");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_chmod");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_fchownat");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_chown");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setuid");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setgid");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setreuid");
