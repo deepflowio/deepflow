@@ -123,6 +123,11 @@ func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 	d.updateStateInfo(cloudData)
 
 	if err := d.shouldRefresh(cloudData); err != nil {
+		if err == DataNotVerifiedError &&
+			len(cloudData.Processes) > 0 &&
+			d.metadata.GetDomainInfo().Type == common.KUBERNETES {
+			return d.tryRefreshProcessOnly(cloudData)
+		}
 		return err
 	}
 
@@ -139,6 +144,41 @@ func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 		log.Info("domain refresh is running, does nothing", d.metadata.LogPrefixes)
 		return RefreshConflictError
 	}
+}
+
+func (d *domain) tryRefreshProcessOnly(cloudData cloudmodel.Resource) error {
+	select {
+	case <-d.cache.RefreshSignal:
+		d.cache.IncrementSequence()
+		d.cache.SetLogLevel(logging.INFO, cache.RefreshSignalCallerDomain)
+
+		d.refreshProcessOnly(cloudData)
+
+		d.cache.ResetRefreshSignal(cache.RefreshSignalCallerDomain)
+		return nil
+	default:
+		log.Info("domain refresh is running, does nothing", d.metadata.LogPrefixes)
+		return RefreshConflictError
+	}
+}
+
+func (d *domain) refreshProcessOnly(cloudData cloudmodel.Resource) {
+	log.Info("domain process-only refresh started", d.metadata.LogPrefixes)
+
+	// for process
+	d.cache.RefreshVTaps()
+
+	processUpdater := updater.NewProcess(d.cache, cloudData.Processes).RegisterListener(
+		listener.NewProcess(d.cache),
+	)
+	updaters := []updater.ResourceUpdater{processUpdater}
+	d.executeUpdaters(updaters)
+	d.notifyOnResourceChanged(updaters)
+	d.pubsub.PublishChange(d.msgMetadata)
+
+	d.updateSyncedAt(cloudData.SyncAt)
+
+	log.Info("domain process-only refresh completed", d.metadata.LogPrefixes)
 }
 
 func (d *domain) shouldRefresh(cloudData cloudmodel.Resource) error {
