@@ -2335,12 +2335,9 @@ static inline int __set_data_limit_max(int limit_size)
 	return socket_data_limit_max;
 }
 
-static inline int __set_ai_agent_data_limit_max(int limit_size)
+static inline int __set_ai_agent_data_limit_max(unsigned int limit_size)
 {
-	if (limit_size < 0) {
-		ebpf_warning("ai_agent limit_size cannot be negative\n");
-		return ETR_INVAL;
-	} else if (limit_size == 0) {
+	if (limit_size == 0) {
 		ai_agent_data_limit_max = 0;
 	} else if (limit_size > INT_MAX) {
 		ai_agent_data_limit_max = INT_MAX;
