@@ -136,6 +136,7 @@ message GenesisSyncProcess {
     optional string start_time = 10;
     optional uint32 netns_id = 11;
     optional string container_id = 12;
+    optional uint32 biz_type = 13;
 }
 
 message GenesisSyncData{
