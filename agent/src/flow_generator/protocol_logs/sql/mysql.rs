@@ -456,7 +456,7 @@ impl MysqlInfo {
                 &mut parser.custom_field_store,
                 self,
                 TrafficDirection::REQUEST,
-                Source::Sql(sql_string),
+                Source::Sql(sql_string, None),
             );
         }
 

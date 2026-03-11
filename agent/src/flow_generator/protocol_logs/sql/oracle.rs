@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
+use std::borrow::Cow;
+
 use serde::Serialize;
 
 use super::super::value_is_default;
 use crate::config::handler::LogParserConfig;
 use crate::flow_generator::{
     protocol_logs::{
+        auto_merge_custom_field,
         pb_adapter::{ExtendedInfo, KeyVal},
         swap_if, L7ResponseStatus,
     },
@@ -37,12 +40,29 @@ use crate::{
     },
 };
 
-use enterprise_utils::l7::sql::oracle::{
-    Body, CallId, DataFlags, DataId, OracleParseConfig, OracleParser, TnsPacketType,
+use enterprise_utils::l7::{
+    custom_policy::{
+        custom_field_policy::{
+            enums::{Op, Source},
+            Store,
+        },
+        enums::TrafficDirection,
+    },
+    sql::oracle::{
+        Body, CallId, DataFlags, DataId, OracleParseConfig, OracleParser, TnsPacketType,
+    },
 };
-use public::l7_protocol::{L7Protocol, LogMessageType};
+use public::l7_protocol::{Field, FieldSetter, L7Log, L7LogAttribute, L7Protocol, LogMessageType};
+use public_derive::L7Log;
 
-#[derive(Serialize, Debug, Default, Clone, PartialEq)]
+#[derive(L7Log, Serialize, Debug, Default, Clone, PartialEq)]
+#[l7_log(request_type.getter = "OracleInfo::get_request_type", request_type.setter = "OracleInfo::set_request_type")]
+#[l7_log(version.skip = "true", request_domain.skip = "true", endpoint.skip = "true")]
+#[l7_log(request_id.skip = "true", http_proxy_client.skip = "true")]
+#[l7_log(trace_id.skip = "true", span_id.skip = "true", x_request_id.skip = "true")]
+#[l7_log(response_result.skip = "true", response_code.skip = "true")]
+#[l7_log(biz_type.skip = "true", biz_code.skip = "true", biz_scenario.skip = "true")]
+#[l7_log(biz_response_code.skip = "true")]
 pub struct OracleInfo {
     pub msg_type: LogMessageType,
     #[serde(skip)]
@@ -51,6 +71,7 @@ pub struct OracleInfo {
     #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
     pub packet_type: TnsPacketType,
     // req
+    #[l7_log(request_resource)]
     #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub sql: String,
     #[serde(skip)]
@@ -68,11 +89,13 @@ pub struct OracleInfo {
     pub ret_code: u16,
     #[serde(rename = "sql_affected_rows", skip_serializing_if = "value_is_default")]
     pub affected_rows: Option<u32>,
+    #[l7_log(response_exception)]
     #[serde(
-        rename = "response_execption",
+        rename = "response_exception",
         skip_serializing_if = "value_is_default"
     )]
     pub error_message: String,
+    #[l7_log(response_status)]
     #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
     #[serde(skip)]
@@ -87,8 +110,28 @@ pub struct OracleInfo {
 
     #[serde(skip)]
     is_on_blacklist: bool,
+
+    #[serde(skip)]
+    pub attributes: Vec<KeyVal>,
 }
+impl L7LogAttribute for OracleInfo {
+    fn add_attribute(&mut self, name: Cow<'_, str>, value: Cow<'_, str>) {
+        self.attributes.push(KeyVal {
+            key: name.into_owned(),
+            val: value.into_owned(),
+        });
+    }
+}
+
 impl OracleInfo {
+    pub fn get_request_type(&self) -> Field<'_> {
+        Field::from(self.packet_type.as_str())
+    }
+
+    pub fn set_request_type(&mut self, _setter: FieldSetter<'_>) {
+        // TnsPacketType is an enum, skip rewrite
+    }
+
     pub fn merge(&mut self, other: &mut Self) {
         self.packet_type = other.packet_type;
         swap_if!(self, sql, is_empty, other);
@@ -120,6 +163,7 @@ impl OracleInfo {
         if other.auth_session_id.is_some() {
             self.auth_session_id = other.auth_session_id.take();
         }
+        self.attributes.append(&mut other.attributes);
     }
 
     fn set_is_on_blacklist(&mut self, config: &LogParserConfig) {
@@ -209,6 +253,7 @@ impl From<OracleInfo> for L7ProtocolSendLog {
                 val: f.resp_data_flags.to_string(),
             });
         }
+        attrs.extend(f.attributes);
         let log = L7ProtocolSendLog {
             captured_request_byte: f.captured_request_byte,
             captured_response_byte: f.captured_response_byte,
@@ -248,12 +293,12 @@ impl From<&OracleInfo> for LogCache {
 #[derive(Default)]
 pub struct OracleLog {
     perf_stats: Vec<L7PerfStats>,
-    parser: OracleParser,
+    custom_field_store: Store,
 }
 
 impl L7ProtocolParserInterface for OracleLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
-        self.parser.check_payload(
+        OracleParser::check_payload(
             payload,
             &OracleParseConfig {
                 is_be: param.oracle_parse_conf.is_be,
@@ -264,7 +309,7 @@ impl L7ProtocolParserInterface for OracleLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
-        if !self.parser.parse_payload(
+        let frames = OracleParser::parse_payload(
             payload,
             param.direction == PacketDirection::ClientToServer,
             &OracleParseConfig {
@@ -272,14 +317,24 @@ impl L7ProtocolParserInterface for OracleLog {
                 int_compress: param.oracle_parse_conf.int_compressed,
                 resp_0x04_extra_byte: param.oracle_parse_conf.resp_0x04_extra_byte,
             },
-        ) {
+        );
+        if frames.is_empty() {
             return Err(Error::L7ProtocolUnknown);
+        }
+
+        let custom_policies = {
+            self.custom_field_store.clear();
+            param
+                .parse_config
+                .as_ref()
+                .and_then(|c| c.get_custom_field_policies(L7Protocol::Oracle.into(), param))
         };
 
         self.perf_stats.clear();
 
         let mut info = vec![];
-        for frame in self.parser.frames.drain(..) {
+        for frame in frames {
+            let frame_payload = frame.payload;
             let mut log_info = match frame.body {
                 Body::Request(req) => OracleInfo {
                     msg_type: param.direction.into(),
@@ -310,6 +365,23 @@ impl L7ProtocolParserInterface for OracleLog {
                     ..Default::default()
                 },
             };
+
+            if let Some(policies) = custom_policies {
+                if !log_info.sql.is_empty() {
+                    policies.apply(
+                        &mut self.custom_field_store,
+                        &log_info,
+                        TrafficDirection::REQUEST,
+                        Source::Sql(&log_info.sql, Some(frame_payload)),
+                    );
+                    for op in self.custom_field_store.drain_with(policies, &log_info) {
+                        match &op.op {
+                            Op::AddMetric(_, _) | Op::SaveHeader(_) | Op::SavePayload(_) => (),
+                            _ => auto_merge_custom_field(op, &mut log_info),
+                        }
+                    }
+                }
+            }
 
             if let Some(config) = param.parse_config {
                 log_info.set_is_on_blacklist(config);
