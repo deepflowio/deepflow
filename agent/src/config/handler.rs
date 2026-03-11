@@ -1236,6 +1236,7 @@ impl Default for LogParserConfig {
             ai_agent_endpoints: vec![
                 "/v1/chat/completions".to_string(),
                 "/v1/embeddings".to_string(),
+                "/v1/responses".to_string(),
             ],
             ai_agent_max_payload_size: usize::MAX, // default: unlimited (config 0 → usize::MAX)
             ai_agent_file_io_enabled: true,
