@@ -76,6 +76,7 @@ $defs:
             - http2
             - dubbo
             - mysql
+            - oracle
             - redis
             - custom
             enum@en:
@@ -83,6 +84,7 @@ $defs:
             - HTTP2
             - Dubbo
             - MySQL
+            - Oracle
             - Redis
             - Custom
             enum@ch:
@@ -90,6 +92,7 @@ $defs:
             - HTTP2
             - Dubbo
             - MySQL
+            - Oracle
             - Redis
             - 自定义协议
             title@en: Filter Protocol Name
@@ -210,6 +213,7 @@ $defs:
         - http2
         - dubbo
         - mysql
+        - oracle
         - redis
         - custom
         enum@en:
@@ -217,6 +221,7 @@ $defs:
         - HTTP2
         - Dubbo
         - MySQL
+        - Oracle
         - Redis
         - Custom
         enum@ch:
@@ -224,6 +229,7 @@ $defs:
         - HTTP2
         - Dubbo
         - MySQL
+        - Oracle
         - Redis
         - 自定义协议
         title@en: Protocol Name
@@ -390,7 +396,7 @@ $defs:
                 - `Dubbo Header Value` (`dubbo_header_value`): Extra field from the Attachments which payload was encoded with Dubbo protocol.
                 - `Dubbo Payload Map String Value` (`dubbo_payload_map_string_value`): Extra field from key-value format which payload was encoded with Dubbo protocol.
                 - `SQL Insert and Update Column` (`sql_upsert_column`): Extract field from SQL insertion columns, e.g., `INSERT INTO table (column1, column2) VALUES (value1, value2)`.
-                  Only MySQL is supported and only the first column can be extracted.
+                  Only MySQL and Oracle are supported and only the first row can be extracted.
               description@ch: |-
                 字段的提取类型，可选值及含义为：
                 - `头字段提取` (`header_field`)：从 HTTP/Dubbo/SofaRPC 等协议的 Header 部分提取字段，例如 HTTP 的 Header 形如：`key: value`。
@@ -405,7 +411,7 @@ $defs:
                 - `Dubbo 头字段提取` (`dubbo_header_value`)：Payload 使用 Dubbo 协议，从 Dubbo Attachments 中提取字段。
                 - `Dubbo map 内容提取` (`dubbo_payload_map_string_value`)：Payload 使用 Dubbo 协议，且业务报文以 key-value 形式编码，从中提取指定的字段。
                 - `SQL 插入和更新语句列提取` (`sql_upsert_column`)：从 SQL 插入列中提取字段，例如：`INSERT INTO table (column1, column2) VALUES (value1, value2)`。
-                  目前只支持 MySQL 协议，且只能提取插入的第一列内容。
+                  目前只支持 MySQL 和 Oracle 协议，且只能提取插入的第一行内容。
             match:
               type: object
               title@en: Match
@@ -722,7 +728,7 @@ $defs:
               $ref: '#/$defs/field_output'
   port_list:
     type: string
-    pattern: ^\d+(-\d+)?$
+    pattern: ^\d+(-\d+)?(,\d+(-\d+)?)*$
   match_keyword:
     type: object
     required:
@@ -941,7 +947,7 @@ $defs:
         - 字典提取
         - 分割提取
         title@en: Post-processing type
-        title@ch: 后期处理类型
+        title@ch: 后处理类型
       settings:
         type: array
         title@en: Settings
