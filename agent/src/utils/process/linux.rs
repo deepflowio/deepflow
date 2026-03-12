@@ -595,8 +595,11 @@ fn should_skip_feature(
 fn fetch_ai_agent_pids(feature: &str) -> Vec<u32> {
     if feature == "proc.gprocess_info" {
         if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
-            return registry.get_all_pids();
+            let pids = registry.get_all_pids();
+            debug!("AI Agent: proc.gprocess_info fetch {} pids", pids.len());
+            return pids;
         }
+        debug!("AI Agent: proc.gprocess_info registry not initialized");
     }
     Vec::new()
 }
@@ -629,6 +632,11 @@ fn merge_ai_agent_processes(
             pids.push(*pid);
             process_datas.push(process_data);
             existing_pids.insert(*pid);
+        } else {
+            debug!(
+                "AI Agent: pid {} not found in process cache, skip gprocess sync",
+                pid
+            );
         }
     }
 }
