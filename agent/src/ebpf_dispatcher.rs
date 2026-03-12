@@ -61,7 +61,9 @@ use crate::common::l7_protocol_log::{
     get_all_protocol, L7ProtocolBitmap, L7ProtocolParserInterface,
 };
 use crate::common::meta_packet::{MetaPacket, SegmentFlags};
-use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent, PROC_LIFECYCLE_FORK};
+#[cfg(feature = "enterprise")]
+use crate::common::proc_event::PROC_LIFECYCLE_FORK;
+use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
 use crate::common::{FlowAclListener, FlowAclListenerId};
 use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserAccess};
 use crate::config::FlowAccess;
@@ -125,7 +127,7 @@ fn register_ai_agent_child(event: &BoxedProcEvents) {
             return;
         }
         if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
-            let now = Duration::from_nanos(event.0.start_time);
+            let now = Duration::from_nanos(event.0.start_time());
             registry.register_child(info.parent_pid, info.pid, now);
         }
     }
