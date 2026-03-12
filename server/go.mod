@@ -16,6 +16,7 @@ replace (
 	github.com/deepflowio/deepflow/server/controller/http/appender => ./controller/http/appender
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense => ./controller/http/service/agentlicense
 	github.com/deepflowio/deepflow/server/controller/http/service/configuration => ./controller/http/service/configuration
+	github.com/deepflowio/deepflow/server/controller/monitor/bill => ./controller/monitor/bill
 	github.com/deepflowio/deepflow/server/controller/monitor/license => ./controller/monitor/license
 	github.com/deepflowio/deepflow/server/controller/monitor/vtap/version => ./controller/monitor/vtap/version
 	github.com/deepflowio/deepflow/server/controller/native_field => ./controller/native_field
@@ -67,6 +68,7 @@ require (
 	github.com/deepflowio/deepflow/server/controller/genesis/store/sync/redis v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/appender v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/http/service/agentlicense v0.0.0-00010101000000-000000000000
+	github.com/deepflowio/deepflow/server/controller/monitor/bill v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/monitor/vtap/version v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/native_field v0.0.0-00010101000000-000000000000
