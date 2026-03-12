@@ -522,7 +522,7 @@ impl ProcessListener {
             process_datas.sort_by_key(|x| x.pid);
             process_datas.merge_and_dedup();
 
-            if pids != value.pids {
+            if pids != value.pids || process_datas != value.process_datas {
                 debug!("Feature {} update {} pids {:?}.", key, pids.len(), pids);
                 value.callback.as_ref().unwrap()(&pids, &process_datas);
                 value.pids = pids;
