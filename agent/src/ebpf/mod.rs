@@ -369,6 +369,7 @@ pub struct SK_BPF_DATA {
      */
     pub syscall_len: u64,      // 本次系统调用读、写数据的总长度
     pub cap_len: u32,          // 返回的cap_data长度
+    pub reasm_bytes: u32,      // 重组后的累计字节数
     pub cap_seq: u64, // cap_data在Socket中的相对顺序号，在所在socket下从0开始自增，用于数据乱序排序
     pub socket_role: u8, // this message is created by: 0:unkonwn 1:client(connect) 2:server(accept)
     pub fd: u32,      // File descriptor for an open file or socket.

@@ -93,6 +93,7 @@ struct socket_bpf_data {
 	uint8_t direction;	// 数据的收发方向，枚举如下: 1 SOCK_DIR_SND, 2 SOCK_DIR_RCV
 	uint64_t syscall_len;	// 本次系统调用读、写数据的总长度
 	uint32_t cap_len;	// 返回的cap_data长度
+	uint32_t reasm_bytes;	// 重组后的累计字节数
 	uint64_t cap_seq;	// cap_data在Socket中的相对顺序号，从启动时的时钟开始自增1，用于数据乱序排序
 	uint8_t socket_role;	// this message is created by: 0:unkonwn 1:client(connect) 2:server(accept)
 	uint32_t fd;		// File descriptor for an open file or socket.
