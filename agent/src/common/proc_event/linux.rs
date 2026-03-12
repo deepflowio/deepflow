@@ -451,6 +451,10 @@ impl ProcEvent {
         Ok(BoxedProcEvents(Box::new(proc_event)))
     }
 
+    pub fn start_time(&self) -> u64 {
+        self.start_time
+    }
+
     pub fn proc_lifecycle_info(&self) -> Option<ProcLifecycleInfo> {
         match &self.event_data {
             EventData::ProcLifecycleEvent(data) => Some(ProcLifecycleInfo {
