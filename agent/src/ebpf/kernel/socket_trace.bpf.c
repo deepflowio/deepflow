@@ -1674,7 +1674,11 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	v->cap_timestamp = bpf_ktime_get_ns();
 	v->direction = conn_info->direction;
 	v->syscall_len = syscall_len;
-	v->reasm_bytes = socket_info_ptr->reasm_bytes;
+	__u32 reasm_bytes = sk_info->reasm_bytes;
+	if (is_socket_info_valid(socket_info_ptr)) {
+		reasm_bytes = socket_info_ptr->reasm_bytes;
+	}
+	v->reasm_bytes = reasm_bytes;
 	v->msg_type = MSG_COMMON;
 
 	// Reassembly modification type
