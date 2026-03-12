@@ -536,6 +536,43 @@ pub struct FlowConfig {
 impl From<&UserConfig> for FlowConfig {
     fn from(conf: &UserConfig) -> Self {
         const ISO8583_FIELD_MAX_COUNT: u16 = 129;
+        let mut packet_segmentation_reassembly = HashSet::new();
+
+        for c in &conf.inputs.cbpf.preprocess.packet_segmentation_reassembly {
+            if let Ok(port) = c.parse::<u16>() {
+                packet_segmentation_reassembly.insert(port);
+            } else {
+                let Some((start, end)) = c.split_once('-') else {
+                    debug!(
+                        "invalid port or port range in packet_segmentation_reassembly: {}",
+                        c
+                    );
+                    continue;
+                };
+                let Ok(start) = start.trim().parse() else {
+                    debug!(
+                        "invalid start port in packet_segmentation_reassembly: {}",
+                        c
+                    );
+                    continue;
+                };
+                let Ok(end) = end.trim().parse() else {
+                    debug!("invalid end port in packet_segmentation_reassembly: {}", c);
+                    continue;
+                };
+                if start <= end {
+                    for port in start..=end {
+                        packet_segmentation_reassembly.insert(port);
+                    }
+                } else {
+                    debug!(
+                        "invalid port range in packet_segmentation_reassembly: {}",
+                        c
+                    );
+                }
+            }
+        }
+
         FlowConfig {
             agent_id: conf.global.common.agent_id as u16,
             agent_type: conf.global.common.agent_type,
@@ -751,14 +788,7 @@ impl From<&UserConfig> for FlowConfig {
                 .request_log
                 .tunning
                 .consistent_timestamp_in_l7_metrics,
-            packet_segmentation_reassembly: HashSet::from_iter(
-                conf.inputs
-                    .cbpf
-                    .preprocess
-                    .packet_segmentation_reassembly
-                    .clone()
-                    .into_iter(),
-            ),
+            packet_segmentation_reassembly,
         }
     }
 }

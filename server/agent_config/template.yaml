@@ -2548,20 +2548,34 @@ inputs:
       # upgrade_from: static_config.trim-tunnel-types
       tunnel_trim_protocols: []
 
-      # type: int
+      # type: string 
       # name:
       #   en: Packet Segmentation Reassembly Ports
       #   ch: TCP分段重组端口
       # unit:
-      # range: [1, 65535]
+      # range: []
       # enum_options: []
       # modification: agent_restart
       # ee_feature: true
       # description:
       #   en: |-
       #     For the specified ports, consecutive TCP packets will be aggregated together for application log parsing.
+      #
+      #     Example: 
+      #
+      #     packet_segmentation_reassembly:
+      #     - 1000
+      #     - 2000-2010
+      #     - 5000
       #   ch: |-
       #     对指定端口的流，相邻的两个TCP分段 Packet 聚合在一起解析应用日志
+      #
+      #     配置示例：
+      #
+      #     packet_segmentation_reassembly:
+      #     - 1000
+      #     - 2000-2010
+      #     - 5000
       # upgrade_from: static_config.packet-segmentation-reassembly
       packet_segmentation_reassembly: []
 
