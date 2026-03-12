@@ -697,7 +697,7 @@ pub struct ParseParam<'a> {
 
     // the config of `l7_log_packet_size`, must set in parse_payload and check_payload
     pub buf_size: u16,
-    pub captured_byte: u16,
+    pub captured_byte: u32,
 
     pub oracle_parse_conf: OracleConfig,
     pub iso8583_parse_conf: Iso8583ParseConfig,
@@ -837,7 +837,7 @@ impl<'a> ParseParam<'a> {
     }
 
     pub fn set_captured_byte(&mut self, captured_byte: usize) {
-        self.captured_byte = captured_byte as u16;
+        self.captured_byte = u32::try_from(captured_byte).unwrap_or(u32::MAX);
     }
 
     pub fn set_rrt_timeout(&mut self, t: usize) {
@@ -959,5 +959,30 @@ impl fmt::Debug for L7ProtocolBitmap {
             }
         }
         f.write_str(format!("{:#?}", p).as_str())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    #[test]
+    fn captured_byte_should_not_truncate_large_payloads() {
+        let packet = MetaPacket::default();
+        let mut param = ParseParam::new(
+            &packet,
+            None,
+            Rc::new(RefCell::new(None)),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Rc::new(RefCell::new(None)),
+            false,
+            false,
+        );
+
+        let captured: u32 = 200_000;
+        param.set_captured_byte(captured as usize);
+        assert_eq!(param.captured_byte as u32, captured);
     }
 }

@@ -1402,6 +1402,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		}
 		submit_data->syscall_len += offset;
 		submit_data->cap_len = len + offset;
+		submit_data->reasm_bytes = sd->reasm_bytes;
 		burst_data[i] = submit_data;
 
 		start +=

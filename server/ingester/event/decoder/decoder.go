@@ -181,7 +181,12 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.SignalSource = uint8(e.EventType)
 	}
 
-	s.GProcessID = d.platformData.QueryProcessInfo(s.OrgId, vtapId, e.Pid)
+	s.GProcessID = resolveGProcessID(
+		func(pid uint32) uint32 {
+			return d.platformData.QueryProcessInfo(s.OrgId, vtapId, pid)
+		},
+		e,
+	)
 	if e.IoEventData != nil {
 		ioData := e.IoEventData
 		s.EventType = strings.ToLower(ioData.Operation.String())
@@ -280,6 +285,32 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 
 	d.export(s)
 	d.eventWriter.Write(s)
+}
+
+func resolveGProcessID(queryProcessInfo func(pid uint32) uint32, e *pb.ProcEvent) uint32 {
+	if e == nil {
+		return 0
+	}
+
+	gprocessID := queryProcessInfo(e.Pid)
+	if gprocessID != 0 {
+		return gprocessID
+	}
+
+	// Proc lifecycle (fork/exec/exit) events may arrive before the controller
+	// has synchronized the child process into the `process` table. In that
+	// window, QueryProcessInfo(child_pid) returns 0 even though the parent is
+	// already mapped. Falling back to the parent_pid keeps the lifecycle event
+	// attached to the correct AI Agent gprocess_id until the child entry is
+	// eventually synced.
+	if e.EventType != pb.EventType_ProcLifecycleEvent || e.ProcLifecycleEventData == nil {
+		return 0
+	}
+	parentPid := e.ProcLifecycleEventData.ParentPid
+	if parentPid == 0 || parentPid == e.Pid {
+		return 0
+	}
+	return queryProcessInfo(parentPid)
 }
 
 func (d *Decoder) export(item exporterscommon.ExportItem) {

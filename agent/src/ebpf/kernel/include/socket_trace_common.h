@@ -129,6 +129,7 @@ struct __socket_data {
 	__u32 fd;
 	__u16 data_type;	// HTTP, DNS, MySQL ...
 	__u16 data_len;		// 数据长度
+	__u32 reasm_bytes;	// 重组后的累计字节数
 	__u8 socket_role;	// this message is created by: 0:unkonwn 1:client(connect) 2:server(accept)
 	char data[BURST_DATA_BUF_SIZE];
 } __attribute__ ((packed));
