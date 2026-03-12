@@ -238,6 +238,9 @@ const PROC_LC_UID_OFF: usize = 9;
 const PROC_LC_GID_OFF: usize = 13;
 const PROC_LC_TS_OFF: usize = 17;
 const PROC_LC_COMM_OFF: usize = 25;
+pub const PROC_LIFECYCLE_FORK: u8 = 1;
+pub const PROC_LIFECYCLE_EXEC: u8 = 2;
+pub const PROC_LIFECYCLE_EXIT: u8 = 3;
 
 struct ProcLifecycleEventData {
     lifecycle_type: u8,
@@ -247,6 +250,13 @@ struct ProcLifecycleEventData {
     gid: u32,
     timestamp: u64,
     comm: Vec<u8>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProcLifecycleInfo {
+    pub lifecycle_type: u8,
+    pub pid: u32,
+    pub parent_pid: u32,
 }
 
 impl TryFrom<&[u8]> for ProcLifecycleEventData {
@@ -440,6 +450,17 @@ impl ProcEvent {
 
         Ok(BoxedProcEvents(Box::new(proc_event)))
     }
+
+    pub fn proc_lifecycle_info(&self) -> Option<ProcLifecycleInfo> {
+        match &self.event_data {
+            EventData::ProcLifecycleEvent(data) => Some(ProcLifecycleInfo {
+                lifecycle_type: data.lifecycle_type,
+                pid: data.pid,
+                parent_pid: data.parent_pid,
+            }),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -489,5 +510,39 @@ impl Sendable for BoxedProcEvents {
 
     fn message_type(&self) -> SendMessageType {
         SendMessageType::ProcEvents
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_proc_lifecycle_info_extracts_fields() {
+        let event_data = ProcLifecycleEventData {
+            lifecycle_type: 1,
+            pid: 4321,
+            parent_pid: 1234,
+            uid: 0,
+            gid: 0,
+            timestamp: 42,
+            comm: b"sleep".to_vec(),
+        };
+        let proc_event = ProcEvent {
+            pid: 1234,
+            pod_id: 0,
+            thread_id: 0,
+            coroutine_id: 0,
+            process_kname: b"python3".to_vec(),
+            start_time: 42,
+            end_time: 43,
+            event_type: EventType::ProcLifecycleEvent,
+            event_data: EventData::ProcLifecycleEvent(event_data),
+        };
+
+        let info = proc_event.proc_lifecycle_info().expect("missing info");
+        assert_eq!(info.lifecycle_type, 1);
+        assert_eq!(info.pid, 4321);
+        assert_eq!(info.parent_pid, 1234);
     }
 }
