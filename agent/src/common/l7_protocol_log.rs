@@ -352,13 +352,13 @@ impl LogCache {
     pub fn is_request_of(&self, other: &Self) -> bool {
         self.msg_type == LogMessageType::Request
             && other.msg_type == LogMessageType::Response
-            && self.time < other.time
+            && self.time <= other.time
     }
 
     pub fn is_response_of(&self, other: &Self) -> bool {
         self.msg_type == LogMessageType::Response
             && other.msg_type == LogMessageType::Request
-            && self.time > other.time
+            && self.time >= other.time
     }
 }
 
