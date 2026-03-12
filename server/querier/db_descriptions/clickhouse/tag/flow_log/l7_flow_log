@@ -127,7 +127,7 @@ capture_nic_type          , capture_nic_type          , capture_nic_type        
 tap_side                  , tap_side                  , tap_side                   , string_enum    , observation_point     , Capture Info      , 111          , 1             , 
 observation_point         , observation_point         , observation_point          , string_enum    , observation_point     , Capture Info      , 111          , 0             , 
 
-biz_type                  , biz_type                  , biz_type                   , int            ,                       , Business Info     , 111          , 0             , 
+biz_type                  , biz_type                  , biz_type                   , int_enum       , biz_type              , Business Info     , 111          , 0             , 
 biz_code                  , biz_code                  , biz_code                   , string         ,                       , Business Info     , 111          , 0             , 
 biz_scenario              , biz_scenario              , biz_scenario               , string         ,                       , Business Info     , 111          , 0             , 
 biz_response_code         , biz_response_code         , biz_response_code          , string         ,                       , Business Info     , 111          , 0             ,

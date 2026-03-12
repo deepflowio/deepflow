@@ -77,4 +77,4 @@ tap_side                   , tap_side                  , tap_side               
 observation_point          , observation_point         , observation_point         , string_enum   , observation_point      , Capture Info    , 111           , 0
 signal_source              , signal_source             , signal_source             , int_enum      , l7_signal_source       , Capture Info    , 111           , 0
 
-biz_type                   , biz_type                  , biz_type                  , int           ,                        , Business Info   , 111           , 0
+biz_type                   , biz_type                  , biz_type                  , int_enum      , biz_type               , Business Info   , 111           , 0
