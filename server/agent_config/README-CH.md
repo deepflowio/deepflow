@@ -3492,12 +3492,18 @@ inputs:
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | int |
-| Range | [1, 65535] |
+| Type | string |
 
 **详细描述**:
 
 对指定端口的流，相邻的两个TCP分段 Packet 聚合在一起解析应用日志
+
+配置示例：
+
+packet_segmentation_reassembly:
+- 1000
+- 2000-2010
+- 5000
 
 ### 物理网络流量镜像 {#inputs.cbpf.physical_mirror}
 

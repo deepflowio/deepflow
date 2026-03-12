@@ -899,7 +899,7 @@ impl Default for CbpfTunning {
 pub struct PreProcess {
     pub tunnel_decap_protocols: Vec<u8>,
     pub tunnel_trim_protocols: Vec<String>,
-    pub packet_segmentation_reassembly: Vec<u16>,
+    pub packet_segmentation_reassembly: Vec<String>,
 }
 
 impl Default for PreProcess {
