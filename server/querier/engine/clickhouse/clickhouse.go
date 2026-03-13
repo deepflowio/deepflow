@@ -2004,6 +2004,36 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 			stmt := &WhereFunction{Function: outfunc, Value: sqlparser.String(node.Right)}
 			return stmt.Trans(node, w, e)
 		}
+	case *sqlparser.IsExpr:
+		if isCheck {
+			return nil, nil
+		}
+		operator := strings.ToLower(node.Operator)
+		if operator != sqlparser.IsNullStr && operator != sqlparser.IsNotNullStr {
+			return nil, errors.New(fmt.Sprintf("parse where error: %s(%T)", sqlparser.String(node), node))
+		}
+		whereTag := chCommon.ParseAlias(node.Expr)
+		metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.ORGID, e.NativeField)
+		if ok && metricStruct.Type != metrics.METRICS_TYPE_TAG {
+			whereTag = metricStruct.DBField
+		}
+		stmt := GetWhere(whereTag, "NULL")
+		filterNode, err := stmt.Trans(&sqlparser.ComparisonExpr{
+			Left:     node.Expr,
+			Operator: "=",
+			Right:    &sqlparser.NullVal{},
+		}, w, e)
+		if err != nil {
+			return nil, err
+		}
+		filterExpr := filterNode.ToString()
+		filterExpr = strings.TrimPrefix(filterExpr, "(")
+		filterExpr = strings.TrimSuffix(filterExpr, ")")
+		filterExpr = strings.Replace(filterExpr, "= NULL", " IS NULL", 1)
+		if operator == sqlparser.IsNotNullStr {
+			filterExpr = "not(" + filterExpr + ")"
+		}
+		return &view.Expr{Value: "(" + filterExpr + ")"}, nil
 	case *sqlparser.FuncExpr:
 		args := []string{}
 		for _, argExpr := range node.Exprs {
