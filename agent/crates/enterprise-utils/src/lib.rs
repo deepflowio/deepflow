@@ -367,7 +367,6 @@ pub mod l7 {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod kernel_version {
     bitflags::bitflags! {
         #[derive(Default)]
