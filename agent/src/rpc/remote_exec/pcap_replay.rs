@@ -193,13 +193,13 @@ impl ApplicationParser {
                 match parser.check_payload(payload, p) {
                     Some(LogMessageType::Request) => {
                         debug!("{protocol:?} identified on server port {}", p.port_dst);
-                        self.l7_protocol = Some((*protocol).into());
+                        self.l7_protocol = Some(parser.l7_protocol_enum());
                         self.server_port = Some(p.port_dst);
                         return Ok(());
                     }
                     Some(LogMessageType::Response) => {
                         debug!("{protocol:?} identified on server port {}", p.port_src);
-                        self.l7_protocol = Some((*protocol).into());
+                        self.l7_protocol = Some(parser.l7_protocol_enum());
                         self.server_port = Some(p.port_src);
                         return Ok(());
                     }
