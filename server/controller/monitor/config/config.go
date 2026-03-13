@@ -25,12 +25,14 @@ type MonitorConfig struct {
 	HealthCheckPort             int                           `default:"30417" yaml:"health_check_port"`
 	HealthCheckHandleChannelLen int                           `default:"1000" yaml:"health_check_handle_channel_len"`
 	LicenseCheckInterval        int                           `default:"60" yaml:"license_check_interval"`
+	BillCheckInterval           int                           `default:"3600" yaml:"bill_check_interval"`
 	VTapCheckInterval           int                           `default:"60" yaml:"vtap_check_interval"`
 	ExceptionTimeFrame          int                           `default:"3600" yaml:"exception_time_frame"`
 	AutoRebalanceVTap           bool                          `default:"true" yaml:"auto_rebalance_vtap"`
 	RebalanceCheckInterval      int                           `default:"300" yaml:"rebalance_check_interval"` // unit: second
 	VTapAutoDelete              VTapAutoDelete                `yaml:"vtap_auto_delete"`
 	Warrant                     configs.Warrant               `yaml:"warrant"`
+	Manager                     configs.Manager               `yaml:"manager"`
 	IngesterLoadBalancingConfig IngesterLoadBalancingStrategy `yaml:"ingester-load-balancing-strategy"`
 	SyncDefaultORGDataInterval  int                           `default:"10" yaml:"sync_default_org_data_interval"`
 }

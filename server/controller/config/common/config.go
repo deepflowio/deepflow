@@ -27,6 +27,13 @@ type Warrant struct {
 	Timeout int    `default:"30" yaml:"timeout"`
 }
 
+type Manager struct {
+	Enabled bool   `default:"false" yaml:"enabled"`
+	Host    string `default:"manager" yaml:"host"`
+	Port    int    `default:"20403" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
+}
+
 type FPermit struct {
 	Enabled bool   `default:"false" yaml:"enabled"`
 	Host    string `default:"fpermit" yaml:"host"`
