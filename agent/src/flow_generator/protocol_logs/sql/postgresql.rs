@@ -43,7 +43,6 @@ use super::{
     postgre_convert::{get_code_desc, get_request_str},
     sql_check::is_postgresql,
     sql_obfuscate::CachedObfuscator,
-    ObfuscateCache,
 };
 
 const SSL_REQ: u64 = 34440615471; // 00000008(len) 04d2162f(const 80877103)
@@ -207,7 +206,6 @@ impl From<&PostgreInfo> for LogCache {
 #[derive(Default)]
 pub struct PostgresqlLog {
     perf_stats: Vec<L7PerfStats>,
-    obfuscator: CachedObfuscator,
 
     has_request: bool,
 }
@@ -221,7 +219,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
             return Some(LogMessageType::Request);
         }
 
-        if self.parse(payload, true, &mut info).is_ok() {
+        if self.parse(payload, param, true, &mut info).is_ok() {
             Some(LogMessageType::Request)
         } else {
             None
@@ -237,7 +235,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
             return Ok(L7ParseResult::None);
         }
 
-        self.parse(payload, false, &mut info)?;
+        self.parse(payload, param, false, &mut info)?;
         self.perf_stats.clear();
         set_captured_byte!(info, param);
         if let Some(config) = param.parse_config {
@@ -270,10 +268,6 @@ impl L7ProtocolParserInterface for PostgresqlLog {
     fn perf_stats(&mut self) -> Vec<L7PerfStats> {
         std::mem::take(&mut self.perf_stats)
     }
-
-    fn set_obfuscate_cache(&mut self, obfuscate_cache: Option<ObfuscateCache>) {
-        self.obfuscator.set_obfuscate_cache(obfuscate_cache);
-    }
 }
 
 impl PostgresqlLog {
@@ -284,7 +278,13 @@ impl PostgresqlLog {
         }
     }
 
-    fn parse(&mut self, payload: &[u8], strict: bool, info: &mut PostgreInfo) -> Result<()> {
+    fn parse(
+        &mut self,
+        payload: &[u8],
+        param: &ParseParam,
+        strict: bool,
+        info: &mut PostgreInfo,
+    ) -> Result<()> {
         let mut offset = 0;
         loop {
             if offset >= payload.len() {
@@ -295,7 +295,7 @@ impl PostgresqlLog {
                 offset += len + 5; // len(data) + len 4B + tag 1B
                 let parsed = match info.msg_type {
                     LogMessageType::Request => {
-                        self.on_req_block(tag, &sub_payload[5..5 + len], strict, info)?
+                        self.on_req_block(param, tag, &sub_payload[5..5 + len], strict, info)?
                     }
                     LogMessageType::Response => {
                         self.on_resp_block(tag, &sub_payload[5..5 + len], info)?
@@ -330,17 +330,19 @@ impl PostgresqlLog {
 
     fn on_req_block(
         &mut self,
+        param: &ParseParam,
         tag: char,
         data: &[u8],
         strict: bool,
         info: &mut PostgreInfo,
     ) -> Result<bool> {
+        let obfuscator = CachedObfuscator::new(param.obfuscate_cache.clone());
         match tag {
             'Q' => {
                 info.req_type = tag;
                 let payload = strip_string_end_with_zero(data)?;
                 let context = String::from_utf8_lossy(payload);
-                info.context = match self.obfuscator.apply(&context) {
+                info.context = match obfuscator.apply(&context) {
                     Ok(obfuscated) => obfuscated.to_string(),
                     Err(_) => context.to_string(),
                 };
@@ -364,7 +366,7 @@ impl PostgresqlLog {
                         let payload = &data[..idx];
                         let postgresql = is_postgresql(payload);
                         let context = String::from_utf8_lossy(payload);
-                        info.context = match self.obfuscator.apply(&context) {
+                        info.context = match obfuscator.apply(&context) {
                             Ok(obfuscated) => obfuscated.to_string(),
                             Err(_) => context.to_string(),
                         };

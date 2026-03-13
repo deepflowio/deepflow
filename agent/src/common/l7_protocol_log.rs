@@ -308,9 +308,6 @@ pub trait L7ProtocolParserInterface {
 
     // return perf data
     fn perf_stats(&mut self) -> Vec<L7PerfStats>;
-
-    // setting obfuscate cache to None disables obfuscation
-    fn set_obfuscate_cache(&mut self, _: Option<ObfuscateCache>) {}
 }
 
 #[cfg(feature = "libtrace")]
@@ -671,6 +668,8 @@ pub struct ParseParam<'a> {
 
     pub parse_config: Option<&'a LogParserConfig>,
 
+    pub obfuscate_cache: Option<ObfuscateCache>,
+
     pub l7_perf_cache: Option<Rc<RefCell<L7PerfCache>>>,
 
     // plugins
@@ -712,6 +711,7 @@ impl<'a> fmt::Debug for ParseParam<'a> {
             .field("parse_perf", &self.parse_perf)
             .field("parse_log", &self.parse_log)
             .field("parse_config", &self.parse_config)
+            .field("obfuscate_cache", &self.obfuscate_cache.is_some())
             .field("wasm_vm", &self.wasm_vm.borrow().is_some());
         #[cfg(any(target_os = "linux", target_os = "android"))]
         ds.field("so_func", &self.so_func.borrow().is_some());
@@ -775,6 +775,7 @@ impl<'a> ParseParam<'a> {
             parse_perf,
             parse_log,
             parse_config: None,
+            obfuscate_cache: None,
 
             l7_perf_cache: cache,
 
@@ -847,6 +848,7 @@ impl<'a> ParseParam<'a> {
             direction: self.direction.reversed(),
             #[cfg(feature = "libtrace")]
             ebpf_param: self.ebpf_param.clone(),
+            obfuscate_cache: self.obfuscate_cache.clone(),
             l7_perf_cache: self.l7_perf_cache.clone(),
             wasm_vm: self.wasm_vm.clone(),
             #[cfg(any(target_os = "linux", target_os = "android"))]

@@ -2797,6 +2797,7 @@ mod tests {
             parse_perf: true,
             parse_log: true,
             parse_config: Some(&conf),
+            obfuscate_cache: None,
             l7_perf_cache: Some(Rc::new(RefCell::new(L7PerfCache::new(1)))),
             wasm_vm: Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
