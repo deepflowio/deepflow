@@ -1087,6 +1087,13 @@ impl<'a> MetaPacket<'a> {
         self.payload_len += packet.payload_len;
         self.l4_payload_len += packet.l4_payload_len;
         self.cap_end_seq = packet.cap_start_seq;
+        // eBPF reassembly: propagate the latest cumulative reassembly bytes.
+        // `reasm_bytes` reflects the total bytes reassembled in the kernel for
+        // this flow. When we merge multiple MSG_REASM_* segments, we must keep
+        // the newest cumulative value, otherwise `get_captured_byte()` will
+        // stay at the first segment's size (e.g., HTTP headers only) and
+        // `captured_request_byte` will be incorrect for large bodies.
+        self.reasm_bytes = self.reasm_bytes.max(packet.reasm_bytes);
     }
 
     #[cfg(all(unix, feature = "libtrace"))]
