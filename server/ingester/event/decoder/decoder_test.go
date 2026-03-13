@@ -89,3 +89,32 @@ func TestResolveGProcessIDChildInheritsRoot(t *testing.T) {
 		t.Fatalf("expected file event inherit gprocess_id %d, got %d", parentGpid, got)
 	}
 }
+
+func TestResolveGProcessIDExecKeepsSelfWhenUncached(t *testing.T) {
+	orgId := uint16(1)
+	vtapId := uint16(2)
+	pid := uint32(7000)
+	parentPid := uint32(8000)
+	pidGpid := uint32(88)
+	cache := NewAiAgentRootPidCache()
+
+	query := func(id uint32) uint32 {
+		if id == pid {
+			return pidGpid
+		}
+		return 0
+	}
+
+	execEvent := &pb.ProcEvent{
+		Pid:       pid,
+		EventType: pb.EventType_ProcLifecycleEvent,
+		ProcLifecycleEventData: &pb.ProcLifecycleEventData{
+			LifecycleType: pb.ProcLifecycleType_ProcLifecycleExec,
+			ParentPid:     parentPid,
+			Pid:           pid,
+		},
+	}
+	if got := resolveGProcessID(query, cache, orgId, vtapId, execEvent); got != pidGpid {
+		t.Fatalf("expected exec event use self gprocess_id %d, got %d", pidGpid, got)
+	}
+}
