@@ -2029,7 +2029,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		filterExpr := filterNode.ToString()
 		filterExpr = strings.TrimPrefix(filterExpr, "(")
 		filterExpr = strings.TrimSuffix(filterExpr, ")")
-		filterExpr = strings.Replace(filterExpr, "= NULL", " IS NULL", 1)
+		filterExpr = strings.ReplaceAll(filterExpr, "= NULL", " IS NULL")
 		if operator == sqlparser.IsNotNullStr {
 			filterExpr = "not(" + filterExpr + ")"
 		}
