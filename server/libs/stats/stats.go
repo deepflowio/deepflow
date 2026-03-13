@@ -34,6 +34,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/codec"
 	. "github.com/deepflowio/deepflow/server/libs/datastructure"
 	"github.com/deepflowio/deepflow/server/libs/stats/pb"
+	"github.com/deepflowio/deepflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("stats")
@@ -248,10 +249,14 @@ func collectPoints(timestamp time.Time) []metricPoint {
 			statSource.name = processName + processNameJoiner + statSource.modulePrefix + statSource.module
 		}
 
+		counter := statSource.countable.GetCounter()
+		if utils.IsNil(counter) {
+			continue
+		}
 		points = append(points, metricPoint{
 			name:      statSource.name,
 			tags:      statSource.tags,
-			fields:    counterToFields(statSource.countable.GetCounter()),
+			fields:    counterToFields(counter),
 			timestamp: timestamp,
 		})
 	}
