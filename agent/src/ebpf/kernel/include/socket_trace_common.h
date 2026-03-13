@@ -369,7 +369,8 @@ enum {
 	 */
 	EVENT_TYPE_MIN = 1 << 9,
 	EVENT_TYPE_PROC_EXEC = 1 << 9,
-	EVENT_TYPE_PROC_EXIT = 1 << 10
+	EVENT_TYPE_PROC_EXIT = 1 << 10,
+	EVENT_TYPE_LIB_LOAD = 1 << 11
 	    // Add new event type here.
 };
 
@@ -378,12 +379,18 @@ struct event_meta {
 	__u32 event_type;
 };
 
-// Process execution or exit event data 
+// Process execution or exit event data
 struct process_event_t {
 	struct event_meta meta;
 	__u32 pid:31;		// process ID
 	__u32 maybe_thread:1;
 	__u8 name[TASK_COMM_LEN];	// process name
+};
+
+// Library load event data (triggered by _dl_open uretprobe)
+struct library_load_event_t {
+	struct event_meta meta;
+	__u32 pid;		// process ID
 };
 
 struct debug_data {

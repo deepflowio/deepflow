@@ -2095,6 +2095,13 @@ bool is_pid_match(int feature, int pid)
 	return kv.value & (1UL << feature);
 }
 
+int add_feature_pid(int feature, int pid)
+{
+	if (feature < 0 || feature >= FEATURE_MAX)
+		return -1;
+	return add_pid_to_match_hash(feature, pid);
+}
+
 static int clear_pid_from_match_hash(int feature, int pid)
 {
 	int ret = 0;
