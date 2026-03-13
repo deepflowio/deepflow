@@ -376,7 +376,25 @@ func resolveGProcessID(queryProcessInfo func(pid uint32) uint32, rootPidCache *A
 			if lifecyclePid != 0 {
 				pid = lifecyclePid
 			}
-			rootPid = rootPidCache.ResolveRootPid(orgId, vtapId, pid, e.ProcLifecycleEventData.ParentPid)
+			parentPid := e.ProcLifecycleEventData.ParentPid
+			if e.ProcLifecycleEventData.LifecycleType == pb.ProcLifecycleType_ProcLifecycleExec {
+				if cachedRoot, ok := rootPidCache.Get(orgId, vtapId, pid); ok && cachedRoot != 0 {
+					rootPid = cachedRoot
+				} else if parentPid != 0 {
+					if parentRoot, ok := rootPidCache.Get(orgId, vtapId, parentPid); ok && parentRoot != 0 {
+						rootPidCache.Set(orgId, vtapId, pid, parentRoot)
+						rootPid = parentRoot
+					} else {
+						rootPidCache.Set(orgId, vtapId, pid, pid)
+						rootPid = pid
+					}
+				} else {
+					rootPidCache.Set(orgId, vtapId, pid, pid)
+					rootPid = pid
+				}
+			} else {
+				rootPid = rootPidCache.ResolveRootPid(orgId, vtapId, pid, parentPid)
+			}
 		} else if cachedRoot, ok := rootPidCache.Get(orgId, vtapId, pid); ok && cachedRoot != 0 {
 			rootPid = cachedRoot
 		}
