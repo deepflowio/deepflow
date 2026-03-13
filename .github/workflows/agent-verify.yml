@@ -45,6 +45,7 @@ jobs:
           make tools && \
           cd ../../ && \
           RUSTFLAGS='-D warnings -C force-frame-pointers=yes' cargo check --all-targets && \
+          cargo check --all --target=x86_64-pc-windows-gnu && \
           cargo fmt --all -- --check"
 
   verify_agent_arm64:
