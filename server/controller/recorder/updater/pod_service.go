@@ -63,7 +63,7 @@ func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN,
 			wholeCache,
 			db.NewPodService().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.PodServices,
+			wholeCache.DiffBases().PodService().GetAll(),
 			cloudData,
 		),
 	}
@@ -79,7 +79,8 @@ func NewPodService(wholeCache *cache.Cache, cloudData []cloudmodel.PodService) *
 
 // Implement DataGenerator interface
 func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*metadbmodel.PodService, bool) {
-	vpcID, exists := s.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := s.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -87,14 +88,16 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*met
 		), s.metadata.LogPrefixes)
 		return nil, false
 	}
-	podNamespaceID, exists := s.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
+	podNamespaceItem := s.cache.Tool().PodNamespace().GetByLcuuid(cloudItem.PodNamespaceLcuuid)
+	podNamespaceID, exists := podNamespaceItem.Id(), podNamespaceItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
 		), s.metadata.LogPrefixes)
 	}
-	podClusterID, exists := s.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
+	podClusterItem := s.cache.Tool().PodCluster().GetByLcuuid(cloudItem.PodClusterLcuuid)
+	podClusterID, exists := podClusterItem.Id(), podClusterItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
@@ -104,7 +107,8 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*met
 	}
 	var podIngressID int
 	if cloudItem.PodIngressLcuuid != "" {
-		podIngressID, exists = s.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
+		podIngressItem := s.cache.Tool().PodIngress().GetByLcuuid(cloudItem.PodIngressLcuuid)
+		podIngressID, exists = podIngressItem.Id(), podIngressItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
@@ -157,7 +161,8 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 		var podIngressID int
 		if cloudItem.PodIngressLcuuid != "" {
 			var exists bool
-			podIngressID, exists = s.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
+			podIngressItem := s.cache.Tool().PodIngress().GetByLcuuid(cloudItem.PodIngressLcuuid)
+			podIngressID, exists = podIngressItem.Id(), podIngressItem.IsValid()
 			if !exists {
 				log.Error(resourceAForResourceBNotFound(
 					ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
@@ -167,7 +172,7 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 			}
 		}
 		mapInfo["pod_ingress_id"] = podIngressID
-		structInfo.PodIngressID.SetNew(podIngressID)
+		structInfo.PodIngressId.SetNew(podIngressID)
 		structInfo.PodIngressLcuuid.Set(diffBase.PodIngressLcuuid, cloudItem.PodIngressLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
@@ -186,13 +191,13 @@ func (s *PodService) generateUpdateInfo(diffBase *diffbase.PodService, cloudItem
 		mapInfo["selector"] = cloudItem.Selector
 		structInfo.Selector.Set(diffBase.Selector, cloudItem.Selector)
 	}
-	if diffBase.ExternalIP != cloudItem.ExternalIP {
+	if diffBase.ExternalIp != cloudItem.ExternalIP {
 		mapInfo["external_ip"] = cloudItem.ExternalIP
-		structInfo.ExternalIP.Set(diffBase.ExternalIP, cloudItem.ExternalIP)
+		structInfo.ExternalIp.Set(diffBase.ExternalIp, cloudItem.ExternalIP)
 	}
-	if diffBase.ServiceClusterIP != cloudItem.ServiceClusterIP {
+	if diffBase.ServiceClusterIp != cloudItem.ServiceClusterIP {
 		mapInfo["service_cluster_ip"] = cloudItem.ServiceClusterIP
-		structInfo.ServiceClusterIP.Set(diffBase.ServiceClusterIP, cloudItem.ServiceClusterIP)
+		structInfo.ServiceClusterIp.Set(diffBase.ServiceClusterIp, cloudItem.ServiceClusterIP)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid

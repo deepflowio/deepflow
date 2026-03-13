@@ -39,13 +39,28 @@ func (r *Recorder) GetCache(domainLcuuid, subDomainLcuuid string) cache.Cache {
 }
 
 func (r *Recorder) GetCacheDiffBaseDataSet(domainLcuuid, subDomainLcuuid, resourceType string) map[string]interface{} {
-	cache := r.GetCache(domainLcuuid, subDomainLcuuid)
-	dataSetValue := reflect.ValueOf(cache.DiffBaseDataSet).Elem()
-	dataSet := dataSetValue.FieldByName(resourceType).Interface()
-	if dataSet == nil {
+	c := r.GetCache(domainLcuuid, subDomainLcuuid)
+	diffBases := c.DiffBases()
+	if diffBases == nil {
 		return nil
 	}
-	return dataSet.(map[string]interface{})
+	method := reflect.ValueOf(diffBases).MethodByName(resourceType)
+	if !method.IsValid() {
+		return nil
+	}
+	result := method.Call(nil)
+	if len(result) == 0 || result[0].IsNil() {
+		return nil
+	}
+	getAllMethod := result[0].MethodByName("GetAll")
+	if !getAllMethod.IsValid() {
+		return nil
+	}
+	getAllResult := getAllMethod.Call(nil)
+	if len(getAllResult) == 0 {
+		return nil
+	}
+	return getAllResult[0].Interface().(map[string]interface{})
 }
 
 func (r *Recorder) GetCacheDiffBase(domainLcuuid, subDomainLcuuid, resourceType, resourceLcuuid string) interface{} {
@@ -58,11 +73,18 @@ func (r *Recorder) GetCacheDiffBase(domainLcuuid, subDomainLcuuid, resourceType,
 }
 
 func (r *Recorder) GetToolMap(domainLcuuid, subDomainLcuuid, field string) map[interface{}]interface{} {
-	cache := r.GetCache(domainLcuuid, subDomainLcuuid)
-	dataSetValue := reflect.ValueOf(cache.ToolDataSet).Elem()
-	dataSet := dataSetValue.FieldByName(field).Interface()
-	if dataSet == nil {
+	c := r.GetCache(domainLcuuid, subDomainLcuuid)
+	t := c.Tool()
+	if t == nil {
 		return nil
 	}
-	return dataSet.(map[interface{}]interface{})
+	method := reflect.ValueOf(t).MethodByName(field)
+	if !method.IsValid() {
+		return nil
+	}
+	result := method.Call(nil)
+	if len(result) == 0 || result[0].IsNil() {
+		return nil
+	}
+	return result[0].Interface().(map[interface{}]interface{})
 }

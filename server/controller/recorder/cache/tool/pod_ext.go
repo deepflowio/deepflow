@@ -32,7 +32,7 @@ func (c *PodCollection) resetExt() {
 
 // GetByContainerID returns the Pod by its containerID
 func (c *PodCollection) GetByContainerID(containerID string) *Pod {
-	return c.GetByID(c.containerIDToPodID[containerID])
+	return c.GetById(c.containerIDToPodID[containerID])
 }
 
 // OnAfterAdd implements CollectionExtender interface
@@ -40,7 +40,7 @@ func (c *PodCollection) GetByContainerID(containerID string) *Pod {
 func (c *PodCollection) OnAfterAdd(item *Pod, dbItem *metadbmodel.Pod) {
 	for _, containerID := range strings.Split(dbItem.ContainerIDs, ", ") {
 		if containerID != "" {
-			c.containerIDToPodID[containerID] = item.ID()
+			c.containerIDToPodID[containerID] = item.Id()
 		}
 	}
 }
@@ -49,7 +49,7 @@ func (c *PodCollection) OnAfterAdd(item *Pod, dbItem *metadbmodel.Pod) {
 func (c *PodCollection) OnAfterUpdate(item *Pod, dbItem *metadbmodel.Pod) {
 	// Remove old containerID mappings for this pod
 	for containerID, podID := range c.containerIDToPodID {
-		if podID == item.ID() {
+		if podID == item.Id() {
 			delete(c.containerIDToPodID, containerID)
 		}
 	}
@@ -57,7 +57,7 @@ func (c *PodCollection) OnAfterUpdate(item *Pod, dbItem *metadbmodel.Pod) {
 	// Add new containerID mappings
 	for _, containerID := range strings.Split(dbItem.ContainerIDs, ", ") {
 		if containerID != "" {
-			c.containerIDToPodID[containerID] = item.ID()
+			c.containerIDToPodID[containerID] = item.Id()
 		}
 	}
 }

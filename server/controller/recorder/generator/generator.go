@@ -30,48 +30,125 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type Field struct {
-	Name              string `yaml:"name"`
-	PublicName        string `yaml:"public_name"`
-	Type              string `yaml:"type"`
-	IsValidationField bool   `yaml:"is_validation_field"`
-	Ref               string `yaml:"ref"`
-	DbFieldName       string `yaml:"db_field_name"`
-	HasSetter         bool   `yaml:"has_setter"`
-	HasCustom         bool   `yaml:"has_custom"`
-	IsCustom          bool   `yaml:"is_custom"`
-	IsPlural          bool   `yaml:"is_plural"`
-	Comment           string `yaml:"comment"`
-	CamelName         string
-	PublicCamelName   string
+// RefConfig 统一的外键引用配置（使用 small_snake_case 值，运行时转换为 PascalCase）
+type RefConfig struct {
+	Resource string `yaml:"resource"`
+	LookupBy string `yaml:"lookup_by"`
+	Target   string `yaml:"target"`
 }
 
+type Field struct {
+	Name          string     `yaml:"name"`
+	OrmName       string     `yaml:"orm_name"`
+	Type          string     `yaml:"type"`
+	Of            string     `yaml:"of"` // 集合元素类型，配合 type: set 使用
+	ForValidation bool       `yaml:"for_validation"`
+	ForIndex      bool       `yaml:"for_index"`
+	ForMutation   bool       `yaml:"for_mutation"`
+	IsExtension   bool       `yaml:"is_extension"`
+	Ref           *RefConfig `yaml:"ref"`
+	Comment       string     `yaml:"comment"`
+
+	// 运行时填充
+	CamelName       string
+	PublicCamelName string
+	IsSet           bool   // 运行时从 type == "set" 推导
+	GoType          string // 运行时生成的实际 Go 类型
+	RefResource     string // 运行时 toCamel(ref.resource)
+	RefLookupBy     string // 运行时 toCamel(ref.lookup_by)
+	RefTarget       string // 运行时 toCamel(ref.target)
+}
+
+// KeyField 运行时从 fields 中 for_index=true 的字段推导生成
 type KeyField struct {
-	Name            string `yaml:"name"`
-	PublicName      string `yaml:"public_name"`
-	Type            string `yaml:"type"`
+	Name            string
+	Type            string
 	CamelName       string
 	PublicCamelName string
 }
 
+// DiffbaseField cache_diffbase 中的字段定义
+type DiffbaseField struct {
+	Name        string     `yaml:"name"`
+	OrmName     string     `yaml:"orm_name"`
+	Type        string     `yaml:"type"`
+	Of          string     `yaml:"of"`           // 集合元素类型，配合 type: list 使用
+	From        string     `yaml:"from"`         // 数据源类型转换，如 bytes
+	IsLarge     bool       `yaml:"is_large"`     // 是否为大字段（日志输出时隐藏）
+	IsExtension bool       `yaml:"is_extension"` // 是否为扩展字段（reset 中跳过，由 resetExt 处理）
+	Ref         *RefConfig `yaml:"ref"`
+	Comment     string     `yaml:"comment"`
+
+	// 运行时填充
+	CamelName       string
+	PublicCamelName string
+	IsList          bool   // 运行时从 type == "list" 推导
+	GoType          string // 运行时生成的实际 Go 类型
+	RefResource     string // 运行时 toCamel(ref.resource)
+	RefLookupBy     string // 运行时 toCamel(ref.lookup_by)
+	RefTarget       string // 运行时 toCamel(ref.target)
+}
+
 type CacheToolConfig struct {
-	Enabled             bool       `yaml:"enabled"`
-	Fields              []Field    `yaml:"fields"`
-	KeyFields           []KeyField `yaml:"key_fields"`
-	HasExtension        bool       `yaml:"has_extension"`
-	CollectionExtension bool       `yaml:"collection_extension"`
-	HasMapset           bool       `yaml:"has_mapset"`
-	HasCustom           bool       `yaml:"has_custom"`
+	Enabled    bool     `yaml:"enabled"`
+	Fields     []Field  `yaml:"fields"`
+	Extensions []string `yaml:"extensions"`
+
+	// 以下字段均在运行时从配置推导，不从 YAML 读取
+	KeyFields           []KeyField
+	HasStructExtension  bool
+	CollectionExtension bool
+	HasMapset           bool
+	HasExtensionField   bool
 
 	// 扩展内容（运行时填充）
 	ExtensionImports string
 	ExtensionFields  string
 }
 
+type CacheDiffbaseConfig struct {
+	Enabled    bool            `yaml:"enabled"`
+	Fields     []DiffbaseField `yaml:"fields"`
+	Extensions []string        `yaml:"extensions"`
+
+	// 运行时推导
+	HasStructExtension bool
+	HasExtensionField  bool
+	HasLargeField      bool
+}
+
+// PubsubMessageField pubsub/message 中的字段定义
+type PubsubMessageField struct {
+	Name string `yaml:"name"`
+	Type string `yaml:"type"`
+
+	// 运行时填充
+	PublicCamelName string
+	GoType          string
+}
+
+type PubsubMessageConfig struct {
+	Enabled        bool                 `yaml:"enabled"`
+	Fields         []PubsubMessageField `yaml:"fields"`
+	AddAddition    string               `yaml:"add_addition"`
+	DeleteAddition string               `yaml:"delete_addition"`
+
+	// 运行时推导
+	HasTimeImport bool
+}
+
+type PubsubConfig struct {
+	Message PubsubMessageConfig `yaml:"message"`
+}
+
 type Config struct {
-	Name       string          `yaml:"name"`
-	PublicName string          `yaml:"public_name"`
-	CacheTool  CacheToolConfig `yaml:"cache_tool"`
+	Name          string              `yaml:"name"`
+	OrmName       string              `yaml:"orm_name"`
+	CacheTool     CacheToolConfig     `yaml:"cache_tool"`
+	CacheDiffbase CacheDiffbaseConfig `yaml:"cache_diffbase"`
+	Pubsub        PubsubConfig        `yaml:"pubsub"`
+
+	PublicName string // 运行时生成
 }
 
 // CacheToolGenerator 聚合 cache_tool 代码生成器的所有方法
@@ -79,6 +156,20 @@ type CacheToolGenerator struct {
 	config      Config
 	cacheConfig CacheToolConfig
 	template    *template.Template
+}
+
+// CacheDiffbaseGenerator 聚合 cache_diffbase 代码生成器的所有方法
+type CacheDiffbaseGenerator struct {
+	config         Config
+	diffbaseConfig CacheDiffbaseConfig
+	template       *template.Template
+}
+
+// PubsubMessageGenerator 聚合 pubsub/message 代码生成器的所有方法
+type PubsubMessageGenerator struct {
+	config        Config
+	messageConfig PubsubMessageConfig
+	template      *template.Template
 }
 
 // NewCacheToolGenerator 创建新的 CacheToolGenerator 实例
@@ -105,11 +196,47 @@ func NewCacheToolGenerator(configFile string) (*CacheToolGenerator, error) {
 	// 处理字段
 	generator.processFields()
 
-	// 检查是否有自定义字段
-	generator.cacheConfig.HasCustomField()
+	// 从字段和 extensions 推导运行时标志
+	generator.deriveFlags()
 
 	// 处理扩展文件
 	generator.loadExtensions()
+
+	// 加载模板
+	err = generator.loadTemplate()
+	if err != nil {
+		return nil, err
+	}
+
+	return generator, nil
+}
+
+// NewCacheDiffbaseGenerator 创建新的 CacheDiffbaseGenerator 实例
+func NewCacheDiffbaseGenerator(configFile string) (*CacheDiffbaseGenerator, error) {
+	configData, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %v", err)
+	}
+
+	var config Config
+	err = yaml.Unmarshal(configData, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config data: %v", err)
+	}
+
+	generator := &CacheDiffbaseGenerator{config: config}
+
+	// 解析和适配配置
+	err = generator.adaptConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// 处理字段
+	generator.processFields()
+
+	// 从字段和 extensions 配置推导运行时标志
+	generator.deriveFlags()
 
 	// 加载模板
 	err = generator.loadTemplate()
@@ -126,24 +253,64 @@ func (g *CacheToolGenerator) adaptConfig() error {
 		return fmt.Errorf("cache_tool is not enabled in configuration")
 	}
 
+	// 自动从 snake_case Name 生成 UpperCamelCase PublicName
+	g.config.PublicName = toCamel(g.config.Name, true)
+
+	if g.config.OrmName == "" {
+		return fmt.Errorf("orm_name is required in configuration")
+	}
+
 	g.cacheConfig = g.config.CacheTool
 	return nil
 }
 
-// processFields 处理字段配置，生成 CamelName 和 PublicCamelName
+// processFields 处理字段配置，生成 CamelName、PublicCamelName、GoType 和 Ref 运行时字段
 func (g *CacheToolGenerator) processFields() {
 	for i := range g.cacheConfig.Fields {
-		g.cacheConfig.Fields[i].CamelName = toCamel(g.cacheConfig.Fields[i].Name, false)
-		if g.cacheConfig.Fields[i].PublicName != "" {
-			g.cacheConfig.Fields[i].PublicCamelName = g.cacheConfig.Fields[i].PublicName
+		f := &g.cacheConfig.Fields[i]
+		f.CamelName = toCamel(f.Name, false)
+		f.PublicCamelName = toCamel(f.Name, true)
+
+		// 处理 set 类型
+		if f.Type == "set" {
+			f.IsSet = true
+			f.GoType = "mapset.Set[" + f.Of + "]"
 		} else {
-			g.cacheConfig.Fields[i].PublicCamelName = toCamel(g.cacheConfig.Fields[i].Name, true)
+			f.GoType = f.Type
+		}
+
+		processRefConfig(f.Ref, &f.RefResource, &f.RefLookupBy, &f.RefTarget)
+	}
+}
+
+// deriveFlags 从 fields 和 extensions 配置推导运行时标志
+func (g *CacheToolGenerator) deriveFlags() {
+	// 从 extensions 列表推导 HasStructExtension 和 CollectionExtension
+	for _, ext := range g.cacheConfig.Extensions {
+		switch ext {
+		case "struct":
+			g.cacheConfig.HasStructExtension = true
+		case "collection":
+			g.cacheConfig.CollectionExtension = true
 		}
 	}
 
-	for i := range g.cacheConfig.KeyFields {
-		g.cacheConfig.KeyFields[i].CamelName = toCamel(g.cacheConfig.KeyFields[i].Name, false)
-		g.cacheConfig.KeyFields[i].PublicCamelName = g.cacheConfig.KeyFields[i].PublicName
+	// 从 fields 推导 KeyFields、HasMapset、HasExtensionField
+	for _, f := range g.cacheConfig.Fields {
+		if f.ForIndex {
+			g.cacheConfig.KeyFields = append(g.cacheConfig.KeyFields, KeyField{
+				Name:            f.Name,
+				Type:            f.Type,
+				CamelName:       f.CamelName,
+				PublicCamelName: f.PublicCamelName,
+			})
+		}
+		if f.IsSet {
+			g.cacheConfig.HasMapset = true
+		}
+		if f.IsExtension {
+			g.cacheConfig.HasExtensionField = true
+		}
 	}
 }
 
@@ -155,6 +322,8 @@ func (g *CacheToolGenerator) loadTemplate() error {
 	tmpl, err := template.New(templateName).Funcs(template.FuncMap{
 		"ToUpper":      toUpper,
 		"toLowerCamel": toLowerCamel,
+		"hasSuffix":    strings.HasSuffix,
+		"trimPrefix":   strings.TrimPrefix, // 注册 trimPrefix 函数
 	}).ParseFiles(templateFile)
 	if err != nil {
 		return fmt.Errorf("failed to parse template: %v", err)
@@ -264,23 +433,25 @@ func (g *CacheToolGenerator) Generate() error {
 	templateData := struct {
 		Name                string
 		PublicName          string
+		OrmName             string
 		Fields              []Field
 		KeyFields           []KeyField
-		HasExtension        bool
+		HasStructExtension  bool
 		CollectionExtension bool
 		HasMapset           bool
-		HasCustom           bool
+		HasExtensionField   bool
 		ExtensionImports    string
 		ExtensionFields     string
 	}{
 		Name:                g.config.Name,
 		PublicName:          g.config.PublicName,
+		OrmName:             g.config.OrmName,
 		Fields:              g.cacheConfig.Fields,
 		KeyFields:           g.cacheConfig.KeyFields,
-		HasExtension:        g.cacheConfig.HasExtension,
+		HasStructExtension:  g.cacheConfig.HasStructExtension,
 		CollectionExtension: g.cacheConfig.CollectionExtension,
 		HasMapset:           g.cacheConfig.HasMapset,
-		HasCustom:           g.cacheConfig.HasCustom,
+		HasExtensionField:   g.cacheConfig.HasExtensionField,
 		ExtensionImports:    g.cacheConfig.ExtensionImports,
 		ExtensionFields:     g.cacheConfig.ExtensionFields,
 	}
@@ -309,23 +480,133 @@ func (g *CacheToolGenerator) Generate() error {
 		log.Printf("Warning: failed to format %s: %v", outputFile, err)
 	}
 
-	// 执行 goimports 格式化 import
-	if err := formatImports(outputFile); err != nil {
-		log.Printf("Warning: failed to format imports in %s: %v", outputFile, err)
-	}
-
 	fmt.Printf("Generated code for %s in %s\n", g.config.Name, outputFile)
 	return nil
 }
 
-// HasCustomField 检查 CacheToolConfig 中是否有自定义字段
-func (c *CacheToolConfig) HasCustomField() {
-	for _, f := range c.Fields {
-		if f.IsCustom {
-			c.HasCustom = true
-			return
+// CacheDiffbaseGenerator 的方法实现
+
+// adaptConfig 适配配置结构
+func (g *CacheDiffbaseGenerator) adaptConfig() error {
+	if !g.config.CacheDiffbase.Enabled {
+		return fmt.Errorf("cache_diffbase is not enabled in configuration")
+	}
+
+	// 自动从 snake_case Name 生成 UpperCamelCase PublicName
+	g.config.PublicName = toCamel(g.config.Name, true)
+
+	if g.config.OrmName == "" {
+		return fmt.Errorf("orm_name is required in configuration")
+	}
+
+	g.diffbaseConfig = g.config.CacheDiffbase
+	return nil
+}
+
+// processFields 处理字段配置，生成 CamelName、PublicCamelName 和 GoType
+func (g *CacheDiffbaseGenerator) processFields() {
+	for i := range g.diffbaseConfig.Fields {
+		f := &g.diffbaseConfig.Fields[i]
+		f.CamelName = toCamel(f.Name, false)
+		f.PublicCamelName = toCamel(f.Name, true)
+
+		// 处理 list 类型
+		if f.Type == "list" {
+			f.IsList = true
+			f.GoType = "[]" + f.Of
+		} else {
+			f.GoType = f.Type
+		}
+
+		// 处理 ref 配置，转换为 PascalCase
+		processRefConfig(f.Ref, &f.RefResource, &f.RefLookupBy, &f.RefTarget)
+
+		// 推导 HasExtensionField 和 HasLargeField
+		if f.IsExtension {
+			g.diffbaseConfig.HasExtensionField = true
+		}
+		if f.IsLarge {
+			g.diffbaseConfig.HasLargeField = true
 		}
 	}
+}
+
+// deriveFlags 从 extensions 配置推导运行时标志
+func (g *CacheDiffbaseGenerator) deriveFlags() {
+	for _, ext := range g.diffbaseConfig.Extensions {
+		switch ext {
+		case "struct":
+			g.diffbaseConfig.HasStructExtension = true
+		}
+	}
+}
+
+// loadTemplate 加载模板文件
+func (g *CacheDiffbaseGenerator) loadTemplate() error {
+	templateFile := "../cache/diffbase/gen.go.tpl"
+	templateName := filepath.Base(templateFile)
+
+	tmpl, err := template.New(templateName).Funcs(template.FuncMap{
+		"ToUpper":      toUpper,
+		"toLowerCamel": toLowerCamel,
+		"hasSuffix":    strings.HasSuffix,
+		"trimPrefix":   strings.TrimPrefix, // 注册 trimPrefix 函数
+	}).ParseFiles(templateFile)
+	if err != nil {
+		return fmt.Errorf("failed to parse template: %v", err)
+	}
+
+	g.template = tmpl
+	return nil
+}
+
+// Generate 生成代码文件
+func (g *CacheDiffbaseGenerator) Generate() error {
+	// 构造模板数据
+	templateData := struct {
+		Name               string
+		PublicName         string
+		OrmName            string
+		Fields             []DiffbaseField
+		HasStructExtension bool
+		HasExtensionField  bool
+		HasLargeField      bool
+	}{
+		Name:               g.config.Name,
+		PublicName:         g.config.PublicName,
+		OrmName:            g.config.OrmName,
+		Fields:             g.diffbaseConfig.Fields,
+		HasStructExtension: g.diffbaseConfig.HasStructExtension,
+		HasExtensionField:  g.diffbaseConfig.HasExtensionField,
+		HasLargeField:      g.diffbaseConfig.HasLargeField,
+	}
+
+	var generatedCode bytes.Buffer
+	err := g.template.Execute(&generatedCode, templateData)
+	if err != nil {
+		return fmt.Errorf("failed to execute template: %v", err)
+	}
+
+	outputDir := "../cache/diffbase"
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			return fmt.Errorf("failed to create output directory: %v", err)
+		}
+	}
+
+	outputFile := filepath.Join(outputDir, g.config.Name+".go")
+	err = os.WriteFile(outputFile, generatedCode.Bytes(), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write generated code to file: %v", err)
+	}
+
+	// 执行 go fmt 格式化生成的代码
+	if err := formatGoFile(outputFile); err != nil {
+		log.Printf("Warning: failed to format %s: %v", outputFile, err)
+	}
+
+	fmt.Printf("Generated diffbase code for %s in %s\n", g.config.Name, outputFile)
+	return nil
 }
 
 // 工具函数
@@ -360,23 +641,179 @@ func toUpper(s string) string {
 	return strings.ToUpper(s)
 }
 
-// formatGoFile 使用 go fmt 格式化 Go 代码文件（通用工具函数）
+// pluralize 简单的英文复数形式：以 s 结尾加 es，否则加 s
+func pluralize(s string) string {
+	if strings.HasSuffix(s, "s") {
+		return s + "es"
+	}
+	return s + "s"
+}
+
+// processRefConfig 将 ref 配置的 snake_case 值转换为 PascalCase 运行时字段（公共方法）
+func processRefConfig(ref *RefConfig, refResource, refLookupBy, refTarget *string) {
+	if ref == nil {
+		return
+	}
+	*refResource = toCamel(ref.Resource, true)
+	*refLookupBy = toCamel(ref.LookupBy, true)
+	*refTarget = toCamel(ref.Target, true)
+}
+
+// formatGoFile 使用 go fmt  格式化 Go 代码文件（通用工具函数）,使用 goimports 格式化 import
 func formatGoFile(filePath string) error {
+	// 设置 go fmt  命令
 	cmd := exec.Command("go", "fmt", filePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("go fmt failed: %v, output: %s", err, string(output))
 	}
-	return nil
-}
 
-// formatImports 使用 goimports 格式化 import
-func formatImports(filePath string) error {
-	cmd := exec.Command("goimports", "-w", filePath)
-	output, err := cmd.CombinedOutput()
+	// 设置 goimports 命令
+	cmd = exec.Command("goimports", "-w", filePath)
+	output, err = cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("goimports failed: %v, output: %s", err, string(output))
 	}
+
+	return nil
+}
+
+// NewPubsubMessageGenerator 创建新的 PubsubMessageGenerator 实例
+func NewPubsubMessageGenerator(configFile string) (*PubsubMessageGenerator, error) {
+	configData, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %v", err)
+	}
+
+	var config Config
+	err = yaml.Unmarshal(configData, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config data: %v", err)
+	}
+
+	generator := &PubsubMessageGenerator{config: config}
+
+	// 解析和适配配置
+	err = generator.adaptConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// 处理字段
+	generator.processFields()
+
+	// 加载模板
+	err = generator.loadTemplate()
+	if err != nil {
+		return nil, err
+	}
+
+	return generator, nil
+}
+
+// adaptConfig 适配配置结构
+func (g *PubsubMessageGenerator) adaptConfig() error {
+	if !g.config.Pubsub.Message.Enabled {
+		return fmt.Errorf("pubsub.message is not enabled in configuration")
+	}
+
+	g.config.PublicName = toCamel(g.config.Name, true)
+
+	if g.config.OrmName == "" {
+		return fmt.Errorf("orm_name is required in configuration")
+	}
+
+	g.messageConfig = g.config.Pubsub.Message
+
+	// 设置默认的 addition 类型
+	if g.messageConfig.AddAddition == "" {
+		g.messageConfig.AddAddition = "AddNoneAddition"
+	}
+	if g.messageConfig.DeleteAddition == "" {
+		g.messageConfig.DeleteAddition = "DeleteNoneAddition"
+	}
+
+	return nil
+}
+
+// processFields 处理字段配置，生成 PublicCamelName 和 GoType
+func (g *PubsubMessageGenerator) processFields() {
+	for i := range g.messageConfig.Fields {
+		f := &g.messageConfig.Fields[i]
+		f.PublicCamelName = toCamel(f.Name, true)
+		f.GoType = f.Type
+
+		// 检测是否需要 time 包
+		if strings.Contains(f.Type, "time.Time") {
+			g.messageConfig.HasTimeImport = true
+		}
+	}
+}
+
+// loadTemplate 加载模板文件
+func (g *PubsubMessageGenerator) loadTemplate() error {
+	templateFile := "../pubsub/message/gen.go.tpl"
+	templateName := filepath.Base(templateFile)
+
+	tmpl, err := template.New(templateName).Funcs(template.FuncMap{
+		"ToUpper":      toUpper,
+		"toLowerCamel": toLowerCamel,
+		"hasSuffix":    strings.HasSuffix,
+		"trimPrefix":   strings.TrimPrefix,
+		"pluralize":    pluralize,
+	}).ParseFiles(templateFile)
+	if err != nil {
+		return fmt.Errorf("failed to parse template: %v", err)
+	}
+
+	g.template = tmpl
+	return nil
+}
+
+// Generate 生成代码文件
+func (g *PubsubMessageGenerator) Generate() error {
+	templateData := struct {
+		Name           string
+		PublicName     string
+		OrmName        string
+		Fields         []PubsubMessageField
+		AddAddition    string
+		DeleteAddition string
+		HasTimeImport  bool
+	}{
+		Name:           g.config.Name,
+		PublicName:     g.config.PublicName,
+		OrmName:        g.config.OrmName,
+		Fields:         g.messageConfig.Fields,
+		AddAddition:    g.messageConfig.AddAddition,
+		DeleteAddition: g.messageConfig.DeleteAddition,
+		HasTimeImport:  g.messageConfig.HasTimeImport,
+	}
+
+	var generatedCode bytes.Buffer
+	err := g.template.Execute(&generatedCode, templateData)
+	if err != nil {
+		return fmt.Errorf("failed to execute template: %v", err)
+	}
+
+	outputDir := "../pubsub/message"
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			return fmt.Errorf("failed to create output directory: %v", err)
+		}
+	}
+
+	outputFile := filepath.Join(outputDir, g.config.Name+".go")
+	err = os.WriteFile(outputFile, generatedCode.Bytes(), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write generated code to file: %v", err)
+	}
+
+	if err := formatGoFile(outputFile); err != nil {
+		log.Printf("Warning: failed to format %s: %v", outputFile, err)
+	}
+
+	fmt.Printf("Generated pubsub message code for %s in %s\n", g.config.Name, outputFile)
 	return nil
 }
 
@@ -387,17 +824,56 @@ func generateFromFiles(configFiles []string) error {
 
 	for _, configFile := range configFiles {
 		fmt.Printf("Processing %s...\n", configFile)
-		generator, err := NewCacheToolGenerator(configFile)
+
+		// 读取配置文件判断启用了哪些生成器
+		configData, err := os.ReadFile(configFile)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("%s: %v", configFile, err))
+			errors = append(errors, fmt.Sprintf("%s: failed to read config: %v", configFile, err))
 			continue
 		}
 
-		if err := generator.Generate(); err != nil {
-			errors = append(errors, fmt.Sprintf("%s: %v", configFile, err))
+		var config Config
+		err = yaml.Unmarshal(configData, &config)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: failed to unmarshal config: %v", configFile, err))
 			continue
 		}
-		successCount++
+
+		// 生成 cache_tool
+		if config.CacheTool.Enabled {
+			generator, err := NewCacheToolGenerator(configFile)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("%s (cache_tool): %v", configFile, err))
+			} else if err := generator.Generate(); err != nil {
+				errors = append(errors, fmt.Sprintf("%s (cache_tool): %v", configFile, err))
+			} else {
+				successCount++
+			}
+		}
+
+		// 生成 cache_diffbase
+		if config.CacheDiffbase.Enabled {
+			generator, err := NewCacheDiffbaseGenerator(configFile)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("%s (cache_diffbase): %v", configFile, err))
+			} else if err := generator.Generate(); err != nil {
+				errors = append(errors, fmt.Sprintf("%s (cache_diffbase): %v", configFile, err))
+			} else {
+				successCount++
+			}
+		}
+
+		// 生成 pubsub message
+		if config.Pubsub.Message.Enabled {
+			generator, err := NewPubsubMessageGenerator(configFile)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("%s (pubsub_message): %v", configFile, err))
+			} else if err := generator.Generate(); err != nil {
+				errors = append(errors, fmt.Sprintf("%s (pubsub_message): %v", configFile, err))
+			} else {
+				successCount++
+			}
+		}
 	}
 
 	fmt.Printf("\nGeneration complete: %d success, %d failed\n", successCount, len(errors))
@@ -476,14 +952,9 @@ func main() {
 		return
 	}
 
-	// 单个文件处理（保持原有兼容性）
+	// 单个文件处理（保持原有兼容性，但使用统一的生成逻辑）
 	configFile := arg
-	generator, err := NewCacheToolGenerator(configFile)
-	if err != nil {
-		log.Fatalf("failed to create generator: %v", err)
-	}
-
-	if err := generator.Generate(); err != nil {
-		log.Fatalf("failed to generate code: %v", err)
+	if err := generateFromFiles([]string{configFile}); err != nil {
+		log.Fatalf("generation failed: %v", err)
 	}
 }

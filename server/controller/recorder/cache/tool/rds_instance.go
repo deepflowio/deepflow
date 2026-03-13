@@ -7,65 +7,65 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// RDSInstance defines cache data structure.
-type RDSInstance struct {
+// RdsInstance defines cache data structure.
+type RdsInstance struct {
 	lcuuid   string
 	id       int
 	name     string
-	regionID int
-	azID     int
-	vpcID    int
+	regionId int
+	azId     int
+	vpcId    int
 }
 
-func (t *RDSInstance) IsValid() bool {
+func (t *RdsInstance) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *RDSInstance) Lcuuid() string {
+func (t *RdsInstance) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *RDSInstance) ID() int {
+func (t *RdsInstance) Id() int {
 	return t.id
 }
 
-func (t *RDSInstance) Name() string {
+func (t *RdsInstance) Name() string {
 	return t.name
 }
 
-func (t *RDSInstance) RegionID() int {
-	return t.regionID
+func (t *RdsInstance) RegionId() int {
+	return t.regionId
 }
 
-func (t *RDSInstance) AZID() int {
-	return t.azID
+func (t *RdsInstance) AzId() int {
+	return t.azId
 }
 
-func (t *RDSInstance) VPCID() int {
-	return t.vpcID
+func (t *RdsInstance) VpcId() int {
+	return t.vpcId
 }
 
-func (t *RDSInstance) reset(dbItem *metadbmodel.RDSInstance, tool *Tool) {
+func (t *RdsInstance) reset(dbItem *metadbmodel.RDSInstance, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.vpcID = dbItem.VPCID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.vpcId = dbItem.VPCID
 }
 
-func NewRDSInstanceCollection(t *Tool) *RDSInstanceCollection {
-	c := new(RDSInstanceCollection)
-	c.collection = newCollectionBuilder[*RDSInstance]().
+func NewRdsInstanceCollection(t *Tool) *RdsInstanceCollection {
+	c := new(RdsInstanceCollection)
+	c.collection = newCollectionBuilder[*RdsInstance]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.RDSInstance { return new(metadbmodel.RDSInstance) }).
-		withCacheItemFactory(func() *RDSInstance { return new(RDSInstance) }).
+		withCacheItemFactory(func() *RdsInstance { return new(RdsInstance) }).
 		build()
 	return c
 }
 
-// RDSInstanceCollection defines a collection that maps individual fields to the RDSInstance cache data structure.
-type RDSInstanceCollection struct {
-	collection[*RDSInstance, *metadbmodel.RDSInstance]
+// RdsInstanceCollection defines a collection that maps individual fields to the RdsInstance cache data structure.
+type RdsInstanceCollection struct {
+	collection[*RdsInstance, *metadbmodel.RDSInstance]
 }

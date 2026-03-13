@@ -185,27 +185,27 @@ func NewHealers(md metadata.Platform) *Healers {
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_HOST_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_HOST)),
-				newHealer[metadbmodel.VM, metadbmodel.ChDevice, *message.AddedVMs](
+				newHealer[metadbmodel.VM, metadbmodel.ChDevice, *message.AddedVms](
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_VM_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_VM)),
-				newHealer[metadbmodel.VRouter, metadbmodel.ChDevice, *message.AddedVRouters](
+				newHealer[metadbmodel.VRouter, metadbmodel.ChDevice, *message.AddedVrouters](
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_VROUTER_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_VROUTER)),
-				newHealer[metadbmodel.DHCPPort, metadbmodel.ChDevice, *message.AddedDHCPPorts](
+				newHealer[metadbmodel.DHCPPort, metadbmodel.ChDevice, *message.AddedDhcpPorts](
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_DHCP_PORT_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_DHCP_PORT)),
-				newHealer[metadbmodel.NATGateway, metadbmodel.ChDevice, *message.AddedNATGateways](
+				newHealer[metadbmodel.NATGateway, metadbmodel.ChDevice, *message.AddedNatGateways](
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_NAT_GATEWAY_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_NAT_GATEWAY)),
-				newHealer[metadbmodel.LB, metadbmodel.ChDevice, *message.AddedLBs](
+				newHealer[metadbmodel.LB, metadbmodel.ChDevice, *message.AddedLbs](
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_LB_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_LB)),
-				newHealer[metadbmodel.RDSInstance, metadbmodel.ChDevice, *message.AddedRDSInstances](
+				newHealer[metadbmodel.RDSInstance, metadbmodel.ChDevice, *message.AddedRdsInstances](
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_RDS_INSTANCE_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_RDS_INSTANCE)),
@@ -218,12 +218,12 @@ func NewHealers(md metadata.Platform) *Healers {
 					newDataGenerator(md, common.RESOURCE_TYPE_CUSTOM_SERVICE_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_DEVICE).setChDeviceTypes(common.VIF_DEVICE_TYPE_CUSTOM_SERVICE)),
 
-				newHealer[metadbmodel.AZ, metadbmodel.ChAZ, *message.AddedAZs](
+				newHealer[metadbmodel.AZ, metadbmodel.ChAZ, *message.AddedAzs](
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_AZ_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_AZ)),
 
-				newHealer[metadbmodel.VM, metadbmodel.ChChost, *message.AddedVMs](
+				newHealer[metadbmodel.VM, metadbmodel.ChChost, *message.AddedVms](
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_VM_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST)),
@@ -233,16 +233,16 @@ func NewHealers(md metadata.Platform) *Healers {
 					newDataGenerator(md, common.RESOURCE_TYPE_CUSTOM_SERVICE_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_BIZ_SERVICE)),
 
-				newHealer[metadbmodel.VPC, metadbmodel.ChVPC, *message.AddedVPCs](
+				newHealer[metadbmodel.VPC, metadbmodel.ChVPC, *message.AddedVpcs](
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_VPC_EN),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_VPC)),
 
-				newHealer[metadbmodel.VM, metadbmodel.ChChostCloudTag, *message.AddedVMs](
+				newHealer[metadbmodel.VM, metadbmodel.ChChostCloudTag, *message.AddedVms](
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAG)),
-				newHealer[metadbmodel.VM, metadbmodel.ChChostCloudTags, *message.AddedVMs](
+				newHealer[metadbmodel.VM, metadbmodel.ChChostCloudTags, *message.AddedVms](
 					msgMetadata,
 					newDataGenerator(md, common.RESOURCE_TYPE_VM_EN).setAdditionalSelectField("learned_cloud_tags", "custom_cloud_tags").setUnscoped(false),
 					newDataGenerator(md, tagrecorder.RESOURCE_TYPE_CH_CHOST_CLOUD_TAGS)),

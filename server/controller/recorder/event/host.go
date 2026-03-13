@@ -43,13 +43,13 @@ func NewHost(q *queue.OverwriteQueue) *Host {
 func (h *Host) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.Host) {
 		var opts []eventapi.TagFieldOption
-		info, err := md.GetToolDataSet().GetHostInfoByID(item.ID)
-		if err != nil {
-			log.Error(err)
+		hostItem := md.GetToolDataSet().Host().GetById(item.ID)
+		if !hostItem.IsValid() {
+			log.Errorf("host(id=%d) not found", item.ID, md.LogPrefixes)
 		} else {
 			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagAZID(info.AZID),
-				eventapi.TagRegionID(info.RegionID),
+				eventapi.TagAZID(hostItem.AzId()),
+				eventapi.TagRegionID(hostItem.RegionId()),
 			}...)
 		}
 		opts = append(opts, []eventapi.TagFieldOption{

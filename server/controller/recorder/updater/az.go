@@ -31,25 +31,25 @@ import (
 type AZMessageFactory struct{}
 
 func (f *AZMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedAZs{}
+	return &message.AddedAzs{}
 }
 
 func (f *AZMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedAZ{}
+	return &message.UpdatedAz{}
 }
 
 func (f *AZMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedAZs{}
+	return &message.DeletedAzs{}
 }
 
 func (f *AZMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedAZFields{}
+	return &message.UpdatedAzFields{}
 }
 
 type AZ struct {
 	UpdaterBase[
 		cloudmodel.AZ,
-		*diffbase.AZ,
+		*diffbase.Az,
 		*metadbmodel.AZ,
 		metadbmodel.AZ,
 	]
@@ -61,7 +61,7 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 			ctrlrcommon.RESOURCE_TYPE_AZ_EN,
 			wholeCache,
 			db.NewAZ().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.AZs,
+			wholeCache.DiffBases().AZ().GetAll(),
 			cloudData,
 		),
 	}
@@ -85,8 +85,8 @@ func (z *AZ) generateDBItemToAdd(cloudItem *cloudmodel.AZ) (*metadbmodel.AZ, boo
 	return dbItem, true
 }
 
-func (z *AZ) generateUpdateInfo(diffBase *diffbase.AZ, cloudItem *cloudmodel.AZ) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedAZFields)
+func (z *AZ) generateUpdateInfo(diffBase *diffbase.Az, cloudItem *cloudmodel.AZ) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedAzFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name

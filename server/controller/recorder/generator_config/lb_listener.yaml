@@ -1,18 +1,53 @@
 name: lb_listener
-public_name: LBListener
+orm_name: LBListener
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: ips
+      orm_name: IPs
+      type: string
+    - name: snat_ips
+      orm_name: SNATIPs
+      type: string
+    - name: port
+      orm_name: Port
+      type: int
+    - name: protocol
+      orm_name: Protocol
+      type: string
+
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: lbID
-    public_name: LBID
+  - name: lb_id
+    orm_name: LBID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: ips
+        type: string
+      - name: snat_ips
+        type: string
+      - name: port
+        type: int
+      - name: protocol
+        type: string

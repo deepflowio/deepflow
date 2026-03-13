@@ -43,14 +43,14 @@ func NewDHCPPort(q *queue.OverwriteQueue) *DHCPPort {
 func (p *DHCPPort) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.DHCPPort) {
 		var opts []eventapi.TagFieldOption
-		info, err := md.GetToolDataSet().GetDHCPPortInfoByID(item.ID) // TODO use method in common
-		if err != nil {
-			log.Error(err)
+		dpItem := md.GetToolDataSet().DhcpPort().GetById(item.ID) // TODO use method in common
+		if !dpItem.IsValid() {
+			log.Errorf("dhcp_port(id=%d) not found", item.ID, md.LogPrefixes)
 		} else {
 			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagAZID(info.AZID),
-				eventapi.TagVPCID(item.VPCID),
-				eventapi.TagRegionID(info.RegionID),
+				eventapi.TagAZID(dpItem.AzId()),
+				eventapi.TagVPCID(dpItem.VpcId()),
+				eventapi.TagRegionID(dpItem.RegionId()),
 			}...)
 		}
 		opts = append(opts, []eventapi.TagFieldOption{

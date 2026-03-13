@@ -91,7 +91,7 @@ func collectionNotFoundByLcuuid(resource, lcuuid string) string {
 	return fmt.Sprintf("cache %s (lcuuid: %s) not found", resource, lcuuid)
 }
 
-func collectionNotFoundByID(resource string, id int) string {
+func collectionNotFoundById(resource string, id int) string {
 	return fmt.Sprintf("cache %s (id: %d) not found", resource, id)
 }
 

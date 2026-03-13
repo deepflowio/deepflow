@@ -69,21 +69,21 @@ func MetadataSoftDelete(flag bool) func(*Metadata) {
 	}
 }
 
-func MetadataToolDataSet(ds *tool.DataSet) func(*Metadata) {
+func MetadataToolDataSet(ds *tool.Tool) func(*Metadata) {
 	return func(m *Metadata) {
 		m.Addition.ToolDataSet = ds
 	}
 }
 
 type Addition struct { // TODO better
-	SoftDelete  bool          // for message type of delete action
-	ToolDataSet *tool.DataSet // for message type of resource event
+	SoftDelete  bool       // for message type of delete action
+	ToolDataSet *tool.Tool // for message type of resource event
 }
 
 func (m Addition) GetSoftDelete() bool {
 	return m.SoftDelete
 }
 
-func (m Addition) GetToolDataSet() *tool.DataSet {
+func (m Addition) GetToolDataSet() *tool.Tool {
 	return m.ToolDataSet
 }

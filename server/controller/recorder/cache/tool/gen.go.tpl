@@ -14,74 +14,73 @@ import (
 // {{.PublicName}} defines cache data structure.
 type {{.PublicName}} struct {
 {{- range .Fields}}
+{{- if not .IsExtension}}
 {{- if .Comment}}
-	{{.Name}} {{.Type}} // {{.Comment}}
+	{{.CamelName}} {{.GoType}} // {{.Comment}}
 {{- else}}
-	{{.Name}} {{.Type}}
+	{{.CamelName}} {{.GoType}}
 {{- end}}
+{{- end}}
+{{- end}}
+{{- if .HasStructExtension}}
+	{{.PublicName}}Ext
 {{- end}}
 }
 
 func (t *{{.PublicName}}) IsValid() bool {
 {{- range .Fields}}
-{{- if .IsValidationField}}
-	return t.{{.Name}} != ""
+{{- if .ForValidation}}
+	return t.{{.CamelName}} != ""
 {{- end}}
 {{- end}}
 }
 {{range .Fields}}
 
-func (t *{{$.PublicName}}) {{.PublicCamelName}}() {{.Type}} {
-	return t.{{.Name}}
+func (t *{{$.PublicName}}) {{.PublicCamelName}}() {{.GoType}} {
+	return t.{{.CamelName}}
 }
 {{- end}}
 {{- range .Fields}}
-{{- if .HasSetter}}
+{{- if .ForMutation}}
 
-func (t *{{$.PublicName}}) Set{{.PublicName}}({{.Name}} {{.Type}}) {
-	t.{{.Name}} = {{.Name}}
+func (t *{{$.PublicName}}) Set{{.PublicCamelName}}({{.CamelName}} {{.Type}}) {
+	t.{{.CamelName}} = {{.CamelName}}
 }
 {{- end}}
 {{- end}}
 {{- range .Fields}}
-{{- if .IsPlural}}
+{{- if .IsSet}}
 
-func (t *{{$.PublicName}}) {{.PublicName}}ToSlice() []int {
-	return t.{{.Name}}.ToSlice()
+func (t *{{$.PublicName}}) {{.PublicCamelName}}ToSlice() []{{.Of}} {
+	return t.{{.CamelName}}.ToSlice()
 }
 
-func (t *{{$.PublicName}}) AddPodGroupID(id int) {
-	t.{{.Name}}.Add(id)
+func (t *{{$.PublicName}}) AddTo{{.PublicCamelName}}(item {{.Of}}) {
+	t.{{.CamelName}}.Add(item)
 }
 
-func (t *{{$.PublicName}}) RemovePodGroupID(id int) {
-	t.{{.Name}}.Remove(id)
+func (t *{{$.PublicName}}) RemoveFrom{{.PublicCamelName}}(item {{.Of}}) {
+	t.{{.CamelName}}.Remove(item)
 }
 {{- end}}
 {{- end}}
 
-func (t *{{.PublicName}}) reset(dbItem *metadbmodel.{{.PublicName}}, tool *Tool) {
+func (t *{{.PublicName}}) reset(dbItem *metadbmodel.{{.OrmName}}, tool *Tool) {
 {{- range .Fields}}
-{{- if and (not .HasSetter) (not .IsPlural) (not .IsCustom)}}
+{{- if and (not .ForMutation) (not .IsSet) (not .IsExtension)}}
 {{- if .Ref}}
-	t.{{.Name}} = tool.{{.Ref}}().GetByLcuuid(dbItem.{{if .DbFieldName}}{{.DbFieldName}}{{else}}{{.PublicName}}{{end}}).ID()
+	t.{{.CamelName}} = tool.{{.RefResource}}().GetBy{{.RefLookupBy}}(dbItem.{{.OrmName}}).{{.RefTarget}}()
 {{- else}}
-	t.{{.Name}} = dbItem.{{if .DbFieldName}}{{.DbFieldName}}{{else}}{{.PublicName}}{{end}}
+	t.{{.CamelName}} = dbItem.{{.OrmName}}
 {{- end}}
 {{- end}}
 {{- end}}
-{{- if .HasCustom}}
-	t.resetCustom(dbItem, tool)
-{{- else}}
-{{- range .Fields}}
-{{- if .IsCustom}}
-	t.{{.Name}} = dbItem.{{if .DbFieldName}}{{.DbFieldName}}{{else}}{{.PublicName}}{{end}}
-{{- end}}
-{{- end}}
+{{- if .HasStructExtension}}
+	t.resetExt(dbItem, tool)
 {{- end}}
 {{- range .Fields}}
-{{- if .IsPlural}}
-	t.{{.Name}} = mapset.NewSet[int]()
+{{- if .IsSet}}
+	t.{{.CamelName}} = mapset.NewSet[{{.Of}}]()
 {{- end}}
 {{- end}}
 }
@@ -99,7 +98,7 @@ func New{{.PublicName}}Collection(t *Tool) *{{.PublicName}}Collection {
 	c.collection = newCollectionBuilder[*{{.PublicName}}]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_{{ToUpper .Name}}_EN).
 		withTool(t).
-		withDBItemFactory(func() *metadbmodel.{{.PublicName}} { return new(metadbmodel.{{.PublicName}}) }).
+		withDBItemFactory(func() *metadbmodel.{{.OrmName}} { return new(metadbmodel.{{.OrmName}}) }).
 		withCacheItemFactory(func() *{{.PublicName}} { return new({{.PublicName}}) }).
 {{- if or .KeyFields .CollectionExtension}}
 		withExtender(c).
@@ -110,7 +109,7 @@ func New{{.PublicName}}Collection(t *Tool) *{{.PublicName}}Collection {
 
 // {{.PublicName}}Collection defines a collection that maps individual fields to the {{.PublicName}} cache data structure.
 type {{.PublicName}}Collection struct {
-	collection[*{{.PublicName}}, *metadbmodel.{{.PublicName}}]
+	collection[*{{.PublicName}}, *metadbmodel.{{.OrmName}}]
 {{- if .KeyFields}}
 {{- range .KeyFields}}
 	{{.CamelName}}ToItem map[{{.Type}}]*{{$.PublicName}}
@@ -124,7 +123,7 @@ type {{.PublicName}}Collection struct {
 {{- if .KeyFields}}
 
 // OnAfterAdd implements CollectionExtender interface
-func (c *{{.PublicName}}Collection) OnAfterAdd(item *{{.PublicName}}, dbItem *metadbmodel.{{.PublicName}}) {
+func (c *{{.PublicName}}Collection) OnAfterAdd(item *{{.PublicName}}, dbItem *metadbmodel.{{.OrmName}}) {
 {{- range .KeyFields}}
 	if item.{{.PublicCamelName}}() != "" {
 		c.{{.CamelName}}ToItem[item.{{.PublicCamelName}}()] = item
@@ -133,7 +132,7 @@ func (c *{{.PublicName}}Collection) OnAfterAdd(item *{{.PublicName}}, dbItem *me
 }
 
 // OnAfterUpdate implements CollectionExtender interface  
-func (c *{{.PublicName}}Collection) OnAfterUpdate(item *{{.PublicName}}, dbItem *metadbmodel.{{.PublicName}}) {
+func (c *{{.PublicName}}Collection) OnAfterUpdate(item *{{.PublicName}}, dbItem *metadbmodel.{{.OrmName}}) {
 {{- range .KeyFields}}
 	// Remove old {{.Name}} mapping if exists
 	for {{.CamelName}}, {{$.PublicName | toLowerCamel}}Item := range c.{{.CamelName}}ToItem {
@@ -150,7 +149,7 @@ func (c *{{.PublicName}}Collection) OnAfterUpdate(item *{{.PublicName}}, dbItem 
 }
 
 // OnAfterDelete implements CollectionExtender interface
-func (c *{{.PublicName}}Collection) OnAfterDelete(item *{{.PublicName}}, dbItem *metadbmodel.{{.PublicName}}) {
+func (c *{{.PublicName}}Collection) OnAfterDelete(item *{{.PublicName}}, dbItem *metadbmodel.{{.OrmName}}) {
 {{- range .KeyFields}}
 	if item.{{.PublicCamelName}}() != "" {
 		delete(c.{{.CamelName}}ToItem, item.{{.PublicCamelName}}())
@@ -159,51 +158,51 @@ func (c *{{.PublicName}}Collection) OnAfterDelete(item *{{.PublicName}}, dbItem 
 }
 
 {{- range .KeyFields}}
-// GetOrLoadBy{{.PublicName}} returns the {{$.PublicName}} by its {{.Name}}, loading from DB if not found in cache.
-func (c *{{$.PublicName}}Collection) GetOrLoadBy{{.PublicName}}({{.Name}} {{.Type}}) *{{$.PublicName}} {
+// GetOrLoadBy{{.PublicCamelName}} returns the {{$.PublicName}} by its {{.CamelName}}, loading from DB if not found in cache.
+func (c *{{$.PublicName}}Collection) GetOrLoadBy{{.PublicCamelName}}({{.CamelName}} {{.Type}}) *{{$.PublicName}} {
 	{{if eq .Type "string"}}
-	if {{.Name}} == "" {
+	if {{.CamelName}} == "" {
 		return new({{$.PublicName}})
 	}
 	{{else if eq .Type "int"}}
-	if {{.Name}} == 0 {
+	if {{.CamelName}} == 0 {
 		return new({{$.PublicName}})
 	}
 	{{end}}
 
-	item, ok := c.{{.CamelName}}ToItem[{{.Name}}]
+	item, ok := c.{{.CamelName}}ToItem[{{.CamelName}}]
 	if ok {
 		return item
 	}
-	log.Warning("cache %s ({{.Name}}: %v) not found", c.resourceType, {{.Name}})
+	log.Warning("cache %s ({{.CamelName}}: %v) not found", c.resourceType, {{.CamelName}})
 
-	var dbItem *metadbmodel.{{$.PublicName}}
-	if result := c.tool.metadata.GetDB().Where("{{.Name}} = ?", {{.Name}}).First(&dbItem); result.RowsAffected == 1 {
+	var dbItem *metadbmodel.{{$.OrmName}}
+	if result := c.tool.metadata.GetDB().Where("{{.Name}} = ?", {{.CamelName}}).First(&dbItem); result.RowsAffected == 1 {
 		c.Add(dbItem)
-		return c.{{.CamelName}}ToItem[{{.Name}}]
+		return c.{{.CamelName}}ToItem[{{.CamelName}}]
 	} else {
-		log.Error("db %s ({{.Name}}: %v) not found", c.resourceType, {{.Name}})
+		log.Error("db %s ({{.CamelName}}: %v) not found", c.resourceType, {{.CamelName}})
 		return new({{$.PublicName}})
 	}
 }
 
-// GetBy{{.PublicName}} returns the {{$.PublicName}} by its {{.Name}} directly from cache.
-func (c *{{$.PublicName}}Collection) GetBy{{.PublicName}}({{.Name}} {{.Type}}) *{{$.PublicName}} {
+// GetBy{{.PublicCamelName}} returns the {{$.PublicName}} by its {{.CamelName}} directly from cache.
+func (c *{{$.PublicName}}Collection) GetBy{{.PublicCamelName}}({{.CamelName}} {{.Type}}) *{{$.PublicName}} {
 	{{if eq .Type "string"}}
-	if {{.Name}} == "" {
+	if {{.CamelName}} == "" {
 		return new({{$.PublicName}})
 	}
 	{{else if eq .Type "int"}}
-	if {{.Name}} == 0 {
+	if {{.CamelName}} == 0 {
 		return new({{$.PublicName}})
 	}
 	{{end}}
 
-	item, ok := c.{{.CamelName}}ToItem[{{.Name}}]
+	item, ok := c.{{.CamelName}}ToItem[{{.CamelName}}]
 	if ok {
 		return item
 	}
-	log.Warning("cache %s ({{.Name}}: %v) not found", c.resourceType, {{.Name}})
+	log.Warning("cache %s ({{.CamelName}}: %v) not found", c.resourceType, {{.CamelName}})
 	return new({{$.PublicName}})
 }
 {{- end}}

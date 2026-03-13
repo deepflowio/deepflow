@@ -7,65 +7,65 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// VRouter defines cache data structure.
-type VRouter struct {
+// Vrouter defines cache data structure.
+type Vrouter struct {
 	lcuuid         string
 	id             int
 	name           string
-	regionID       int
-	vpcID          int
+	regionId       int
+	vpcId          int
 	gwLaunchServer string
 }
 
-func (t *VRouter) IsValid() bool {
+func (t *Vrouter) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *VRouter) Lcuuid() string {
+func (t *Vrouter) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *VRouter) ID() int {
+func (t *Vrouter) Id() int {
 	return t.id
 }
 
-func (t *VRouter) Name() string {
+func (t *Vrouter) Name() string {
 	return t.name
 }
 
-func (t *VRouter) RegionID() int {
-	return t.regionID
+func (t *Vrouter) RegionId() int {
+	return t.regionId
 }
 
-func (t *VRouter) VPCID() int {
-	return t.vpcID
+func (t *Vrouter) VpcId() int {
+	return t.vpcId
 }
 
-func (t *VRouter) GWLaunchServer() string {
+func (t *Vrouter) GwLaunchServer() string {
 	return t.gwLaunchServer
 }
 
-func (t *VRouter) reset(dbItem *metadbmodel.VRouter, tool *Tool) {
+func (t *Vrouter) reset(dbItem *metadbmodel.VRouter, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.vpcID = dbItem.VPCID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.vpcId = dbItem.VPCID
 	t.gwLaunchServer = dbItem.GWLaunchServer
 }
 
-func NewVRouterCollection(t *Tool) *VRouterCollection {
-	c := new(VRouterCollection)
-	c.collection = newCollectionBuilder[*VRouter]().
+func NewVrouterCollection(t *Tool) *VrouterCollection {
+	c := new(VrouterCollection)
+	c.collection = newCollectionBuilder[*Vrouter]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.VRouter { return new(metadbmodel.VRouter) }).
-		withCacheItemFactory(func() *VRouter { return new(VRouter) }).
+		withCacheItemFactory(func() *Vrouter { return new(Vrouter) }).
 		build()
 	return c
 }
 
-// VRouterCollection defines a collection that maps individual fields to the VRouter cache data structure.
-type VRouterCollection struct {
-	collection[*VRouter, *metadbmodel.VRouter]
+// VrouterCollection defines a collection that maps individual fields to the Vrouter cache data structure.
+type VrouterCollection struct {
+	collection[*Vrouter, *metadbmodel.VRouter]
 }

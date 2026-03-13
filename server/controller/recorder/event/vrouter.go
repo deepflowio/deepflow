@@ -43,22 +43,22 @@ func NewVRouter(q *queue.OverwriteQueue) *VRouter {
 func (r *VRouter) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.VRouter) {
 		var opts []eventapi.TagFieldOption
-		info, err := md.GetToolDataSet().GetVRouterInfoByID(item.ID)
-		if err != nil {
-			log.Error(err)
+		vrItem := md.GetToolDataSet().Vrouter().GetById(item.ID)
+		if !vrItem.IsValid() {
+			log.Errorf("vrouter(id=%d) not found", item.ID, md.LogPrefixes)
 		} else {
 			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagRegionID(info.RegionID),
+				eventapi.TagRegionID(vrItem.RegionId()),
 			}...)
 		}
 
 		if item.GWLaunchServer != "" {
-			hostID, ok := md.GetToolDataSet().GetHostIDByIP(item.GWLaunchServer)
-			if !ok {
+			hostItem := md.GetToolDataSet().Host().GetByIp(item.GWLaunchServer)
+			if !hostItem.IsValid() {
 				log.Error(idByIPNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, item.GWLaunchServer))
 			} else {
 				opts = append(opts, []eventapi.TagFieldOption{
-					eventapi.TagHostID(hostID),
+					eventapi.TagHostID(hostItem.Id()),
 				}...)
 			}
 		}

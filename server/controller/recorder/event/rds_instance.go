@@ -43,13 +43,13 @@ func NewRDSInstance(q *queue.OverwriteQueue) *RDSInstance {
 func (r *RDSInstance) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbmodel.RDSInstance) {
 		var opts []eventapi.TagFieldOption
-		info, err := md.GetToolDataSet().GetRDSInstanceInfoByID(item.ID)
-		if err != nil {
-			log.Error(err)
+		rdsItem := md.GetToolDataSet().RdsInstance().GetById(item.ID)
+		if !rdsItem.IsValid() {
+			log.Errorf("rds_instance(id=%d) not found", item.ID, md.LogPrefixes)
 		} else {
 			opts = append(opts, []eventapi.TagFieldOption{
-				eventapi.TagAZID(info.AZID),
-				eventapi.TagRegionID(info.RegionID),
+				eventapi.TagAZID(rdsItem.AzId()),
+				eventapi.TagRegionID(rdsItem.RegionId()),
 			}...)
 		}
 		opts = append(opts, []eventapi.TagFieldOption{

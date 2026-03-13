@@ -31,25 +31,25 @@ import (
 type NATGatewayMessageFactory struct{}
 
 func (f *NATGatewayMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedNATGateways{}
+	return &message.AddedNatGateways{}
 }
 
 func (f *NATGatewayMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedNATGateway{}
+	return &message.UpdatedNatGateway{}
 }
 
 func (f *NATGatewayMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedNATGateways{}
+	return &message.DeletedNatGateways{}
 }
 
 func (f *NATGatewayMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedNATGatewayFields{}
+	return &message.UpdatedNatGatewayFields{}
 }
 
 type NATGateway struct {
 	UpdaterBase[
 		cloudmodel.NATGateway,
-		*diffbase.NATGateway,
+		*diffbase.NatGateway,
 		*metadbmodel.NATGateway,
 		metadbmodel.NATGateway,
 	]
@@ -61,7 +61,7 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 			ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN,
 			wholeCache,
 			db.NewNATGateway().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.NATGateways,
+			wholeCache.DiffBases().NATGateway().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 }
 
 func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*metadbmodel.NATGateway, bool) {
-	vpcID, exists := g.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := g.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -97,8 +98,8 @@ func (g *NATGateway) generateDBItemToAdd(cloudItem *cloudmodel.NATGateway) (*met
 	return dbItem, true
 }
 
-func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem *cloudmodel.NATGateway) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedNATGatewayFields)
+func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NatGateway, cloudItem *cloudmodel.NATGateway) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedNatGatewayFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -108,9 +109,9 @@ func (g *NATGateway) generateUpdateInfo(diffBase *diffbase.NATGateway, cloudItem
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.FloatingIPs != cloudItem.FloatingIPs {
+	if diffBase.FloatingIps != cloudItem.FloatingIPs {
 		mapInfo["floating_ips"] = cloudItem.FloatingIPs
-		structInfo.FloatingIPs.Set(diffBase.FloatingIPs, cloudItem.FloatingIPs)
+		structInfo.FloatingIps.Set(diffBase.FloatingIps, cloudItem.FloatingIPs)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

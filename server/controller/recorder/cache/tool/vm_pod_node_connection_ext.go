@@ -22,20 +22,20 @@ import (
 
 // OnAfterAdd implements CollectionExtender interface
 // Maintains VM-PodNode bidirectional relationship when connection is added
-func (c *VMPodNodeConnectionCollection) OnAfterAdd(item *VMPodNodeConnection, dbItem *metadbmodel.VMPodNodeConnection) {
-	c.tool.VM().GetByID(item.VMID()).SetPodNodeID(item.PodNodeID())
-	c.tool.PodNode().GetByID(item.PodNodeID()).SetVMID(item.VMID())
+func (c *VmPodNodeConnectionCollection) OnAfterAdd(item *VmPodNodeConnection, dbItem *metadbmodel.VMPodNodeConnection) {
+	c.tool.Vm().GetById(item.VmId()).SetPodNodeId(item.PodNodeId())
+	c.tool.PodNode().GetById(item.PodNodeId()).SetVmId(item.VmId())
 }
 
 // OnAfterUpdate implements CollectionExtender interface
-func (c *VMPodNodeConnectionCollection) OnAfterUpdate(item *VMPodNodeConnection, dbItem *metadbmodel.VMPodNodeConnection) {
+func (c *VmPodNodeConnectionCollection) OnAfterUpdate(item *VmPodNodeConnection, dbItem *metadbmodel.VMPodNodeConnection) {
 	// For connection tables, update is usually just add/delete operations
 	// No special logic needed for update
 }
 
 // OnAfterDelete implements CollectionExtender interface
 // Clears VM-PodNode bidirectional relationship when connection is deleted
-func (c *VMPodNodeConnectionCollection) OnAfterDelete(item *VMPodNodeConnection, dbItem *metadbmodel.VMPodNodeConnection) {
-	c.tool.VM().GetByID(item.VMID()).SetPodNodeID(0)
-	c.tool.PodNode().GetByID(item.PodNodeID()).SetVMID(0)
+func (c *VmPodNodeConnectionCollection) OnAfterDelete(item *VmPodNodeConnection, dbItem *metadbmodel.VMPodNodeConnection) {
+	c.tool.Vm().GetById(item.VmId()).SetPodNodeId(0)
+	c.tool.PodNode().GetById(item.PodNodeId()).SetVmId(0)
 }

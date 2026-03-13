@@ -22,7 +22,7 @@ func (t *PodIngressRule) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *PodIngressRule) ID() int {
+func (t *PodIngressRule) Id() int {
 	return t.id
 }
 

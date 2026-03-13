@@ -62,7 +62,7 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 			ctrlrcommon.RESOURCE_TYPE_SUBNET_EN,
 			wholeCache,
 			db.NewSubnet().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.Subnets,
+			wholeCache.DiffBases().Subnet().GetAll(),
 			cloudData,
 		),
 	}
@@ -76,7 +76,8 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 }
 
 func (s *Subnet) generateDBItemToAdd(cloudItem *cloudmodel.Subnet) (*metadbmodel.Subnet, bool) {
-	networkID, exists := s.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+	networkItem := s.cache.Tool().Network().GetByLcuuid(cloudItem.NetworkLcuuid)
+	networkID, exists := networkItem.Id(), networkItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
