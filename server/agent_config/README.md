@@ -3556,12 +3556,18 @@ inputs:
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | int |
-| Range | [1, 65535] |
+| Type | string |
 
 **Description**:
 
 For the specified ports, consecutive TCP packets will be aggregated together for application log parsing.
+
+Example: 
+
+packet_segmentation_reassembly:
+- 1000
+- 2000-2010
+- 5000
 
 ### Physical Mirror Traffic {#inputs.cbpf.physical_mirror}
 
