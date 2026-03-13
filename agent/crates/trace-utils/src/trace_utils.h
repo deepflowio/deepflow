@@ -195,7 +195,8 @@ typedef struct {
     uint16_t version;
     tsd_info_t tsd_info;
     uint8_t offsets_id;
-    uint8_t padding[5];
+    uint8_t _padding[5];
+    uint64_t none_struct_addr;
 } python_unwind_info_t;
 #endif
 

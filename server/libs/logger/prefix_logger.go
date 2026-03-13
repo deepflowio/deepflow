@@ -17,7 +17,7 @@
 package logger
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 
 	logging "github.com/op/go-logging"
@@ -40,11 +40,32 @@ func NewORGPrefix(id int) Prefix {
 	return ORGPrefix(id)
 }
 
+const maxORGID = 1024
+
+var orgPrefixStrs = func() [maxORGID]string {
+	var a [maxORGID]string
+	for i := range a {
+		a[i] = "[ORGID-" + strconv.Itoa(i) + "]"
+	}
+	return a
+}()
+
+var teamPrefixStrs = func() [maxORGID]string {
+	var a [maxORGID]string
+	for i := range a {
+		a[i] = "[TeamID-" + strconv.Itoa(i) + "]"
+	}
+	return a
+}()
+
 func (o ORGPrefix) Prefix() string {
 	if blocker.IfBlockORGID(int(o)) {
 		return ""
 	}
-	return fmt.Sprintf("[ORGID-%d]", o)
+	if o >= 0 && int(o) < maxORGID {
+		return orgPrefixStrs[o]
+	}
+	return "[ORGID-" + strconv.Itoa(int(o)) + "]"
 }
 
 type TeamPrefix int
@@ -57,7 +78,10 @@ func (t TeamPrefix) Prefix() string {
 	if blocker.IfBlockTeamID(int(t)) {
 		return ""
 	}
-	return fmt.Sprintf("[TeamID-%d]", t)
+	if t >= 0 && int(t) < maxORGID {
+		return teamPrefixStrs[t]
+	}
+	return "[TeamID-" + strconv.Itoa(int(t)) + "]"
 }
 
 var argsJoiner = " "
@@ -82,39 +106,49 @@ func MustGetLogger(module string) *Logger {
 	return &Logger{l}
 }
 
-func (l *Logger) splitArgs(args ...interface{}) (trueArgs []interface{}, prefixes string) {
+// collectPrefixes writes each prefix from args into sb and returns the non-prefix args.
+func collectPrefixes(sb *strings.Builder, args []interface{}) []interface{} {
+	var trueArgs []interface{}
 	for _, arg := range args {
 		if prefix, ok := arg.(Prefix); ok {
-			if prefix.Prefix() != "" {
-				prefixes += prefix.Prefix() + argsJoiner
+			if p := prefix.Prefix(); p != "" {
+				sb.WriteString(p)
+				sb.WriteString(argsJoiner)
 			}
 		} else if prefix, ok := arg.([]Prefix); ok {
 			for _, p := range prefix {
-				if p.Prefix() != "" {
-					prefixes += p.Prefix() + argsJoiner
+				if pStr := p.Prefix(); pStr != "" {
+					sb.WriteString(pStr)
+					sb.WriteString(argsJoiner)
 				}
 			}
 		} else {
 			trueArgs = append(trueArgs, arg)
 		}
 	}
-	return
+	return trueArgs
 }
 
 func (l *Logger) formatArgs(args ...interface{}) []interface{} {
-	args, prefixes := l.splitArgs(args...)
-	if prefixes != "" {
-		args = append([]interface{}{strings.Trim(prefixes, argsJoiner)}, args...)
+	var sb strings.Builder
+	trueArgs := collectPrefixes(&sb, args)
+	if sb.Len() > 0 {
+		// trim trailing joiner by slicing (no allocation)
+		prefixes := sb.String()
+		trueArgs = append([]interface{}{prefixes[:sb.Len()-len(argsJoiner)]}, trueArgs...)
 	}
-	return args
+	return trueArgs
 }
 
-func (l *Logger) formatFArgs(fmt string, args ...interface{}) (string, []interface{}) {
-	args, prefixes := l.splitArgs(args...)
-	if prefixes != "" {
-		fmt = prefixes + fmt
+// formatFArgs builds prefix+fmtStr in a single strings.Builder pass, avoiding an intermediate string.
+func (l *Logger) formatFArgs(fmtStr string, args ...interface{}) (string, []interface{}) {
+	var sb strings.Builder
+	trueArgs := collectPrefixes(&sb, args)
+	if sb.Len() > 0 {
+		sb.WriteString(fmtStr)
+		return sb.String(), trueArgs
 	}
-	return fmt, args
+	return fmtStr, trueArgs
 }
 
 func (l *Logger) Error(args ...interface{}) {
@@ -222,14 +256,15 @@ func (l *Logger) Criticalf(format string, args ...interface{}) {
 }
 
 type PrefixLogger struct {
-	prefix string
+	prefix      string
+	prefixSpace string // prefix + argsJoiner, pre-computed to avoid per-call allocation
 	*logging.Logger
 }
 
 // 将logger包装为前缀logger
 // 注意需要自行将ExtraCalldepth加1，以便拿到log文件名，行号等信息
 func WrapWithPrefixLogger(prefix string, logger *logging.Logger) *PrefixLogger {
-	return &PrefixLogger{prefix, logger}
+	return &PrefixLogger{prefix, prefix + argsJoiner, logger}
 }
 
 func GetPrefixLogger(module, prefix string) (*PrefixLogger, error) {
@@ -238,7 +273,7 @@ func GetPrefixLogger(module, prefix string) (*PrefixLogger, error) {
 		return nil, err
 	}
 	logger.ExtraCalldepth++
-	return &PrefixLogger{prefix, logger}, nil
+	return &PrefixLogger{prefix, prefix + argsJoiner, logger}, nil
 }
 
 func (l *PrefixLogger) GetPrefix() string {
@@ -247,6 +282,7 @@ func (l *PrefixLogger) GetPrefix() string {
 
 func (l *PrefixLogger) UpdatePrefix(prefix string) {
 	l.prefix = prefix
+	l.prefixSpace = prefix + argsJoiner
 }
 
 func (l *PrefixLogger) Error(args ...interface{}) {
@@ -258,7 +294,7 @@ func (l *PrefixLogger) Error(args ...interface{}) {
 
 func (l *PrefixLogger) Errorf(format string, args ...interface{}) {
 	if l.IsEnabledFor(logging.ERROR) {
-		l.Logger.Errorf(l.prefix+" "+format, args...)
+		l.Logger.Errorf(l.prefixSpace+format, args...)
 	}
 }
 
@@ -271,7 +307,7 @@ func (l *PrefixLogger) Warning(args ...interface{}) {
 
 func (l *PrefixLogger) Warningf(format string, args ...interface{}) {
 	if l.IsEnabledFor(logging.WARNING) {
-		l.Logger.Warningf(l.prefix+" "+format, args...)
+		l.Logger.Warningf(l.prefixSpace+format, args...)
 	}
 }
 
@@ -284,7 +320,7 @@ func (l *PrefixLogger) Notice(args ...interface{}) {
 
 func (l *PrefixLogger) Noticef(format string, args ...interface{}) {
 	if l.IsEnabledFor(logging.NOTICE) {
-		l.Logger.Noticef(l.prefix+" "+format, args...)
+		l.Logger.Noticef(l.prefixSpace+format, args...)
 	}
 }
 
@@ -297,7 +333,7 @@ func (l *PrefixLogger) Info(args ...interface{}) {
 
 func (l *PrefixLogger) Infof(format string, args ...interface{}) {
 	if l.IsEnabledFor(logging.INFO) {
-		l.Logger.Infof(l.prefix+" "+format, args...)
+		l.Logger.Infof(l.prefixSpace+format, args...)
 	}
 }
 
@@ -310,7 +346,7 @@ func (l *PrefixLogger) Debug(args ...interface{}) {
 
 func (l *PrefixLogger) Debugf(format string, args ...interface{}) {
 	if l.IsEnabledFor(logging.DEBUG) {
-		l.Logger.Debugf(l.prefix+" "+format, args...)
+		l.Logger.Debugf(l.prefixSpace+format, args...)
 	}
 }
 
@@ -323,7 +359,7 @@ func (l *PrefixLogger) Fatal(args ...interface{}) {
 
 func (l *PrefixLogger) Fatalf(format string, args ...interface{}) {
 	if l.IsEnabledFor(logging.CRITICAL) {
-		l.Logger.Fatalf(l.prefix+" "+format, args...)
+		l.Logger.Fatalf(l.prefixSpace+format, args...)
 	}
 }
 
@@ -336,7 +372,7 @@ func (l *PrefixLogger) Panic(args ...interface{}) {
 
 func (l *PrefixLogger) Panicf(format string, args ...interface{}) {
 	if l.IsEnabledFor(logging.CRITICAL) {
-		l.Logger.Panicf(l.prefix+" "+format, args...)
+		l.Logger.Panicf(l.prefixSpace+format, args...)
 	}
 }
 
@@ -349,6 +385,6 @@ func (l *PrefixLogger) Critical(args ...interface{}) {
 
 func (l *PrefixLogger) Criticalf(format string, args ...interface{}) {
 	if l.IsEnabledFor(logging.CRITICAL) {
-		l.Logger.Criticalf(l.prefix+" "+format, args...)
+		l.Logger.Criticalf(l.prefixSpace+format, args...)
 	}
 }

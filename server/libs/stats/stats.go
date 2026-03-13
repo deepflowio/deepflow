@@ -23,14 +23,11 @@ import (
 	"path"
 	"reflect"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb/client/v2"
-	"github.com/influxdata/influxdb/models"
 	logging "github.com/op/go-logging"
 	statsd "gopkg.in/alexcesaro/statsd.v2"
 
@@ -40,7 +37,6 @@ import (
 )
 
 var log = logging.MustGetLogger("stats")
-
 var remoteType = REMOTE_TYPE_DFSTATSD
 
 const (
@@ -55,6 +51,7 @@ type StatSource struct {
 	countable    Countable
 	tags         OptionStatTags
 	skip         int
+	name         string
 }
 
 func (s *StatSource) Equal(other *StatSource) bool {
@@ -74,8 +71,6 @@ var (
 	statSources       = LinkedList{}
 	remotes           = []string{}
 	dfRemote          string
-	remoteIndex       = -1
-	connection        client.Client
 
 	statsdClients  = make([]*statsd.Client, 0, 2)
 	dfstatsdClient *UDPClient // could be nil
@@ -84,6 +79,13 @@ var (
 type StatItem struct {
 	Name  string
 	Value interface{}
+}
+
+type metricPoint struct {
+	name      string
+	tags      map[string]string
+	fields    []map[string]interface{} // one entry per struct when counter is []struct
+	timestamp time.Time
 }
 
 func registerCountable(modulePrefix, module string, countable Countable, opts ...Option) error {
@@ -99,9 +101,6 @@ func registerCountable(modulePrefix, module string, countable Countable, opts ..
 				source.skip = (60 - time.Now().Second()) / int(TICK_CYCLE/time.Second)
 			}
 		}
-	}
-	if source.tags == nil {
-		source.tags = OptionStatTags{}
 	}
 	// if already has tag "host", add tag "_host"
 	if _, ok := source.tags["host"]; ok {
@@ -123,67 +122,141 @@ func registerCountable(modulePrefix, module string, countable Countable, opts ..
 	return nil
 }
 
-func counterToFields(counter interface{}) models.Fields {
-	fields := models.Fields{}
-	if items, ok := counter.([]StatItem); ok {
-		for _, item := range items {
-			switch item.Value.(type) {
-			case uint, uint8, uint16, uint32, uint64:
-				fields[item.Name] = int64(reflect.ValueOf(item.Value).Uint())
-			default:
-				fields[item.Name] = item.Value
-			}
+// fieldDesc holds pre-computed metadata for a single struct field with a statsd tag.
+type fieldDesc struct {
+	index int
+	name  string
+	kind  reflect.Kind
+}
+
+// fieldDescCache maps a struct reflect.Type to its pre-computed []fieldDesc.
+// Populated once per type on first call; read-mostly thereafter.
+var fieldDescCache sync.Map
+
+func getFieldDescs(t reflect.Type) []fieldDesc {
+	if v, ok := fieldDescCache.Load(t); ok {
+		return v.([]fieldDesc)
+	}
+	descs := make([]fieldDesc, 0, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		sf := t.Field(i)
+		if !sf.IsExported() {
+			continue
 		}
-	} else {
-		val := reflect.Indirect(reflect.ValueOf(counter))
-		for i := 0; i < val.Type().NumField(); i++ {
-			if !val.Field(i).CanInterface() {
-				continue
-			}
-			field := val.Type().Field(i)
-			statsTag := field.Tag.Get("statsd")
-			if statsTag == "" {
-				continue
-			}
-			statsOpts := strings.Split(statsTag, ",")
-			switch val.Field(i).Kind() {
-			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				fields[statsOpts[0]] = int64(val.Field(i).Uint())
-			default:
-				fields[statsOpts[0]] = val.Field(i).Interface()
-			}
+		tag := sf.Tag.Get("statsd")
+		if tag == "" {
+			continue
+		}
+		name := tag
+		if idx := strings.IndexByte(tag, ','); idx >= 0 {
+			name = tag[:idx]
+		}
+		descs = append(descs, fieldDesc{index: i, name: name, kind: sf.Type.Kind()})
+	}
+	fieldDescCache.Store(t, descs)
+	return descs
+}
+
+func reflectStructToFields(val reflect.Value, descs []fieldDesc) map[string]interface{} {
+	fields := make(map[string]interface{}, len(descs))
+	for _, d := range descs {
+		fv := val.Field(d.index)
+		switch d.kind {
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			fields[d.name] = int64(fv.Uint())
+		default:
+			fields[d.name] = fv.Interface()
 		}
 	}
 	return fields
 }
 
-func collectBatchPoints(timestamp time.Time) client.BatchPoints {
-	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{Precision: "s"})
+// counterToFields converts a counter value to a slice of field maps.
+// counter may be []StatItem, a struct/pointer-to-struct, or []struct — the last
+// case produces one map per element so each can be written as a separate data point.
+func counterToFields(counter interface{}) []map[string]interface{} {
+	if items, ok := counter.([]StatItem); ok {
+		fields := make(map[string]interface{}, len(items))
+		for _, item := range items {
+			switch v := item.Value.(type) {
+			case uint:
+				fields[item.Name] = int64(v)
+			case uint8:
+				fields[item.Name] = int64(v)
+			case uint16:
+				fields[item.Name] = int64(v)
+			case uint32:
+				fields[item.Name] = int64(v)
+			case uint64:
+				fields[item.Name] = int64(v)
+			default:
+				fields[item.Name] = item.Value
+			}
+		}
+		return []map[string]interface{}{fields}
+	}
+
+	val := reflect.Indirect(reflect.ValueOf(counter))
+	if val.Kind() == reflect.Slice {
+		n := val.Len()
+		if n == 0 {
+			return nil
+		}
+		// Dereference pointer element type (supports both []struct and []*struct).
+		elemType := val.Type().Elem()
+		if elemType.Kind() == reflect.Ptr {
+			elemType = elemType.Elem()
+		}
+		descs := getFieldDescs(elemType)
+		result := make([]map[string]interface{}, 0, n)
+		for i := 0; i < n; i++ {
+			elem := reflect.Indirect(val.Index(i)) // no-op for non-pointer elements
+			if !elem.IsValid() {                   // skip nil pointers
+				continue
+			}
+			result = append(result, reflectStructToFields(elem, descs))
+		}
+		if len(result) == 0 {
+			return nil
+		}
+		return result
+	}
+
+	// single struct or pointer-to-struct (Indirect already dereffed)
+	return []map[string]interface{}{reflectStructToFields(val, getFieldDescs(val.Type()))}
+}
+
+func collectPoints(timestamp time.Time) []metricPoint {
 	lock.Lock()
 	statSources.Remove(func(x interface{}) bool {
 		return x.(*StatSource).countable.Closed()
 	})
+	points := make([]metricPoint, 0, statSources.Len())
 	for it := statSources.Iterator(); !it.Empty(); it.Next() {
 		statSource := it.Value().(*StatSource)
-		max := func(x, y time.Duration) time.Duration {
-			if x > y {
-				return x
-			}
-			return y
-		}
 
 		statSource.skip--
 		if statSource.skip > 0 {
 			continue
 		}
-		statSource.skip = int(max(statSource.interval, MinInterval) / TICK_CYCLE)
+		interval := statSource.interval
+		if interval < MinInterval {
+			interval = MinInterval
+		}
+		statSource.skip = int(interval / TICK_CYCLE)
+		if statSource.name == "" {
+			statSource.name = processName + processNameJoiner + statSource.modulePrefix + statSource.module
+		}
 
-		fields := counterToFields(statSource.countable.GetCounter())
-		point, _ := client.NewPoint(processName+processNameJoiner+statSource.modulePrefix+statSource.module, statSource.tags, fields, timestamp)
-		bp.AddPoint(point)
+		points = append(points, metricPoint{
+			name:      statSource.name,
+			tags:      statSource.tags,
+			fields:    counterToFields(statSource.countable.GetCounter()),
+			timestamp: timestamp,
+		})
 	}
 	lock.Unlock()
-	return bp
+	return points
 }
 
 func newStatsdClient(remote string) *statsd.Client {
@@ -199,7 +272,19 @@ func newStatsdClient(remote string) *statsd.Client {
 	return c
 }
 
-func sendStatsd(bp client.BatchPoints) {
+// sortTagPairs sorts tag names and their corresponding values together by name.
+// Uses insertion sort which is optimal for the small number of tags typical in metrics.
+func sortTagPairs[T any](names []string, values []T) {
+	n := len(names)
+	for i := 1; i < n; i++ {
+		for j := i; j > 0 && names[j] < names[j-1]; j-- {
+			names[j], names[j-1] = names[j-1], names[j]
+			values[j], values[j-1] = values[j-1], values[j]
+		}
+	}
+}
+
+func sendStatsd(points []metricPoint) {
 	encoder := new(codec.SimpleEncoder)
 	if remoteType&REMOTE_TYPE_STATSD != 0 {
 		for i, remote := range remotes {
@@ -215,138 +300,133 @@ func sendStatsd(bp client.BatchPoints) {
 		dfstatsdClient, _ = NewUDPClient(UDPConfig{dfRemote, 1400})
 	}
 
-	for i, point := range bp.Points() {
-		module := point.Name()
-		tags := point.Tags()
-		tagsOption := make([]string, 0, len(tags)*2)
-		hasHost := false
-		for key, value := range tags {
-			if !hasHost && key == "host" {
-				hasHost = true
+	for i, p := range points {
+		if remoteType&REMOTE_TYPE_STATSD != 0 && len(statsdClients) > 0 {
+			tagsOption := make([]string, 0, len(p.tags)*2)
+			hasHost := false
+			for key, value := range p.tags {
+				if !hasHost && key == "host" {
+					hasHost = true
+				}
+				tagsOption = append(tagsOption, key, strings.ReplaceAll(value, ":", "-"))
 			}
-			tagsOption = append(tagsOption, key, strings.Replace(value, ":", "-", -1))
-		}
-		if hostname != "" && !hasHost { // specified hostname
-			tagsOption = append(tagsOption, "host", hostname)
-		}
-		fields, _ := point.Fields()
-		if remoteType&REMOTE_TYPE_STATSD != 0 {
-			if len(statsdClients) > 0 {
-				statsdClient := statsdClients[i%len(statsdClients)]
-				if statsdClient != nil {
-					statsdClient = statsdClient.Clone(
-						statsd.Prefix(strings.Replace(module, "-", "_", -1)),
-						statsd.Tags(tagsOption...),
-					)
-					for key, value := range fields {
-						name := strings.Replace(key, "-", "_", -1)
-						statsdClient.Count(name, value)
+			if hostname != "" && !hasHost {
+				tagsOption = append(tagsOption, "host", hostname)
+			}
+			statsdClient := statsdClients[i%len(statsdClients)]
+			if statsdClient != nil {
+				statsdClient = statsdClient.Clone(
+					statsd.Prefix(strings.ReplaceAll(p.name, "-", "_")),
+					statsd.Tags(tagsOption...),
+				)
+				for _, fm := range p.fields {
+					for key, value := range fm {
+						statsdClient.Count(strings.ReplaceAll(key, "-", "_"), value)
 					}
 				}
 			}
 		}
 
 		if dfstatsdClient != nil {
-			dfStats := pb.AcquireDFStats()
-			dfStats.Timestamp = uint64(point.Time().Unix())
-			dfStats.Name = strings.ReplaceAll(module, "-", "_")
-			for k := range point.Tags() {
-				if k == TENANT_ORG_ID {
-					v, _ := strconv.Atoi(point.Tags()[k])
-					dfStats.OrgId = uint32(v)
-				} else if k == TENANT_TEAM_ID {
-					v, _ := strconv.Atoi(point.Tags()[k])
-					dfStats.TeamId = uint32(v)
-				} else {
-					dfStats.TagNames = append(dfStats.TagNames, k)
-				}
-			}
-			sort.Slice(dfStats.TagNames, func(i, j int) bool {
-				return dfStats.TagNames[i] < dfStats.TagNames[j]
-			})
-			for _, v := range dfStats.TagNames {
-				dfStats.TagValues = append(dfStats.TagValues, point.Tags()[v])
-			}
-
-			for k, v := range fields {
-				switch v.(type) {
-				case string:
-					dfStats.TagNames = append(dfStats.TagNames, k)
-					dfStats.TagValues = append(dfStats.TagValues, v.(string))
+			// Precompute base tags (from p.tags) once; reused for every field map.
+			var orgId, teamId uint32
+			baseTagNames := make([]string, 0, len(p.tags))
+			baseTagValues := make([]string, 0, len(p.tags))
+			for k, v := range p.tags {
+				switch k {
+				case TENANT_ORG_ID:
+					id, _ := strconv.Atoi(v)
+					orgId = uint32(id)
+				case TENANT_TEAM_ID:
+					id, _ := strconv.Atoi(v)
+					teamId = uint32(id)
 				default:
-					dfStats.MetricsFloatNames = append(dfStats.MetricsFloatNames, k)
+					baseTagNames = append(baseTagNames, k)
+					baseTagValues = append(baseTagValues, v)
 				}
 			}
-			sort.Slice(dfStats.MetricsFloatNames, func(i, j int) bool {
-				return dfStats.MetricsFloatNames[i] < dfStats.MetricsFloatNames[j]
-			})
-			for i, k := range dfStats.MetricsFloatNames {
-				v := fields[k]
-				var value float64
-				switch v.(type) {
-				case float64:
-					value = v.(float64)
-				case uint:
-					value = float64(v.(uint))
-				case uint64:
-					value = float64(v.(uint64))
-				case int:
-					value = float64(v.(int))
-				case int64:
-					value = float64(v.(int64))
-				}
-				dfStats.MetricsFloatValues = append(dfStats.MetricsFloatValues, value)
-				dfStats.MetricsFloatNames[i] = strings.Replace(k, "-", "_", -1)
-			}
+			sortTagPairs(baseTagNames, baseTagValues)
+			name := strings.ReplaceAll(p.name, "-", "_")
+			ts := uint64(p.timestamp.Unix())
 
-			if dfstatsdClient != nil {
+			for _, fm := range p.fields {
+				// Snapshot base org/team IDs; fm string fields may override per-element.
+				fmOrgId := orgId
+				fmTeamId := teamId
+
+				dfStats := pb.AcquireDFStats()
+				dfStats.Timestamp = ts
+				dfStats.Name = name
+				dfStats.TagNames = append(dfStats.TagNames, baseTagNames...)
+				dfStats.TagValues = append(dfStats.TagValues, baseTagValues...)
+
+				for k, v := range fm {
+					var value float64
+					isTag := false
+					switch vt := v.(type) {
+					case string:
+						isTag = true
+						if vt != "" {
+							switch k {
+							case TENANT_ORG_ID:
+								id, _ := strconv.Atoi(vt)
+								fmOrgId = uint32(id)
+							case TENANT_TEAM_ID:
+								id, _ := strconv.Atoi(vt)
+								fmTeamId = uint32(id)
+							case "host":
+								rewriteHost := false
+								for i := range dfStats.TagNames {
+									if dfStats.TagNames[i] == "host" {
+										dfStats.TagValues[i] = vt
+										rewriteHost = true
+										break
+									}
+								}
+								if !rewriteHost {
+									dfStats.TagNames = append(dfStats.TagNames, k)
+									dfStats.TagValues = append(dfStats.TagValues, vt)
+								}
+							default:
+								dfStats.TagNames = append(dfStats.TagNames, k)
+								dfStats.TagValues = append(dfStats.TagValues, vt)
+							}
+						}
+					case float64:
+						value = vt
+					case uint:
+						value = float64(vt)
+					case uint64:
+						value = float64(vt)
+					case int:
+						value = float64(vt)
+					case int64:
+						value = float64(vt)
+					}
+					if !isTag {
+						dfStats.MetricsFloatNames = append(dfStats.MetricsFloatNames, strings.ReplaceAll(k, "-", "_"))
+						dfStats.MetricsFloatValues = append(dfStats.MetricsFloatValues, value)
+					}
+				}
+				sortTagPairs(dfStats.MetricsFloatNames, dfStats.MetricsFloatValues)
+
+				dfStats.OrgId = fmOrgId
+				dfStats.TeamId = fmTeamId
+
 				dfStats.Encode(encoder)
 				dfstatsdClient.Write(encoder.Bytes())
 				encoder.Reset()
+				pb.ReleaseDFStats(dfStats)
 			}
-			pb.ReleaseDFStats(dfStats)
 		}
 	}
-}
-
-func nextRemote() error {
-	remoteIndex = (remoteIndex + 1) % len(remotes)
-	conn, err := client.NewUDPClient(client.UDPConfig{remotes[remoteIndex], 1400})
-	if err != nil {
-		return err
-	}
-	connection = conn
-	return nil
 }
 
 func runOnce(timestamp time.Time) {
-	bp := collectBatchPoints(timestamp)
-
 	if len(remotes) == 0 && len(dfRemote) == 0 {
 		return
 	}
-
-	if remoteType&REMOTE_TYPE_STATSD != 0 || remoteType&REMOTE_TYPE_DFSTATSD != 0 {
-		sendStatsd(bp)
-	}
-
-	if remoteType&REMOTE_TYPE_INFLUXDB == 0 {
-		return
-	}
-	for i := 0; i < len(remotes); i++ {
-		if connection == nil {
-			goto next_server
-		}
-		if err := connection.Write(bp); err != nil {
-			log.Warning(err) // probably ICMP unreachable
-			goto next_server
-		}
-		break
-	next_server:
-		if err := nextRemote(); err != nil {
-			log.Warning(err) // probably route unreachable
-		}
-	}
+	sendStatsd(collectPoints(timestamp))
 }
 
 func run() {
@@ -385,11 +465,6 @@ func setRemotes(addrs ...string) {
 			statsdClients[i].Close()
 			statsdClients[i] = nil
 		}
-	}
-
-	if connection != nil {
-		connection.Close()
-		connection = nil
 	}
 	lock.Unlock()
 }
@@ -452,7 +527,7 @@ func init() {
 	} else {
 
 	}
-	processName = strings.Replace(processName, "-", "_", -1)
+	processName = strings.ReplaceAll(processName, "-", "_")
 
 	go run()
 }

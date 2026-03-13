@@ -30,7 +30,7 @@ use serde::Serialize;
 
 use super::{
     sql_check::{is_mysql, is_valid_sql, trim_head_comment_and_get_first_word},
-    sql_obfuscate::attempt_obfuscation,
+    sql_obfuscate::CachedObfuscator,
     ObfuscateCache,
 };
 
@@ -456,26 +456,16 @@ impl MysqlInfo {
                 &mut parser.custom_field_store,
                 self,
                 TrafficDirection::REQUEST,
-                Source::Sql(sql_string),
+                Source::Sql(sql_string, None),
             );
         }
 
         if let Some(c) = config {
             self.extract_trace_and_span_id(&c.l7_log_dynamic, sql_string);
         }
-        let context = match attempt_obfuscation(&parser.obfuscate_cache, payload) {
-            Some(mut m) => {
-                let valid_len = match str::from_utf8(&m) {
-                    Ok(_) => m.len(),
-                    Err(e) => e.valid_up_to(),
-                };
-                m.truncate(valid_len);
-                unsafe {
-                    // SAFTY: str in m is checked to be valid utf8 up to `valid_len`
-                    String::from_utf8_unchecked(m)
-                }
-            }
-            _ => String::from_utf8_lossy(payload).to_string(),
+        let context = match parser.obfuscator.apply(sql_string) {
+            Ok(obfuscated) => obfuscated.to_string(),
+            Err(_) => sql_string.to_string(),
         };
         self.context = context;
         self.generate_endpoint();
@@ -661,7 +651,7 @@ fn give_buffer(buffer: Vec<u8>) {
 pub struct MysqlLog {
     pub protocol_version: u8,
     perf_stats: Vec<L7PerfStats>,
-    obfuscate_cache: Option<ObfuscateCache>,
+    obfuscator: CachedObfuscator,
 
     // This field is extracted in the COM_STMT_PREPARE request and calculate based on SQL statements
     pc: ParameterCounter,
@@ -827,7 +817,7 @@ impl L7ProtocolParserInterface for MysqlLog {
     }
 
     fn set_obfuscate_cache(&mut self, obfuscate_cache: Option<ObfuscateCache>) {
-        self.obfuscate_cache = obfuscate_cache;
+        self.obfuscator.set_obfuscate_cache(obfuscate_cache);
     }
 }
 

@@ -1730,7 +1730,7 @@ Synchronization interval for process Socket information.
 '0ns' means disabled, do not configure a value less than `1s` except for 0.
 
 Note: When enabling this feature, the specific process list must also be specified in `inputs.proc.process_matcher`,
-i.e., `inputs.proc.socket_info_sync_interval` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
+i.e., `proc.socket_list` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
 Additionally, ensure `inputs.proc.enabled` is configured to **true**.
 
 ### Minimal Lifetime {#inputs.proc.min_lifetime}

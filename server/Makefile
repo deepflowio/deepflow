@@ -21,7 +21,8 @@ generated_libs = libs/hmap/idmap/ubig_id_map.go libs/hmap/idmap/ubig_id_map_test
 proto = vendor/${MESSAGE}/trident/trident.pb.go vendor/${MESSAGE}/agent/agent.pb.go vendor/${MESSAGE}/controller/controller.pb.go vendor/${MESSAGE}/alert_event/alert_event.pb.go vendor/${MESSAGE}/k8s_event/k8s_event.pb.go libs/datatype/pb/flow_log.pb.go libs/flow-metrics/pb/metric.pb.go libs/stats/pb/stats.pb.go
 
 $(generated_libs): $(generate_sources)
-	go generate ./...
+	# run generation with the host OS/ARCH so the helper binaries are runnable
+	GOOS=$(shell go env GOHOSTOS) GOARCH=$(shell go env GOHOSTARCH) go generate ./...
 
 vendor/${MESSAGE}/common.proto: vendor
 	cp -r ../message/common.proto vendor/${MESSAGE}/
