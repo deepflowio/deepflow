@@ -72,6 +72,7 @@ fn get_req_param<'a>(
         parse_perf: true,
         parse_log: true,
         parse_config: None,
+        obfuscate_cache: None,
         l7_perf_cache: Some(rrt_cache.clone()),
         wasm_vm: vm,
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -113,6 +114,7 @@ fn get_resq_param<'a>(
         parse_perf: true,
         parse_log: true,
         parse_config: None,
+        obfuscate_cache: None,
         l7_perf_cache: Some(rrt_cache.clone()),
         wasm_vm: vm,
         #[cfg(any(target_os = "linux", target_os = "android"))]

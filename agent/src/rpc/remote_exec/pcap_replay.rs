@@ -28,15 +28,14 @@ use pcap_parser::{
 };
 use thiserror::Error;
 
-use public::{
-    enums::PacketDirection,
-    l7_protocol::{L7ProtocolEnum, LogMessageType},
-};
+use public::{enums::PacketDirection, l7_protocol::LogMessageType};
 
 use crate::{
     common::{
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::{get_parser, L7ParseResult, L7ProtocolParserInterface, ParseParam},
+        l7_protocol_log::{
+            get_parser, L7ParseResult, L7ProtocolParser, L7ProtocolParserInterface, ParseParam,
+        },
         meta_packet::{MetaPacket, PcapData},
     },
     config::handler::{FlowConfig, LogParserConfig},
@@ -165,7 +164,7 @@ impl StreamingParser {
 struct ApplicationParser {
     protocol_checker: Option<L7ProtocolChecker>,
 
-    l7_protocol: Option<L7ProtocolEnum>,
+    parser: Option<L7ProtocolParser>,
     server_port: Option<u16>,
 }
 
@@ -173,7 +172,7 @@ impl Default for ApplicationParser {
     fn default() -> Self {
         Self {
             protocol_checker: None,
-            l7_protocol: None,
+            parser: None,
             server_port: None,
         }
     }
@@ -193,13 +192,13 @@ impl ApplicationParser {
                 match parser.check_payload(payload, p) {
                     Some(LogMessageType::Request) => {
                         debug!("{protocol:?} identified on server port {}", p.port_dst);
-                        self.l7_protocol = Some((*protocol).into());
+                        self.parser = Some(parser);
                         self.server_port = Some(p.port_dst);
                         return Ok(());
                     }
                     Some(LogMessageType::Response) => {
                         debug!("{protocol:?} identified on server port {}", p.port_src);
-                        self.l7_protocol = Some((*protocol).into());
+                        self.parser = Some(parser);
                         self.server_port = Some(p.port_src);
                         return Ok(());
                     }
@@ -267,7 +266,7 @@ impl ApplicationParser {
         parse_param.set_buf_size(config.flow_config.l7_log_packet_size as usize);
         parse_param.set_captured_byte(payload.len());
 
-        if self.l7_protocol.is_none() {
+        if self.parser.is_none() {
             if self.protocol_checker.is_none() {
                 self.protocol_checker = Some(L7ProtocolChecker::from(config.flow_config));
             }
@@ -287,7 +286,7 @@ impl ApplicationParser {
             }
             _ => (),
         }
-        let Some(mut l7_parser) = get_parser(self.l7_protocol.clone().unwrap()) else {
+        let Some(l7_parser) = self.parser.as_mut() else {
             return Err(Error::GetParserFailed);
         };
         match l7_parser.parse_payload(payload, &parse_param) {

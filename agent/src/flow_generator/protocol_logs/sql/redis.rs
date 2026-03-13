@@ -45,10 +45,7 @@ use crate::{
     },
 };
 
-use super::{
-    super::{value_is_default, AppProtoHead, L7ResponseStatus},
-    ObfuscateCache,
-};
+use super::super::{value_is_default, AppProtoHead, L7ResponseStatus};
 
 const SEPARATOR_SIZE: usize = 2;
 
@@ -396,6 +393,7 @@ impl L7ProtocolParserInterface for RedisLog {
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
+        self.obfuscate = param.obfuscate_cache.is_some();
         #[cfg(feature = "enterprise")]
         self.custom_field_store.clear();
         #[cfg(feature = "enterprise")]
@@ -461,10 +459,6 @@ impl L7ProtocolParserInterface for RedisLog {
 
     fn perf_stats(&mut self) -> Vec<L7PerfStats> {
         std::mem::take(&mut self.perf_stats)
-    }
-
-    fn set_obfuscate_cache(&mut self, obfuscate_cache: Option<ObfuscateCache>) {
-        self.obfuscate = obfuscate_cache.is_some();
     }
 }
 

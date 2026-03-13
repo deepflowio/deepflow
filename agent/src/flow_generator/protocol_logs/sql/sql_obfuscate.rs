@@ -202,11 +202,11 @@ pub struct CachedObfuscator {
 }
 
 impl CachedObfuscator {
-    pub fn set_obfuscate_cache(&mut self, cache: Option<ObfuscateCache>) {
-        self.cache = cache;
+    pub fn new(cache: Option<ObfuscateCache>) -> Self {
+        Self { cache }
     }
 
-    pub fn apply<'a>(&mut self, sql: &'a str) -> Result<Cow<'a, str>> {
+    pub fn apply<'a>(&self, sql: &'a str) -> Result<Cow<'a, str>> {
         let Some(cache) = self.cache.as_ref() else {
             return Ok(Cow::Borrowed(sql));
         };

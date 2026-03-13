@@ -31,7 +31,6 @@ use serde::Serialize;
 use super::{
     sql_check::{is_mysql, is_valid_sql, trim_head_comment_and_get_first_word},
     sql_obfuscate::CachedObfuscator,
-    ObfuscateCache,
 };
 
 use self::consts::*;
@@ -438,7 +437,7 @@ impl MysqlInfo {
         &mut self,
         param: &ParseParam,
         payload: &[u8],
-        parser: &mut MysqlLog,
+        _parser: &mut MysqlLog,
         #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) -> Result<()> {
         let config = param.parse_config.as_ref();
@@ -453,7 +452,7 @@ impl MysqlInfo {
         #[cfg(feature = "enterprise")]
         if let Some(policies) = custom_policies {
             policies.apply(
-                &mut parser.custom_field_store,
+                &mut _parser.custom_field_store,
                 self,
                 TrafficDirection::REQUEST,
                 Source::Sql(sql_string, None),
@@ -463,9 +462,10 @@ impl MysqlInfo {
         if let Some(c) = config {
             self.extract_trace_and_span_id(&c.l7_log_dynamic, sql_string);
         }
-        let context = match parser.obfuscator.apply(sql_string) {
+        let obfuscator = CachedObfuscator::new(param.obfuscate_cache.clone());
+        let context = match obfuscator.apply(sql_string) {
             Ok(obfuscated) => obfuscated.to_string(),
-            Err(_) => sql_string.to_string(),
+            _ => sql_string.to_string(),
         };
         self.context = context;
         self.generate_endpoint();
@@ -651,7 +651,6 @@ fn give_buffer(buffer: Vec<u8>) {
 pub struct MysqlLog {
     pub protocol_version: u8,
     perf_stats: Vec<L7PerfStats>,
-    obfuscator: CachedObfuscator,
 
     // This field is extracted in the COM_STMT_PREPARE request and calculate based on SQL statements
     pc: ParameterCounter,
@@ -814,10 +813,6 @@ impl L7ProtocolParserInterface for MysqlLog {
 
     fn perf_stats(&mut self) -> Vec<L7PerfStats> {
         std::mem::take(&mut self.perf_stats)
-    }
-
-    fn set_obfuscate_cache(&mut self, obfuscate_cache: Option<ObfuscateCache>) {
-        self.obfuscator.set_obfuscate_cache(obfuscate_cache);
     }
 }
 
