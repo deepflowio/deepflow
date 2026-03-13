@@ -593,13 +593,17 @@ fn should_skip_feature(
 
 #[cfg(feature = "enterprise")]
 fn fetch_ai_agent_pids(feature: &str) -> Vec<u32> {
-    if feature == "proc.gprocess_info" {
+    // AI Agent processes must participate in both gprocess_info and socket_list.
+    // - gprocess_info ensures process metadata sync (MySQL process table, biz_type tagging)
+    // - socket_list ensures GPID sync for EBPF flows (gprocess_id injection)
+    // Without socket_list, GPID sync remains empty, leading to gprocess_id=0 in L7/proc events.
+    if feature == "proc.gprocess_info" || feature == "proc.socket_list" {
         if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
             let pids = registry.get_all_pids();
-            debug!("AI Agent: proc.gprocess_info fetch {} pids", pids.len());
+            debug!("AI Agent: {} fetch {} pids", feature, pids.len());
             return pids;
         }
-        debug!("AI Agent: proc.gprocess_info registry not initialized");
+        debug!("AI Agent: {} registry not initialized", feature);
     }
     Vec::new()
 }
