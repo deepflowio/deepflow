@@ -1049,6 +1049,18 @@ impl EbpfCollector {
                     tcp_option_trace.enabled
                 );
             }
+
+            // NicOptimize
+            if ebpf::set_nic_optimization(config.ebpf.network.nic_opt_enabled) != 0 {
+                warn!(
+                    "Failed to apply NIC optimization setting (enabled: {})",
+                    config.ebpf.network.nic_opt_enabled
+                );
+            }
+
+            for nic in &config.ebpf.network.nic_optimize {
+                nic.apply();
+            }
         }
 
         if ebpf::running_socket_tracer(
@@ -1526,8 +1538,21 @@ impl EbpfCollector {
                         tcp_option_trace.enabled
                     );
                 }
+
+                // NicOptimize
+                if ebpf::set_nic_optimization(config.ebpf.network.nic_opt_enabled) != 0 {
+                    warn!(
+                        "Failed to apply NIC optimization setting (enabled: {})",
+                        config.ebpf.network.nic_opt_enabled
+                    );
+                }
+
+                for nic in &config.ebpf.network.nic_optimize {
+                    nic.apply();
+                }
             }
         }
+
         if config.l7_log_enabled() || config.dpdk_enabled {
             self.start();
         } else {

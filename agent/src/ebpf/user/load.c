@@ -630,6 +630,8 @@ static enum bpf_prog_type get_prog_type(struct sec_desc *desc)
 		prog_type = BPF_PROG_TYPE_SOCKET_FILTER;
 	} else if (!strncmp(desc->name, "sockops", 7)) {
 		prog_type = BPF_PROG_TYPE_SOCK_OPS;
+	} else if (!memcmp(desc->name, "xdp", 3)) {
+		prog_type = BPF_PROG_TYPE_XDP;
 	} else {
 		prog_type = BPF_PROG_TYPE_UNSPEC;
 	}

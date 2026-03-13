@@ -3523,6 +3523,26 @@ impl ConfigHandler {
             restart_agent = !first_run;
         }
 
+        // The hot-update configuration items in ebpf.network are handled within the set_ebpf() callback.
+        let network = &mut ebpf.network;
+        let new_network = &mut new_ebpf.network;
+
+        if network.nic_opt_enabled != new_network.nic_opt_enabled {
+            info!(
+                "Update inputs.ebpf.network.nic_opt_enabled from {:?} to {:?}.",
+                network.nic_opt_enabled, new_network.nic_opt_enabled
+            );
+            network.nic_opt_enabled = new_network.nic_opt_enabled;
+        }
+
+        if network.nic_optimize != new_network.nic_optimize {
+            info!(
+                "Update inputs.ebpf.network.nic_optimize from {:?} to {:?}.",
+                network.nic_optimize, new_network.nic_optimize
+            );
+            network.nic_optimize = new_network.nic_optimize.clone();
+        }
+
         let kprobe = &mut ebpf.socket.kprobe;
         let new_kprobe = &mut new_ebpf.socket.kprobe;
         if kprobe.disabled != new_kprobe.disabled {

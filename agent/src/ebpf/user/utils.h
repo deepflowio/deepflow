@@ -48,6 +48,8 @@
 
 #define MAX_PATH_LENGTH 1024
 #define CONTAINER_ID_SIZE 65
+#ifndef _LINUX_SYSINFO_H   /* Header guard used by glibc and musl */
+#define _LINUX_SYSINFO_H
 
 struct sysinfo {
 	long uptime;
@@ -65,6 +67,8 @@ struct sysinfo {
 	uint32_t mem_unit;
 	char _f[20 - 2 * sizeof(unsigned long) - sizeof(uint32_t)];
 };
+
+#endif
 
 extern int sysinfo(struct sysinfo *__info);
 

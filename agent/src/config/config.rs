@@ -23,8 +23,15 @@ use std::net::{IpAddr, ToSocketAddrs};
 use std::path::Path;
 use std::time::Duration;
 
+#[cfg(feature = "extended_observability")]
+use std::ffi::CString;
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use envmnt::{ExpandOptions, ExpansionType};
+#[cfg(feature = "extended_observability")]
+use libc::c_int;
+#[cfg(feature = "extended_observability")]
+use log::warn;
 use log::{debug, error, info};
 use md5::{Digest, Md5};
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -39,6 +46,8 @@ use tokio::runtime::Runtime;
 
 use crate::common::l7_protocol_log::{L7ProtocolBitmap, L7ProtocolParser};
 use crate::dispatcher::recv_engine::DEFAULT_BLOCK_SIZE;
+#[cfg(feature = "extended_observability")]
+use crate::ebpf;
 use crate::flow_generator::{DnsLog, MemcachedLog};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use crate::platform::{OsAppTag, ProcessData};
@@ -1237,6 +1246,75 @@ impl Default for EbpfTunning {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
+pub struct NicOptimizeConfig {
+    pub interface: String,
+    pub rx_ring_size: u64,
+    pub rss_channel_count: u64,
+    pub irq_cpu_list: String,
+    pub xdp_cpu_redirect: bool,
+    pub xdp_queue_size: u64,
+    pub xdp_cpu_redirect_list: String,
+}
+
+const XDP_QUEUE_SIZE_MIN: u64 = 512;
+const XDP_QUEUE_SIZE_MAX: u64 = 8192;
+
+impl Default for NicOptimizeConfig {
+    fn default() -> Self {
+        Self {
+            interface: "".to_string(),
+            rx_ring_size: 0,
+            rss_channel_count: 0,
+            irq_cpu_list: "".to_string(),
+            xdp_cpu_redirect: false,
+            xdp_queue_size: 2048,
+            xdp_cpu_redirect_list: "".to_string(),
+        }
+    }
+}
+
+impl NicOptimizeConfig {
+    #[cfg(feature = "extended_observability")]
+    pub fn apply(&self) {
+        let nic_name = CString::new(self.interface.as_str()).unwrap();
+        let irq_cpu = CString::new(self.irq_cpu_list.as_str()).unwrap();
+        let xdp_cpu = CString::new(self.xdp_cpu_redirect_list.as_str()).unwrap();
+
+        let ret = ebpf::nic_optimize_config(
+            nic_name.as_ptr(),
+            self.rx_ring_size as c_int,
+            self.rss_channel_count as c_int,
+            irq_cpu.as_ptr(),
+            self.xdp_cpu_redirect,
+            self.xdp_queue_size as c_int,
+            xdp_cpu.as_ptr(),
+        );
+
+        if ret != 0 {
+            warn!(
+                "Failed to configure NIC optimization for interface '{}' \
+                (ret={}, rx_ring_size={}, rss_channel_count={}, \
+                xdp_cpu_redirect={}, xdp_queue_size={})",
+                self.interface,
+                ret,
+                self.rx_ring_size,
+                self.rss_channel_count,
+                self.xdp_cpu_redirect,
+                self.xdp_queue_size,
+            );
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfNetwork {
+    pub nic_opt_enabled: bool,
+    pub nic_optimize: Vec<NicOptimizeConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct EbpfSocketPreprocess {
     pub out_of_order_reassembly_cache_size: usize,
     pub out_of_order_reassembly_protocols: Vec<String>,
@@ -1285,6 +1363,7 @@ pub struct Ebpf {
     pub file: EbpfFile,
     pub profile: EbpfProfile,
     pub tunning: EbpfTunning,
+    pub network: EbpfNetwork,
     #[serde(skip)]
     pub java_symbol_file_refresh_defer_interval: i32,
 }
@@ -1297,6 +1376,7 @@ impl Default for Ebpf {
             file: EbpfFile::default(),
             profile: EbpfProfile::default(),
             tunning: EbpfTunning::default(),
+            network: EbpfNetwork::default(),
             java_symbol_file_refresh_defer_interval: 60,
         }
     }
@@ -3217,6 +3297,15 @@ impl UserConfig {
                 "invalid data_socket_type {:?}",
                 self.outputs.socket.data_socket_type
             )));
+        }
+
+        for nic in &self.inputs.ebpf.network.nic_optimize {
+            if !(XDP_QUEUE_SIZE_MIN..=XDP_QUEUE_SIZE_MAX).contains(&nic.xdp_queue_size) {
+                return Err(ConfigError::RuntimeConfigInvalid(format!(
+                    "xdp_queue_size {} for interface {} not in [{}, {}]",
+                    nic.xdp_queue_size, nic.interface, XDP_QUEUE_SIZE_MIN, XDP_QUEUE_SIZE_MAX,
+                )));
+            }
         }
 
         Ok(())

@@ -5159,6 +5159,362 @@ inputs:
 禁用 Node.js（V8）解释器剖析。禁用后将不采集 Node.js 进程的函数调用栈，
 可节省约 6.4 MB 内核内存（v8_unwind_info_map）。
 
+### 网络 {#inputs.ebpf.network}
+
+#### NIC optimization Enabled {#inputs.ebpf.network.nic_opt_enabled}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_opt_enabled`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_opt_enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否启用网卡优化功能，用于提升多核环境下的网络包处理能力
+以及突发流量承载能力。
+
+开启后将综合进行以下优化：
+  - RSS 硬件队列数量配置
+  - RX ring 描述符数量调优
+  - 硬件中断与 CPU 亲和性绑定（IRQ 绑核）
+  - 可选的 XDP CPUMAP 软件重定向分发
+
+该优化主要解决 RSS 硬件无法基于封装报文内层头部
+（如 GRE、Double VLAN、VXLAN、ERSPAN）进行哈希分摊的问题，
+避免流量集中在单个 CPU 上造成过载和丢包。
+
+通过调整 RX ring 描述符数量，可提升突发流量场景下的
+接收缓存能力，降低 ring 满导致的丢包风险。
+
+在启用 XDP CPU Redirect 时，数据包会在接收后通过
+CPUMAP 在多个 CPU 核心之间进行软件层重分发，
+从而突破硬件 RSS 的能力限制，实现更均衡的负载分布。
+
+建议在以下场景开启该功能：
+  1）使用 tcpdump 抓包发现该接口流量主要为 GRE、
+     Double VLAN、VXLAN 等封装报文；
+  2）通过 `top`（按 1）观察各 CPU 软中断占用率时，
+     发现某一个 CPU 的 softirq 接近 100%，
+     而其他 CPU 软中断占用率明显偏低。
+
+为获得最佳性能，建议将中断 CPU 和 XDP 重定向 CPU
+配置在与物理网卡相同的 NUMA 节点上。
+
+#### 网卡优化配置 {#inputs.ebpf.network.nic_optimize}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - interface: ''
+        irq_cpu_list: ''
+        rss_channel_count: 0
+        rx_ring_size: 0
+        xdp_cpu_redirect: false
+        xdp_cpu_redirect_list: ''
+        xdp_queue_size: 2048
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+针对指定网卡接口进行性能优化配置。
+
+该功能通过调优 RSS 队列、中断绑核、RX ring 大小、
+以及可选的 XDP CPUMAP 重定向机制，提升多核扩展能力
+和突发流量承载能力。
+
+建议在以下场景开启：
+  - 接口流量主要为 GRE、Double VLAN、VXLAN、ERSPAN 等封装报文；
+  - 某个 CPU 的 softirq 占用率接近 100%，而其他 CPU 空闲。
+
+为了获得更好的性能，程序会自动停用 irqbalance 服务，以防止网卡中断在 CPU 之间迁移。
+
+可为多个接口分别配置优化策略。
+
+样例:
+```yaml
+inputs:
+  eppf:
+    network:
+      nic_opt_enabled: true
+      nic_optimize:
+      - interface: eth0
+        rx_ring_size: 4096
+        rss_channel_count: 2
+        irq_cpu_list: 1,2
+        xdp_cpu_redirect: true
+        xdp_queue_size: 2048
+        xdp_cpu_redirect_list: 4,5,6,7
+      - interface: eth1
+        rx_ring_size: 4096
+        rss_channel_count: 2
+        irq_cpu_list: 1,2
+        xdp_cpu_redirect: true
+        xdp_queue_size: 2048
+        xdp_cpu_redirect_list: 4,5,6,7
+```
+
+##### 网卡接口 {#inputs.ebpf.network.nic_optimize.interface}
+
+**标签**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.interface`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - interface: ''
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+需要进行优化的网卡接口名称。
+
+##### RX Ring 描述符数量 {#inputs.ebpf.network.nic_optimize.rx_ring_size}
+
+**标签**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.rx_ring_size`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - rx_ring_size: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**详细描述**:
+
+网卡接收环（RX ring）的描述符数量。
+
+增大该值可提升突发流量场景下的缓存能力，
+降低因 ring 满导致的丢包风险。
+具体使用`ethtool -g <iface>` 查看当前配置情况。
+
+默认值为 0 表示保持原状忽略此项配置。
+
+##### RSS 队列数量 {#inputs.ebpf.network.nic_optimize.rss_channel_count}
+
+**标签**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.rss_channel_count`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - rss_channel_count: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**详细描述**:
+
+RSS 硬件队列数量。
+数据包在物理网卡完成哈希后，将分发到指定数量的队列并触发中断。
+
+最大一般支持 16，且不要超过逻辑 CPU 核数。
+具体使用`ethtool -l <iface>` 查看当前配置情况。
+
+当启用 XDP CPU Redirect 时建议设置为 1。
+默认值为 0 表示保持原状忽略此项配置。
+
+##### 硬件中断 CPU 列表 {#inputs.ebpf.network.nic_optimize.irq_cpu_list}
+
+**标签**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.irq_cpu_list`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - irq_cpu_list: ''
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+用于处理网卡硬件中断的 CPU ID 或 CPU 列表。
+
+数量建议与 RSS 队列数量一致。
+若启用 XDP CPU Redirect，仅需指定一个 CPU。
+
+可设置为：
+  - 指定 CPU 列表（如 2,4,6）
+  - local（自动匹配本地 NUMA 节点 CPU）
+
+建议所选 CPU 与物理网卡位于同一 NUMA 节点。
+
+##### 启用 XDP CPU 重定向 {#inputs.ebpf.network.nic_optimize.xdp_cpu_redirect}
+
+**标签**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.xdp_cpu_redirect`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - xdp_cpu_redirect: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否启用 XDP CPUMAP 重定向分发。
+
+用于解决硬件 RSS 无法对封装报文
+（如 Double VLAN、ERSPAN 等）进行均匀分摊，
+导致单核过载和丢包的问题。
+
+##### XDP 队列大小 {#inputs.ebpf.network.nic_optimize.xdp_queue_size}
+
+**标签**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.xdp_queue_size`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - xdp_queue_size: 2048
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**详细描述**:
+
+XDP CPUMAP 队列大小。
+
+取值范围：[512, 8192]，建议配置为 2 的幂。
+
+增大可提升突发流量承载能力，但会占用更多内存。
+
+##### XDP 重定向 CPU 列表 {#inputs.ebpf.network.nic_optimize.xdp_cpu_redirect_list}
+
+**标签**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.xdp_cpu_redirect_list`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - xdp_cpu_redirect_list: ''
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+XDP 重定向后用于处理数据包的 CPU 列表。
+
+填写样式如：4,6,8
+
 ### 调优 {#inputs.ebpf.tunning}
 
 #### 采集队列大小 {#inputs.ebpf.tunning.collector_queue_size}
@@ -10950,4 +11306,3 @@ dev:
 **详细描述**:
 
 未发布的采集器特性可以通过该选项开启。
-

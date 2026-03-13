@@ -21,3 +21,5 @@ lazy_static = "1.4.0"
 log = "0.4"
 env_logger = "0.9"
 trace-utils = { path = "../../../../../crates/trace-utils" }
+# Enable this option when building the Enterprise edition.
+# trace-utils-interp = { path = "../../../../../crates/trace-utils-interp" }

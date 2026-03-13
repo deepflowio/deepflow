@@ -28,6 +28,21 @@ use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 use log::info;
 
+// Reference trace-utils-interp when building the Enterprise edition.
+// The purpose is to ensure that Rust links against libtrace_utils_interp-xxxx.rlib
+// during the linking stage.
+//
+// interpreter_tracer.c calls is_php_process(),
+// and this function is defined in the trace-utils-interp crate.
+//
+// However, the Rust code in socket_tracer does not directly reference
+// trace-utils-interp. As a result, Cargo considers this dependency unused
+// and excludes it from the linking stage.
+//
+// Therefore, we explicitly reference trace-utils-interp here to force
+// Cargo to include it in the final link.
+//use trace_utils_interp as _;
+
 extern "C" {
     fn print_uprobe_http2_info(data: *mut c_char, len: c_uint);
     fn print_uprobe_grpc_dataframe(data: *mut c_char, len: c_uint);
@@ -745,6 +760,31 @@ fn main() {
             print!("socket_tracer_start() error, sleep 1s retry.\n");
             std::thread::sleep(Duration::from_secs(1));
         }
+
+        // ------ Nic Optimization ----
+        //if set_nic_optimization(true) != 0 {
+        //    println!("set_nic_optimization() error.");
+        //    ::std::process::exit(1);
+        //}
+
+        //let nic_name = CString::new("p2p2").unwrap();
+        //let irq_cpu_list = CString::new("").unwrap();
+        //let xdp_cpu_list = CString::new("").unwrap();
+
+        //if nic_optimize_config(
+        //    nic_name.as_c_str().as_ptr(),
+        //    0, // rx_ring_size
+        //    0, // rss_channel_count
+        //    irq_cpu_list.as_c_str().as_ptr(),
+        //    true, // xdp_cpu_redirect
+        //    0,    // xdp_queue_size
+        //    xdp_cpu_list.as_c_str().as_ptr(),
+        //) != 0
+        //{
+        //    println!("nic_optimize_config() error.");
+        //    ::std::process::exit(1);
+        //}
+        // ------ Nic Optimization end ----
 
         //thread::sleep(Duration::from_secs(60));
         //stop_continuous_profiler();
