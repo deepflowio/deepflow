@@ -96,6 +96,7 @@ func NewResouceEventor(eventQueue *queue.OverwriteQueue, config *config.Config, 
 		platformTable,
 		nil,
 		config,
+		nil,
 	)
 	return &Eventor{
 		Config:   config,
@@ -126,6 +127,7 @@ func NewAlertEventor(config *config.Config, recv *receiver.Receiver, manager *dr
 		platformTable,
 		nil,
 		config,
+		nil,
 	)
 	return &Eventor{
 		Config:   config,
@@ -161,6 +163,10 @@ func NewEventor(eventType common.EventType, config *config.Config, recv *receive
 
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
+	var aiAgentRootPidCache *decoder.AiAgentRootPidCache
+	if eventType == common.FILE_EVENT {
+		aiAgentRootPidCache = decoder.NewAiAgentRootPidCache()
+	}
 	for i := 0; i < queueCount; i++ {
 		eventWriter, err := dbwriter.NewEventWriter(eventType, i, config)
 		if err != nil {
@@ -178,6 +184,7 @@ func NewEventor(eventType common.EventType, config *config.Config, recv *receive
 			platformDatas[i],
 			exporters,
 			config,
+			aiAgentRootPidCache,
 		)
 	}
 	return &Eventor{
