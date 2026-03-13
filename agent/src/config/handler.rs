@@ -5476,6 +5476,14 @@ impl ConfigHandler {
                         candidate_config.environment.max_memory,
                     )) {
                         warn!("set container resources limit failed: {:?}", e);
+                    } else {
+                        warn!(
+                            "container resource limit updated: cpu {}c -> {}c, memory {}B -> {}B, the agent will restart",
+                            self.container_cpu_limit as f64 / 1000.0,
+                            candidate_config.environment.max_millicpus as f64 / 1000.0,
+                            self.container_mem_limit,
+                            candidate_config.environment.max_memory
+                        );
                     };
                 }
             }
