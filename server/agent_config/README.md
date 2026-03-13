@@ -7630,7 +7630,7 @@ processors:
 
 Turning off some protocol identification can reduce deepflow-agent resource consumption.
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-<mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+<mark>Oracle, SqlServer and TLS is only supported in the Enterprise Edition.</mark>
 
 #### Protocol Special Config {#processors.request_log.application_protocol_inference.protocol_special_config}
 
@@ -8060,6 +8060,7 @@ processors:
         RocketMQ: 1-65535
         SofaRPC: 1-65535
         SomeIP: 1-65535
+        SqlServer: 1433
         TLS: 443,6443
         Tars: 1-65535
         WebSphereMQ: 1-65535
@@ -8089,7 +8090,7 @@ NOTE:
 1. HTTP2 and TLS are only used for Kprobe, not applicable to Uprobe.
    All data obtained through Uprobe is not subject to port restrictions.
    - Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-   - <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+   - <mark>Oracle, SqlServer and TLS is only supported in the Enterprise Edition.</mark>
 2. Attention: use `HTTP2` for `gRPC` Protocol.
 
 #### Tag Filters {#processors.request_log.filters.tag_filters}
@@ -8133,6 +8134,7 @@ processors:
         RocketMQ: []
         SOFARPC: []
         SomeIP: []
+        SqlServer: []
         TLS: []
         Tars: []
         WebSphereMQ: []
@@ -8173,7 +8175,7 @@ blacklist. Including business request logs might lead to breaks in the distribut
 
 Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
 
-<mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+<mark>Oracle, SqlServer and TLS is only supported in the Enterprise Edition.</mark>
 
 ##### $HTTP Tag Filters {#processors.request_log.filters.tag_filters.HTTP}
 
@@ -8221,7 +8223,7 @@ blacklist. Including business request logs might lead to breaks in the distribut
 
 Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
 
-<mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+<mark>Oracle, SqlServer and TLS is only supported in the Enterprise Edition.</mark>
 
 ###### Field Name {#processors.request_log.filters.tag_filters.HTTP.field_name}
 
