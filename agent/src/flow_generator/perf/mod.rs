@@ -41,6 +41,8 @@ use super::{
     protocol_logs::AppProtoHead,
 };
 
+#[cfg(feature = "enterprise")]
+use crate::common::flow::BIZ_TYPE_AI_AGENT;
 use crate::common::l7_protocol_log::L7PerfCache;
 use crate::common::{
     flow::{Flow, L7PerfStats},
@@ -237,6 +239,12 @@ pub struct FlowLog {
 
     ntp_diff: Arc<AtomicI64>,
     obfuscate_cache: Option<ObfuscateCache>,
+
+    // Enterprise: set to true when AI Agent traffic is detected (biz_type == BIZ_TYPE_AI_AGENT).
+    // When true, subsequent packets use ai_agent_max_payload_size instead of l7_log_packet_size
+    // to preserve full LLM request/response bodies for audit.
+    #[cfg(feature = "enterprise")]
+    is_ai_agent: bool,
 }
 
 impl FlowLog {
@@ -272,6 +280,17 @@ impl FlowLog {
         remote_epc: i32,
     ) -> Result<L7ParseResult> {
         if let Some(payload) = packet.get_l7() {
+            // Enterprise: AI Agent flows use a larger payload size to preserve full
+            // LLM request/response bodies for governance audit.
+            #[cfg(feature = "enterprise")]
+            let pkt_size = if self.is_ai_agent {
+                log_parser_config.ai_agent_max_payload_size
+            } else {
+                flow_config.l7_log_packet_size as usize
+            };
+            #[cfg(not(feature = "enterprise"))]
+            let pkt_size = flow_config.l7_log_packet_size as usize;
+
             let mut parse_param = ParseParam::new(
                 &*packet,
                 Some(self.perf_cache.clone()),
@@ -285,7 +304,7 @@ impl FlowLog {
             #[cfg(any(target_os = "linux", target_os = "android"))]
             parse_param.set_counter(self.stats_counter.clone());
             parse_param.set_rrt_timeout(self.rrt_timeout);
-            parse_param.set_buf_size(flow_config.l7_log_packet_size as usize);
+            parse_param.set_buf_size(pkt_size);
             parse_param.set_captured_byte(packet.get_captured_byte());
             parse_param.set_oracle_conf(flow_config.oracle_parse_conf);
             parse_param.set_iso8583_conf(&flow_config.iso8583_parse_conf);
@@ -304,7 +323,6 @@ impl FlowLog {
 
             let ret = parser.parse_payload(
                 {
-                    let pkt_size = flow_config.l7_log_packet_size as usize;
                     if pkt_size > payload.len() {
                         payload
                     } else {
@@ -313,6 +331,17 @@ impl FlowLog {
                 },
                 &parse_param,
             );
+
+            // Enterprise: detect AI Agent traffic from parsed result and set the flag
+            // so subsequent packets in this flow use the larger payload size.
+            #[cfg(feature = "enterprise")]
+            if !self.is_ai_agent {
+                if let Ok(ref result) = ret {
+                    if result.has_biz_type(BIZ_TYPE_AI_AGENT) {
+                        self.is_ai_agent = true;
+                    }
+                }
+            }
 
             let mut cache_proto = |proto: L7ProtocolEnum| match packet.signal_source {
                 SignalSource::EBPF => {
@@ -589,6 +618,8 @@ impl FlowLog {
             l7_protocol_inference_ttl,
             ntp_diff,
             obfuscate_cache,
+            #[cfg(feature = "enterprise")]
+            is_ai_agent: false,
         })
     }
 

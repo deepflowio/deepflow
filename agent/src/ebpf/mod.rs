@@ -157,6 +157,12 @@ pub const DATA_SOURCE_OPENSSL_UPROBE: u8 = 3;
 #[allow(dead_code)]
 pub const DATA_SOURCE_IO_EVENT: u8 = 4;
 #[allow(dead_code)]
+pub const DATA_SOURCE_FILE_OP_EVENT: u8 = 9;
+#[allow(dead_code)]
+pub const DATA_SOURCE_PERM_OP_EVENT: u8 = 10;
+#[allow(dead_code)]
+pub const DATA_SOURCE_PROC_LIFECYCLE_EVENT: u8 = 11;
+#[allow(dead_code)]
 pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
 #[allow(dead_code)]
 pub const DATA_SOURCE_UNIX_SOCKET: u8 = 8;
@@ -363,6 +369,7 @@ pub struct SK_BPF_DATA {
      */
     pub syscall_len: u64,      // 本次系统调用读、写数据的总长度
     pub cap_len: u32,          // 返回的cap_data长度
+    pub reasm_bytes: u32,      // 重组后的累计字节数
     pub cap_seq: u64, // cap_data在Socket中的相对顺序号，在所在socket下从0开始自增，用于数据乱序排序
     pub socket_role: u8, // this message is created by: 0:unkonwn 1:client(connect) 2:server(accept)
     pub fd: u32,      // File descriptor for an open file or socket.
@@ -568,6 +575,7 @@ extern "C" {
      * @return the set maximum buffer size value on success, < 0 on failure.
      */
     pub fn set_data_limit_max(limit_size: c_int) -> c_int;
+    pub fn set_ai_agent_data_limit_max(limit_size: c_int) -> c_int;
     pub fn set_go_tracing_timeout(timeout: c_int) -> c_int;
     pub fn set_io_event_collect_mode(mode: c_int) -> c_int;
     pub fn set_io_event_minimal_duration(duration: c_ulonglong) -> c_int;
@@ -835,6 +843,16 @@ extern "C" {
     pub fn disable_fentry();
     pub fn enable_fentry();
     pub fn set_virtual_file_collect(enabled: bool) -> c_int;
+
+    // BPF map helpers for u32-key maps (used by AI Agent PID tracking)
+    pub fn bpf_table_get_map_fd(tracer_name: *const c_char, map_name: *const c_char) -> c_int;
+    pub fn bpf_table_update_u32_key(
+        map_fd: c_int,
+        key: c_uint,
+        val_buf: *const c_void,
+        val_size: c_int,
+    ) -> c_int;
+    pub fn bpf_table_delete_u32_key(map_fd: c_int, key: c_uint) -> c_int;
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "extended_observability")] {

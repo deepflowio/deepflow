@@ -360,6 +360,26 @@ struct sched_comm_exit_ctx {
 #endif
 };
 
+/* sched_process_fork tracepoint context */
+struct sched_comm_fork_ctx {
+#ifdef LINUX_VER_RT
+	__u64 __pad_0;		/*     0     8 */
+	unsigned char common_migrate_disable;	/*     8     1 */
+	unsigned char common_preempt_lazy_count;	/*     9     1 */
+	unsigned short padding;
+	char parent_comm[16];	/*    12    16 */
+	pid_t parent_pid;	/*    28     4 */
+	char child_comm[16];	/*    32    16 */
+	pid_t child_pid;	/*    48     4 */
+#else
+	__u64 __pad_0;		/*     0     8 */
+	char parent_comm[16];	/*     offset:8;       size:16 */
+	pid_t parent_pid;	/*     offset:24;      size:4  */
+	char child_comm[16];	/*     offset:28;      size:16 */
+	pid_t child_pid;	/*     offset:44;      size:4  */
+#endif
+};
+
 struct syscall_sendto_enter_ctx {
 #ifdef LINUX_VER_RT
 	__u64 __pad_0;		/*     0     8 */
@@ -388,25 +408,7 @@ struct syscall_sendto_enter_ctx {
 #endif
 };
 
-struct sched_comm_fork_ctx {
-#ifdef LINUX_VER_RT
-	__u64 __pad_0;		/*     0     8 */
-	unsigned char common_migrate_disable;	/*     8     1 */
-	unsigned char common_preempt_lazy_count;	/*     9     1 */
-	unsigned short padding;
-	char parent_comm[16];	/*    12    16 */
-
-	__u32 parent_pid;	/*    28     4 */
-	char child_comm[16];	/*    32    16 */
-	__u32 child_pid;	/*    48     4 */
-#else
-	__u64 __pad_0;		/*     0     8 */
-	char parent_comm[16];	/*     8    16 */
-	__u32 parent_pid;	/*    24     4 */
-	char child_comm[16];	/*    28    16 */
-	__u32 child_pid;	/*    44     4 */
-#endif
-};
+/* sched_comm_fork_ctx already defined above (near sched_comm_exit_ctx) */
 
 struct sched_comm_exec_ctx {
 #ifdef LINUX_VER_RT

@@ -72,6 +72,9 @@ if #[cfg(feature = "enterprise")] {
         use public::l7_protocol::NativeTag;
 
         use crate::flow_generator::protocol_logs::{auto_merge_custom_field, CUSTOM_FIELD_POLICY_PRIORITY};
+
+        use enterprise_utils::ai_agent::match_ai_agent_endpoint;
+        use crate::common::flow::BIZ_TYPE_AI_AGENT;
     }
 }
 
@@ -307,6 +310,9 @@ pub struct HttpInfo {
     pub grpc_status_code: Option<u16>,
 
     endpoint: Option<String>,
+    // set when AI Agent URL is detected (enterprise only)
+    #[serde(skip)]
+    protocol_str: Option<String>,
     // set by wasm plugin
     #[l7_log(response_result)]
     custom_result: Option<String>,
@@ -913,6 +919,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 user_agent: f.user_agent,
                 referer: f.referer,
                 rpc_service: f.service_name,
+                protocol_str: f.protocol_str,
                 attributes: {
                     if f.attributes.is_empty() {
                         None
@@ -1248,11 +1255,36 @@ impl HttpLog {
         info.service_name = info.grpc_package_service_name();
         if !config.http_endpoint_disabled && info.path.len() > 0 {
             // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
-            let path = match info.endpoint.as_ref() {
-                Some(p) if !p.is_empty() => p,
-                _ => &info.path,
+            let _endpoint_already_set = matches!(info.endpoint.as_ref(), Some(p) if !p.is_empty());
+            let path_owned = if let Some(p) = info.endpoint.as_ref().filter(|p| !p.is_empty()) {
+                p.clone()
+            } else {
+                info.path.clone()
             };
-            info.endpoint = Some(handle_endpoint(config, path));
+            // Priority chain: WASM/biz_field > AI Agent detection > http_endpoint Trie
+            #[cfg(feature = "enterprise")]
+            let ai_agent_matched = if !_endpoint_already_set {
+                if let Some(matched_path) = match_ai_agent_endpoint(
+                    &config.ai_agent_endpoints,
+                    path_owned.as_str(),
+                    param.process_id,
+                    std::time::Duration::from_micros(param.time),
+                ) {
+                    info.endpoint = Some(matched_path);
+                    info.biz_type = BIZ_TYPE_AI_AGENT;
+                    info.protocol_str = Some("LLM".to_string());
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+            #[cfg(not(feature = "enterprise"))]
+            let ai_agent_matched = false;
+            if !ai_agent_matched {
+                info.endpoint = Some(handle_endpoint(config, &path_owned));
+            }
         }
 
         let l7_dynamic_config = &config.l7_log_dynamic;
@@ -2809,6 +2841,7 @@ mod tests {
             iso8583_parse_conf: Iso8583ParseConfig::default(),
             web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
             icmp_data: None,
+            process_id: 0,
         };
 
         //测试长度不正确

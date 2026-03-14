@@ -123,6 +123,11 @@ func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 	d.updateStateInfo(cloudData)
 
 	if err := d.shouldRefresh(cloudData); err != nil {
+		if err == DataNotVerifiedError &&
+			len(cloudData.Processes) > 0 &&
+			d.metadata.GetDomainInfo().Type == common.KUBERNETES {
+			return d.tryRefreshProcessOnly(cloudData)
+		}
 		return err
 	}
 
@@ -139,6 +144,41 @@ func (d *domain) tryRefresh(cloudData cloudmodel.Resource) error {
 		log.Info("domain refresh is running, does nothing", d.metadata.LogPrefixes)
 		return RefreshConflictError
 	}
+}
+
+func (d *domain) tryRefreshProcessOnly(cloudData cloudmodel.Resource) error {
+	select {
+	case <-d.cache.RefreshSignal:
+		d.cache.IncrementSequence()
+		d.cache.SetLogLevel(logging.INFO, cache.RefreshSignalCallerDomain)
+
+		d.refreshProcessOnly(cloudData)
+
+		d.cache.ResetRefreshSignal(cache.RefreshSignalCallerDomain)
+		return nil
+	default:
+		log.Info("domain refresh is running, does nothing", d.metadata.LogPrefixes)
+		return RefreshConflictError
+	}
+}
+
+func (d *domain) refreshProcessOnly(cloudData cloudmodel.Resource) {
+	log.Info("domain process-only refresh started", d.metadata.LogPrefixes)
+
+	// for process
+	d.cache.RefreshVTaps()
+
+	processUpdater := updater.NewProcess(d.cache, cloudData.Processes).RegisterListener(
+		listener.NewProcess(d.cache),
+	)
+	updaters := []updater.ResourceUpdater{processUpdater}
+	d.executeUpdaters(updaters)
+	d.notifyOnResourceChanged(updaters)
+	d.pubsub.PublishChange(d.msgMetadata)
+
+	d.updateSyncedAt(cloudData.SyncAt)
+
+	log.Info("domain process-only refresh completed", d.metadata.LogPrefixes)
 }
 
 func (d *domain) shouldRefresh(cloudData cloudmodel.Resource) error {
@@ -273,14 +313,26 @@ func (r *domain) executeUpdaters(updatersInUpdateOrder []updater.ResourceUpdater
 		updater.HandleAddAndUpdate()
 	}
 
+	if len(updatersInUpdateOrder) == 0 {
+		return
+	}
+
+	if len(updatersInUpdateOrder) == 1 {
+		updatersInUpdateOrder[0].HandleDelete()
+		return
+	}
+
 	// 删除操作的顺序，是创建的逆序
 	// 特殊资源：VMPodNodeConnection虽然是末序创建，但需要末序删除，序号-1；
 	// 原因：避免数据量大时，此数据删除后，云主机、容器节点还在，导致采集器类型变化
 	processUpdater := updatersInUpdateOrder[len(updatersInUpdateOrder)-1]
 	vmPodNodeConnectionUpdater := updatersInUpdateOrder[len(updatersInUpdateOrder)-2]
-	// 因为 processUpdater 是 -1，VMPodNodeConnection 是 -2，特殊处理后，逆序删除从 -3 开始
-	for i := len(updatersInUpdateOrder) - 3; i >= 0; i-- {
-		updatersInUpdateOrder[i].HandleDelete()
+
+	if len(updatersInUpdateOrder) > 2 {
+		// 因为 processUpdater 是 -1，VMPodNodeConnection 是 -2，特殊处理后，逆序删除从 -3 开始
+		for i := len(updatersInUpdateOrder) - 3; i >= 0; i-- {
+			updatersInUpdateOrder[i].HandleDelete()
+		}
 	}
 	processUpdater.HandleDelete()
 	vmPodNodeConnectionUpdater.HandleDelete()

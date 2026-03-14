@@ -84,6 +84,7 @@ fn get_req_param<'a>(
         iso8583_parse_conf: Iso8583ParseConfig::default(),
         web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
         icmp_data: None,
+        process_id: 0,
     }
 }
 
@@ -125,6 +126,7 @@ fn get_resq_param<'a>(
         iso8583_parse_conf: Iso8583ParseConfig::default(),
         web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
         icmp_data: None,
+        process_id: 0,
     }
 }
 

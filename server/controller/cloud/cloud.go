@@ -244,6 +244,10 @@ func (c *Cloud) GetResource() model.Resource {
 		cResource = c.getKubernetesData()
 	}
 	if !cResource.Verified {
+		if c.basicInfo.Type == common.KUBERNETES {
+			cResource = c.appendResourceProcess(cResource)
+			return cResource
+		}
 		return model.Resource{
 			ErrorState:   cResource.ErrorState,
 			ErrorMessage: cResource.ErrorMessage,
@@ -693,18 +697,22 @@ func (c *Cloud) appendResourceProcess(resource model.Resource) model.Resource {
 			PID:         sProcess.PID,
 			NetnsID:     sProcess.NetnsID,
 			ProcessName: processName,
+			BizType:     sProcess.BizType,
 			CommandLine: sProcess.CMDLine,
 			UserName:    sProcess.UserName,
 			ContainerID: sProcess.ContainerID,
 			StartTime:   sProcess.StartTime,
 			OSAPPTags:   sProcess.OSAPPTags,
 		}
-		if resource.Verified && lcuuid == "" {
+		if (resource.Verified || c.basicInfo.Type == common.KUBERNETES) && lcuuid == "" {
 			resource.Processes = append(resource.Processes, process)
 			continue
 		}
 		subDomainResource, ok := resource.SubDomainResources[lcuuid]
 		if !ok || !subDomainResource.Verified {
+			if c.basicInfo.Type == common.KUBERNETES {
+				resource.Processes = append(resource.Processes, process)
+			}
 			continue
 		}
 		process.SubDomainLcuuid = lcuuid

@@ -60,4 +60,4 @@ agent                      , agent                     , agent                  
 signal_source              , signal_source             , signal_source             , int_enum      , l7_signal_source     , Capture Info      , 111           , 0
 role                       , role                      , role                      , int_enum      , role                 , Capture Info      , 111           , 0
 
-biz_type                   , biz_type                  , biz_type                  , int           ,                      , Business Info     , 111           , 0
+biz_type                   , biz_type                  , biz_type                  , int_enum      , biz_type             , Business Info     , 111           , 0

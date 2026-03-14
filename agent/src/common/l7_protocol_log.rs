@@ -24,6 +24,8 @@ use std::sync::{
 };
 use std::time::Duration;
 
+use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
+
 use enum_dispatch::enum_dispatch;
 use log::debug;
 use lru::LruCache;
@@ -246,6 +248,16 @@ impl L7ParseResult {
             L7ParseResult::Multi(m) => m,
             L7ParseResult::Single(_) => panic!("parse result is single but unwrap multi"),
             L7ParseResult::None => panic!("parse result is none but unwrap multi"),
+        }
+    }
+
+    /// Check if any parsed result has the given biz_type.
+    /// Used to detect AI Agent flows after parsing.
+    pub fn has_biz_type(&self, biz_type: u8) -> bool {
+        match self {
+            L7ParseResult::Single(info) => info.get_biz_type() == biz_type,
+            L7ParseResult::Multi(infos) => infos.iter().any(|i| i.get_biz_type() == biz_type),
+            L7ParseResult::None => false,
         }
     }
 }
@@ -685,11 +697,13 @@ pub struct ParseParam<'a> {
 
     // the config of `l7_log_packet_size`, must set in parse_payload and check_payload
     pub buf_size: u16,
-    pub captured_byte: u16,
+    pub captured_byte: u32,
 
     pub oracle_parse_conf: OracleConfig,
     pub iso8583_parse_conf: Iso8583ParseConfig,
     pub web_sphere_mq_parse_conf: WebSphereMqParseConfig,
+
+    pub process_id: u32,
 }
 
 impl<'a> fmt::Debug for ParseParam<'a> {
@@ -793,6 +807,8 @@ impl<'a> ParseParam<'a> {
             oracle_parse_conf: OracleConfig::default(),
             iso8583_parse_conf: Iso8583ParseConfig::default(),
             web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
+
+            process_id: packet.process_id,
         }
     }
 }
@@ -811,11 +827,17 @@ impl<'a> ParseParam<'a> {
     }
 
     pub fn set_buf_size(&mut self, buf_size: usize) {
-        self.buf_size = buf_size as u16;
+        // Saturate to u16::MAX to avoid overflow when AI Agent flows use larger payload sizes.
+        // buf_size is informational for plugins; actual payload truncation uses the usize value directly.
+        self.buf_size = if buf_size > u16::MAX as usize {
+            u16::MAX
+        } else {
+            buf_size as u16
+        };
     }
 
     pub fn set_captured_byte(&mut self, captured_byte: usize) {
-        self.captured_byte = captured_byte as u16;
+        self.captured_byte = u32::try_from(captured_byte).unwrap_or(u32::MAX);
     }
 
     pub fn set_rrt_timeout(&mut self, t: usize) {
@@ -937,5 +959,30 @@ impl fmt::Debug for L7ProtocolBitmap {
             }
         }
         f.write_str(format!("{:#?}", p).as_str())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    #[test]
+    fn captured_byte_should_not_truncate_large_payloads() {
+        let packet = MetaPacket::default();
+        let mut param = ParseParam::new(
+            &packet,
+            None,
+            Rc::new(RefCell::new(None)),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Rc::new(RefCell::new(None)),
+            false,
+            false,
+        );
+
+        let captured: u32 = 200_000;
+        param.set_captured_byte(captured as usize);
+        assert_eq!(param.captured_byte as u32, captured);
     }
 }

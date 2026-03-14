@@ -20,6 +20,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	logging "github.com/op/go-logging"
@@ -56,15 +57,81 @@ type Counter struct {
 	ErrorCount int64 `statsd:"err-count"`
 }
 
+type AiAgentRootPidCache struct {
+	mu           sync.RWMutex
+	rootPidByKey map[uint64]uint32
+}
+
+func NewAiAgentRootPidCache() *AiAgentRootPidCache {
+	return &AiAgentRootPidCache{
+		rootPidByKey: make(map[uint64]uint32),
+	}
+}
+
+func aiAgentRootPidKey(orgId, vtapId uint16, pid uint32) uint64 {
+	return uint64(orgId)<<48 | uint64(vtapId)<<32 | uint64(pid)
+}
+
+func (c *AiAgentRootPidCache) Get(orgId, vtapId uint16, pid uint32) (uint32, bool) {
+	if c == nil || pid == 0 {
+		return 0, false
+	}
+	key := aiAgentRootPidKey(orgId, vtapId, pid)
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	rootPid, ok := c.rootPidByKey[key]
+	return rootPid, ok
+}
+
+func (c *AiAgentRootPidCache) Set(orgId, vtapId uint16, pid, rootPid uint32) {
+	if c == nil || pid == 0 {
+		return
+	}
+	key := aiAgentRootPidKey(orgId, vtapId, pid)
+	c.mu.Lock()
+	c.rootPidByKey[key] = rootPid
+	c.mu.Unlock()
+}
+
+func (c *AiAgentRootPidCache) Delete(orgId, vtapId uint16, pid uint32) {
+	if c == nil || pid == 0 {
+		return
+	}
+	key := aiAgentRootPidKey(orgId, vtapId, pid)
+	c.mu.Lock()
+	delete(c.rootPidByKey, key)
+	c.mu.Unlock()
+}
+
+func (c *AiAgentRootPidCache) ResolveRootPid(orgId, vtapId uint16, pid, parentPid uint32) uint32 {
+	if c == nil || pid == 0 {
+		return 0
+	}
+	if rootPid, ok := c.Get(orgId, vtapId, pid); ok && rootPid != 0 {
+		return rootPid
+	}
+	if parentPid != 0 && parentPid != pid {
+		if rootPid, ok := c.Get(orgId, vtapId, parentPid); ok && rootPid != 0 {
+			c.Set(orgId, vtapId, pid, rootPid)
+			return rootPid
+		}
+		c.Set(orgId, vtapId, pid, parentPid)
+		return parentPid
+	}
+	c.Set(orgId, vtapId, pid, pid)
+	return pid
+}
+
 type Decoder struct {
-	index        int
-	eventType    common.EventType
-	platformData *grpc.PlatformInfoTable
-	inQueue      queue.QueueReader
-	eventWriter  *dbwriter.EventWriter
-	exporters    *exporters.Exporters
-	debugEnabled bool
-	config       *config.Config
+	index               int
+	eventType           common.EventType
+	platformData        *grpc.PlatformInfoTable
+	inQueue             queue.QueueReader
+	eventWriter         *dbwriter.EventWriter
+	exporters           *exporters.Exporters
+	debugEnabled        bool
+	config              *config.Config
+	aiAgentRootPidCache *AiAgentRootPidCache
 
 	orgId, teamId uint16
 
@@ -80,6 +147,7 @@ func NewDecoder(
 	platformData *grpc.PlatformInfoTable,
 	exporters *exporters.Exporters,
 	config *config.Config,
+	aiAgentRootPidCache *AiAgentRootPidCache,
 ) *Decoder {
 	controllers := make([]net.IP, len(config.Base.ControllerIPs))
 	for i, ipString := range config.Base.ControllerIPs {
@@ -89,15 +157,16 @@ func NewDecoder(
 		}
 	}
 	return &Decoder{
-		index:        index,
-		eventType:    eventType,
-		platformData: platformData,
-		inQueue:      inQueue,
-		debugEnabled: log.IsEnabledFor(logging.DEBUG),
-		eventWriter:  eventWriter,
-		exporters:    exporters,
-		config:       config,
-		counter:      &Counter{},
+		index:               index,
+		eventType:           eventType,
+		platformData:        platformData,
+		inQueue:             inQueue,
+		debugEnabled:        log.IsEnabledFor(logging.DEBUG),
+		eventWriter:         eventWriter,
+		exporters:           exporters,
+		config:              config,
+		aiAgentRootPidCache: aiAgentRootPidCache,
+		counter:             &Counter{},
 	}
 }
 
@@ -181,7 +250,15 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.SignalSource = uint8(e.EventType)
 	}
 
-	s.GProcessID = d.platformData.QueryProcessInfo(s.OrgId, vtapId, e.Pid)
+	s.GProcessID = resolveGProcessID(
+		func(pid uint32) uint32 {
+			return d.platformData.QueryProcessInfo(s.OrgId, vtapId, pid)
+		},
+		d.aiAgentRootPidCache,
+		s.OrgId,
+		vtapId,
+		e,
+	)
 	if e.IoEventData != nil {
 		ioData := e.IoEventData
 		s.EventType = strings.ToLower(ioData.Operation.String())
@@ -195,7 +272,27 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.MountSource = string(ioData.MountSource)
 		s.MountPoint = string(ioData.MountPoint)
 		s.Bytes = ioData.BytesCount
+		s.AccessPermission = ioData.AccessPermission
 		s.Duration = uint64(s.EndTime - s.StartTime)
+	} else if e.FileOpEventData != nil {
+		d := e.FileOpEventData
+		s.EventType = strings.ToLower(d.OpType.String())
+		s.ProcessKName = string(e.ProcessKname)
+		s.FileName = string(d.Filename)
+		s.SyscallThread = e.ThreadId
+		s.SyscallCoroutine = e.CoroutineId
+	} else if e.PermOpEventData != nil {
+		d := e.PermOpEventData
+		s.EventType = strings.ToLower(d.OpType.String())
+		s.ProcessKName = string(e.ProcessKname)
+		s.SyscallThread = e.ThreadId
+		s.SyscallCoroutine = e.CoroutineId
+	} else if e.ProcLifecycleEventData != nil {
+		d := e.ProcLifecycleEventData
+		s.EventType = strings.ToLower(d.LifecycleType.String())
+		s.ProcessKName = string(d.Comm)
+		s.SyscallThread = e.ThreadId
+		s.SyscallCoroutine = e.CoroutineId
 	}
 	s.VTAPID = vtapId
 	s.L3EpcID = d.platformData.QueryVtapEpc0(s.OrgId, vtapId)
@@ -260,6 +357,94 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 
 	d.export(s)
 	d.eventWriter.Write(s)
+}
+
+func resolveGProcessID(queryProcessInfo func(pid uint32) uint32, rootPidCache *AiAgentRootPidCache, orgId, vtapId uint16, e *pb.ProcEvent) uint32 {
+	if e == nil {
+		return 0
+	}
+
+	pid := e.Pid
+	if pid == 0 {
+		return 0
+	}
+
+	rootPid := pid
+	if rootPidCache != nil {
+		if e.EventType == pb.EventType_ProcLifecycleEvent && e.ProcLifecycleEventData != nil {
+			lifecyclePid := e.ProcLifecycleEventData.Pid
+			if lifecyclePid != 0 {
+				pid = lifecyclePid
+			}
+			parentPid := e.ProcLifecycleEventData.ParentPid
+			if e.ProcLifecycleEventData.LifecycleType == pb.ProcLifecycleType_ProcLifecycleExec {
+				if cachedRoot, ok := rootPidCache.Get(orgId, vtapId, pid); ok && cachedRoot != 0 {
+					rootPid = cachedRoot
+				} else if parentPid != 0 {
+					if parentRoot, ok := rootPidCache.Get(orgId, vtapId, parentPid); ok && parentRoot != 0 {
+						rootPidCache.Set(orgId, vtapId, pid, parentRoot)
+						rootPid = parentRoot
+					} else {
+						rootPidCache.Set(orgId, vtapId, pid, pid)
+						rootPid = pid
+					}
+				} else {
+					rootPidCache.Set(orgId, vtapId, pid, pid)
+					rootPid = pid
+				}
+			} else {
+				rootPid = rootPidCache.ResolveRootPid(orgId, vtapId, pid, parentPid)
+			}
+		} else if cachedRoot, ok := rootPidCache.Get(orgId, vtapId, pid); ok && cachedRoot != 0 {
+			rootPid = cachedRoot
+		}
+	}
+
+	if rootPid != 0 {
+		gprocessID := queryProcessInfo(rootPid)
+		if gprocessID != 0 {
+			if rootPidCache != nil &&
+				e.EventType == pb.EventType_ProcLifecycleEvent && e.ProcLifecycleEventData != nil &&
+				e.ProcLifecycleEventData.LifecycleType == pb.ProcLifecycleType_ProcLifecycleExit {
+				rootPidCache.Delete(orgId, vtapId, pid)
+			}
+			return gprocessID
+		}
+	}
+
+	if rootPid == pid {
+		gprocessID := queryProcessInfo(pid)
+		if gprocessID != 0 {
+			if rootPidCache != nil &&
+				e.EventType == pb.EventType_ProcLifecycleEvent && e.ProcLifecycleEventData != nil &&
+				e.ProcLifecycleEventData.LifecycleType == pb.ProcLifecycleType_ProcLifecycleExit {
+				rootPidCache.Delete(orgId, vtapId, pid)
+			}
+			return gprocessID
+		}
+	}
+
+	// Proc lifecycle (fork/exec/exit) events may arrive before the controller
+	// has synchronized the child process into the `process` table. In that
+	// window, QueryProcessInfo(child_pid) returns 0 even though the parent is
+	// already mapped. Falling back to the parent_pid keeps the lifecycle event
+	// attached to the correct AI Agent gprocess_id until the child entry is
+	// eventually synced.
+	if e.EventType != pb.EventType_ProcLifecycleEvent || e.ProcLifecycleEventData == nil {
+		return 0
+	}
+	parentPid := e.ProcLifecycleEventData.ParentPid
+	if parentPid == 0 || parentPid == e.Pid {
+		return 0
+	}
+	gprocessID := queryProcessInfo(parentPid)
+	if gprocessID == 0 {
+		return 0
+	}
+	if rootPidCache != nil && e.ProcLifecycleEventData.LifecycleType == pb.ProcLifecycleType_ProcLifecycleExit {
+		rootPidCache.Delete(orgId, vtapId, pid)
+	}
+	return gprocessID
 }
 
 func (d *Decoder) export(item exporterscommon.ExportItem) {

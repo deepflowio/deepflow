@@ -1150,6 +1150,9 @@ pub struct LogParserConfig {
     pub unconcerned_dns_nxdomain_trie: DomainNameTrie,
     pub mysql_decompress_payload: bool,
     pub custom_app: CustomAppConfig,
+    pub ai_agent_endpoints: Vec<String>,
+    pub ai_agent_max_payload_size: usize,
+    pub ai_agent_file_io_enabled: bool,
 }
 
 impl Default for LogParserConfig {
@@ -1169,6 +1172,13 @@ impl Default for LogParserConfig {
             unconcerned_dns_nxdomain_trie: DomainNameTrie::default(),
             mysql_decompress_payload: true,
             custom_app: CustomAppConfig::default(),
+            ai_agent_endpoints: vec![
+                "/v1/chat/completions".to_string(),
+                "/v1/embeddings".to_string(),
+                "/v1/responses".to_string(),
+            ],
+            ai_agent_max_payload_size: usize::MAX, // default: unlimited (config 0 → usize::MAX)
+            ai_agent_file_io_enabled: true,
         }
     }
 }
@@ -1215,6 +1225,8 @@ impl fmt::Debug for LogParserConfig {
             )
             .field("mysql_decompress_payload", &self.mysql_decompress_payload)
             .field("custom_app", &self.custom_app)
+            .field("ai_agent_endpoints", &self.ai_agent_endpoints)
+            .field("ai_agent_max_payload_size", &self.ai_agent_max_payload_size)
             .finish()
     }
 }
@@ -1288,6 +1300,7 @@ pub struct EbpfConfig {
     pub agent_id: u16,
     pub epc_id: u32,
     pub l7_log_packet_size: usize,
+    pub ai_agent_max_payload_size: usize,
     // 静态配置
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
@@ -1313,6 +1326,7 @@ impl fmt::Debug for EbpfConfig {
             .field("agent_id", &self.agent_id)
             .field("epc_id", &self.epc_id)
             .field("l7_log_packet_size", &self.l7_log_packet_size)
+            .field("ai_agent_max_payload_size", &self.ai_agent_max_payload_size)
             .field(
                 "l7_protocol_inference_max_fail_count",
                 &self.l7_protocol_inference_max_fail_count,
@@ -2335,6 +2349,13 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                         None
                     },
                 },
+                ai_agent_endpoints: conf.inputs.proc.ai_agent.http_endpoints.clone(),
+                ai_agent_max_payload_size: if conf.inputs.proc.ai_agent.max_payload_size == 0 {
+                    usize::MAX // 0 means unlimited
+                } else {
+                    conf.inputs.proc.ai_agent.max_payload_size
+                },
+                ai_agent_file_io_enabled: conf.inputs.proc.ai_agent.file_io_enabled,
             },
             debug: DebugConfig {
                 agent_id: conf.global.common.agent_id as u16,
@@ -2372,6 +2393,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 epc_id: conf.global.common.vpc_id,
                 l7_log_packet_size: crate::ebpf::CAP_LEN_MAX
                     .min(conf.processors.request_log.tunning.payload_truncation as usize),
+                ai_agent_max_payload_size: conf.inputs.proc.ai_agent.max_payload_size,
                 l7_log_tap_types: generate_tap_types_array(
                     &conf.outputs.flow_log.filters.l7_capture_network_types,
                 ),
@@ -5656,6 +5678,15 @@ impl ConfigHandler {
                 },
                 ..new_config.log_parser.clone()
             };
+
+            // Propagate file_io_enabled toggle to AiAgentRegistry
+            #[cfg(feature = "enterprise")]
+            {
+                if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
+                    registry
+                        .set_file_io_enabled(candidate_config.log_parser.ai_agent_file_io_enabled);
+                }
+            }
         }
 
         if candidate_config.synchronizer != new_config.synchronizer {

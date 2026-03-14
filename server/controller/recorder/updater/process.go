@@ -121,6 +121,7 @@ func (p *Process) generateDBItemToAdd(cloudItem *cloudmodel.Process) (*metadbmod
 		VTapID:      cloudItem.VTapID,
 		PID:         cloudItem.PID,
 		ProcessName: cloudItem.ProcessName,
+		BizType:     cloudItem.BizType,
 		CommandLine: cloudItem.CommandLine,
 		StartTime:   cloudItem.StartTime,
 		UserName:    cloudItem.UserName,
@@ -155,6 +156,10 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 	if diffBase.OSAPPTags != cloudItem.OSAPPTags {
 		mapInfo["os_app_tags"] = cloudItem.OSAPPTags
 		structInfo.OSAPPTags.Set(diffBase.OSAPPTags, cloudItem.OSAPPTags)
+	}
+	if diffBase.BizType != cloudItem.BizType {
+		mapInfo["biz_type"] = cloudItem.BizType
+		structInfo.BizType.Set(diffBase.BizType, cloudItem.BizType)
 	}
 	if diffBase.ContainerID != cloudItem.ContainerID {
 		mapInfo["container_id"] = cloudItem.ContainerID

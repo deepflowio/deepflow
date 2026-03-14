@@ -560,6 +560,28 @@ pub struct SymbolTable {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
+pub struct AiAgentConfig {
+    pub http_endpoints: Vec<String>,
+    pub max_payload_size: usize,
+    pub file_io_enabled: bool,
+}
+
+impl Default for AiAgentConfig {
+    fn default() -> Self {
+        Self {
+            http_endpoints: vec![
+                "/v1/chat/completions".to_string(),
+                "/v1/embeddings".to_string(),
+                "/v1/responses".to_string(),
+            ],
+            max_payload_size: 0, // 0 means unlimited
+            file_io_enabled: true,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct Proc {
     pub enabled: bool,
     pub proc_dir_path: String,
@@ -572,6 +594,7 @@ pub struct Proc {
     pub process_blacklist: Vec<String>,
     pub process_matcher: Vec<ProcessMatcher>,
     pub symbol_table: SymbolTable,
+    pub ai_agent: AiAgentConfig,
 }
 
 impl Default for Proc {
@@ -658,6 +681,7 @@ impl Default for Proc {
                 },
             ],
             symbol_table: SymbolTable::default(),
+            ai_agent: AiAgentConfig::default(),
         };
         p.process_blacklist.sort_unstable();
         p.process_blacklist.dedup();
