@@ -21,6 +21,7 @@ use std::{
     time::Duration,
 };
 
+use hex::encode as hex_encode;
 use log::{debug, trace};
 use pcap::Linktype;
 use pcap_parser::{
@@ -182,9 +183,19 @@ impl Default for ApplicationParser {
 impl ApplicationParser {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<()> {
         let checker = self.protocol_checker.as_ref().unwrap();
+        let payload_preview_len = payload.len().min(32);
+        let payload_preview = hex_encode(&payload[..payload_preview_len]);
         // check both directions
         let rev_param = param.reversed();
         for p in [param, &rev_param] {
+            trace!(
+                "check_payload port_dst={} port_src={} dir={:?} payload_len={} preview={}",
+                p.port_dst,
+                p.port_src,
+                p.direction,
+                payload.len(),
+                payload_preview
+            );
             for protocol in checker.possible_protocols(p.l4_protocol.into(), p.port_dst) {
                 let Some(mut parser) = get_parser((*protocol).into()) else {
                     continue;
