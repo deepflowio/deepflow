@@ -1097,7 +1097,6 @@ dependencies = [
  "thiserror 1.0.47",
  "time",
  "tokio",
- "tokio-stream",
  "tonic",
  "tonic-build",
  "trace-utils",
