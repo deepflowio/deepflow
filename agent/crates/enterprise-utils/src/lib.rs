@@ -494,10 +494,6 @@ pub mod ai_agent {
         pub fn set_bpf_map_fd(&self, _fd: i32) {}
 
         pub fn set_file_io_enabled(&self, _enabled: bool) {}
-
-        pub fn record_endpoint_hit(&self, _pid: u32, _endpoint: &str, _now: Duration) -> bool {
-            false
-        }
     }
 
     /// Check if a URL path matches an AI Agent endpoint pattern.
