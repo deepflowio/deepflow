@@ -3154,7 +3154,7 @@ int socket_tracer_stop(void)
 	if (t == NULL)
 		return ret;
 	if (t->state == TRACER_INIT) {
-		ebpf_warning
+		ebpf_info
 		    ("[eBPF Kernel Adapt] Adapting the linux kernel(%s) is in "
 		     "progress, please try the stop operation again later.\n",
 		     linux_release);
@@ -3162,7 +3162,7 @@ int socket_tracer_stop(void)
 	}
 
 	if (probes_act == ACT_DETACH) {
-		ebpf_warning
+		ebpf_info
 		    ("The latest probes_act is already ACT_DETACH, without operating.\n");
 
 		return 0;
@@ -3181,7 +3181,7 @@ int socket_tracer_start(void)
 		return ret;
 
 	if (t->state == TRACER_INIT) {
-		ebpf_warning
+		ebpf_info
 		    ("[eBPF Kernel Adapt] Adapting the linux kernel(%s) "
 		     "is in progress, please try "
 		     "the start operation again later.\n", linux_release);
@@ -3189,7 +3189,7 @@ int socket_tracer_start(void)
 	}
 
 	if (probes_act == ACT_ATTACH) {
-		ebpf_warning
+		ebpf_info
 		    ("The latest probes_act already ACT_ATTACH, without operating.\n");
 		return 0;
 	}
