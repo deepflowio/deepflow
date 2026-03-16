@@ -1280,15 +1280,17 @@ impl NicOptimizeConfig {
         let irq_cpu = CString::new(self.irq_cpu_list.as_str()).unwrap();
         let xdp_cpu = CString::new(self.xdp_cpu_redirect_list.as_str()).unwrap();
 
-        let ret = ebpf::nic_optimize_config(
-            nic_name.as_ptr(),
-            self.rx_ring_size as c_int,
-            self.rss_channel_count as c_int,
-            irq_cpu.as_ptr(),
-            self.xdp_cpu_redirect,
-            self.xdp_queue_size as c_int,
-            xdp_cpu.as_ptr(),
-        );
+        let ret = unsafe {
+            ebpf::nic_optimize_config(
+                nic_name.as_ptr(),
+                self.rx_ring_size as c_int,
+                self.rss_channel_count as c_int,
+                irq_cpu.as_ptr(),
+                self.xdp_cpu_redirect,
+                self.xdp_queue_size as c_int,
+                xdp_cpu.as_ptr(),
+            )
+        };
 
         if ret != 0 {
             warn!(
