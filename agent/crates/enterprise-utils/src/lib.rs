@@ -452,6 +452,7 @@ pub mod ai_agent {
         pub first_seen: Duration,
         pub last_seen: Duration,
         pub matched_endpoint: String,
+        pub root_pid: u32,
     }
 
     #[derive(Debug, Clone, Default)]
@@ -467,6 +468,14 @@ pub mod ai_agent {
         }
 
         pub fn is_ai_agent(&self, _pid: u32) -> bool {
+            false
+        }
+
+        pub fn get_root_pid(&self, _pid: u32) -> u32 {
+            0
+        }
+
+        pub fn register_child(&self, _parent_pid: u32, _child_pid: u32, _now: Duration) -> bool {
             false
         }
 

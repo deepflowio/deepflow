@@ -335,6 +335,7 @@ message ProcEvent {
     FileOpEventData file_op_event_data = 11;
     PermOpEventData perm_op_event_data = 12;
     ProcLifecycleEventData proc_lifecycle_event_data = 13;
+    uint32 ai_agent_root_pid = 14;
 }
 
 message PrometheusMetric {

@@ -133,6 +133,16 @@ fn register_ai_agent_child(event: &BoxedProcEvents) {
     }
 }
 
+#[cfg(feature = "enterprise")]
+fn fill_ai_agent_root_pid(event: &mut BoxedProcEvents) {
+    if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
+        let root_pid = registry.get_root_pid(event.0.pid);
+        if root_pid != 0 {
+            event.0.ai_agent_root_pid = root_pid;
+        }
+    }
+}
+
 impl OwnedCountable for SyncEbpfCounter {
     fn get_counters(&self) -> Vec<Counter> {
         let rx = self.counter.rx.swap(0, Ordering::Relaxed);
@@ -661,6 +671,8 @@ impl EbpfCollector {
                 }
                 #[cfg(feature = "enterprise")]
                 register_ai_agent_child(&event);
+                #[cfg(feature = "enterprise")]
+                fill_ai_agent_root_pid(&mut event);
                 if let Err(e) = PROC_EVENT_SENDER.as_mut().unwrap().send(event) {
                     warn!("event send ebpf error: {:?}", e);
                 }
