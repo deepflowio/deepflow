@@ -387,6 +387,7 @@ impl fmt::Display for EventType {
 pub struct ProcEvent {
     pub pid: u32,
     pub pod_id: u32,
+    pub ai_agent_root_pid: u32,
     thread_id: u32,
     coroutine_id: u64, // optional
     process_kname: Vec<u8>,
@@ -446,6 +447,7 @@ impl ProcEvent {
             event_type,
             event_data,
             pod_id: 0,
+            ai_agent_root_pid: 0,
         };
 
         Ok(BoxedProcEvents(Box::new(proc_event)))
@@ -490,6 +492,7 @@ impl Sendable for BoxedProcEvents {
             end_time: self.0.end_time,
             event_type: self.0.event_type.into(),
             pod_id: self.0.pod_id,
+            ai_agent_root_pid: self.0.ai_agent_root_pid,
             ..Default::default()
         };
         match self.0.event_data {
@@ -535,6 +538,7 @@ mod tests {
         let proc_event = ProcEvent {
             pid: 1234,
             pod_id: 0,
+            ai_agent_root_pid: 0,
             thread_id: 0,
             coroutine_id: 0,
             process_kname: b"python3".to_vec(),

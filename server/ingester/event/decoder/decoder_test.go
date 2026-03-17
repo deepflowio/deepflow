@@ -118,3 +118,50 @@ func TestResolveGProcessIDExecKeepsSelfWhenUncached(t *testing.T) {
 		t.Fatalf("expected exec event use self gprocess_id %d, got %d", pidGpid, got)
 	}
 }
+
+func TestResolveGProcessIDAiAgentRootPidFallback(t *testing.T) {
+	orgId := uint16(1)
+	vtapId := uint16(2)
+	rootPid := uint32(1000)
+	childPid := uint32(2000)
+	rootGpid := uint32(55)
+	cache := NewAiAgentRootPidCache()
+
+	query := func(pid uint32) uint32 {
+		if pid == rootPid {
+			return rootGpid
+		}
+		return 0
+	}
+
+	// File event from a child process that isn't in the process table yet,
+	// but carries the root AI Agent PID from the agent registry.
+	fileEvent := &pb.ProcEvent{
+		Pid:             childPid,
+		EventType:       pb.EventType_FileOpEvent,
+		AiAgentRootPid:  rootPid,
+		FileOpEventData: &pb.FileOpEventData{OpType: pb.FileOpType_FileOpCreate},
+	}
+	got := resolveGProcessID(query, cache, orgId, vtapId, fileEvent)
+	if got != rootGpid {
+		t.Fatalf("expected ai_agent_root_pid fallback to gprocess_id %d, got %d", rootGpid, got)
+	}
+
+	// After the first resolution, the cache should be populated so
+	// subsequent events for the same child resolve without the fallback.
+	query2 := func(pid uint32) uint32 {
+		if pid == rootPid {
+			return rootGpid
+		}
+		return 0
+	}
+	fileEvent2 := &pb.ProcEvent{
+		Pid:         childPid,
+		EventType:   pb.EventType_IoEvent,
+		IoEventData: &pb.IoEventData{},
+	}
+	got2 := resolveGProcessID(query2, cache, orgId, vtapId, fileEvent2)
+	if got2 != rootGpid {
+		t.Fatalf("expected cached root_pid resolution to gprocess_id %d, got %d", rootGpid, got2)
+	}
+}

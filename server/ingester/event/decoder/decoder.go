@@ -409,26 +409,42 @@ func resolveGProcessID(queryProcessInfo func(pid uint32) uint32, rootPidCache *A
 		}
 	}
 
+	cleanupOnExit := func() {
+		if rootPidCache != nil &&
+			e.EventType == pb.EventType_ProcLifecycleEvent && e.ProcLifecycleEventData != nil &&
+			e.ProcLifecycleEventData.LifecycleType == pb.ProcLifecycleType_ProcLifecycleExit {
+			rootPidCache.Delete(orgId, vtapId, pid)
+		}
+	}
+
 	if rootPid != 0 {
 		gprocessID := queryProcessInfo(rootPid)
 		if gprocessID != 0 {
-			if rootPidCache != nil &&
-				e.EventType == pb.EventType_ProcLifecycleEvent && e.ProcLifecycleEventData != nil &&
-				e.ProcLifecycleEventData.LifecycleType == pb.ProcLifecycleType_ProcLifecycleExit {
-				rootPidCache.Delete(orgId, vtapId, pid)
-			}
+			cleanupOnExit()
 			return gprocessID
 		}
 	}
 
-	if rootPid == pid {
+	if rootPid != pid {
 		gprocessID := queryProcessInfo(pid)
 		if gprocessID != 0 {
-			if rootPidCache != nil &&
-				e.EventType == pb.EventType_ProcLifecycleEvent && e.ProcLifecycleEventData != nil &&
-				e.ProcLifecycleEventData.LifecycleType == pb.ProcLifecycleType_ProcLifecycleExit {
-				rootPidCache.Delete(orgId, vtapId, pid)
+			cleanupOnExit()
+			return gprocessID
+		}
+	}
+
+	// Fallback: use ai_agent_root_pid sent by the agent.
+	// The agent tracks root AI Agent PIDs in its registry and attaches
+	// the root PID to every event from AI Agent processes. This resolves
+	// gprocess_id for child/grandchild processes that haven't been
+	// synchronized to the process table yet.
+	if e.AiAgentRootPid != 0 && e.AiAgentRootPid != pid && e.AiAgentRootPid != rootPid {
+		gprocessID := queryProcessInfo(e.AiAgentRootPid)
+		if gprocessID != 0 {
+			if rootPidCache != nil {
+				rootPidCache.Set(orgId, vtapId, pid, e.AiAgentRootPid)
 			}
+			cleanupOnExit()
 			return gprocessID
 		}
 	}
@@ -450,9 +466,7 @@ func resolveGProcessID(queryProcessInfo func(pid uint32) uint32, rootPidCache *A
 	if gprocessID == 0 {
 		return 0
 	}
-	if rootPidCache != nil && e.ProcLifecycleEventData.LifecycleType == pb.ProcLifecycleType_ProcLifecycleExit {
-		rootPidCache.Delete(orgId, vtapId, pid)
-	}
+	cleanupOnExit()
 	return gprocessID
 }
 
