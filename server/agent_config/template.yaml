@@ -6699,9 +6699,21 @@ processors:
         # description:
         #   en: |-
         #     Service port list, priority lower than TCP SYN flags.
+        #
+        #     The server determines the priority order from highest to lowest as:
+        #     - TCP Flags: SYN|ACK, GPID
+        #     - Layer 7 Parsing
+        #     - `server_ports` Configuration
+        #     - Packet Count (The side with more sent packets is the server.)
         #   ch: |-
         #     deepflow-agent 有可能会错误的判断长流的方向，如果某个端口一定是服务端端口，
         #     可配置在此处避免误判断。
+        #
+        #     服务端判定优先级从高到低为：
+        #     - TCP Flags 中 SYN|ACK、GPID
+        #     - L7 层解析
+        #     - `server_ports` 配置 
+        #     - Packet 计数（发送包数多的为服务端）
         # upgrade_from: static_config.server-ports
         server_ports: []
         # type: bool
