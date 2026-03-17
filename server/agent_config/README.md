@@ -9391,6 +9391,12 @@ processors:
 
 Service port list, priority lower than TCP SYN flags.
 
+The server determines the priority order from highest to lowest as:
+- TCP Flags: SYN|ACK, GPID
+- Layer 7 Parsing
+- `server_ports` Configuration
+- Packet Count (The side with more sent packets is the server.)
+
 ##### Cloud Traffic Ignore MAC {#processors.flow_log.conntrack.flow_generation.cloud_traffic_ignore_mac}
 
 **Tags**:
