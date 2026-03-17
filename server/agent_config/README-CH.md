@@ -9335,6 +9335,12 @@ processors:
 deepflow-agent 有可能会错误的判断长流的方向，如果某个端口一定是服务端端口，
 可配置在此处避免误判断。
 
+服务端判定优先级从高到低为：
+- TCP Flags 中 SYN|ACK、GPID
+- L7 层解析
+- `server_ports` 配置 
+- Packet 计数（发送包数多的为服务端）
+
 ##### 云流量忽略 MAC {#processors.flow_log.conntrack.flow_generation.cloud_traffic_ignore_mac}
 
 **标签**:
