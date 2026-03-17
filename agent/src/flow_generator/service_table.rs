@@ -90,7 +90,9 @@ pub struct ServiceTable {
 impl ServiceTable {
     const MIN_SCORE: u8 = 0;
     pub const MAX_SCORE: u8 = 0xff;
-    pub const MAX_SCORE_FROM_CONFIG: u8 = Self::MAX_SCORE - 1;
+    pub const MAX_SCORE_FROM_L7: u8 = Self::MAX_SCORE - 1;
+    pub const MAX_SCORE_FROM_CONFIG: u8 = Self::MAX_SCORE - 2;
+    pub const MAX_SCORE_FROM_PACKET: u8 = Self::MAX_SCORE - 3;
     const SCORE_DIFF_THRESHOLD: u8 = 8;
     const PORT_MSB: u16 = 1 << 15;
 
@@ -115,17 +117,11 @@ impl ServiceTable {
         match (flow_src_key, flow_dst_key) {
             (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
                 self.ipv4.put(flow_src_key, Self::MIN_SCORE);
-                self.ipv4.put(
-                    flow_dst_key,
-                    Self::MIN_SCORE + Self::SCORE_DIFF_THRESHOLD + 1,
-                );
+                self.ipv4.put(flow_dst_key, Self::MAX_SCORE_FROM_L7);
             }
             (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
                 self.ipv6.put(flow_src_key, Self::MIN_SCORE);
-                self.ipv6.put(
-                    flow_dst_key,
-                    Self::MIN_SCORE + Self::SCORE_DIFF_THRESHOLD + 1,
-                );
+                self.ipv6.put(flow_dst_key, Self::MAX_SCORE_FROM_L7);
             }
             _ => unimplemented!(),
         }
@@ -174,7 +170,7 @@ impl ServiceTable {
                     if let Some(score) = self.ipv4.get(&flow_dst_key) {
                         flow_dst_score = *score;
                     }
-                    if is_first_packet && flow_dst_score < Self::MAX_SCORE - 1 {
+                    if is_first_packet && flow_dst_score < Self::MAX_SCORE_FROM_PACKET {
                         flow_dst_score += 1;
                         self.ipv4.put(flow_dst_key, flow_dst_score);
                     }
@@ -185,7 +181,7 @@ impl ServiceTable {
                     if let Some(score) = self.ipv6.get(&flow_dst_key) {
                         flow_dst_score = *score;
                     }
-                    if is_first_packet && flow_dst_score < Self::MAX_SCORE - 1 {
+                    if is_first_packet && flow_dst_score < Self::MAX_SCORE_FROM_PACKET {
                         flow_dst_score += 1;
                         self.ipv6.put(flow_dst_key, flow_dst_score);
                     }
@@ -390,11 +386,13 @@ impl ServiceTable {
             (ServiceKey::V4(flow_src_key), ServiceKey::V4(flow_dst_key)) => {
                 if self.port_map.contains(&flow_src_key.port) {
                     flow_src_score = Self::MAX_SCORE_FROM_CONFIG;
+                    self.ipv4.put(flow_src_key, flow_src_score);
                 } else if let Some(score) = self.ipv4.get(&flow_src_key) {
                     flow_src_score = *score;
                 }
                 if self.port_map.contains(&flow_dst_key.port) {
                     flow_dst_score = Self::MAX_SCORE_FROM_CONFIG;
+                    self.ipv4.put(flow_dst_key, flow_dst_score);
                 } else if let Some(score) = self.ipv4.get(&flow_dst_key) {
                     flow_dst_score = *score;
                 }
@@ -412,7 +410,7 @@ impl ServiceTable {
                     }
                 }
 
-                if flow_dst_score < Self::MAX_SCORE - 1 {
+                if flow_dst_score < Self::MAX_SCORE_FROM_PACKET {
                     flow_dst_score += 1;
                     self.ipv4.put(flow_dst_key, flow_dst_score);
                 }
@@ -427,11 +425,13 @@ impl ServiceTable {
             (ServiceKey::V6(flow_src_key), ServiceKey::V6(flow_dst_key)) => {
                 if self.port_map.contains(&flow_src_key.port) {
                     flow_src_score = Self::MAX_SCORE_FROM_CONFIG;
+                    self.ipv6.put(flow_src_key, flow_src_score);
                 } else if let Some(score) = self.ipv6.get(&flow_src_key) {
                     flow_src_score = *score;
                 }
                 if self.port_map.contains(&flow_dst_key.port) {
                     flow_dst_score = Self::MAX_SCORE_FROM_CONFIG;
+                    self.ipv6.put(flow_dst_key, flow_dst_score);
                 } else if let Some(score) = self.ipv6.get(&flow_dst_key) {
                     flow_dst_score = *score;
                 }
@@ -449,7 +449,7 @@ impl ServiceTable {
                     }
                 }
 
-                if flow_dst_score < Self::MAX_SCORE - 1 {
+                if flow_dst_score < Self::MAX_SCORE_FROM_PACKET {
                     flow_dst_score += 1;
                     self.ipv6.put(flow_dst_key, flow_dst_score);
                 }
@@ -467,6 +467,11 @@ impl ServiceTable {
         flow_src_score: u8,
         flow_dst_score: u8,
     ) -> (u8, u8) {
+        if flow_src_score > Self::MAX_SCORE_FROM_PACKET
+            || flow_dst_score > Self::MAX_SCORE_FROM_PACKET
+        {
+            return (flow_src_score, flow_dst_score);
+        }
         let diff_value = if flow_src_score > flow_dst_score {
             flow_src_score - flow_dst_score
         } else {
