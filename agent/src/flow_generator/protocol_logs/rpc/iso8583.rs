@@ -282,15 +282,12 @@ impl L7ProtocolParserInterface for Iso8583Log {
                 } else if field.id == 39 {
                     info.f39 = field.value.clone();
                     info.msg_type = LogMessageType::Response;
-                    if matches!(
-                        field.value.as_str(),
-                        "00" | "10" | "11" | "16" | "A2" | "A4" | "A5" | "A6" | "Y1" | "Y3"
-                    ) {
-                        info.response_status = L7ResponseStatus::Ok;
-                    } else {
+                    if matches!(field.value.as_str(), "96" | "A0" | "30") {
                         info.response_status = L7ResponseStatus::ClientError;
                         info.response_exception =
                             field.translated.clone().unwrap_or(field.value.clone());
+                    } else {
+                        info.response_status = L7ResponseStatus::Ok;
                     }
                 };
                 set_captured_byte!(info, param);
