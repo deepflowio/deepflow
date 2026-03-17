@@ -233,6 +233,43 @@ message Profile {
     // Deprecated in v6.4.1: string container_id = 32;
     uint32 pod_id = 33;
     uint64 wide_count = 34;
+
+    // Server-side symbolization fields (added for symbolization migration)
+    InterpreterStack interpreter_stack = 40;  // Structured interpreter stack frames
+    string native_stack_trace = 41;           // Native frame folded stack string
+    bool raw_interpreter_data = 42;           // true = new format (needs server symbolization)
+}
+
+// Interpreter frame type constants (matches eBPF FRAME_TYPE_* values)
+enum InterpreterFrameType {
+    FRAME_TYPE_UNKNOWN = 0;
+    FRAME_TYPE_PYTHON = 1;
+    FRAME_TYPE_PHP = 2;
+    FRAME_TYPE_V8 = 3;
+    FRAME_TYPE_LUA = 4;
+}
+
+// Structured symbol information for a single interpreter stack frame.
+// Agent extracts raw symbol strings from process memory and sends
+// structured data; Server performs formatting and stack merging.
+message InterpreterFrameSymbol {
+    InterpreterFrameType frame_type = 1;
+    string function_name = 2;    // Function/method name (extracted from process memory)
+    string class_name = 3;       // Class name (PHP/Python)
+    uint32 lineno = 4;           // Line number
+    string file_name = 5;        // File/script name (V8 Script name, Lua chunk name)
+    uint32 sub_type = 6;         // Language-specific sub-type:
+                                 //   PHP: type_info (distinguishes top-level code, etc.)
+                                 //   V8: frame sub-type (BYTECODE/NATIVE_SFI/NATIVE_CODE/...)
+                                 //   Lua: tag type (LUA_FUNC/CFUNC/FFUNC)
+    bool is_jit = 7;             // JIT compiled flag
+    uint64 raw_addr = 8;         // Original address (for fallback/debugging)
+    bool resolve_failed = 9;     // Symbol extraction failed flag
+}
+
+// A complete interpreter call stack
+message InterpreterStack {
+    repeated InterpreterFrameSymbol frames = 1;
 }
 
 enum IoOperation {

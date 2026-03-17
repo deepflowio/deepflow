@@ -609,16 +609,6 @@ extern int32_t lua_detect(uint32_t pid, lua_runtime_info_t *out);
 #endif
 
 #if defined(DF_ENTERPRISE)
-extern char *lua_format_folded_stack_trace(void *tracer,
-                                           uint32_t pid,
-                                           const uint64_t *frames,
-                                           uint32_t frame_count,
-                                           bool new_cache,
-                                           void *info_p,
-                                           const char *err_tag);
-#endif
-
-#if defined(DF_ENTERPRISE)
 extern void lua_set_map_fds(int32_t lang_flags_fd,
                             int32_t unwind_info_fd,
                             int32_t lua_offsets_fd,
@@ -642,34 +632,6 @@ extern void lua_unwind_table_load(lua_unwind_table_t *table, uint32_t pid);
 
 #if defined(DF_ENTERPRISE)
 extern void lua_unwind_table_unload(lua_unwind_table_t *table, uint32_t pid);
-#endif
-
-#if defined(DF_ENTERPRISE)
-extern size_t merge_lua_stacks(void *trace_str,
-                               size_t len,
-                               const void *u_trace,
-                               const void *i_trace);
-#endif
-
-#if defined(DF_ENTERPRISE)
-extern size_t merge_php_stacks(void *trace_str,
-                               size_t len,
-                               const void *i_trace,
-                               const void *u_trace);
-#endif
-
-#if defined(DF_ENTERPRISE)
-extern size_t merge_python_stacks(void *trace_str,
-                                  size_t len,
-                                  const void *i_trace,
-                                  const void *u_trace);
-#endif
-
-#if defined(DF_ENTERPRISE)
-extern size_t merge_v8_stacks(void *trace_str,
-                              size_t len,
-                              const void *i_trace,
-                              const void *u_trace);
 #endif
 
 #if defined(DF_ENTERPRISE)

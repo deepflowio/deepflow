@@ -17,9 +17,8 @@
 /*
  * Excute Stringifier on each iteration of the continuous perf profiler.
  *
- * The Stringifier serves two purposes:
- * 1. It constructs a "folded stack trace string" based on the stack frame addresses.
- * 2. It records the result of (1) when reusing a stack identifier (stack-id).
+ * The Stringifier constructs a "folded stack trace string" based on
+ * the stack frame addresses.
  *
  * Example of a folded stack trace string (taken from a perf profiler test):
  * main;xxx();yyy()
@@ -28,16 +27,11 @@
  *
  * Kernel collects stack-traces separately for user & kernel space,
  * at the BPF level, we track stack traces with a key that includes two "stack-trace-ids",
- * one for user space and one for kernel. Therefore, it is common to see reuse of
- * individual stack trace identifiers...
- * for example, when the same kernel stack trace is observed from multiple user
- * stack traces, or when a given user space stack occasionally (but not always) enters
- * the kernel.
+ * one for user space and one for kernel.
  *
- * When the Stringifier reads the shared BPF stack trace address map, it uses a
- * destructive read approach (it reads a stack trace from the table and then clears it).
- * Due to the reuse of stack trace identifiers and destructive reads, the Stringifier
- * caches the result of its stringification. In each iteration of a continuous perf profiler.
+ * Note: The per-stack string cache (stack_str_hash, ~1GB) has been replaced by a
+ * per-symbol cache (~5-50MB) in trace-utils-interp. Interpreter frame formatting
+ * and stack merging now happen server-side.
  */
 
 #ifndef AARCH64_MUSL
@@ -54,8 +48,6 @@
 #include "../../kernel/include/perf_profiler.h"
 #include "../perf_reader.h"
 #include "../table.h"
-#include "../bihash_8_8.h"
-#include "../bihash_16_8.h"
 #include "java/collect_symbol_files.h"
 #include "stringifier.h"
 #include <bcc/bcc_syms.h>
@@ -65,11 +57,163 @@
 
 // static const char *k_err_tag = "[kernel stack trace error]";
 // static const char *u_err_tag = "[user stack trace error]";
-const char *i_err_tag = "[interpreter stack trace error]";
 static const char *lost_tag = "[stack trace lost]";
 static const char *k_sym_prefix = "[k] ";
 static const char *lib_sym_prefix = "[l] ";
 static const char *u_sym_prefix = "";
+
+#define PROC_SYM_CACHE_SIZE 8192
+#define FOLDED_STACK_CACHE_SIZE 16384
+#define FOLDED_STACK_CACHE_OPT_IGNORE_LIBS 0x1
+#define FOLDED_STACK_CACHE_OPT_USE_SYMBOL_TABLE 0x2
+
+struct proc_symbol_cache_entry {
+	pid_t pid;
+	u64 stime;
+	u64 resolver;
+	u64 address;
+	char *symbol;
+	bool valid;
+};
+
+static __thread struct proc_symbol_cache_entry g_proc_symbol_cache[PROC_SYM_CACHE_SIZE];
+
+struct folded_stack_cache_entry {
+	pid_t pid;
+	u64 stime;
+	u64 stack_hash;
+	u32 opts;
+	char *folded;
+	bool valid;
+};
+
+static __thread struct folded_stack_cache_entry
+	g_folded_stack_cache[FOLDED_STACK_CACHE_SIZE];
+
+static inline u32 proc_symbol_cache_hash(pid_t pid, u64 stime, u64 resolver,
+					 u64 address)
+{
+	u64 h = address;
+	h ^= resolver + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+	h ^= stime + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+	h ^= ((u64)(u32)pid) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+	return (u32)h & (PROC_SYM_CACHE_SIZE - 1);
+}
+
+static inline u32 folded_stack_cache_hash(pid_t pid, u64 stime, u64 stack_hash,
+					  u32 opts)
+{
+	u64 h = stack_hash;
+	h ^= stime + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+	h ^= ((u64)(u32)pid) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+	h ^= (u64)opts + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+	return (u32)h & (FOLDED_STACK_CACHE_SIZE - 1);
+}
+
+static char *clone_symbol_str(const char *src)
+{
+	if (src == NULL) {
+		return NULL;
+	}
+	int len = strlen(src);
+	char *dst = clib_mem_alloc_aligned("symbol_str", len + 1, 0, NULL);
+	if (dst == NULL) {
+		return NULL;
+	}
+	memcpy(dst, src, len + 1);
+	return dst;
+}
+
+static inline bool is_unresolved_symbol(const char *symbol)
+{
+	return symbol
+	       && strncmp(symbol, "[unknown", strlen("[unknown")) == 0;
+}
+
+static bool proc_symbol_cache_lookup(pid_t pid, u64 stime, u64 resolver,
+				     u64 address, char **sym_ptr)
+{
+	if (sym_ptr == NULL) {
+		return false;
+	}
+	u32 idx = proc_symbol_cache_hash(pid, stime, resolver, address);
+	struct proc_symbol_cache_entry *entry = &g_proc_symbol_cache[idx];
+	if (!entry->valid || entry->pid != pid || entry->stime != stime
+	    || entry->resolver != resolver || entry->address != address
+	    || entry->symbol == NULL) {
+		return false;
+	}
+	*sym_ptr = clone_symbol_str(entry->symbol);
+	return *sym_ptr != NULL;
+}
+
+static void proc_symbol_cache_store(pid_t pid, u64 stime, u64 resolver,
+				    u64 address, const char *symbol)
+{
+	if (symbol == NULL) {
+		return;
+	}
+	u32 idx = proc_symbol_cache_hash(pid, stime, resolver, address);
+	struct proc_symbol_cache_entry *entry = &g_proc_symbol_cache[idx];
+	char *new_symbol = clone_symbol_str(symbol);
+	if (new_symbol == NULL) {
+		return;
+	}
+	if (entry->symbol != NULL) {
+		clib_mem_free(entry->symbol);
+	}
+	entry->pid = pid;
+	entry->stime = stime;
+	entry->resolver = resolver;
+	entry->address = address;
+	entry->symbol = new_symbol;
+	entry->valid = true;
+}
+
+static bool folded_stack_cache_lookup(pid_t pid, u64 stime, u64 stack_hash,
+				      u32 opts, char **folded_ptr)
+{
+	if (folded_ptr == NULL) {
+		return false;
+	}
+
+	u32 idx = folded_stack_cache_hash(pid, stime, stack_hash, opts);
+	struct folded_stack_cache_entry *entry = &g_folded_stack_cache[idx];
+	if (!entry->valid || entry->pid != pid || entry->stime != stime
+	    || entry->stack_hash != stack_hash || entry->opts != opts
+	    || entry->folded == NULL) {
+		return false;
+	}
+
+	*folded_ptr = clone_symbol_str(entry->folded);
+	return *folded_ptr != NULL;
+}
+
+static void folded_stack_cache_store(pid_t pid, u64 stime, u64 stack_hash,
+				     u32 opts, const char *folded)
+{
+	if (folded == NULL) {
+		return;
+	}
+
+	u32 idx = folded_stack_cache_hash(pid, stime, stack_hash, opts);
+	struct folded_stack_cache_entry *entry = &g_folded_stack_cache[idx];
+	char *new_folded = clone_symbol_str(folded);
+	if (new_folded == NULL) {
+		return;
+	}
+
+	if (entry->folded != NULL) {
+		clib_mem_free(entry->folded);
+	}
+
+	entry->pid = pid;
+	entry->stime = stime;
+	entry->stack_hash = stack_hash;
+	entry->opts = opts;
+	entry->folded = new_folded;
+	entry->valid = true;
+}
 
 // Stack trace structure definition (user-space copy of eBPF structure)
 // Must match the definition in perf_profiler.bpf.c
@@ -86,6 +230,33 @@ typedef struct {
 	u64 extra_data_a[PERF_MAX_STACK_DEPTH];
 	u64 extra_data_b[PERF_MAX_STACK_DEPTH];
 } stack_t;
+
+static u64 folded_stack_calc_hash(const stack_t *stack, u64 sentinel_addr)
+{
+	if (!stack) {
+		return 0;
+	}
+
+	u64 hash = 1469598103934665603ULL;
+	for (int i = 0; i < PERF_MAX_STACK_DEPTH; i++) {
+		u64 addr = stack->addrs[i];
+		u8 frame_type = stack->frame_types[i];
+
+		if (addr == 0) {
+			break;
+		}
+		if (addr == sentinel_addr) {
+			continue;
+		}
+
+		hash ^= addr + 0x9e3779b97f4a7c15ULL + (hash << 6)
+			+ (hash >> 2);
+		hash ^= (u64)frame_type + 0x9e3779b97f4a7c15ULL + (hash << 6)
+			+ (hash >> 2);
+	}
+
+	return hash;
+}
 
 /*
  * To track the scenario where stack data is missing in the eBPF
@@ -105,69 +276,6 @@ u64 get_stack_table_data_miss_count(void)
 	return stack_table_data_miss;
 }
 
-int init_stack_str_hash(stack_str_hash_t * h, const char *name)
-{
-	memset(h, 0, sizeof(*h));
-	u32 nbuckets = STRINGIFIER_STACK_STR_HASH_BUCKETS_NUM;
-	u64 hash_memory_size = STRINGIFIER_STACK_STR_HASH_MEM_SZ;	// 1G bytes
-	h->private =
-	    clib_mem_alloc_aligned("hash_ext_data",
-				   sizeof(struct stack_str_hash_ext_data),
-				   0, NULL);
-	if (h->private == NULL)
-		return ETR_NOMEM;
-
-	struct stack_str_hash_ext_data *ext = h->private;
-	ext->stack_str_kvps = NULL;
-	ext->clear_hash = false;
-
-	return stack_str_hash_init(h, (char *)name, nbuckets, hash_memory_size);
-}
-
-void release_stack_str_hash(stack_str_hash_t * h)
-{
-	if (h->private) {
-		struct stack_str_hash_ext_data *ext = h->private;
-		vec_free(ext->stack_str_kvps);
-		clib_mem_free(ext);
-	}
-
-	stack_str_hash_free(h);
-}
-
-void clean_stack_strs(stack_str_hash_t * h)
-{
-	u64 elems_count = 0;
-
-	/*
-	 * In this iteration, all elements will be cleared, and in the
-	 * next iteration, this hash will be reused.
-	 */
-	stack_str_hash_kv *v;
-	struct stack_str_hash_ext_data *ext = h->private;
-	vec_foreach(v, ext->stack_str_kvps) {
-		if (v->value != 0)
-			clib_mem_free((void *)v->value);
-
-		if (stack_str_hash_add_del(h, v, 0 /* delete */ )) {
-			ebpf_warning("stack_str_hash_add_del() failed.\n");
-			ext->clear_hash = true;
-		}
-
-		elems_count++;
-	}
-
-	vec_free(ext->stack_str_kvps);
-
-	h->hit_hash_count = 0;
-	h->hash_elems_count = 0;
-
-	if (ext->clear_hash) {
-		release_stack_str_hash(h);
-	}
-
-	ebpf_debug("clean_stack_strs hashmap clear %lu elems.\n", elems_count);
-}
 
 static inline char *create_symbol_str(int len, char *src, const char *tag)
 {
@@ -219,9 +327,12 @@ static char *proc_symbol_name_fetch(pid_t pid, struct bcc_symbol *sym)
 	ASSERT(pid >= 0);
 
 	int len = 0;
-	char *ptr = (char *)sym->demangle_name;
+	char *ptr = (char *)(sym->demangle_name ? sym->demangle_name : sym->name);
+	if (ptr == NULL) {
+		ptr = "[unknown]";
+	}
 
-	if (maybe_rust_symbol(sym->demangle_name)) {
+	if (maybe_rust_symbol(ptr)) {
 		// likely a rust name
 		char rust_name[RUST_SYM_MAX_LEN];
 		memset(rust_name, 0, sizeof(rust_name));
@@ -346,13 +457,29 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 	} else {
 		struct symbolizer_proc_info *p = info_p;
 		if (p) {
+			bool cache_allowed = !p->is_java && p->stime != 0;
+			u64 resolver_key = (u64)resolver;
 			if (p->is_exit
 			    || ((u64) resolver != (u64) p->syms_cache))
 				return (-1);
 			pthread_mutex_lock(&p->mutex);
+			if (cache_allowed
+			    && proc_symbol_cache_lookup(pid, p->stime,
+							resolver_key, address,
+							sym_ptr)) {
+				pthread_mutex_unlock(&p->mutex);
+				return 0;
+			}
+
 			ret = bcc_symcache_resolve(resolver, address, sym);
 			if (ret == 0) {
 				*sym_ptr = proc_symbol_name_fetch(pid, sym);
+				if (cache_allowed && *sym_ptr != NULL
+				    && !is_unresolved_symbol(*sym_ptr)) {
+					proc_symbol_cache_store(pid, p->stime,
+								resolver_key,
+								address, *sym_ptr);
+				}
 				if (p->is_java) {
 					// handle java encoded symbols
 					char *new_sym =
@@ -540,7 +667,6 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 				      const char *stack_map_name,
 				      pid_t pid,
 				      int stack_id,
-				      stack_str_hash_t * h,
 				      bool new_cache,
 				      int *ret_val, void *info_p, u64 ts,
 				      bool ignore_libs, bool use_symbol_table)
@@ -591,6 +717,32 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		return NULL;
 	}
 
+	bool stack_cache_enabled = new_cache && !use_symbol_table;
+	u64 stime_key = 0;
+	u64 stack_hash = 0;
+	u32 stack_cache_opts = 0;
+	if (stack_cache_enabled) {
+		if (ignore_libs) {
+			stack_cache_opts |= FOLDED_STACK_CACHE_OPT_IGNORE_LIBS;
+		}
+		if (use_symbol_table) {
+			stack_cache_opts |= FOLDED_STACK_CACHE_OPT_USE_SYMBOL_TABLE;
+		}
+
+		if (pid > 0 && info_p) {
+			struct symbolizer_proc_info *proc_info = info_p;
+			stime_key = proc_info->stime;
+		}
+
+		stack_hash = folded_stack_calc_hash(&stack, sentinel_addr);
+		char *cached_folded = NULL;
+		if (folded_stack_cache_lookup(pid, stime_key, stack_hash,
+					      stack_cache_opts,
+					      &cached_folded)) {
+			return cached_folded;
+		}
+	}
+
 	// For debugging: stack.len is the number of frames
 	u64 *ips = stack.addrs;
 
@@ -602,39 +754,42 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 		return NULL;
 
 	int start_idx = -1, folded_size = 0;
+	bool has_unresolved_frame = false;
 	for (i = PERF_MAX_STACK_DEPTH - 1; i >= 0; i--) {
 		if (ips[i] == 0 || ips[i] == sentinel_addr)
+			continue;
+
+		/*
+		 * Skip interpreter frames (PHP/V8/Python/Lua).
+		 * These are now sent as structured data via
+		 * extended_extract_structured_frames() and merged
+		 * server-side. Only native frames go into the
+		 * folded stack trace string.
+		 */
+		if (stack.frame_types[i] != FRAME_TYPE_NORMAL)
 			continue;
 
 		if (start_idx == -1)
 			start_idx = i;
 
-		/*
-		 * Use extended hook to resolve frame if it's special.
-		 * We pass possible extra data. If the frame type is 0 (normal),
-		 * this call should return NULL.
-		 */
-		str = extended_resolve_frame(pid, ips[i], stack.frame_types[i],
-					     stack.extra_data_a[i],
-					     stack.extra_data_b[i]);
-		if (str == NULL) {
-			/* Normal fallback */
-			if (use_symbol_table) {
-				str = resolve_custom_symbol_addr(symbols, symbol_ids,
-								 n_symbols,
-								 (i == start_idx),
-								 ips[i]);
-			} else {
-				str = resolve_addr(t, pid, (i == start_idx),
-						   ips[i], new_cache, info_p);
+		if (use_symbol_table) {
+			str = resolve_custom_symbol_addr(symbols, symbol_ids,
+							 n_symbols,
+							 (i == start_idx),
+							 ips[i]);
+		} else {
+			str = resolve_addr(t, pid, (i == start_idx),
+					   ips[i], new_cache, info_p);
 			}
-		}
-		if (str) {
-			// ignore frames in library for memory profiling
-			if (ignore_libs && strlen(str) >= strlen(lib_sym_prefix)
-			    && strncmp(str, lib_sym_prefix,
-				       strlen(lib_sym_prefix)) == 0) {
-				clib_mem_free(str);
+			if (str) {
+				if (is_unresolved_symbol(str)) {
+					has_unresolved_frame = true;
+				}
+				// ignore frames in library for memory profiling
+				if (ignore_libs && strlen(str) >= strlen(lib_sym_prefix)
+				    && strncmp(str, lib_sym_prefix,
+					       strlen(lib_sym_prefix)) == 0) {
+					clib_mem_free(str);
 				continue;
 			}
 			symbol_array[i] = pointer_to_uword(str);
@@ -664,6 +819,14 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 	if (len - 1 >= 0) {
 		fold_stack_trace_str[len - 1] = '\0';
 	}
+
+	if (stack_cache_enabled && !has_unresolved_frame
+	    && fold_stack_trace_str[0] != '\0') {
+		folded_stack_cache_store(pid, stime_key, stack_hash,
+					 stack_cache_opts,
+					 fold_stack_trace_str);
+	}
+
 	vec_free(symbol_array);
 	return fold_stack_trace_str;
 
@@ -680,87 +843,26 @@ failed:
 
 
 
+/*
+ * Build a folded stack trace string for the given stack ID.
+ * Returns a freshly allocated string that the caller must free.
+ */
 static char *folded_stack_trace_string(struct bpf_tracer *t,
 				       int stack_id,
 				       pid_t pid,
 				       const char *stack_map_name,
-				       stack_str_hash_t * h,
 				       bool new_cache, void *info_p, u64 ts,
 				       bool ignore_libs, bool use_symbol_table)
 {
 	ASSERT(pid >= 0 && stack_id >= 0);
 
-	/*
-	 * Firstly, search the stack-trace hash to see if the
-	 * stack trace string has already been stored.
-	 */
-	stack_str_hash_kv kv;
-	kv.key = (u64) stack_id;
-	kv.value = 0;
-	if (stack_str_hash_search(h, &kv, &kv) == 0) {
-		__sync_fetch_and_add(&h->hit_hash_count, 1);
-		return (char *)kv.value;
-	}
-
-	char *str = NULL;
 	int ret_val = 0;
-
-	/*
-	 * Lua frames require special handling via extended hook.
-	 * Lua uses its own stack format with encoded tag + pointer values.
-	 */
-	if (use_symbol_table) {
-		str = extended_format_lua_stack(t, pid, stack_id, stack_map_name,
-						h, new_cache, info_p);
-		if (str != NULL) {
-			/* Cache the result */
-			kv.key = (u64) stack_id;
-			kv.value = pointer_to_uword(str);
-			if (stack_str_hash_add_del(h, &kv, 1)) {
-				clib_mem_free((void *)str);
-				return NULL;
-			}
-			int ret = VEC_OK;
-			struct stack_str_hash_ext_data *ext = h->private;
-			vec_add1(ext->stack_str_kvps, kv, ret);
-			if (ret != VEC_OK) {
-				ebpf_warning("vec add failed\n");
-			}
-			return str;
-		}
-	}
-
-	str = build_stack_trace_string(t, stack_map_name, pid, stack_id,
-				       h, new_cache, &ret_val, info_p, ts,
-				       ignore_libs, use_symbol_table);
+	char *str = build_stack_trace_string(t, stack_map_name, pid, stack_id,
+					     new_cache, &ret_val, info_p, ts,
+					     ignore_libs, use_symbol_table);
 
 	if (ret_val == ETR_NOTEXIST)
 		return NULL;
-
-	if (str == NULL)
-		return NULL;
-
-	kv.key = (u64) stack_id;
-	kv.value = pointer_to_uword(str);
-	/* memoized stack trace string. Because the stack-ids
-	   are not stable across profiler iterations. */
-	if (stack_str_hash_add_del(h, &kv, 1 /* is_add */ )) {
-		ebpf_warning("stack_str_hash_add_del() failed.\n");
-		clib_mem_free((void *)str);
-		str = NULL;
-	} else {
-		/*
-		 * The new key-value pair has been successfully added.
-		 * At the same time, add it to the additional data fo
-		 * quick reference and easy access.
-		 */
-		int ret = VEC_OK;
-		struct stack_str_hash_ext_data *ext = h->private;
-		vec_add1(ext->stack_str_kvps, kv, ret);
-		if (ret != VEC_OK) {
-			ebpf_warning("vec add failed\n");
-		}
-	}
 
 	return str;
 }
@@ -780,30 +882,14 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 				      struct stack_trace_key_t *v,
 				      const char *stack_map_name,
 				      const char *custom_stack_map_name,
-				      stack_str_hash_t * h,
 				      bool new_cache,
 				      char *process_name, void *info_p,
 				      bool ignore_libs)
 {
-	/*
-	 * We need to prepare a hashtable (stack_trace_strs) to record the results
-	 * of this iteration analysis. The key is the user-stack-ID or kernel-stack-ID,
-	 * and the value is the "folded stack trace string". There are two reasons why
-	 * we use this hashtable:
-	 *
-	 * 1. It is common to see reuse of individual stack trace identifiers
-	 *    (avoiding repetitive symbolization work).
-	 * 2. When the Stringifier reads the shared BPF stack trace address map,
-	 *    it uses a destructive read approach (it reads a stack trace from
-	 *    the table and then clears it). It means that when a stackID is
-	 *    deleted, the list of IPs (function addresses) associated with it
-	 *    no longer exists, and must be kept beforehand.
-	 */
-
 	/* add separator and '\0' */
 	int len = 2;
-	char *k_trace_str, *u_trace_str, *trace_str, *uprobe_str, *i_trace_str;
-	k_trace_str = u_trace_str = trace_str = uprobe_str = i_trace_str = NULL;
+	char *k_trace_str, *u_trace_str, *trace_str, *uprobe_str;
+	k_trace_str = u_trace_str = trace_str = uprobe_str = NULL;
 
 	/* For processes without configuration, the stack string is in the format
 	   'process name;thread name'. */
@@ -838,11 +924,11 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	if (v->kernstack >= 0) {
 		k_trace_str = folded_stack_trace_string(t, v->kernstack,
 							0, stack_map_name,
-							h, new_cache, info_p,
+							new_cache, info_p,
 							v->timestamp,
 							ignore_libs, false);
 		if (k_trace_str == NULL)
-			return NULL;
+			goto cleanup;
 		len += strlen(k_trace_str);
 	}
 
@@ -852,12 +938,12 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 							v->flags &
 							STACK_TRACE_FLAGS_DWARF
 							? custom_stack_map_name
-							: stack_map_name, h,
+							: stack_map_name,
 							new_cache, info_p,
 							v->timestamp,
 							ignore_libs, false);
 		if (u_trace_str == NULL)
-			return NULL;
+			goto cleanup;
 		len += strlen(u_trace_str);
 	}
 
@@ -866,53 +952,28 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 		    resolve_addr(t, v->tgid, false, v->uprobe_addr, new_cache,
 				 info_p);
 		if (uprobe_str == NULL) {
-			return NULL;
+			goto cleanup;
 		}
 		len += strlen(uprobe_str) + 1;
 	}
 
-	bool has_intpstack = v->intpstack > 0;
-	if (has_intpstack) {
-		i_trace_str = folded_stack_trace_string(t, v->intpstack, v->tgid,
-							custom_stack_map_name, h,
-							new_cache, info_p,
-							v->timestamp,
-							ignore_libs, true);
-		if (i_trace_str != NULL) {
-			len += strlen(i_trace_str) + strlen(INCOMPLETE_PYTHON_STACK) + 2;
-		} else {
-			len += strlen(i_err_tag);
-		}
-	}
+	/*
+	 * Interpreter frames (Python/Lua) from the interpreter stack map are
+	 * now sent as structured data via extended_extract_structured_frames()
+	 * and merged server-side. Skip reading the interpreter stack map here.
+	 */
 
 	trace_str = alloc_stack_trace_str(len);
 	if (trace_str == NULL) {
 		ebpf_warning("No available memory space.\n");
-		goto error;
+		goto cleanup;
 	}
 
-	/* trace_str combines user/interpreter/kstack strings in call-order (root -> leaf). */
+	/* trace_str combines user/kstack strings in call-order (root -> leaf).
+	 * Interpreter-native stack merging now happens server-side. */
 	int offset = 0;
-	if (i_trace_str && u_trace_str) {
-		/* Use extended merge */
-		int merged = extended_merge_stacks(trace_str + offset,
-						   len - offset, i_trace_str,
-						   u_trace_str, v->tgid);
-		if (merged > 0) {
-			offset += merged;
-		} else {
-			/* Fallback */
-			offset += snprintf(trace_str + offset, len - offset,
-					   "%s;%s", i_trace_str, u_trace_str);
-		}
-	} else if (i_trace_str) {
-		offset += snprintf(trace_str + offset, len - offset, "%s", i_trace_str);
-	} else if (u_trace_str) {
-		if (has_intpstack) {
-			offset += snprintf(trace_str + offset, len - offset, "%s;%s", i_err_tag, u_trace_str);
-		} else {
-			offset += snprintf(trace_str + offset, len - offset, "%s", u_trace_str);
-		}
+	if (u_trace_str) {
+		offset += snprintf(trace_str + offset, len - offset, "%s", u_trace_str);
 	}
 	if (u_trace_str && uprobe_str) {
 		offset += snprintf(trace_str + offset, len - offset, ";%s", uprobe_str);
@@ -922,41 +983,34 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	}
 
 	if (offset == 0) {
-		/*
-		 * The kernel can indicate the invalidity of a stack ID in two
-		 * different ways:
-		 *
-		 * -EFAULT: Stack trace is unavailable
-		 * For example, if the stack trace is only available in user space
-		 * and the kstack_id is invalid, this error code (-EFAULT) is used.
-		 *
-		 * -EEXIST: Hash bucket collision in the stack trace table
-		 *
-		 * If there is a hash table collision for one or both stack IDs, we
-		 * may reach this branch. However, we should not reach this point when
-		 * both stack IDs are set to "invalid" with the error code -EFAULT.
-		 */
-
+		clib_mem_free(trace_str);
 		len += strlen(lost_tag);
 		trace_str = alloc_stack_trace_str(len);
 		if (trace_str == NULL) {
 			ebpf_warning("No available memory space.\n");
-			goto error;
+			goto cleanup;
 		}
 
 		snprintf(trace_str, len, "%s", lost_tag);
 	}
 
-	if (uprobe_str) {
+	/* Free sub-strings (now owned by caller, no longer cached) */
+	if (k_trace_str)
+		clib_mem_free(k_trace_str);
+	if (u_trace_str)
+		clib_mem_free(u_trace_str);
+	if (uprobe_str)
 		clib_mem_free(uprobe_str);
-	}
 
 	return trace_str;
 
-error:
-	if (uprobe_str) {
+cleanup:
+	if (k_trace_str)
+		clib_mem_free(k_trace_str);
+	if (u_trace_str)
+		clib_mem_free(u_trace_str);
+	if (uprobe_str)
 		clib_mem_free(uprobe_str);
-	}
 
 	return NULL;
 }

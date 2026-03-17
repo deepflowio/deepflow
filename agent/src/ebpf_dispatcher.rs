@@ -731,6 +731,53 @@ impl EbpfCollector {
             } else {
                 profile.data = profile_data.to_vec();
             }
+
+            // Convert structured interpreter frames to protobuf if present
+            if data.raw_interpreter_data != 0
+                && data.interp_frame_count > 0
+                && data.interp_frames_ptr != 0
+            {
+                let frames_ptr = data.interp_frames_ptr as *const ebpf::CInterpreterFrameInfo;
+                let frame_count = data.interp_frame_count as usize;
+                let mut pb_frames = Vec::with_capacity(frame_count);
+                for i in 0..frame_count {
+                    let f = &*frames_ptr.add(i);
+                    let function_name = if f.function_name.is_null() {
+                        String::new()
+                    } else {
+                        CStr::from_ptr(f.function_name)
+                            .to_string_lossy()
+                            .into_owned()
+                    };
+                    let class_name = if f.class_name.is_null() {
+                        String::new()
+                    } else {
+                        CStr::from_ptr(f.class_name).to_string_lossy().into_owned()
+                    };
+                    let file_name = if f.file_name.is_null() {
+                        String::new()
+                    } else {
+                        CStr::from_ptr(f.file_name).to_string_lossy().into_owned()
+                    };
+                    pb_frames.push(metric::InterpreterFrameSymbol {
+                        frame_type: f.frame_type as i32,
+                        function_name,
+                        class_name,
+                        lineno: f.lineno,
+                        file_name,
+                        sub_type: f.sub_type,
+                        is_jit: f.is_jit != 0,
+                        raw_addr: f.raw_addr,
+                        resolve_failed: f.resolve_failed != 0,
+                    });
+                }
+                profile.interpreter_stack = Some(metric::InterpreterStack { frames: pb_frames });
+                profile.raw_interpreter_data = true;
+                // stack_data now contains native+kernel frames only (interpreter frames
+                // are skipped in build_stack_trace_string). Server uses native_stack_trace
+                // + interpreter_stack to merge the complete folded stack.
+                profile.native_stack_trace = String::from_utf8_lossy(profile_data).into_owned();
+            }
             let container_id =
                 CStr::from_ptr(data.container_id.as_ptr() as *const libc::c_char).to_string_lossy();
             if let Some(policy_getter) = POLICY_GETTER.as_ref() {
