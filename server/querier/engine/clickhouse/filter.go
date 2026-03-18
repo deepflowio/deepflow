@@ -810,7 +810,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			}
 		}
 		return &view.Expr{Value: filter}, nil
-	} else if table == "alert_event" {
+	} else if table == chCommon.TABLE_NAME_ALERT_EVENT || table == chCommon.TABLE_NAME_ALERT_RECORD {
 		tagName := strings.Trim(t.Tag, "`")
 		tagItem, ok := tag.GetTag(tagName, db, table, "default")
 		if !ok {
@@ -823,7 +823,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 		noSuffixTag := strings.TrimSuffix(tagName, "_0")
 		noSuffixTag = strings.TrimSuffix(noSuffixTag, "_1")
 		noIDTag := noSuffixTag
-		if !slices.Contains([]string{"_id", "x_request_id", "syscall_trace_id", chCommon.TRACE_ID_TAG}, noSuffixTag) {
+		if !slices.Contains([]string{"_id", "x_request_id", "syscall_trace_id", chCommon.TRACE_ID_TAG, "event_id"}, noSuffixTag) {
 			noIDTag = strings.TrimSuffix(noIDTag, "_id")
 		}
 		if ok {
@@ -902,7 +902,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 				} else {
 					switch strings.Trim(t.Tag, "`") {
-					case "policy_type", "metric_value", "event_level", "team_id", "user_id", "target_tags", "_query_region", "_target_uid", "1", "_id":
+					case "policy_type", "metric_value", "event_level", "team_id", "user_id", "target_tags", "_query_region", "_target_uid", "1", "_id", "event_id", "alert_time", "duration":
 						if strings.Contains(op, "match") {
 							filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
 						} else {

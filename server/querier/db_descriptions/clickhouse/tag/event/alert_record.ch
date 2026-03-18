@@ -26,12 +26,6 @@ pod_group_type            , K8s 工作负载类型         ,
 pod_group                 , K8s 工作负载             , 例如 Deployment、StatefulSet、Daemonset 等。
 pod                       , K8s 容器 POD             ,
 service                   , 服务                     , 已废弃，请使用 pod_service
-resource_gl0_type         , 自动实例类型              , 已废弃，请使用 auto_instance_type。
-resource_gl0              , 自动实例                 , 已废弃，请使用 auto_instance。
-resource_gl1_type         , 自动服务类型              , 已废弃，请使用 auto_service_type。
-resource_gl1              , 自动服务                  , 已废弃，请使用 auto_service。
-resource_gl2_type         , 自动服务类型              , 已废弃，请使用 auto_service_type。
-resource_gl2              , 自动服务                  , 已废弃，请使用 auto_service。
 auto_instance_type        , 自动实例类型              , `auto_instance`实例对应的类型。
 auto_instance             , 自动实例                  , IP 对应的实例，实例为IP时，auto_instance_id显示为子网ID。
 auto_service_type         , 自动服务类型               , `auto_service`实例对应的类型。
@@ -75,12 +69,10 @@ user                       , 创建人                   ,
 alert_policy               , 告警策略                 ,
 policy_type                , 策略类型                 ,
 event_level                , 事件等级                 ,
-target_tags                , 监控对象标签              , 
+target_tags                , 告警对象                 , 
 _target_uid                ,                          , 
 _query_region              , 查询区域                 ,
+trigger_threshold          , 告警阈值                 ,
+metric_unit                , 告警值单位                ,
+metric_value_str           , 告警值                   ,
 event_id                   , 事件 ID                  ,
-start_time                 , 开始时间                  ,
-end_time                   , 结束时间                  ,
-duration                   , 持续时间                  ,
-state                      , 状态                      ,
-alert_time                 , 告警时间                   ,

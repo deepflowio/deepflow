@@ -313,7 +313,7 @@ func (g *GroupTag) Format(m *view.Model) {
 	preAsTag, preAsOK := g.AsTagMap[g.Value]
 	for _, suffix := range []string{"", "_0", "_1"} {
 		table := m.From.ToString()
-		if table == "event.`alert_event`" {
+		if strings.Contains(table, chCommon.TABLE_NAME_ALERT_EVENT) || strings.Contains(table, chCommon.TABLE_NAME_ALERT_RECORD) {
 			break
 		}
 		for _, resourceName := range []string{"resource_gl0", "auto_instance", "resource_gl1", "resource_gl2", "auto_service"} {
