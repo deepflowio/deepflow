@@ -285,9 +285,25 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.Duration = uint64(s.EndTime - s.StartTime)
 	} else if e.FileOpEventData != nil {
 		d := e.FileOpEventData
-		s.EventType = strings.ToLower(d.OpType.String())
+		// Strip "FileOp" prefix: FileOpCreate→create, FileOpDelete→delete, etc.
+		opStr := d.OpType.String()
+		if strings.HasPrefix(opStr, "FileOp") {
+			opStr = opStr[len("FileOp"):]
+		}
+		s.EventType = strings.ToLower(opStr)
 		s.ProcessKName = string(e.ProcessKname)
-		s.FileName = string(d.Filename)
+		// Split full path into file_dir and file_name to match IoEvent format
+		fullPath := string(d.Filename)
+		if idx := strings.LastIndex(fullPath, "/"); idx >= 0 {
+			s.FileDir = fullPath[:idx+1]
+			s.FileName = fullPath[idx+1:]
+		} else {
+			s.FileName = fullPath
+		}
+		// For chmod, mode contains the actual permission bits
+		if d.OpType == pb.FileOpType_FileOpChmod {
+			s.AccessPermission = d.Mode
+		}
 		s.SyscallThread = e.ThreadId
 		s.SyscallCoroutine = e.CoroutineId
 	} else if e.PermOpEventData != nil {
