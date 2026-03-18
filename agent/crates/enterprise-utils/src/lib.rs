@@ -334,14 +334,22 @@ pub mod l7 {
             pub struct WebSphereMqParser {
                 pub base: L7LogBase,
                 pub orig_send_time: String,
+                pub skip_frame: bool,
             }
 
             impl WebSphereMqParser {
-                pub fn check_payload(&mut self, _: &[u8]) -> Option<LogMessageType> {
+                pub fn check_payload(&mut self, _: &[u8], _: bool) -> Option<LogMessageType> {
                     unimplemented!()
                 }
 
-                pub fn parse_payload(&mut self, _: &[u8], _: PacketDirection, _: bool) -> usize {
+                pub fn parse_payload(
+                    &mut self,
+                    _: &[u8],
+                    _: PacketDirection,
+                    _: bool,
+                    _: bool,
+                    _: bool,
+                ) -> usize {
                     unimplemented!()
                 }
             }

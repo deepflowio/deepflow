@@ -1834,12 +1834,16 @@ impl Default for Iso8583Config {
 #[serde(default)]
 pub struct WebSphereMqConfig {
     pub parse_xml_enabled: bool,
+    pub decompress_enabled: bool,
+    pub filter_attributes_enabled: bool,
 }
 
 impl Default for WebSphereMqConfig {
     fn default() -> Self {
         Self {
             parse_xml_enabled: true,
+            decompress_enabled: true,
+            filter_attributes_enabled: true,
         }
     }
 }
@@ -3641,12 +3645,16 @@ impl Default for Iso8583ParseConfig {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WebSphereMqParseConfig {
     pub parse_xml_enabled: bool,
+    pub decompress_enabled: bool,
+    pub filter_attributes_enabled: bool,
 }
 
 impl Default for WebSphereMqParseConfig {
     fn default() -> Self {
         Self {
             parse_xml_enabled: true,
+            decompress_enabled: true,
+            filter_attributes_enabled: true,
         }
     }
 }

@@ -8114,6 +8114,78 @@ processors:
 
 是否解析 XML 数据内容。
 
+###### 解压数据包 {#processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.decompress_enabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.decompress_enabled`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        web_sphere_mq:
+          decompress_enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+部分 web_sphere_mq 的消息中使用 zlib 压缩，开启此选项后，agent 在解析时会对数据包进行解压。
+
+###### 属性字段过滤器 {#processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.filter_attributes_enabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.filter_attributes_enabled`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        web_sphere_mq:
+          filter_attributes_enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+开启此选项后，agent 在解析时 XML 仅保留如下字段，减少数据存储。
+- Document.ComConf.ConfInf.MT
+- Document.ComConf.ConfInf.MsgId
+- Document.ComConf.ConfInf.MsgPrcCd
+- Document.ComConf.ConfInf.MsgRefId
+- Document.ComConf.ConfInf.OrigSndDt
+- Document.ComConf.ConfInf.OrigSndr
+- Document.ComuCnfm.MsgId
+- Document.ComuCnfm.MsgProCd
+- Document.ComuCnfm.MsgRefId
+- Document.ComuCnfm.MsgTp
+- Document.ComuCnfm.OrigSndDt
+- Document.ComuCnfm.OrigSndr
+
 ##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
 
 ###### 解压 MySQL 数据包 {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}

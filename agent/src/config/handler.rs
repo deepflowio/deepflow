@@ -768,6 +768,20 @@ impl From<&UserConfig> for FlowConfig {
                     .protocol_special_config
                     .web_sphere_mq
                     .parse_xml_enabled,
+                decompress_enabled: conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .protocol_special_config
+                    .web_sphere_mq
+                    .decompress_enabled,
+                filter_attributes_enabled: conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .protocol_special_config
+                    .web_sphere_mq
+                    .filter_attributes_enabled,
             },
             obfuscate_enabled_protocols: L7ProtocolBitmap::from(
                 conf.processors
