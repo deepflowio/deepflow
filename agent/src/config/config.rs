@@ -46,6 +46,7 @@ use tokio::runtime::Runtime;
 
 use crate::common::l7_protocol_log::{L7ProtocolBitmap, L7ProtocolParser};
 use crate::dispatcher::recv_engine::DEFAULT_BLOCK_SIZE;
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg(feature = "extended_observability")]
 use crate::ebpf;
 use crate::flow_generator::{DnsLog, MemcachedLog};
@@ -1274,6 +1275,7 @@ impl Default for NicOptimizeConfig {
 }
 
 impl NicOptimizeConfig {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     #[cfg(feature = "extended_observability")]
     pub fn apply(&self) {
         let nic_name = CString::new(self.interface.as_str()).unwrap();
