@@ -44,7 +44,7 @@ func GetTagTranslator(name, alias string, e *CHEngine) ([]Statement, string, err
 	labelType := ""
 	nameNoBackQuote := strings.Trim(name, "`")
 	tagItem, ok := tag.GetTag(nameNoBackQuote, db, table, "default")
-	if table == "alert_event" {
+	if table == chCommon.TABLE_NAME_ALERT_EVENT || table == chCommon.TABLE_NAME_ALERT_RECORD {
 		if slices.Contains(tag.AUTO_CUSTOM_TAG_NAMES, nameNoBackQuote) {
 			autoTagMap := tagItem.TagTranslatorMap
 			autoTagSlice := []string{}

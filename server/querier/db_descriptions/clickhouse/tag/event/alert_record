@@ -26,12 +26,6 @@ pod_group_type            , pod_group_type_0          , pod_group_type_1        
 pod_group                 , pod_group_0               , pod_group_1                , resource       ,                       , Universal Tag     , 111          , 0             , 110
 pod                       , pod_0                     , pod_1                      , resource       ,                       , Universal Tag     , 111          , 0             , 110
 service                   , service_0                 , service_1                  , resource       ,                       , Universal Tag     , 111          , 1             , 110
-resource_gl0_type         , resource_gl0_type_0       , resource_gl0_type_1        , int            ,                       , Universal Tag     , 111          , 1             , 110
-resource_gl0              , resource_gl0_0            , resource_gl0_1             , resource       ,                       , Universal Tag     , 111          , 1             , 110
-resource_gl1_type         , resource_gl1_type_0       , resource_gl1_type_1        , int            ,                       , Universal Tag     , 111          , 1             , 110
-resource_gl1              , resource_gl1_0            , resource_gl1_1             , resource       ,                       , Universal Tag     , 111          , 1             , 110
-resource_gl2_type         , resource_gl2_type_0       , resource_gl2_type_1        , int            ,                       , Universal Tag     , 111          , 1             , 110
-resource_gl2              , resource_gl2_0            , resource_gl2_1             , resource       ,                       , Universal Tag     , 111          , 1             , 110
 auto_instance_type        , auto_instance_type_0      , auto_instance_type_1       , int            ,                       , Universal Tag     , 111          , 0             , 110
 auto_instance             , auto_instance_0           , auto_instance_1            , resource       ,                       , Universal Tag     , 111          , 0             , 110
 auto_service_type         , auto_service_type_0       , auto_service_type_1        , int            ,                       , Universal Tag     , 111          , 0             , 110
@@ -78,9 +72,7 @@ event_level                , event_level               , event_level            
 target_tags                , target_tags               , target_tags               , string         ,                       , Event Info        , 111          , 0             , 
 _target_uid                , _target_uid               , _target_uid               , string         ,                       , Event Info        , 111          , 0             , 111
 _query_region              , _query_region             , _query_region             , string         ,                       , Event Info        , 111          , 0             ,
+trigger_threshold          , trigger_threshold         , trigger_threshold         , string         ,                       , Event Info        , 111          , 0             ,
+metric_unit                , metric_unit               , metric_unit               , string         ,                       , Event Info        , 111          , 0             ,
+metric_value_str           , metric_value_str          , metric_value_str          , string         ,                       , Event Info        , 111          , 0             ,
 event_id                   , event_id                  , event_id                  , string         ,                       , Event Info        , 111          , 0             ,
-start_time                 , start_time                , start_time                , int            ,                       , Event Info        , 111          , 0             ,
-end_time                   , end_time                  , end_time                  , int            ,                       , Event Info        , 111          , 0             ,
-duration                   , duration                  , duration                  , int            ,                       , Event Info        , 111          , 0             ,
-state                      , state                     , state                     , int_enum       , state                 , Event Info        , 111          , 0             ,
-alert_time                 , alert_time                , alert_time                , int            ,                       , Event Info        , 111          , 0             ,

@@ -37,6 +37,8 @@ const TABLE_NAME_FILE_EVENT = "file_event"
 const TABLE_NAME_IN_PROCESS = "in_process"
 const TABLE_NAME_IN_PROCESS_METRICS = "in_process_metrics"
 const TABLE_NAME_FILE_EVENT_METRICS = "file_event_metrics"
+const TABLE_NAME_ALERT_EVENT = "alert_event"
+const TABLE_NAME_ALERT_RECORD = "alert_record"
 const INDEX_TYPE_INCREMETAL_ID = "incremental-id"
 const FORMAT_HEX = "hex"
 const TAG_SERVER_CH_PREFIX = "服务端"
@@ -55,7 +57,7 @@ var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_EXT_METRICS:     []string{"ext_common"},
 	DB_NAME_DEEPFLOW_ADMIN:  []string{"deepflow_server"},
 	DB_NAME_DEEPFLOW_TENANT: []string{"deepflow_collector"},
-	DB_NAME_EVENT:           []string{"event", "file_event", "alert_event", TABLE_NAME_FILE_EVENT_METRICS},
+	DB_NAME_EVENT:           []string{"event", "file_event", TABLE_NAME_ALERT_EVENT, TABLE_NAME_ALERT_RECORD, TABLE_NAME_FILE_EVENT_METRICS},
 	DB_NAME_PROFILE:         []string{"in_process", TABLE_NAME_IN_PROCESS_METRICS},
 	DB_NAME_PROMETHEUS:      []string{"samples"},
 	DB_NAME_APPLICATION_LOG: []string{"log"},
