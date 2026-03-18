@@ -3556,12 +3556,18 @@ inputs:
 **Schema**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | int |
-| Range | [1, 65535] |
+| Type | string |
 
 **Description**:
 
 For the specified ports, consecutive TCP packets will be aggregated together for application log parsing.
+
+Example: 
+
+packet_segmentation_reassembly:
+- 1000
+- 2000-2010
+- 5000
 
 ### Physical Mirror Traffic {#inputs.cbpf.physical_mirror}
 
@@ -9915,6 +9921,12 @@ processors:
 **Description**:
 
 Service port list, priority lower than TCP SYN flags.
+
+The server determines the priority order from highest to lowest as:
+- TCP Flags: SYN|ACK, GPID
+- Layer 7 Parsing
+- `server_ports` Configuration
+- Packet Count (The side with more sent packets is the server.)
 
 ##### Cloud Traffic Ignore MAC {#processors.flow_log.conntrack.flow_generation.cloud_traffic_ignore_mac}
 
