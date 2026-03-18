@@ -29,6 +29,8 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/pool"
 )
 
+// ─── AlertEventStore (new AlertEvent proto, ReplacingMergeTree) ───────────────
+
 var alertEventPool = pool.NewLockFreePool(func() *AlertEventStore {
 	return &AlertEventStore{}
 })
@@ -71,11 +73,18 @@ type AlertEventStore struct {
 	UserId uint32
 	OrgId  uint16
 	TeamID uint16
+
+	// New fields for AlertEvent
+	EventId   string
+	StartTime uint64
+	EndTime   uint64
+	Duration  uint32
+	State     uint32
+	AlertTime uint64
 }
 
 func (e *AlertEventStore) SetId(time, analyzerID uint32) {
 	count := atomic.AddUint32(&EventCounter, 1)
-	// The high 32 bits of time, 23-32 bits represent analyzerId, the low 22 bits are counter
 	e._id = uint64(time)<<32 | uint64(analyzerID&0x3ff)<<22 | (uint64(count) & 0x3fffff)
 }
 
@@ -106,6 +115,14 @@ func AlertEventColumns() []*ckdb.Column {
 
 		ckdb.NewColumn("team_id", ckdb.UInt16),
 		ckdb.NewColumn("user_id", ckdb.UInt32),
+
+		// New columns
+		ckdb.NewColumn("event_id", ckdb.String),
+		ckdb.NewColumn("start_time", ckdb.UInt64),
+		ckdb.NewColumn("end_time", ckdb.UInt64),
+		ckdb.NewColumn("duration", ckdb.UInt32),
+		ckdb.NewColumn("state", ckdb.UInt32),
+		ckdb.NewColumn("alert_time", ckdb.UInt64),
 	}
 }
 
@@ -126,7 +143,6 @@ func (e *AlertEventStore) Table() string {
 }
 
 func (e *AlertEventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
-	// reset temporary buffers
 	flowTagInfo := &cache.FlowTagInfoBuffer
 	*flowTagInfo = flow_tag.FlowTagInfo{
 		Table:  e.Table(),
@@ -159,12 +175,9 @@ func (e *AlertEventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 		}
 
 		flowTagInfo.FieldName = name
-		// tag + value
 		flowTagInfo.FieldValue = value
 		if old, ok := cache.FieldValueCache.AddOrGet(*flowTagInfo, e.Time); ok {
 			if old+cache.CacheFlushTimeout >= e.Time {
-				// If there is no new fieldValue, of course there will be no new field.
-				// So we can just skip the rest of the process in the loop.
 				continue
 			} else {
 				cache.FieldValueCache.Add(*flowTagInfo, e.Time)
@@ -175,7 +188,6 @@ func (e *AlertEventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 		tagFieldValue.FlowTagInfo = *flowTagInfo
 		cache.FieldValues = append(cache.FieldValues, tagFieldValue)
 
-		// only tag
 		flowTagInfo.FieldValue = ""
 		if old, ok := cache.FieldCache.AddOrGet(*flowTagInfo, e.Time); ok {
 			if old+cache.CacheFlushTimeout >= e.Time {
@@ -191,11 +203,13 @@ func (e *AlertEventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 	}
 }
 
+// GenAlertEventCKTable creates the alert_event table definition.
+// Engine: ReplacingMergeTree(_id), ORDER BY (time, event_id).
 func GenAlertEventCKTable(cluster, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	table := common.ALERT_EVENT.TableName()
 	timeKey := "time"
-	engine := ckdb.MergeTree
-	orderKeys := []string{"time", "policy_id"}
+	engine := ckdb.ReplacingMergeTree
+	orderKeys := []string{"time", "event_id"}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
@@ -205,6 +219,7 @@ func GenAlertEventCKTable(cluster, storagePolicy, ckdbType string, ttl int, cold
 		GlobalName:      table,
 		Columns:         AlertEventColumns(),
 		TimeKey:         timeKey,
+		ReplacingKey:    "_id",
 		TTL:             ttl,
 		PartitionFunc:   DefaultPartition,
 		Engine:          engine,
@@ -238,6 +253,223 @@ func NewAlertEventWriter(config *config.Config) (*EventWriter, error) {
 
 	ckwriter, err := ckwriter.NewCKWriter(*w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
 		common.ALERT_EVENT.TableName(), config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, config.Base.CKDB.Watcher)
+	if err != nil {
+		return nil, err
+	}
+	w.ckWriter = ckwriter
+	w.ckWriter.Run()
+	return w, nil
+}
+
+// ─── AlertRecordStore (AlertRecord proto, MergeTree, same structure as old AlertEvent) ──
+
+var alertRecordPool = pool.NewLockFreePool(func() *AlertRecordStore {
+	return &AlertRecordStore{}
+})
+
+func AcquireAlertRecordStore() *AlertRecordStore {
+	return alertRecordPool.Get()
+}
+
+func ReleaseAlertRecordStore(e *AlertRecordStore) {
+	if e == nil {
+		return
+	}
+	*e = AlertRecordStore{}
+	alertRecordPool.Put(e)
+}
+
+type AlertRecordStore struct {
+	Time uint32
+	_id  uint64
+
+	PolicyId         uint32
+	PolicyType       uint8
+	AlertPolicy      string
+	MetricValue      float64
+	MetricValueStr   string
+	EventLevel       uint8
+	TargetTags       string
+	TagStrKeys       []string
+	TagStrValues     []string
+	TagIntKeys       []string
+	TagIntValues     []int64
+	TriggerThreshold string
+	MetricUnit       string
+	CustomTagKeys    []string
+	CustomTagValues  []string
+
+	XTargetUid   string
+	XQueryRegion string
+
+	UserId uint32
+	OrgId  uint16
+	TeamID uint16
+
+	EventId string
+}
+
+func (e *AlertRecordStore) SetId(time, analyzerID uint32) {
+	count := atomic.AddUint32(&EventCounter, 1)
+	e._id = uint64(time)<<32 | uint64(analyzerID&0x3ff)<<22 | (uint64(count) & 0x3fffff)
+}
+
+func AlertRecordColumns() []*ckdb.Column {
+	return []*ckdb.Column{
+		ckdb.NewColumn("time", ckdb.DateTime),
+		ckdb.NewColumn("_id", ckdb.UInt64),
+
+		ckdb.NewColumn("policy_id", ckdb.UInt32),
+		ckdb.NewColumn("policy_type", ckdb.UInt8),
+		ckdb.NewColumn("alert_policy", ckdb.LowCardinalityString),
+		ckdb.NewColumn("metric_value", ckdb.Float64),
+		ckdb.NewColumn("metric_value_str", ckdb.String),
+		ckdb.NewColumn("event_level", ckdb.UInt8),
+		ckdb.NewColumn("target_tags", ckdb.String),
+
+		ckdb.NewColumn("tag_string_names", ckdb.ArrayLowCardinalityString),
+		ckdb.NewColumn("tag_string_values", ckdb.ArrayString),
+		ckdb.NewColumn("tag_int_names", ckdb.ArrayLowCardinalityString),
+		ckdb.NewColumn("tag_int_values", ckdb.ArrayInt64),
+		ckdb.NewColumn("trigger_threshold", ckdb.LowCardinalityString),
+		ckdb.NewColumn("metric_unit", ckdb.LowCardinalityString),
+		ckdb.NewColumn("custom_tag_names", ckdb.ArrayLowCardinalityString),
+		ckdb.NewColumn("custom_tag_values", ckdb.ArrayString),
+
+		ckdb.NewColumn("_target_uid", ckdb.String),
+		ckdb.NewColumn("_query_region", ckdb.LowCardinalityString),
+
+		ckdb.NewColumn("team_id", ckdb.UInt16),
+		ckdb.NewColumn("user_id", ckdb.UInt32),
+
+		ckdb.NewColumn("event_id", ckdb.String),
+	}
+}
+
+func (e *AlertRecordStore) Release() {
+	ReleaseAlertRecordStore(e)
+}
+
+func (e *AlertRecordStore) NativeTagVersion() uint32 {
+	return 0
+}
+
+func (e *AlertRecordStore) OrgID() uint16 {
+	return e.OrgId
+}
+
+func (e *AlertRecordStore) Table() string {
+	return common.ALERT_RECORD.TableName()
+}
+
+func (e *AlertRecordStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
+	flowTagInfo := &cache.FlowTagInfoBuffer
+	*flowTagInfo = flow_tag.FlowTagInfo{
+		Table:  e.Table(),
+		OrgId:  e.OrgId,
+		TeamID: e.TeamID,
+	}
+	cache.Fields = cache.Fields[:0]
+	cache.FieldValues = cache.FieldValues[:0]
+
+	tagStrLen := len(e.TagStrKeys)
+	tagIntLen := len(e.TagIntKeys)
+	customTagLen := len(e.CustomTagKeys)
+	var name, value string
+	for i := 0; i < tagStrLen+tagIntLen+customTagLen; i++ {
+		if i < tagStrLen {
+			name = e.TagStrKeys[i]
+			value = e.TagStrValues[i]
+			flowTagInfo.FieldValueType = flow_tag.FieldValueTypeString
+			flowTagInfo.FieldType = flow_tag.FieldTag
+		} else if i < tagStrLen+tagIntLen {
+			name = e.TagIntKeys[i-tagStrLen]
+			value = strconv.FormatInt(e.TagIntValues[i-tagStrLen], 10)
+			flowTagInfo.FieldValueType = flow_tag.FieldValueTypeInt
+			flowTagInfo.FieldType = flow_tag.FieldTag
+		} else {
+			name = e.CustomTagKeys[i-tagStrLen-tagIntLen]
+			value = e.CustomTagValues[i-tagStrLen-tagIntLen]
+			flowTagInfo.FieldValueType = flow_tag.FieldValueTypeString
+			flowTagInfo.FieldType = flow_tag.FieldCustomTag
+		}
+
+		flowTagInfo.FieldName = name
+		flowTagInfo.FieldValue = value
+		if old, ok := cache.FieldValueCache.AddOrGet(*flowTagInfo, e.Time); ok {
+			if old+cache.CacheFlushTimeout >= e.Time {
+				continue
+			} else {
+				cache.FieldValueCache.Add(*flowTagInfo, e.Time)
+			}
+		}
+		tagFieldValue := flow_tag.AcquireFlowTag(flow_tag.TagFieldValue)
+		tagFieldValue.Timestamp = e.Time
+		tagFieldValue.FlowTagInfo = *flowTagInfo
+		cache.FieldValues = append(cache.FieldValues, tagFieldValue)
+
+		flowTagInfo.FieldValue = ""
+		if old, ok := cache.FieldCache.AddOrGet(*flowTagInfo, e.Time); ok {
+			if old+cache.CacheFlushTimeout >= e.Time {
+				continue
+			} else {
+				cache.FieldCache.Add(*flowTagInfo, e.Time)
+			}
+		}
+		tagField := flow_tag.AcquireFlowTag(flow_tag.TagField)
+		tagField.Timestamp = e.Time
+		tagField.FlowTagInfo = *flowTagInfo
+		cache.Fields = append(cache.Fields, tagField)
+	}
+}
+
+func GenAlertRecordCKTable(cluster, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
+	table := common.ALERT_RECORD.TableName()
+	timeKey := "time"
+	engine := ckdb.MergeTree
+	orderKeys := []string{"time", "policy_id"}
+
+	return &ckdb.Table{
+		Version:         basecommon.CK_VERSION,
+		Database:        EVENT_DB,
+		DBType:          ckdbType,
+		LocalName:       table + ckdb.LOCAL_SUBFFIX,
+		GlobalName:      table,
+		Columns:         AlertRecordColumns(),
+		TimeKey:         timeKey,
+		TTL:             ttl,
+		PartitionFunc:   DefaultPartition,
+		Engine:          engine,
+		Cluster:         cluster,
+		StoragePolicy:   storagePolicy,
+		ColdStorage:     *coldStorage,
+		OrderKeys:       orderKeys,
+		PrimaryKeyCount: len(orderKeys),
+	}
+}
+
+func NewAlertRecordWriter(config *config.Config) (*EventWriter, error) {
+	w := &EventWriter{
+		ckdbAddrs:         config.Base.CKDB.ActualAddrs,
+		ckdbUsername:      config.Base.CKDBAuth.Username,
+		ckdbPassword:      config.Base.CKDBAuth.Password,
+		ckdbCluster:       config.Base.CKDB.ClusterName,
+		ckdbStoragePolicy: config.Base.CKDB.StoragePolicy,
+		ckdbColdStorages:  config.Base.GetCKDBColdStorages(),
+		ttl:               config.AlertRecordTTL,
+		writerConfig:      config.CKWriterConfig,
+	}
+
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(0, common.ALERT_RECORD.String(), EVENT_DB, w.ttl, ckdb.TimeFuncTwelveHour, config.Base, &w.writerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	w.flowTagWriter = flowTagWriter
+	ckTable := GenAlertRecordCKTable(w.ckdbCluster, w.ckdbStoragePolicy, config.Base.CKDB.Type, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, EVENT_DB, common.ALERT_RECORD.TableName()))
+
+	ckwriter, err := ckwriter.NewCKWriter(*w.ckdbAddrs, w.ckdbUsername, w.ckdbPassword,
+		common.ALERT_RECORD.TableName(), config.Base.CKDB.TimeZone, ckTable, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout, config.Base.CKDB.Watcher)
 	if err != nil {
 		return nil, err
 	}

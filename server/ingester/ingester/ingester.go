@@ -151,6 +151,8 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 			checkError(err)
 			err = issu.RunRecreateTables()
 			checkError(err)
+			// Drop alert_event table if engine is not ReplacingMergeTree; it will be recreated with the new engine on startup
+			issu.RunDropAlertEventTableIfNotReplacingMergeTree()
 
 			err = issu.Start()
 			checkError(err)

@@ -30,6 +30,7 @@ const (
 	FILE_EVENT
 	ALERT_EVENT
 	K8S_EVENT
+	ALERT_RECORD
 )
 
 func (e EventType) String() string {
@@ -42,6 +43,8 @@ func (e EventType) String() string {
 		return "alert_event"
 	case K8S_EVENT:
 		return "k8s_event"
+	case ALERT_RECORD:
+		return "alert_record"
 	default:
 		return "unknown_event"
 	}
@@ -56,6 +59,8 @@ func (e EventType) TableName() string {
 		return "file_event"
 	case ALERT_EVENT:
 		return "alert_event"
+	case ALERT_RECORD:
+		return "alert_record"
 	default:
 		return "unknown_event"
 	}

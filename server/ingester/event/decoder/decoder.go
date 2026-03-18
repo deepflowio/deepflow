@@ -149,6 +149,15 @@ func (d *Decoder) Run() {
 				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
 				d.handleAlertEvent(decoder)
 				receiver.ReleaseRecvBuffer(recvBytes)
+			case common.ALERT_RECORD:
+				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
+				if !ok {
+					log.Warning("get alert record decode queue data type wrong")
+					continue
+				}
+				decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
+				d.handleAlertRecord(decoder)
+				receiver.ReleaseRecvBuffer(recvBytes)
 			case common.K8S_EVENT:
 				recvBytes, ok := buffer[i].(*receiver.RecvBuffer)
 				if !ok {
@@ -476,5 +485,69 @@ func (d *Decoder) writeAlertEvent(event *alert_event.AlertEvent) {
 	s.TeamID = uint16(event.GetTeamId())
 	s.UserId = event.GetUserId()
 
+	// New fields
+	s.EventId = event.GetEventId()
+	s.StartTime = event.GetStartTime()
+	s.EndTime = event.GetEndTime()
+	s.Duration = event.GetDuration()
+	s.State = event.GetState()
+	s.AlertTime = event.GetAlertTime()
+
 	d.eventWriter.WriteAlertEvent(s)
+}
+
+func (d *Decoder) handleAlertRecord(decoder *codec.SimpleDecoder) {
+	for !decoder.IsEnd() {
+		bytes := decoder.ReadBytes()
+		if decoder.Failed() {
+			if d.counter.ErrorCount == 0 {
+				log.Errorf("alert record decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
+			}
+			d.counter.ErrorCount++
+			return
+		}
+		pbAlertRecord := &alert_event.AlertRecord{}
+		if err := pbAlertRecord.Unmarshal(bytes); err != nil {
+			if d.counter.ErrorCount == 0 {
+				log.Errorf("alert record unmarshal failed, err: %s", err)
+			}
+			d.counter.ErrorCount++
+			continue
+		}
+		d.counter.OutCount++
+		d.writeAlertRecord(pbAlertRecord)
+	}
+}
+
+func (d *Decoder) writeAlertRecord(event *alert_event.AlertRecord) {
+	s := dbwriter.AcquireAlertRecordStore()
+	s.Time = event.GetTime()
+	s.SetId(s.Time, d.platformData.QueryAnalyzerID())
+
+	s.PolicyId = event.GetPolicyId()
+	s.PolicyType = uint8(event.GetPolicyType())
+	s.AlertPolicy = event.GetAlertPolicy()
+	s.MetricValue = event.GetMetricValue()
+	s.MetricValueStr = event.GetMetricValueStr()
+	s.EventLevel = uint8(event.GetEventLevel())
+	s.TargetTags = event.GetTargetTags()
+
+	s.TagStrKeys = event.GetTagStrKeys()
+	s.TagStrValues = event.GetTagStrValues()
+	s.TagIntKeys = event.GetTagIntKeys()
+	s.TagIntValues = event.GetTagIntValues()
+	s.TriggerThreshold = event.GetTriggerThreshold()
+	s.CustomTagKeys = event.GetCustomTagKeys()
+	s.CustomTagValues = event.GetCustomTagValues()
+	s.MetricUnit = event.GetMetricUnit()
+	s.XTargetUid = event.GetXTargetUid()
+	s.XQueryRegion = event.GetXQueryRegion()
+
+	s.OrgId = uint16(event.GetOrgId())
+	s.TeamID = uint16(event.GetTeamId())
+	s.UserId = event.GetUserId()
+
+	s.EventId = event.GetEventId()
+
+	d.eventWriter.WriteAlertRecord(s)
 }

@@ -35,6 +35,7 @@ const (
 	DefaultEventTTL                   = 720 // hour
 	DefaultFileEventTTL               = 168 // hour
 	DefaultAlertEventTTL              = 720 // hour
+	DefaultAlertRecordTTL             = 720 // hour
 )
 
 type Config struct {
@@ -48,6 +49,7 @@ type Config struct {
 	FileEventDecoderQueueSize  int                   `yaml:"file-event-decoder-queue-size"`
 	FileEventTTL               int                   `yaml:"file-event-ttl"`
 	AlertEventTTL              int                   `yaml:"alert-event-ttl"`
+	AlertRecordTTL             int                   `yaml:"alert-record-ttl"`
 	K8sCKWriterConfig          config.CKWriterConfig `yaml:"k8s-event-ck-writer"`
 	K8sDecoderQueueCount       int                   `yaml:"k8s-event-decoder-queue-count"`
 	K8sDecoderQueueSize        int                   `yaml:"k8s-event-decoder-queue-size"`
@@ -79,6 +81,9 @@ func (c *Config) Validate() error {
 	if c.AlertEventTTL <= 0 {
 		c.AlertEventTTL = DefaultAlertEventTTL
 	}
+	if c.AlertRecordTTL <= 0 {
+		c.AlertRecordTTL = DefaultAlertRecordTTL
+	}
 	if c.K8sDecoderQueueCount == 0 {
 		c.K8sDecoderQueueCount = DefaultDecoderQueueCount
 	}
@@ -103,6 +108,7 @@ func Load(base *config.Config, path string) *Config {
 			FileEventDecoderQueueSize:  DefaultFileEventDecoderQueueSize,
 			FileEventTTL:               DefaultFileEventTTL,
 			AlertEventTTL:              DefaultAlertEventTTL,
+			AlertRecordTTL:             DefaultAlertRecordTTL,
 			K8sCKWriterConfig:          config.CKWriterConfig{QueueCount: 1, QueueSize: 50000, BatchSize: 25600, FlushTimeout: 5},
 			K8sDecoderQueueCount:       DefaultDecoderQueueCount,
 			K8sDecoderQueueSize:        DefaultDecoderQueueSize,
