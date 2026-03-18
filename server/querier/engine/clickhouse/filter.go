@@ -809,7 +809,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 			}
 		}
 		return &view.Expr{Value: filter}, nil
-	} else if table == "alert_event" {
+	} else if table == chCommon.TABLE_NAME_ALERT_EVENT || table == chCommon.TABLE_NAME_ALERT_RECORD {
 		tagName := strings.Trim(t.Tag, "`")
 		tagItem, ok := tag.GetTag(tagName, db, table, "default")
 		if !ok {

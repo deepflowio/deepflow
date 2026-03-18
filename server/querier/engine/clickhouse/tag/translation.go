@@ -64,7 +64,7 @@ var INT_ENUM_TAG = []string{
 	"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol",
 	"protocol", "response_status", "server_port", "status", "capture_nic_type", "tunnel_tier",
 	"tunnel_type", "instance_type", "nat_source", "role", "event_level", "policy_level",
-	"policy_app_type", "is_tls", "is_async", "is_reversed", "severity_number", "file_type",
+	"policy_app_type", "is_tls", "is_async", "is_reversed", "severity_number", "file_type", "state",
 }
 var INT_ENUM_PEER_TAG = []string{"tcp_flags_bit", "auto_instance_type", "auto_service_type"}
 var STRING_ENUM_TAG = []string{"observation_point", "event_type", "profile_language_type"}
@@ -2255,6 +2255,17 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			"toUInt64(event_level) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
 			"toUInt64(event_level) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
 			"event_level",
+		),
+	}
+
+	// enum(state)
+	tagResourceMap["state"] = map[string]*Tag{
+		"enum": NewTag(
+			"dictGetOrDefault('flow_tag.int_enum_map', '%s', ('%s',toUInt64(state)), state)",
+			"",
+			"toUInt64(state) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
+			"toUInt64(state) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
+			"state",
 		),
 	}
 
