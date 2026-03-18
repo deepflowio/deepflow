@@ -121,7 +121,7 @@ func GetGroup(name string, e *CHEngine) ([]Statement, error) {
 		} else if tagItem.GroupTranslator != "" {
 			stmts = append(stmts, &GroupTag{Value: tagItem.GroupTranslator, AsTagMap: asTagMap})
 		} else {
-			if table == "alert_event" {
+			if table == chCommon.TABLE_NAME_ALERT_EVENT || table == chCommon.TABLE_NAME_ALERT_RECORD {
 				stmts = append(stmts, &GroupTag{Value: name, AsTagMap: asTagMap})
 			} else {
 				stmts = GetMultiGroup(stmts, name, asTagMap)

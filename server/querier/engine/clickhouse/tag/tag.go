@@ -18,6 +18,8 @@ package tag
 
 import (
 	"strings"
+
+	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 )
 
 type Tag struct {
@@ -44,7 +46,7 @@ func GetTag(name, db, table, function string) (*Tag, bool) {
 	tag, ok := TagResoureMap[name][function]
 	if db == "flow_tag" {
 		tag, ok = FlowTagResourceMap[name][function]
-	} else if table == "alert_event" {
+	} else if table == common.TABLE_NAME_ALERT_EVENT || table == common.TABLE_NAME_ALERT_RECORD {
 		tag, ok = AlarmEventResourceMap[name][function]
 	}
 	// Avoid return nil

@@ -56,7 +56,7 @@ var AUTO_CUSTOM_TAG_MAP = map[string][]string{}
 var AUTO_CUSTOM_TAG_CHECK_MAP = map[string][]string{}
 
 var tagNativeTagDB = []string{ckcommon.DB_NAME_EXT_METRICS, ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT, ckcommon.DB_NAME_PROFILE, ckcommon.DB_NAME_PROMETHEUS}
-var noCustomTagTable = []string{"traffic_policy", "l4_packet", "l7_packet", "alert_event"}
+var noCustomTagTable = []string{"traffic_policy", "l4_packet", "l7_packet", ckcommon.TABLE_NAME_ALERT_EVENT, ckcommon.TABLE_NAME_ALERT_RECORD}
 var noCustomTagDB = []string{ckcommon.DB_NAME_DEEPFLOW_ADMIN, ckcommon.DB_NAME_DEEPFLOW_TENANT}
 
 var tagTypeToOperators = map[string][]string{
@@ -775,7 +775,7 @@ func GetStaticTagDescriptions(db, table string) (response *common.Result, err er
 					tagName, tagName + "_0", tagName + "_1", tagDisplayName, tagDisplayName, tagDisplayName, "auto_custom_tag",
 					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.Description, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{}, "",
 				})
-			} else if table == "alert_event" {
+			} else if table == ckcommon.TABLE_NAME_ALERT_EVENT || table == ckcommon.TABLE_NAME_ALERT_RECORD {
 				response.Values = append(response.Values, []interface{}{
 					tagName, tagName + "_0", tagName + "_1", tagDisplayName, tagDisplayName, tagDisplayName, "auto_custom_tag",
 					"Custom Tag", []string{}, []bool{true, true, true}, AutoCustomTag.Description, AutoCustomTag.Description, AutoCustomTag.Description, AutoCustomTag.TagFields, false, []string{"select", "group"}, "",
@@ -990,7 +990,7 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.prometheus_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", whereSql, limit)
 		} else if table == "" {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, whereSql, limit)
-		} else if table == "alert_event" {
+		} else if table == ckcommon.TABLE_NAME_ALERT_EVENT || table == ckcommon.TABLE_NAME_ALERT_RECORD {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table, field_type FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type in ('tag', 'custom_tag') AND (%s) GROUP BY tag_name, table, field_type ORDER BY tag_name ASC LIMIT %s", db, table, whereSql, limit)
 		} else {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, whereSql, limit)
@@ -1000,7 +1000,7 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.prometheus_custom_field WHERE field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", limit)
 		} else if table == "" {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, limit)
-		} else if table == "alert_event" {
+		} else if table == ckcommon.TABLE_NAME_ALERT_EVENT || table == ckcommon.TABLE_NAME_ALERT_RECORD {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table, field_type FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type in ('tag', 'custom_tag') GROUP BY tag_name, table, field_type ORDER BY tag_name ASC LIMIT %s", db, table, limit)
 		} else {
 			externalSql = fmt.Sprintf("SELECT field_name AS tag_name, table FROM flow_tag.%s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name, table ORDER BY tag_name ASC LIMIT %s", db, table, limit)
@@ -1023,7 +1023,7 @@ func GetDynamicTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, u
 				externalTag, externalTag, externalTag, externalTag, externalTag, externalTag, "map_item",
 				"Native Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, externalTag, externalTag, "", false, notSupportOperator, tableName,
 			})
-		} else if table == "alert_event" {
+		} else if table == ckcommon.TABLE_NAME_ALERT_EVENT || table == ckcommon.TABLE_NAME_ALERT_RECORD {
 			externalTag := tagName.(string)
 			var categoryValue string
 			fieldType := _tagName.([]interface{})[2]
@@ -1097,7 +1097,7 @@ func GetDynamicMetric(db, table, metric string) (response *common.Result) {
 		},
 		Values: []interface{}{},
 	}
-	if table == "alert_event" {
+	if table == ckcommon.TABLE_NAME_ALERT_EVENT || table == ckcommon.TABLE_NAME_ALERT_RECORD {
 		return
 	}
 
@@ -1175,7 +1175,7 @@ func GetTagDescriptions(db, table, rawSql, queryCacheTTL, orgID string, useQuery
 	if err != nil {
 		return
 	}
-	if table == "alert_event" {
+	if table == ckcommon.TABLE_NAME_ALERT_EVENT || table == ckcommon.TABLE_NAME_ALERT_RECORD {
 		return GetAlertEventTagDescriptions(staticResponse, dynamicResponse)
 	}
 	response.Values = append(response.Values, staticResponse.Values...)
@@ -1383,7 +1383,7 @@ func GetTagValues(db, table, sql, queryCacheTTL, orgID, language string, useQuer
 		DB: db, Table: table, TagName: tag,
 	}]
 	if !ok {
-		if table == "alert_event" {
+		if table == ckcommon.TABLE_NAME_ALERT_EVENT || table == ckcommon.TABLE_NAME_ALERT_RECORD {
 			return nil, sqlList, nil
 		} else {
 			return nil, sqlList, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
