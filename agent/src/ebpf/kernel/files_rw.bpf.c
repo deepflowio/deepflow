@@ -334,7 +334,14 @@ static __inline int trace_io_event_common(void *ctx,
 		return -1;
 	}
 
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+	int __ai_agent = is_ai_agent_process(pid_tgid);
+#endif
+
 	if (tracer_ctx->io_event_collect_mode == 0) {
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+		if (!__ai_agent)
+#endif
 		return -1;
 	}
 
@@ -346,6 +353,9 @@ static __inline int trace_io_event_common(void *ctx,
 	}
 
 	if (trace_id == 0 && tracer_ctx->io_event_collect_mode == 1) {
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+		if (!__ai_agent)
+#endif
 		return -1;
 	}
 
@@ -370,20 +380,12 @@ static __inline int trace_io_event_common(void *ctx,
 		latency = TIME_ROLLBACK_DEFAULT_LATENCY_NS;
 	}
 
-#ifdef EXTENDED_AI_AGENT_FILE_IO
-	if (is_ai_agent_process(pid_tgid)) {
-		goto skip_latency_filter;
-	}
-#endif
-
 	if (latency < tracer_ctx->io_event_minimal_duration) {
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+		if (!__ai_agent)
+#endif
 		return -1;
 	}
-
-#ifdef EXTENDED_AI_AGENT_FILE_IO
-skip_latency_filter:
-	; /* null statement - labels cannot be followed by declarations in C */
-#endif
 
 	struct __io_event_buffer *buffer = io_event_buffer__lookup(&k0);
 	if (!buffer) {
