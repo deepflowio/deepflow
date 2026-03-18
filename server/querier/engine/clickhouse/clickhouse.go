@@ -197,7 +197,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	fromMatch := fromRegexp.FindStringSubmatch(sql)
 	if len(fromMatch) > 1 {
 		table := fromMatch[1]
-		if table != "alert_event" {
+		if table != chCommon.TABLE_NAME_ALERT_EVENT && table != chCommon.TABLE_NAME_ALERT_RECORD {
 			sql, err = ReplaceCustomBizServiceFilter(sql, e.ORGID)
 			if err != nil {
 				return nil, nil, err
