@@ -5495,7 +5495,8 @@ Number of RX descriptors in NIC receive ring.
 
 Increasing this value improves burst traffic buffering
 and reduces packet drops caused by ring overflow.
-Specifically, use `ethtool -g <iface>` to check the current configuration.
+Specifically, use `ethtool -g <iface>` to check the current
+configuration, and adjust to an appropriate value based on your workload.
 
 0 (default) means keep the original state and ignore this setting.
 
@@ -5531,7 +5532,8 @@ hardware hash calculation.
 
 Maximum supported value is typically 16 and must not exceed
 the number of logical CPU cores.
-Specifically, use `ethtool -l <iface>` to check the current configuration.
+Specifically, use `ethtool -l <iface>` to check the current configuration
+and adjust to an appropriate value based on your workload.
 
 When XDP CPU redirect is enabled, it is recommended to set this to 1.
 0 (default) means keep the original state and ignore this setting.
@@ -11581,3 +11583,4 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
+
