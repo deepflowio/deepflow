@@ -3,7 +3,7 @@ syntax = "proto2";
 package alert_event;
 option go_package = "alert_event";
 
-message AlertEvent {
+message AlertRecord {
     optional uint32 time = 1;
     optional uint32 policy_id = 2;
     optional uint32 policy_type = 3;
@@ -26,4 +26,38 @@ message AlertEvent {
 
     optional string _target_uid = 21;
     optional string _query_region = 22;
+    // Link record to aggregated event when available.
+    optional string event_id = 31;
+}
+
+message AlertEvent {
+    optional uint32 time = 1;
+    optional uint32 policy_id = 2;
+    optional uint32 policy_type = 3;
+    optional string alert_policy = 4;
+    optional double metric_value = 5;
+    optional uint32 event_level = 6;
+    optional string target_tags = 7;
+    repeated  string tag_str_keys = 8;
+    repeated  string tag_str_values = 9;
+    repeated  string tag_int_keys = 10;
+    repeated  int64 tag_int_values = 11;
+    optional uint32 org_id = 12;
+    optional uint32 user_id = 13;
+    optional uint32 team_id = 14;
+    optional string trigger_threshold = 15;
+    optional string metric_unit = 16;
+    optional string metric_value_str = 17;
+    repeated  string custom_tag_keys = 18;
+    repeated  string custom_tag_values = 19;
+
+    optional string _target_uid = 21;
+    optional string _query_region = 22;
+
+    optional string event_id = 31;
+    optional uint64 start_time = 32;
+    optional uint64 end_time = 33;
+    optional uint32 duration = 34;
+    optional uint32 state = 35;
+    optional uint64 alert_time = 36;
 }
