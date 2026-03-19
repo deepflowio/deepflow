@@ -923,7 +923,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 				} else {
 					switch strings.Trim(t.Tag, "`") {
-					case "policy_type", "metric_value", "event_level", "team_id", "user_id", "target_tags", "_query_region", "_target_uid", "1", "_id", "event_id", "alert_time", "duration", "state":
+					case "policy_type", "metric_value", "event_level", "team_id", "user_id", "target_tags", "_query_region", "_target_uid", "1", "_id", "event_id", "alert_time", "duration", "state", "start_time", "end_time":
 						if strings.Contains(op, "match") {
 							filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
 						} else {

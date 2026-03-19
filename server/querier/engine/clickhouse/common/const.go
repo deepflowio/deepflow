@@ -59,6 +59,10 @@ const (
 	NATIVE_FIELD_STATE_NORMAL        = 1
 )
 
+const (
+	API_CUSTOM_METRICS_FORMAT = "http://localhost:%d/v1/custom-metrics"
+)
+
 var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_FLOW_LOG:        []string{"l4_flow_log", "l7_flow_log", "l4_packet", "l7_packet"},
 	DB_NAME_FLOW_METRICS:    []string{"network", "network_map", "application", "application_map", "traffic_policy"},
