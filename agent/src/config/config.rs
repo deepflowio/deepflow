@@ -1278,9 +1278,28 @@ impl NicOptimizeConfig {
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[cfg(feature = "extended_observability")]
     pub fn apply(&self) {
-        let nic_name = CString::new(self.interface.as_str()).unwrap();
-        let irq_cpu = CString::new(self.irq_cpu_list.as_str()).unwrap();
-        let xdp_cpu = CString::new(self.xdp_cpu_redirect_list.as_str()).unwrap();
+        let to_cstring = |field: &str, value: &str| {
+            CString::new(value)
+                .map_err(|_| {
+                    warn!(
+                        "Skip NIC optimization for interface {:?}: {} contains NUL byte",
+                        self.interface, field
+                    );
+                })
+                .ok()
+        };
+
+        let Some(nic_name) = to_cstring("interface", self.interface.as_str()) else {
+            return;
+        };
+        let Some(irq_cpu) = to_cstring("irq_cpu_list", self.irq_cpu_list.as_str()) else {
+            return;
+        };
+        let Some(xdp_cpu) =
+            to_cstring("xdp_cpu_redirect_list", self.xdp_cpu_redirect_list.as_str())
+        else {
+            return;
+        };
 
         let ret = unsafe {
             ebpf::nic_optimize_config(

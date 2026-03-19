@@ -5273,7 +5273,7 @@ inputs:
 样例:
 ```yaml
 inputs:
-  eppf:
+  ebpf:
     network:
       nic_opt_enabled: true
       nic_optimize:

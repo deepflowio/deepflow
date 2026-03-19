@@ -5417,7 +5417,7 @@ Multiple NIC optimize entries can be configured for different interfaces.
 Example:
 ```yaml
 inputs:
-  eppf:
+  ebpf:
     network:
       nic_opt_enabled: true
       nic_optimize:
