@@ -158,7 +158,7 @@ PERF_PROFILER_ELFS := user/perf_profiler_bpf_common.c \
 	user/perf_profiler_bpf_5_2_plus.c \
 	user/perf_profiler_bpf_5_15_plus.c
 
-ELFFILES := $(SOCKET_TRACE_ELFS) $(PERF_PROFILER_ELFS) $(AF_PACKET_FANOUT_ELFS) $(TCP_OPTION_TRACING_ELFS)
+ELFFILES := $(SOCKET_TRACE_ELFS) $(PERF_PROFILER_ELFS) $(EXTEND_ELFS)
 
 tools/bintobuffer:
 	$(call msg,TOOLS,tools/bintobuffer)

@@ -5304,6 +5304,372 @@ inputs:
 Disable Node.js (V8) interpreter profiling. When disabled, Node.js process stack traces will not be collected,
 saving approximately 6.4 MB of kernel memory (v8_unwind_info_map).
 
+### Network {#inputs.ebpf.network}
+
+#### NIC optimization Enabled {#inputs.ebpf.network.nic_opt_enabled}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_opt_enabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_opt_enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to enable NIC optimization for enhanced multi-core packet
+processing and burst traffic resilience.
+
+When enabled, the system applies a combination of:
+  - RSS hardware queue configuration
+  - RX ring descriptor size tuning
+  - IRQ (interrupt) CPU affinity binding
+  - Optional XDP CPUMAP-based CPU redirection
+
+This optimization mitigates scenarios where RSS hardware cannot hash
+inner headers of encapsulated traffic (e.g., GRE, Double VLAN,
+VXLAN, ERSPAN), which may otherwise cause traffic to be concentrated
+on a single CPU core and lead to packet drops or performance bottlenecks.
+
+RX ring tuning improves burst handling capability by increasing
+the number of descriptors available for packet reception, reducing
+the likelihood of ring overflow under high traffic conditions.
+
+When XDP CPU redirect is enabled, packets are redistributed in
+software across multiple CPU cores after initial reception,
+providing better load balancing beyond hardware RSS capabilities.
+
+Recommended to enable this feature when:
+  1) Traffic on the interface consists primarily of encapsulated
+     packets (e.g., verified via tcpdump showing GRE, Double VLAN,
+     VXLAN, etc.).
+  2) One CPU core shows near 100% softirq utilization (e.g.,
+     observed via `top` with per-CPU view), while other CPUs
+     remain underutilized.
+
+For optimal performance, IRQ CPUs and XDP redirect CPUs should be
+configured on the same NUMA node as the physical NIC.
+
+#### NIC Optimize {#inputs.ebpf.network.nic_optimize}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - interface: ''
+        irq_cpu_list: ''
+        rss_channel_count: 0
+        rx_ring_size: 0
+        xdp_cpu_redirect: false
+        xdp_cpu_redirect_list: ''
+        xdp_queue_size: 2048
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**Description**:
+
+Configure NIC-level performance optimizations for specific interfaces.
+
+This feature improves packet processing scalability and burst handling
+by tuning hardware RSS queues, interrupt CPU affinity, RX ring size,
+and optional XDP CPUMAP-based CPU redirection.
+
+Recommended when:
+  - Traffic is primarily encapsulated (GRE, Double VLAN, VXLAN, ERSPAN).
+  - One CPU shows near 100% softirq usage while others are idle.
+
+To achieve better performance, the program will automatically disable the
+irqbalance service to prevent network interface interrupts from migrating
+between CPUs.
+
+Multiple NIC optimize entries can be configured for different interfaces.
+
+Example:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_opt_enabled: true
+      nic_optimize:
+      - interface: eth0
+        rx_ring_size: 4096
+        rss_channel_count: 2
+        irq_cpu_list: 1,2
+        xdp_cpu_redirect: true
+        xdp_queue_size: 2048
+        xdp_cpu_redirect_list: 4,5,6,7
+      - interface: eth1
+        rx_ring_size: 4096
+        rss_channel_count: 2
+        irq_cpu_list: 1,2
+        xdp_cpu_redirect: true
+        xdp_queue_size: 2048
+        xdp_cpu_redirect_list: 4,5,6,7
+```
+
+##### Interface {#inputs.ebpf.network.nic_optimize.interface}
+
+**Tags**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.interface`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - interface: ''
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Name of the network interface to optimize.
+
+##### RX Ring Size {#inputs.ebpf.network.nic_optimize.rx_ring_size}
+
+**Tags**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.rx_ring_size`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - rx_ring_size: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**Description**:
+
+Number of RX descriptors in NIC receive ring.
+
+Increasing this value improves burst traffic buffering
+and reduces packet drops caused by ring overflow.
+Specifically, use `ethtool -g <iface>` to check the current
+configuration, and adjust to an appropriate value based on your workload.
+
+0 (default) means keep the original state and ignore this setting.
+
+##### RSS Channel Count {#inputs.ebpf.network.nic_optimize.rss_channel_count}
+
+**Tags**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.rss_channel_count`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - rss_channel_count: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**Description**:
+
+Number of hardware RSS queues.
+Determines how many queues packets are distributed to after
+hardware hash calculation.
+
+Maximum supported value is typically 16 and must not exceed
+the number of logical CPU cores.
+Specifically, use `ethtool -l <iface>` to check the current configuration
+and adjust to an appropriate value based on your workload.
+
+When XDP CPU redirect is enabled, it is recommended to set this to 1.
+0 (default) means keep the original state and ignore this setting.
+
+##### Hardware IRQ CPU List {#inputs.ebpf.network.nic_optimize.irq_cpu_list}
+
+**Tags**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.irq_cpu_list`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - irq_cpu_list: ''
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+CPU ID or comma-separated CPU list used for handling NIC interrupts.
+
+Recommended to match the number of RSS queues.
+If XDP CPU redirect is enabled, only one CPU is required.
+
+Value can be:
+  - Specific CPU list (e.g., 2,4,6)
+  - "local" (auto match CPUs in local NUMA node)
+
+CPUs should be located on the same NUMA node as the NIC.
+
+##### Enable XDP CPU Redirect {#inputs.ebpf.network.nic_optimize.xdp_cpu_redirect}
+
+**Tags**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.xdp_cpu_redirect`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - xdp_cpu_redirect: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Enable XDP CPUMAP redirect to redistribute packets across CPUs
+in software.
+
+Useful when hardware RSS cannot distribute encapsulated traffic
+(e.g., Double VLAN, ERSPAN) evenly across CPUs, resulting in
+single-core overload and packet drops.
+
+##### XDP Queue Size {#inputs.ebpf.network.nic_optimize.xdp_queue_size}
+
+**Tags**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.xdp_queue_size`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - xdp_queue_size: 2048
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+
+**Description**:
+
+Size of the XDP CPUMAP queue.
+
+Valid range: [512, 8192]. Powers of two are recommended.
+
+Larger values improve burst tolerance but consume more memory.
+
+##### XDP Redirect CPU List {#inputs.ebpf.network.nic_optimize.xdp_cpu_redirect_list}
+
+**Tags**:
+
+<mark></mark>
+
+**FQCN**:
+
+`inputs.ebpf.network.nic_optimize.xdp_cpu_redirect_list`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    network:
+      nic_optimize:
+      - xdp_cpu_redirect_list: ''
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+CPU list used for processing packets after XDP redirection.
+
+Format example: 4,6,8
+
 ### Tunning {#inputs.ebpf.tunning}
 
 #### Collector Queue Size {#inputs.ebpf.tunning.collector_queue_size}
