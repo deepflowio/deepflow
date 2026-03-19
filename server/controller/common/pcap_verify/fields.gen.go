@@ -48,7 +48,7 @@ var ResponseFieldToAppProtoLogsDataFieldPath = map[string]string{
 }
 
 type PartialConvertedAppProtoLogsData struct {
-	ResponseStatus    uint32 `json:"response_status,omitempty"`
+	ResponseStatus    uint32 `json:"response_status"`
 	StartTime         string `json:"start_time,omitempty"`
 	EndTime           string `json:"end_time,omitempty"`
 	Ip0               string `json:"ip_0,omitempty"`
