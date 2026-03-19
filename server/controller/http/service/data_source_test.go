@@ -57,6 +57,34 @@ func Test_getTableName(t *testing.T) {
 			},
 			want: "deepflow_system",
 		},
+		{
+			name: "event.file_agg_event",
+			args: args{
+				collection: "event.file_agg_event",
+			},
+			want: "event.file_agg_event",
+		},
+		{
+			name: "event.file_mgmt_event",
+			args: args{
+				collection: "event.file_mgmt_event",
+			},
+			want: "event.file_mgmt_event",
+		},
+		{
+			name: "event.proc_perm_event",
+			args: args{
+				collection: "event.proc_perm_event",
+			},
+			want: "event.proc_perm_event",
+		},
+		{
+			name: "event.proc_ops_event",
+			args: args{
+				collection: "event.proc_ops_event",
+			},
+			want: "event.proc_ops_event",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
