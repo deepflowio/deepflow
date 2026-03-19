@@ -95,6 +95,7 @@ fn get_req_param<'a>(
         net_sign_parse_conf: NetSignParseConfig::default(),
         icmp_data: None,
         process_id: 0,
+        socket_role: 0,
     }
 }
 
@@ -138,6 +139,7 @@ fn get_resp_param<'a>(
         net_sign_parse_conf: NetSignParseConfig::default(),
         icmp_data: None,
         process_id: 0,
+        socket_role: 0,
     }
 }
 

@@ -577,6 +577,7 @@ pub mod ai_agent {
         _endpoints: &[String],
         _path: &str,
         _pid: u32,
+        _socket_role: u8,
         _now: Duration,
     ) -> Option<String> {
         None
