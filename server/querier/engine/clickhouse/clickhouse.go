@@ -28,6 +28,7 @@ import (
 	"time"
 
 	//"github.com/k0kubun/pp"
+	"github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
 
@@ -112,6 +113,7 @@ type CHEngine struct {
 	ORGID              string
 	Language           string
 	NativeField        map[string]*metrics.Metrics
+	CustomMetrics      map[string]*simplejson.Json
 }
 
 func init() {
@@ -1329,6 +1331,15 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 			e.Table = table
 			// native field
 			if config.ControllerCfg.DFWebService.Enabled && (slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_DEEPFLOW_TENANT, chCommon.DB_NAME_APPLICATION_LOG, chCommon.DB_NAME_EXT_METRICS}, e.DB) || slices.Contains([]string{chCommon.TABLE_NAME_L7_FLOW_LOG, chCommon.TABLE_NAME_EVENT, chCommon.TABLE_NAME_FILE_EVENT}, e.Table)) {
+				// get custom-metrics
+				var err error
+				if e.CustomMetrics == nil {
+					e.CustomMetrics, err = chCommon.GetCustomMetrics(e.ORGID)
+					if err != nil {
+						log.Error(err.Error())
+					}
+				}
+				customMetrics := e.CustomMetrics
 				e.NativeField = map[string]*metrics.Metrics{}
 				getNativeUrl := fmt.Sprintf("http://localhost:%d/v1/native-fields/?db=%s&table_name=%s", config.ControllerCfg.ListenPort, e.DB, e.Table)
 				resp, err := ctlcommon.CURLPerform("GET", getNativeUrl, nil, ctlcommon.WithHeader(ctlcommon.HEADER_KEY_X_ORG_ID, e.ORGID))
@@ -1346,9 +1357,18 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 							continue
 						}
 						if fieldType == chCommon.NATIVE_FIELD_TYPE_METRIC {
+							var mUnit string
+							mType := metrics.METRICS_TYPE_COUNTER
+							customMetric, ok := customMetrics[fmt.Sprintf("%s.%s.%s", e.DB, e.Table, nativeMetric)]
+							if ok {
+								mType = customMetric.Get("TYPE").MustInt()
+								mUnit = customMetric.Get("UNIT").MustString()
+								displayName = customMetric.Get("DISPLAY_NAME").MustString()
+								description = customMetric.Get("DESCRIPTION").MustString()
+							}
 							metric := metrics.NewMetrics(
 								0, nativeMetric,
-								displayName, displayName, displayName, "", "", "", metrics.METRICS_TYPE_COUNTER,
+								displayName, displayName, displayName, mUnit, mUnit, mUnit, mType,
 								chCommon.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", table, description, description, description, "", "",
 							)
 							e.NativeField[nativeMetric] = metric
@@ -1872,7 +1892,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if fieldFunc != nil {
 			return fieldFunc, nil
 		}
-		metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID, e.NativeField)
+		metricStruct, ok := metrics.GetAggMetrics(field, e.DB, e.Table, e.ORGID, e.NativeField, e.CustomMetrics)
 		if ok {
 			return &Field{Value: metricStruct.DBField}, nil
 		}
@@ -1985,7 +2005,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
-			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.ORGID, e.NativeField)
+			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.ORGID, e.NativeField, e.CustomMetrics)
 			if ok && metricStruct.Type != metrics.METRICS_TYPE_TAG {
 				whereTag = metricStruct.DBField
 			}
@@ -2013,7 +2033,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 			return nil, errors.New(fmt.Sprintf("parse where error: %s(%T)", sqlparser.String(node), node))
 		}
 		whereTag := chCommon.ParseAlias(node.Expr)
-		metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.ORGID, e.NativeField)
+		metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.ORGID, e.NativeField, e.CustomMetrics)
 		if ok && metricStruct.Type != metrics.METRICS_TYPE_TAG {
 			whereTag = metricStruct.DBField
 		}
