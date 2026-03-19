@@ -2403,6 +2403,9 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     monitoring_interval     CHAR(64) DEFAULT "1m",
     trigger_info_event      INTEGER DEFAULT 0,
     trigger_recovery_event  INTEGER DEFAULT 1,
+    trigger_mode            INTEGER DEFAULT 1 COMMENT '1-连续次数 2-时间窗口',
+    trigger_count           INTEGER DEFAULT 1 COMMENT '触发次数',
+    trigger_window_minutes  INTEGER DEFAULT 0 COMMENT '时间窗口(分钟)',
     recovery_event_levels   TEXT,
     lcuuid                  CHAR(64),
     biz_id                  INTEGER DEFAULT 0,
@@ -2449,6 +2452,8 @@ CREATE TABLE IF NOT EXISTS alarm_event (
     status                  CHAR(64),
     timestamp               DATETIME,
     end_time                BIGINT,
+    event_id                CHAR(64) NOT NULL COMMENT '聚合事件ID',
+    event_level             INTEGER,
     policy_id               INTEGER,
     policy_name             TEXT,
     policy_level            INTEGER,
@@ -2468,10 +2473,20 @@ CREATE TABLE IF NOT EXISTS alarm_event (
     end_value               TEXT,
     value_unit              CHAR(64),
     endpoint_results        TEXT,
-    event_level             INTEGER,
     lcuuid                  CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_event;
+
+CREATE TABLE IF NOT EXISTS alarm_event_state (
+    id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    event_id                CHAR(64) NOT NULL COMMENT '聚合事件ID',
+    state                   INTEGER COMMENT '0-ongoing 1-ended',
+    event_payload           TEXT COMMENT '事件JSON',
+    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_event_id(event_id)
+) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 COMMENT='告警事件状态';
+TRUNCATE TABLE alarm_event_state;
 
 CREATE TABLE IF NOT EXISTS report_policy (
     id                      INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
