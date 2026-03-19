@@ -20,6 +20,7 @@ import (
 	"unsafe"
 
 	"github.com/ClickHouse/ch-go/proto"
+	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/nativetag"
 )
@@ -197,9 +198,18 @@ func (n *EventStore) NewColumnBlock() ckdb.CKColumnBlock {
 		ColMountSource:     new(proto.ColStr).LowCardinality(),
 		ColMountPoint:      new(proto.ColStr).LowCardinality(),
 	}
-	if n.IsFileEvent {
+	switch n.storeEventType() {
+	case common.FILE_EVENT:
 		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_FILE_EVENT)
-	} else {
+	case common.FILE_AGG_EVENT:
+		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_FILE_AGG_EVENT)
+	case common.FILE_MGMT_EVENT:
+		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_FILE_MGMT_EVENT)
+	case common.PROC_PERM_EVENT:
+		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_PROC_PERM_EVENT)
+	case common.PROC_OPS_EVENT:
+		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_PROC_OPS_EVENT)
+	default:
 		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_EVENT)
 	}
 	return b

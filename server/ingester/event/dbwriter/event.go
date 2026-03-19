@@ -103,6 +103,7 @@ type EventStore struct {
 	AttributeNames  []string `json:"attribute_names" category:"$tag" sub:"native_tag" data_type:"[]string"`
 	AttributeValues []string `json:"attribute_values" category:"$tag" sub:"native_tag" data_type:"[]string"`
 
+	StoreEventType   common.EventType
 	IsFileEvent      bool
 	Bytes            uint32 `json:"bytes" category:"$metrics" sub:"throughput"`
 	Duration         uint64 `json:"duration" category:"$metrics" sub:"delay"`
@@ -118,10 +119,20 @@ type EventStore struct {
 }
 
 func (e *EventStore) NativeTagVersion() uint32 {
-	if e.IsFileEvent {
+	switch e.storeEventType() {
+	case common.FILE_EVENT:
 		return nativetag.GetTableNativeTagsVersion(e.OrgId, nativetag.EVENT_FILE_EVENT)
+	case common.FILE_AGG_EVENT:
+		return nativetag.GetTableNativeTagsVersion(e.OrgId, nativetag.EVENT_FILE_AGG_EVENT)
+	case common.FILE_MGMT_EVENT:
+		return nativetag.GetTableNativeTagsVersion(e.OrgId, nativetag.EVENT_FILE_MGMT_EVENT)
+	case common.PROC_PERM_EVENT:
+		return nativetag.GetTableNativeTagsVersion(e.OrgId, nativetag.EVENT_PROC_PERM_EVENT)
+	case common.PROC_OPS_EVENT:
+		return nativetag.GetTableNativeTagsVersion(e.OrgId, nativetag.EVENT_PROC_OPS_EVENT)
+	default:
+		return nativetag.GetTableNativeTagsVersion(e.OrgId, nativetag.EVENT_EVENT)
 	}
-	return nativetag.GetTableNativeTagsVersion(e.OrgId, nativetag.EVENT_EVENT)
 }
 
 func (e *EventStore) OrgID() uint16 {
@@ -129,10 +140,7 @@ func (e *EventStore) OrgID() uint16 {
 }
 
 func (e *EventStore) Table() string {
-	if e.IsFileEvent {
-		return common.FILE_EVENT.TableName()
-	}
-	return common.RESOURCE_EVENT.TableName() // the same as common.K8S_EVENT.TableName()
+	return e.storeEventType().TableName()
 }
 
 func (e *EventStore) Release() {
@@ -140,10 +148,30 @@ func (e *EventStore) Release() {
 }
 
 func (e *EventStore) DataSource() uint32 {
-	if e.IsFileEvent {
+	switch e.storeEventType() {
+	case common.FILE_EVENT:
 		return uint32(config.FILE_EVENT)
+	case common.FILE_AGG_EVENT:
+		return uint32(config.FILE_AGG_EVENT)
+	case common.FILE_MGMT_EVENT:
+		return uint32(config.FILE_MGMT_EVENT)
+	case common.PROC_PERM_EVENT:
+		return uint32(config.PROC_PERM_EVENT)
+	case common.PROC_OPS_EVENT:
+		return uint32(config.PROC_OPS_EVENT)
+	default:
+		return uint32(config.MAX_DATASOURCE_ID)
 	}
-	return uint32(config.MAX_DATASOURCE_ID)
+}
+
+func (e *EventStore) storeEventType() common.EventType {
+	if e.StoreEventType != common.RESOURCE_EVENT {
+		return e.StoreEventType
+	}
+	if e.IsFileEvent {
+		return common.FILE_EVENT
+	}
+	return common.RESOURCE_EVENT
 }
 
 func (e *EventStore) EncodeTo(protocol config.ExportProtocol, utags *utag.UniversalTagsManager, cfg *config.ExporterCfg) (interface{}, error) {
@@ -250,10 +278,21 @@ func GenEventCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, co
 	timeKey := "time"
 	engine := ckdb.MergeTree
 	orderKeys := []string{timeKey, "signal_source", "event_type", "l3_epc_id", "l3_device_type", "l3_device_id"}
-	isFileEvent := false
 	partition := DefaultPartition
-	if table == common.FILE_EVENT.TableName() {
-		isFileEvent = true
+	columns := EventColumns(false)
+	switch table {
+	case common.FILE_EVENT.TableName():
+		columns = EventColumns(true)
+	case common.FILE_AGG_EVENT.TableName():
+		columns = FileAggEventColumns()
+	case common.FILE_MGMT_EVENT.TableName():
+		columns = FileMgmtEventColumns()
+	case common.PROC_PERM_EVENT.TableName():
+		columns = ProcPermEventColumns()
+	case common.PROC_OPS_EVENT.TableName():
+		columns = ProcOpsEventColumns()
+	}
+	if table == common.FILE_EVENT.TableName() || table == common.FILE_MGMT_EVENT.TableName() || table == common.FILE_AGG_EVENT.TableName() {
 		partition = DefaultFileEventPartition
 	}
 
@@ -263,7 +302,7 @@ func GenEventCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, co
 		DBType:          ckdbType,
 		LocalName:       table + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      table,
-		Columns:         EventColumns(isFileEvent),
+		Columns:         columns,
 		TimeKey:         timeKey,
 		TTL:             ttl,
 		PartitionFunc:   partition,

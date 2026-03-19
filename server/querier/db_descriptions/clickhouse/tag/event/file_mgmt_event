@@ -1,0 +1,28 @@
+# Name                     , ClientName                , ServerName                , Type           , EnumFile              , Category        , Permission      , Deprecated
+time_str                   , time_str                  , time_str                  , time           ,                       , Timestamp       , 111             , 0
+_id                        , _id                       , _id                       , id             ,                       , Event Info      , 111             , 0
+time                       , time                      , time                      , time           ,                       , Event Info      , 111             , 0
+start_time                 , start_time                , start_time                , int            ,                       , Event Info      , 111             , 0
+end_time                   , end_time                  , end_time                  , int            ,                       , Event Info      , 111             , 0
+region                     , region                    , region                    , resource       ,                       , Universal Tag   , 110             , 0
+pod                        , pod                       , pod                       , resource       ,                       , Universal Tag   , 111             , 0
+gprocess                   , gprocess                  , gprocess                  , resource       ,                       , Universal Tag   , 111             , 0
+ip                         , ip                        , ip                        , ip             ,                       , Network Layer   , 111             , 0
+is_ipv4                    , is_ipv4                   , is_ipv4                   , int_enum       , ip_type               , Network Layer   , 111             , 0
+
+event_type                 , event_type                , event_type                , string         ,                       , Event Info      , 111             , 0
+process_kname              , process_kname             , process_kname             , string         ,                       , Service Info    , 111             , 0
+app_instance               , app_instance              , app_instance              , string         ,                       , Service Info    , 111             , 0
+agent                      , agent                     , agent                     , resource       ,                       , Capture Info    , 111             , 0
+signal_source              , signal_source             , signal_source             , int_enum       , file_event_signal_source, Capture Info    , 111             , 0
+mount_source               , mount_source              , mount_source              , string         ,                       , Event Info      , 111             , 0
+mount_point                , mount_point               , mount_point               , string         ,                       , Event Info      , 111             , 0
+file_dir                   , file_dir                  , file_dir                  , string         ,                       , Event Info      , 111             , 0
+file_name                  , file_name                 , file_name                 , string         ,                       , Event Info      , 111             , 0
+file_type                  , file_type                 , file_type                 , int_enum       , file_type              , Event Info      , 111             , 0
+target_uid                 , target_uid                , target_uid                , int            ,                       , Event Info      , 111             , 0
+target_gid                 , target_gid                , target_gid                , int            ,                       , Event Info      , 111             , 0
+target_mode                , target_mode               , target_mode               , int            ,                       , Event Info      , 111             , 0
+access_permission          , access_permission         , access_permission         , int            ,                       , Event Info      , 111             , 0
+syscall_thread             , syscall_thread            , syscall_thread            , int            ,                       , Tracing Info    , 111             , 0
+syscall_coroutine          , syscall_coroutine         , syscall_coroutine         , int            ,                       , Tracing Info    , 111             , 0
