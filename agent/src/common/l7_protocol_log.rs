@@ -699,6 +699,7 @@ pub struct ParseParam<'a> {
     pub web_sphere_mq_parse_conf: WebSphereMqParseConfig,
 
     pub process_id: u32,
+    pub socket_role: u8,
 }
 
 impl<'a> fmt::Debug for ParseParam<'a> {
@@ -731,6 +732,7 @@ impl<'a> fmt::Debug for ParseParam<'a> {
             .field("oracle_parse_conf", &self.oracle_parse_conf)
             .field("iso8583_parse_conf", &self.iso8583_parse_conf)
             .field("web_sphere_mq_parse_conf", &self.web_sphere_mq_parse_conf)
+            .field("socket_role", &self.socket_role)
             .finish()
     }
 }
@@ -806,6 +808,7 @@ impl<'a> ParseParam<'a> {
             web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
 
             process_id: packet.process_id,
+            socket_role: packet.socket_role,
         }
     }
 }
