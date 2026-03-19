@@ -16,7 +16,7 @@
 
 use std::{
     fmt::{self, Debug, Formatter},
-    slice, str,
+    fs, slice, str,
 };
 
 use prost::Message;
@@ -250,6 +250,40 @@ struct ProcLifecycleEventData {
     gid: u32,
     timestamp: u64,
     comm: Vec<u8>,
+    cmdline: Vec<u8>,
+    exec_path: Vec<u8>,
+}
+
+fn read_proc_cmdline(pid: u32) -> Vec<u8> {
+    let Ok(mut cmdline) = fs::read(format!("/proc/{pid}/cmdline")) else {
+        return Vec::new();
+    };
+    if cmdline.is_empty() {
+        return cmdline;
+    }
+    if cmdline.last() == Some(&0) {
+        cmdline.pop();
+    }
+    for b in cmdline.iter_mut() {
+        if *b == 0 {
+            *b = b' ';
+        }
+    }
+    cmdline
+}
+
+fn read_proc_exec_path(pid: u32) -> Vec<u8> {
+    let Ok(path) = fs::read_link(format!("/proc/{pid}/exe")) else {
+        return Vec::new();
+    };
+    path.to_string_lossy().into_owned().into_bytes()
+}
+
+fn enrich_proc_lifecycle_metadata(pid: u32, lifecycle_type: u8) -> (Vec<u8>, Vec<u8>) {
+    if pid == 0 || lifecycle_type == PROC_LIFECYCLE_EXIT {
+        return (Vec::new(), Vec::new());
+    }
+    (read_proc_cmdline(pid), read_proc_exec_path(pid))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -278,14 +312,19 @@ impl TryFrom<&[u8]> for ProcLifecycleEventData {
         } else {
             vec![]
         };
+        let lifecycle_type = raw[0];
+        let pid = read_u32_le(&raw[PROC_LC_PID_OFF..]);
+        let (cmdline, exec_path) = enrich_proc_lifecycle_metadata(pid, lifecycle_type);
         Ok(Self {
-            lifecycle_type: raw[0],
-            pid: read_u32_le(&raw[PROC_LC_PID_OFF..]),
+            lifecycle_type,
+            pid,
             parent_pid: read_u32_le(&raw[PROC_LC_PPID_OFF..]),
             uid: read_u32_le(&raw[PROC_LC_UID_OFF..]),
             gid: read_u32_le(&raw[PROC_LC_GID_OFF..]),
             timestamp: read_u64_le(&raw[PROC_LC_TS_OFF..]),
             comm,
+            cmdline,
+            exec_path,
         })
     }
 }
@@ -300,6 +339,8 @@ impl From<ProcLifecycleEventData> for metric::ProcLifecycleEventData {
             gid: d.gid,
             timestamp: d.timestamp,
             comm: d.comm,
+            cmdline: d.cmdline,
+            exec_path: d.exec_path,
         }
     }
 }
@@ -534,6 +575,8 @@ mod tests {
             gid: 0,
             timestamp: 42,
             comm: b"sleep".to_vec(),
+            cmdline: Vec::new(),
+            exec_path: Vec::new(),
         };
         let proc_event = ProcEvent {
             pid: 1234,
@@ -552,5 +595,34 @@ mod tests {
         assert_eq!(info.lifecycle_type, 1);
         assert_eq!(info.pid, 4321);
         assert_eq!(info.parent_pid, 1234);
+    }
+
+    #[test]
+    fn test_enrich_proc_lifecycle_metadata_reads_current_process() {
+        let pid = std::process::id();
+        let (cmdline, exec_path) = enrich_proc_lifecycle_metadata(pid, PROC_LIFECYCLE_EXEC);
+        assert!(!cmdline.is_empty());
+        assert!(!exec_path.is_empty());
+    }
+
+    #[test]
+    fn test_proc_lifecycle_event_into_metric_carries_proc_metadata() {
+        let pid = std::process::id();
+        let (cmdline, exec_path) = enrich_proc_lifecycle_metadata(pid, PROC_LIFECYCLE_EXEC);
+        let event = ProcLifecycleEventData {
+            lifecycle_type: PROC_LIFECYCLE_EXEC,
+            pid,
+            parent_pid: 1,
+            uid: 0,
+            gid: 0,
+            timestamp: 42,
+            comm: b"python3".to_vec(),
+            cmdline: cmdline.clone(),
+            exec_path: exec_path.clone(),
+        };
+
+        let pb: metric::ProcLifecycleEventData = event.into();
+        assert_eq!(pb.cmdline, cmdline);
+        assert_eq!(pb.exec_path, exec_path);
     }
 }

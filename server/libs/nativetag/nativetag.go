@@ -36,6 +36,10 @@ const (
 	APPLICATION_LOG NativeTagTable = iota
 	EVENT_EVENT
 	EVENT_FILE_EVENT
+	EVENT_FILE_AGG_EVENT
+	EVENT_FILE_MGMT_EVENT
+	EVENT_PROC_PERM_EVENT
+	EVENT_PROC_OPS_EVENT
 	L7_FLOW_LOG
 	DEEPFLOW_ADMIN
 	DEEPFLOW_TENANT
@@ -46,25 +50,33 @@ const (
 )
 
 var NativeTagDatabaseNames = [MAX_NATIVE_TAG_TABLE]string{
-	APPLICATION_LOG:  "application_log",
-	EVENT_EVENT:      "event",
-	EVENT_FILE_EVENT: "event",
-	L7_FLOW_LOG:      "flow_log",
-	DEEPFLOW_ADMIN:   "deepflow_admin",
-	DEEPFLOW_TENANT:  "deepflow_tenant",
-	EXT_METRICS:      "ext_metrics",
-	PROFILE:          "profile",
+	APPLICATION_LOG:       "application_log",
+	EVENT_EVENT:           "event",
+	EVENT_FILE_EVENT:      "event",
+	EVENT_FILE_AGG_EVENT:  "event",
+	EVENT_FILE_MGMT_EVENT: "event",
+	EVENT_PROC_PERM_EVENT: "event",
+	EVENT_PROC_OPS_EVENT:  "event",
+	L7_FLOW_LOG:           "flow_log",
+	DEEPFLOW_ADMIN:        "deepflow_admin",
+	DEEPFLOW_TENANT:       "deepflow_tenant",
+	EXT_METRICS:           "ext_metrics",
+	PROFILE:               "profile",
 }
 
 var NativeTagTableNames = [MAX_NATIVE_TAG_TABLE]string{
-	APPLICATION_LOG:  "log",
-	EVENT_EVENT:      "event",
-	EVENT_FILE_EVENT: "file_event",
-	L7_FLOW_LOG:      "l7_flow_log",
-	DEEPFLOW_ADMIN:   "deepflow_server",
-	DEEPFLOW_TENANT:  "deepflow_collector",
-	EXT_METRICS:      "metrics",
-	PROFILE:          "in_process",
+	APPLICATION_LOG:       "log",
+	EVENT_EVENT:           "event",
+	EVENT_FILE_EVENT:      "file_event",
+	EVENT_FILE_AGG_EVENT:  "file_agg_event",
+	EVENT_FILE_MGMT_EVENT: "file_mgmt_event",
+	EVENT_PROC_PERM_EVENT: "proc_perm_event",
+	EVENT_PROC_OPS_EVENT:  "proc_ops_event",
+	L7_FLOW_LOG:           "l7_flow_log",
+	DEEPFLOW_ADMIN:        "deepflow_server",
+	DEEPFLOW_TENANT:       "deepflow_collector",
+	EXT_METRICS:           "metrics",
+	PROFILE:               "in_process",
 }
 
 func (t NativeTagTable) Database() string {

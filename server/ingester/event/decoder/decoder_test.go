@@ -3,8 +3,64 @@ package decoder
 import (
 	"testing"
 
+	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
 )
+
+func TestRouteProcEventType(t *testing.T) {
+	tests := []struct {
+		name  string
+		event *pb.ProcEvent
+		want  common.EventType
+	}{
+		{
+			name: "io event keeps file_event",
+			event: &pb.ProcEvent{
+				EventType:   pb.EventType_IoEvent,
+				IoEventData: &pb.IoEventData{},
+			},
+			want: common.FILE_EVENT,
+		},
+		{
+			name: "file op goes to file_mgmt_event",
+			event: &pb.ProcEvent{
+				EventType: pb.EventType_FileOpEvent,
+				FileOpEventData: &pb.FileOpEventData{
+					OpType: pb.FileOpType_FileOpCreate,
+				},
+			},
+			want: common.FILE_MGMT_EVENT,
+		},
+		{
+			name: "perm op goes to proc_perm_event",
+			event: &pb.ProcEvent{
+				EventType: pb.EventType_PermOpEvent,
+				PermOpEventData: &pb.PermOpEventData{
+					OpType: pb.PermOpType_PermOpSetuid,
+				},
+			},
+			want: common.PROC_PERM_EVENT,
+		},
+		{
+			name: "proc lifecycle goes to proc_ops_event",
+			event: &pb.ProcEvent{
+				EventType: pb.EventType_ProcLifecycleEvent,
+				ProcLifecycleEventData: &pb.ProcLifecycleEventData{
+					LifecycleType: pb.ProcLifecycleType_ProcLifecycleFork,
+				},
+			},
+			want: common.PROC_OPS_EVENT,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := routeProcEventType(tt.event); got != tt.want {
+				t.Fatalf("routeProcEventType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestResolveGProcessIDProcLifecycleFallback(t *testing.T) {
 	parentPid := uint32(2000)
@@ -163,5 +219,43 @@ func TestResolveGProcessIDAiAgentRootPidFallback(t *testing.T) {
 	got2 := resolveGProcessID(query2, cache, orgId, vtapId, fileEvent2)
 	if got2 != rootGpid {
 		t.Fatalf("expected cached root_pid resolution to gprocess_id %d, got %d", rootGpid, got2)
+	}
+}
+
+func TestExtractProcOpsCommandData(t *testing.T) {
+	event := &pb.ProcEvent{
+		EventType: pb.EventType_ProcLifecycleEvent,
+		ProcLifecycleEventData: &pb.ProcLifecycleEventData{
+			LifecycleType: pb.ProcLifecycleType_ProcLifecycleExec,
+			Cmdline:       []byte("python3.11 batch_processor.py --interval=300"),
+			ExecPath:      []byte("/usr/bin/python3.11"),
+		},
+	}
+
+	cmdline, execPath := extractProcOpsCommandData(event)
+	if cmdline != "python3.11 batch_processor.py --interval=300" {
+		t.Fatalf("cmdline = %q", cmdline)
+	}
+	if execPath != "/usr/bin/python3.11" {
+		t.Fatalf("exec_path = %q", execPath)
+	}
+}
+
+func TestExtractFileMgmtTargets(t *testing.T) {
+	uid, gid, mode := extractFileMgmtTargets(&pb.FileOpEventData{
+		OpType: pb.FileOpType_FileOpChown,
+		Uid:    1001,
+		Gid:    1002,
+	})
+	if uid != 1001 || gid != 1002 || mode != 0 {
+		t.Fatalf("chown targets = (%d,%d,%d)", uid, gid, mode)
+	}
+
+	uid, gid, mode = extractFileMgmtTargets(&pb.FileOpEventData{
+		OpType: pb.FileOpType_FileOpChmod,
+		Mode:   0600,
+	})
+	if uid != 0 || gid != 0 || mode != 0600 {
+		t.Fatalf("chmod targets = (%d,%d,%d)", uid, gid, mode)
 	}
 }

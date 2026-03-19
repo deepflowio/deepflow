@@ -319,6 +319,8 @@ message ProcLifecycleEventData {
     uint32 gid = 5;
     uint64 timestamp = 6;
     bytes comm = 7;
+    bytes cmdline = 8;
+    bytes exec_path = 9;
 }
 
 message ProcEvent {

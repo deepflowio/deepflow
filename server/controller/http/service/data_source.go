@@ -96,6 +96,10 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"Prometheus 数据", // prometheus.*
 	"事件-资源变更事件",     // event.event
 	"事件-文件读写事件",     // event.file_event
+	"事件-文件读写聚合事件",   // event.file_agg_event
+	"事件-文件管理事件",     // event.file_mgmt_event
+	"事件-进程权限事件",     // event.proc_perm_event
+	"事件-进程操作事件",     // event.proc_ops_event
 	"事件-文件读写指标",     // event.file_event_metrics
 	"事件-告警事件",       // event.alert_event
 	"应用-性能剖析",       // profile.in_process

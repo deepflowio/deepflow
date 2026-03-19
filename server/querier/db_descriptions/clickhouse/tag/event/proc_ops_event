@@ -1,0 +1,26 @@
+# Name                     , ClientName                , ServerName                , Type           , EnumFile              , Category        , Permission      , Deprecated
+time_str                   , time_str                  , time_str                  , time           ,                       , Timestamp       , 111             , 0
+_id                        , _id                       , _id                       , id             ,                       , Event Info      , 111             , 0
+time                       , time                      , time                      , time           ,                       , Event Info      , 111             , 0
+start_time                 , start_time                , start_time                , int            ,                       , Event Info      , 111             , 0
+end_time                   , end_time                  , end_time                  , int            ,                       , Event Info      , 111             , 0
+region                     , region                    , region                    , resource       ,                       , Universal Tag   , 110             , 0
+pod                        , pod                       , pod                       , resource       ,                       , Universal Tag   , 111             , 0
+gprocess                   , gprocess                  , gprocess                  , resource       ,                       , Universal Tag   , 111             , 0
+ip                         , ip                        , ip                        , ip             ,                       , Network Layer   , 111             , 0
+is_ipv4                    , is_ipv4                   , is_ipv4                   , int_enum       , ip_type               , Network Layer   , 111             , 0
+
+event_type                 , event_type                , event_type                , string         ,                       , Event Info      , 111             , 0
+process_kname              , process_kname             , process_kname             , string         ,                       , Service Info    , 111             , 0
+app_instance               , app_instance              , app_instance              , string         ,                       , Service Info    , 111             , 0
+agent                      , agent                     , agent                     , resource       ,                       , Capture Info    , 111             , 0
+signal_source              , signal_source             , signal_source             , int_enum       , file_event_signal_source, Capture Info    , 111             , 0
+pid                        , pid                       , pid                       , int            ,                       , Event Info      , 111             , 0
+parent_pid                 , parent_pid                , parent_pid                , int            ,                       , Event Info      , 111             , 0
+ai_agent_root_pid          , ai_agent_root_pid         , ai_agent_root_pid         , int            ,                       , Event Info      , 111             , 0
+uid                        , uid                       , uid                       , int            ,                       , Event Info      , 111             , 0
+gid                        , gid                       , gid                       , int            ,                       , Event Info      , 111             , 0
+cmdline                    , cmdline                   , cmdline                   , string         ,                       , Event Info      , 111             , 0
+exec_path                  , exec_path                 , exec_path                 , string         ,                       , Event Info      , 111             , 0
+syscall_thread             , syscall_thread            , syscall_thread            , int            ,                       , Tracing Info    , 111             , 0
+syscall_coroutine          , syscall_coroutine         , syscall_coroutine         , int            ,                       , Tracing Info    , 111             , 0

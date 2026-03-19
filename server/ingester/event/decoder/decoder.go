@@ -128,6 +128,8 @@ type Decoder struct {
 	platformData        *grpc.PlatformInfoTable
 	inQueue             queue.QueueReader
 	eventWriter         *dbwriter.EventWriter
+	procEventWriters    *ProcEventWriters
+	fileAggReducer      *FileAggReducer
 	exporters           *exporters.Exporters
 	debugEnabled        bool
 	config              *config.Config
@@ -139,11 +141,20 @@ type Decoder struct {
 	utils.Closable
 }
 
+type ProcEventWriters struct {
+	FileWriter     *dbwriter.EventWriter
+	FileAggWriter  *dbwriter.EventWriter
+	FileMgmtWriter *dbwriter.EventWriter
+	ProcPermWriter *dbwriter.EventWriter
+	ProcOpsWriter  *dbwriter.EventWriter
+}
+
 func NewDecoder(
 	index int,
 	eventType common.EventType,
 	inQueue queue.QueueReader,
 	eventWriter *dbwriter.EventWriter,
+	procEventWriters *ProcEventWriters,
 	platformData *grpc.PlatformInfoTable,
 	exporters *exporters.Exporters,
 	config *config.Config,
@@ -163,6 +174,8 @@ func NewDecoder(
 		inQueue:             inQueue,
 		debugEnabled:        log.IsEnabledFor(logging.DEBUG),
 		eventWriter:         eventWriter,
+		procEventWriters:    procEventWriters,
+		fileAggReducer:      NewFileAggReducer(),
 		exporters:           exporters,
 		config:              config,
 		aiAgentRootPidCache: aiAgentRootPidCache,
@@ -186,6 +199,9 @@ func (d *Decoder) Run() {
 		n := d.inQueue.Gets(buffer)
 		for i := 0; i < n; i++ {
 			if buffer[i] == nil {
+				if d.eventType == common.FILE_EVENT {
+					d.flushFileAggEvent()
+				}
 				d.export(nil)
 				continue
 			}
@@ -242,9 +258,44 @@ func (d *Decoder) Run() {
 	}
 }
 
-func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
-	s := dbwriter.AcquireEventStore()
-	s.IsFileEvent = true
+func routeProcEventType(e *pb.ProcEvent) common.EventType {
+	if e == nil {
+		return common.FILE_EVENT
+	}
+	switch {
+	case e.FileOpEventData != nil:
+		return common.FILE_MGMT_EVENT
+	case e.PermOpEventData != nil:
+		return common.PROC_PERM_EVENT
+	case e.ProcLifecycleEventData != nil:
+		return common.PROC_OPS_EVENT
+	default:
+		return common.FILE_EVENT
+	}
+}
+
+func extractProcOpsCommandData(e *pb.ProcEvent) (string, string) {
+	if e == nil || e.ProcLifecycleEventData == nil {
+		return "", ""
+	}
+	return string(e.ProcLifecycleEventData.Cmdline), string(e.ProcLifecycleEventData.ExecPath)
+}
+
+func extractFileMgmtTargets(d *pb.FileOpEventData) (uint32, uint32, uint32) {
+	if d == nil {
+		return 0, 0, 0
+	}
+	switch d.OpType {
+	case pb.FileOpType_FileOpChown:
+		return d.Uid, d.Gid, 0
+	case pb.FileOpType_FileOpChmod:
+		return 0, 0, d.Mode
+	default:
+		return 0, 0, 0
+	}
+}
+
+func (d *Decoder) initEventStoreCommon(s *dbwriter.EventStore, vtapId uint16, e *pb.ProcEvent) {
 	s.Time = uint32(time.Duration(e.StartTime) / time.Second)
 	s.SetId(s.Time, d.platformData.QueryAnalyzerID())
 	s.StartTime = int64(time.Duration(e.StartTime) / time.Microsecond)
@@ -268,57 +319,7 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		vtapId,
 		e,
 	)
-	if e.IoEventData != nil {
-		ioData := e.IoEventData
-		s.EventType = strings.ToLower(ioData.Operation.String())
-		s.ProcessKName = string(e.ProcessKname)
-		s.FileName = string(ioData.Filename)
-		s.Offset = ioData.OffBytes
-		s.SyscallThread = e.ThreadId
-		s.SyscallCoroutine = e.CoroutineId
-		s.FileType = uint8(ioData.FileType)
-		s.FileDir = string(ioData.FileDir)
-		s.MountSource = string(ioData.MountSource)
-		s.MountPoint = string(ioData.MountPoint)
-		s.Bytes = ioData.BytesCount
-		s.AccessPermission = ioData.AccessPermission
-		s.Duration = uint64(s.EndTime - s.StartTime)
-	} else if e.FileOpEventData != nil {
-		d := e.FileOpEventData
-		// Strip "FileOp" prefix: FileOpCreate→create, FileOpDelete→delete, etc.
-		opStr := d.OpType.String()
-		if strings.HasPrefix(opStr, "FileOp") {
-			opStr = opStr[len("FileOp"):]
-		}
-		s.EventType = strings.ToLower(opStr)
-		s.ProcessKName = string(e.ProcessKname)
-		// Split full path into file_dir and file_name to match IoEvent format
-		fullPath := string(d.Filename)
-		if idx := strings.LastIndex(fullPath, "/"); idx >= 0 {
-			s.FileDir = fullPath[:idx+1]
-			s.FileName = fullPath[idx+1:]
-		} else {
-			s.FileName = fullPath
-		}
-		// For chmod, mode contains the actual permission bits
-		if d.OpType == pb.FileOpType_FileOpChmod {
-			s.AccessPermission = d.Mode
-		}
-		s.SyscallThread = e.ThreadId
-		s.SyscallCoroutine = e.CoroutineId
-	} else if e.PermOpEventData != nil {
-		d := e.PermOpEventData
-		s.EventType = strings.ToLower(d.OpType.String())
-		s.ProcessKName = string(e.ProcessKname)
-		s.SyscallThread = e.ThreadId
-		s.SyscallCoroutine = e.CoroutineId
-	} else if e.ProcLifecycleEventData != nil {
-		d := e.ProcLifecycleEventData
-		s.EventType = strings.ToLower(d.LifecycleType.String())
-		s.ProcessKName = string(d.Comm)
-		s.SyscallThread = e.ThreadId
-		s.SyscallCoroutine = e.CoroutineId
-	}
+
 	s.VTAPID = vtapId
 	s.L3EpcID = d.platformData.QueryVtapEpc0(s.OrgId, vtapId)
 
@@ -327,7 +328,6 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		info = d.platformData.QueryPodIdInfo(s.OrgId, e.PodId)
 	}
 
-	// if platformInfo cannot be obtained from PodId, finally fill with Vtap's platformInfo
 	if info == nil {
 		vtapInfo := d.platformData.QueryVtapInfo(s.OrgId, vtapId)
 		if vtapInfo != nil {
@@ -365,7 +365,6 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.IsIPv4 = info.IsIPv4
 		s.IP4 = info.IP4
 		s.IP6 = info.IP6
-		// if it is just Pod Node, there is no need to match the service
 		if ingestercommon.IsPodServiceIP(flow_metrics.DeviceType(s.L3DeviceType), s.PodID, 0) {
 			s.ServiceID = d.platformData.QueryPodService(s.OrgId,
 				s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
@@ -377,11 +376,167 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 	s.AutoInstanceID, s.AutoInstanceType = ingestercommon.GetAutoInstance(s.PodID, s.GProcessID, s.PodNodeID, s.L3DeviceID, uint32(s.SubnetID), uint8(s.L3DeviceType), s.L3EpcID)
 	customServiceID := d.platformData.QueryCustomService(s.OrgId, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, s.PodClusterID, s.ServiceID, s.PodGroupID, s.L3DeviceID, s.PodID, uint8(s.L3DeviceType), 0)
 	s.AutoServiceID, s.AutoServiceType = ingestercommon.GetAutoService(customServiceID, s.ServiceID, s.PodGroupID, s.GProcessID, uint32(s.PodClusterID), s.L3DeviceID, uint32(s.SubnetID), uint8(s.L3DeviceType), podGroupType, s.L3EpcID)
-
 	s.AppInstance = strconv.Itoa(int(e.Pid))
+}
+
+func (d *Decoder) rawFileWriter() *dbwriter.EventWriter {
+	if d.procEventWriters != nil && d.procEventWriters.FileWriter != nil {
+		return d.procEventWriters.FileWriter
+	}
+	return d.eventWriter
+}
+
+func (d *Decoder) fileAggWriter() *dbwriter.EventWriter {
+	if d.procEventWriters != nil && d.procEventWriters.FileAggWriter != nil {
+		return d.procEventWriters.FileAggWriter
+	}
+	return nil
+}
+
+func (d *Decoder) flushFileAggEvent() {
+	if d.fileAggReducer == nil {
+		return
+	}
+	flushed := d.fileAggReducer.Flush()
+	if flushed == nil {
+		return
+	}
+	if writer := d.fileAggWriter(); writer != nil {
+		writer.WriteCKItem(flushed)
+		return
+	}
+	flushed.Release()
+}
+
+func (d *Decoder) writeRawFileEvent(vtapId uint16, e *pb.ProcEvent) {
+	s := dbwriter.AcquireEventStore()
+	s.IsFileEvent = true
+	s.StoreEventType = common.FILE_EVENT
+	d.initEventStoreCommon(s, vtapId, e)
+
+	ioData := e.IoEventData
+	s.EventType = strings.ToLower(ioData.Operation.String())
+	s.ProcessKName = string(e.ProcessKname)
+	s.FileName = string(ioData.Filename)
+	s.Offset = ioData.OffBytes
+	s.SyscallThread = e.ThreadId
+	s.SyscallCoroutine = e.CoroutineId
+	s.FileType = uint8(ioData.FileType)
+	s.FileDir = string(ioData.FileDir)
+	s.MountSource = string(ioData.MountSource)
+	s.MountPoint = string(ioData.MountPoint)
+	s.Bytes = ioData.BytesCount
+	s.AccessPermission = ioData.AccessPermission
+	s.Duration = uint64(s.EndTime - s.StartTime)
 
 	d.export(s)
-	d.eventWriter.Write(s)
+	d.rawFileWriter().Write(s)
+	if d.fileAggReducer != nil {
+		flushed := d.fileAggReducer.Add(s)
+		if flushed != nil {
+			if writer := d.fileAggWriter(); writer != nil {
+				writer.WriteCKItem(flushed)
+			} else {
+				flushed.Release()
+			}
+		}
+	}
+}
+
+func (d *Decoder) writeFileMgmtEvent(vtapId uint16, e *pb.ProcEvent) {
+	s := dbwriter.AcquireFileMgmtEventStore()
+	d.initEventStoreCommon(&s.EventStore, vtapId, e)
+
+	data := e.FileOpEventData
+	opStr := data.OpType.String()
+	if strings.HasPrefix(opStr, "FileOp") {
+		opStr = opStr[len("FileOp"):]
+	}
+	s.EventType = strings.ToLower(opStr)
+	s.ProcessKName = string(e.ProcessKname)
+	fullPath := string(data.Filename)
+	if idx := strings.LastIndex(fullPath, "/"); idx >= 0 {
+		s.FileDir = fullPath[:idx+1]
+		s.FileName = fullPath[idx+1:]
+	} else {
+		s.FileName = fullPath
+	}
+	s.TargetUID, s.TargetGID, s.TargetMode = extractFileMgmtTargets(data)
+	if data.OpType == pb.FileOpType_FileOpChmod {
+		s.AccessPermission = data.Mode
+	}
+	s.SyscallThread = e.ThreadId
+	s.SyscallCoroutine = e.CoroutineId
+
+	if d.procEventWriters != nil && d.procEventWriters.FileMgmtWriter != nil {
+		d.procEventWriters.FileMgmtWriter.WriteCKItem(s)
+		return
+	}
+	s.Release()
+}
+
+func (d *Decoder) writeProcPermEvent(vtapId uint16, e *pb.ProcEvent) {
+	s := dbwriter.AcquireProcPermEventStore()
+	d.initEventStoreCommon(&s.EventStore, vtapId, e)
+
+	data := e.PermOpEventData
+	s.EventType = strings.ToLower(data.OpType.String())
+	s.ProcessKName = string(e.ProcessKname)
+	s.Pid = e.Pid
+	s.AiAgentRootPid = e.AiAgentRootPid
+	s.OldUID = data.OldUid
+	s.OldGID = data.OldGid
+	s.NewUID = data.NewUid
+	s.NewGID = data.NewGid
+	s.SyscallThread = e.ThreadId
+	s.SyscallCoroutine = e.CoroutineId
+
+	if d.procEventWriters != nil && d.procEventWriters.ProcPermWriter != nil {
+		d.procEventWriters.ProcPermWriter.WriteCKItem(s)
+		return
+	}
+	s.Release()
+}
+
+func (d *Decoder) writeProcOpsEvent(vtapId uint16, e *pb.ProcEvent) {
+	s := dbwriter.AcquireProcOpsEventStore()
+	d.initEventStoreCommon(&s.EventStore, vtapId, e)
+
+	data := e.ProcLifecycleEventData
+	s.EventType = strings.ToLower(data.LifecycleType.String())
+	s.ProcessKName = string(data.Comm)
+	s.Pid = data.Pid
+	s.ParentPid = data.ParentPid
+	s.AiAgentRootPid = e.AiAgentRootPid
+	s.UID = data.Uid
+	s.GID = data.Gid
+	s.Cmdline, s.ExecPath = extractProcOpsCommandData(e)
+	s.SyscallThread = e.ThreadId
+	s.SyscallCoroutine = e.CoroutineId
+
+	if d.procEventWriters != nil && d.procEventWriters.ProcOpsWriter != nil {
+		d.procEventWriters.ProcOpsWriter.WriteCKItem(s)
+		return
+	}
+	s.Release()
+}
+
+func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
+	switch routeProcEventType(e) {
+	case common.FILE_EVENT:
+		if e.IoEventData != nil {
+			d.writeRawFileEvent(vtapId, e)
+		}
+	case common.FILE_MGMT_EVENT:
+		d.flushFileAggEvent()
+		d.writeFileMgmtEvent(vtapId, e)
+	case common.PROC_PERM_EVENT:
+		d.flushFileAggEvent()
+		d.writeProcPermEvent(vtapId, e)
+	case common.PROC_OPS_EVENT:
+		d.flushFileAggEvent()
+		d.writeProcOpsEvent(vtapId, e)
+	}
 }
 
 func resolveGProcessID(queryProcessInfo func(pid uint32) uint32, rootPidCache *AiAgentRootPidCache, orgId, vtapId uint16, e *pb.ProcEvent) uint32 {
