@@ -76,6 +76,7 @@ $defs:
             - http2
             - dubbo
             - mysql
+            - oracle
             - redis
             - custom
             enum@en:
@@ -83,6 +84,7 @@ $defs:
             - HTTP2
             - Dubbo
             - MySQL
+            - Oracle
             - Redis
             - Custom
             enum@ch:
@@ -90,6 +92,7 @@ $defs:
             - HTTP2
             - Dubbo
             - MySQL
+            - Oracle
             - Redis
             - 自定义协议
             title@en: Filter Protocol Name
@@ -210,6 +213,7 @@ $defs:
         - http2
         - dubbo
         - mysql
+        - oracle
         - redis
         - custom
         enum@en:
@@ -217,6 +221,7 @@ $defs:
         - HTTP2
         - Dubbo
         - MySQL
+        - Oracle
         - Redis
         - Custom
         enum@ch:
@@ -224,6 +229,7 @@ $defs:
         - HTTP2
         - Dubbo
         - MySQL
+        - Oracle
         - Redis
         - 自定义协议
         title@en: Protocol Name
@@ -338,10 +344,10 @@ $defs:
           properties:
             name:
               type: string
-              title@en: Field Name
-              title@ch: 字段名
-              description@en: Used in `Compound Fields` (`compound_fields`), can be omitted.
-              description@ch: 用于 `复合字段`（`compound_fields`）中，可以省略。
+              title@en: Reference Name
+              title@ch: 引用名
+              description@en: Primarily used to reference this field in `Compound Fields` (`compound_fields`).
+              description@ch: 主要用于在 `复合字段`（`compound_fields`）中引用本字段。
             type:
               type: string
               enum:
@@ -390,7 +396,7 @@ $defs:
                 - `Dubbo Header Value` (`dubbo_header_value`): Extra field from the Attachments which payload was encoded with Dubbo protocol.
                 - `Dubbo Payload Map String Value` (`dubbo_payload_map_string_value`): Extra field from key-value format which payload was encoded with Dubbo protocol.
                 - `SQL Insert and Update Column` (`sql_upsert_column`): Extract field from SQL insertion columns, e.g., `INSERT INTO table (column1, column2) VALUES (value1, value2)`.
-                  Only MySQL is supported and only the first column can be extracted.
+                  Only MySQL and Oracle are supported and only the first row can be extracted.
               description@ch: |-
                 字段的提取类型，可选值及含义为：
                 - `头字段提取` (`header_field`)：从 HTTP/Dubbo/SofaRPC 等协议的 Header 部分提取字段，例如 HTTP 的 Header 形如：`key: value`。
@@ -405,7 +411,7 @@ $defs:
                 - `Dubbo 头字段提取` (`dubbo_header_value`)：Payload 使用 Dubbo 协议，从 Dubbo Attachments 中提取字段。
                 - `Dubbo map 内容提取` (`dubbo_payload_map_string_value`)：Payload 使用 Dubbo 协议，且业务报文以 key-value 形式编码，从中提取指定的字段。
                 - `SQL 插入和更新语句列提取` (`sql_upsert_column`)：从 SQL 插入列中提取字段，例如：`INSERT INTO table (column1, column2) VALUES (value1, value2)`。
-                  目前只支持 MySQL 协议，且只能提取插入的第一列内容。
+                  目前只支持 MySQL 和 Oracle 协议，且只能提取插入的第一行内容。
             match:
               type: object
               title@en: Match
@@ -552,8 +558,8 @@ $defs:
           properties:
             name:
               type: string
-              title@en: Constant Field Name
-              title@ch: 常量字段名
+              title@en: Constant Field Reference Name
+              title@ch: 常量字段引用名
             value:
               type: string
               title@en: Constant Value
@@ -577,11 +583,11 @@ $defs:
         title@en: Compound Fields
         title@ch: 复合字段
         description@en: |-
-          Compound fields, can use configured `Field` (`field`) or `Native Tag` (`native_tag`) as input fields for formatted output.
+          Compound fields, can use reference names of configured `Field` (`field`) or `Native Tag` (`native_tag`) as input fields for formatted output.
 
           Note that all configured fields (including `Field` (`field`) and `Native Tag` (`native_tag`)) need to be parsed in the same request or response to output compound fields normally.
         description@ch: |-
-          复合字段，可以使用配置的 `字段` (`field`) 或 `原生标签` (`native_tag`) 作为输入字段，进行格式化输出。
+          复合字段，可以使用配置的 `字段` (`field`) 的引用名或 `原生标签` (`native_tag`) 作为输入字段，进行格式化输出。
 
           注意配置的所有字段（包括 `字段` (`field`) 和 `原生标签` (`native_tag`)）都需要在同一个请求或响应中解析到才能正常输出复合字段。
         items:
@@ -598,8 +604,8 @@ $defs:
           properties:
             name:
               type: string
-              title@en: Compound Field Name
-              title@ch: 复合字段名
+              title@en: Compound Field Reference Name
+              title@ch: 复合字段引用名
             format:
               type: string
               title@en: Format
@@ -607,13 +613,13 @@ $defs:
               description@en: |-
                 Output format, such as `{field1_name}-{field2_name:1:4}`.
 
-                Here, `field1_name` and `field2_name` are names of configured fields. You can also use a configured `Native Tag` (`native_tag`) as an input field.
+                Here, `field1_name` and `field2_name` are reference names of fields. You can also use `Native Tag` (`native_tag`) as an input field. Note that when using a native tag, you can only obtain the raw value of the field, not the value rewritten by business decoding.
 
                 When configuring fields, you can specify index slicing. For example, `{field2_name:1:4}` means starting from index 1 of the field and taking 4 characters.
               description@ch: |-
                 输出格式，如 `{field1_name}-{field2_name:1:4}` 的形式。
 
-                其中 `field1_name` 和 `field2_name` 为已配置的字段名，也可以配置 `原生标签` (`native_tag`) 作为输入字段。
+                其中 `field1_name` 和 `field2_name` 为已配置的字段的引用名，也可以配置 `原生标签` (`native_tag`) 作为输入字段。注意当使用原生标签时，此处仅能获取字段的原始值，无法获取经过业务解码之后被改写的值。
 
                 配置字段时可以指定按下标切割。如 `{field2_name:1:4}` 表示从字段下标 1 开始，取 4 个字符。
             join:
@@ -722,7 +728,7 @@ $defs:
               $ref: '#/$defs/field_output'
   port_list:
     type: string
-    pattern: ^\d+(-\d+)?$
+    pattern: ^\d+(-\d+)?(,\d+(-\d+)?)*$
   match_keyword:
     type: object
     required:
@@ -941,7 +947,7 @@ $defs:
         - 字典提取
         - 分割提取
         title@en: Post-processing type
-        title@ch: 后期处理类型
+        title@ch: 后处理类型
       settings:
         type: array
         title@en: Settings
@@ -1024,7 +1030,7 @@ $defs:
       rewrite_native_tag:
         type: object
         title@en: Rewrite Native Tag
-        title@ch: 重写原生标签
+        title@ch: 重写原生字段
         properties:
           name:
             title@en: Name
@@ -1051,45 +1057,45 @@ $defs:
             - biz_scenario
             - biz_response_code
             enum@en:
-            - Version
-            - Request Type
-            - Request Domain
-            - Request Resource
-            - Request ID
-            - Endpoint
-            - Application Response Code
-            - Response Exception
-            - Response Result
-            - Trace ID
-            - Span ID
-            - X Request ID
-            - X Request ID 0
-            - X Request ID 1
-            - HTTP Proxy Client
-            - Business Type
-            - Business Code
-            - Business Scenario
-            - Business Response Code
+            - version | Version
+            - request_type | Request Type
+            - request_domain | Request Domain
+            - request_resource | Request Resource
+            - request_id | Request ID
+            - endpoint | Endpoint
+            - response_code | Application Response Code
+            - response_exception | Response Exception
+            - response_result | Response Result
+            - trace_id | Trace ID
+            - span_id | Span ID
+            - x_request_id | X Request ID
+            - x_request_id_0 | X Request ID 0
+            - x_request_id_1 | X Request ID 1
+            - http_proxy_client | HTTP Proxy Client
+            - biz_type | Business Type
+            - biz_code | Business Code
+            - biz_scenario | Business Scenario
+            - biz_response_code | Business Response Code
             enum@ch:
-            - 版本
-            - 请求类型
-            - 请求域
-            - 请求资源
-            - 请求 ID
-            - 端点
-            - 应用响应码
-            - 响应异常
-            - 响应结果
-            - Trace ID
-            - Span ID
-            - X Request ID
-            - X Request ID 0
-            - X Request ID 1
-            - HTTP 代理客户端
-            - 业务类型
-            - 业务代码
-            - 业务场景
-            - 业务响应码
+            - version | 版本
+            - request_type | 请求类型
+            - request_domain | 请求域
+            - request_resource | 请求资源
+            - request_id | 请求 ID
+            - endpoint | 端点
+            - response_code | 应用响应码
+            - response_exception | 响应异常
+            - response_result | 响应结果
+            - trace_id | Trace ID
+            - span_id | Span ID
+            - x_request_id | X Request ID
+            - x_request_id_0 | X Request ID 0
+            - x_request_id_1 | X Request ID 1
+            - http_proxy_client | HTTP 代理客户端
+            - biz_type | 业务类型
+            - biz_code | 业务代码
+            - biz_scenario | 业务场景
+            - biz_response_code | 业务响应码
             description@en: |-
               Can fill in one of the following fields to overwrite the corresponding field value.
 
@@ -1120,8 +1126,8 @@ $defs:
             description@ch: 匹配自定义策略提取的值，当匹配时进行重写。
       rewrite_response_status:
         type: object
-        title@en: Rewrite Response Status
-        title@ch: 重写响应状态
+        title@en: Rewrite Response Status (response_status)
+        title@ch: 重写响应状态（response_status）
         description@en: Match the following array content based on extraction value, if matched, set response_status to corresponding value.
         description@ch: 根据提取值匹配下列数组内容，如果匹配到，则将 response_status 设置为对应的值。
         properties:

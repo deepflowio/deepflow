@@ -528,12 +528,13 @@ func (MailServer) TableName() string {
 }
 
 type AlarmPolicy struct {
-	ID                 int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name               string `gorm:"column:name;type:char(128)" json:"NAME"`
-	QueryConditions    string `gorm:"column:query_conditions;type:text" json:"QUERY_CONDITIONS"`
-	MonitoringInterval string `gorm:"column:monitoring_interval;type:char(64)" json:"MONITORING_INTERVAL"`
-	UserID             int    `gorm:"column:user_id;type:int" json:"USER_ID"`
-	TeamID             int    `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
+	ID                 int            `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name               string         `gorm:"column:name;type:char(128)" json:"NAME"`
+	QueryConditions    string         `gorm:"column:query_conditions;type:text" json:"QUERY_CONDITIONS"`
+	MonitoringInterval string         `gorm:"column:monitoring_interval;type:char(64)" json:"MONITORING_INTERVAL"`
+	UserID             int            `gorm:"column:user_id;type:int" json:"USER_ID"`
+	TeamID             int            `gorm:"column:team_id;type:int;default:1" json:"TEAM_ID"`
+	DeletedAt          gorm.DeletedAt `gorm:"column:deleted_at;type:timestamp;default:null" json:"DELETED_AT" mapstructure:"DELETED_AT"`
 }
 
 func (AlarmPolicy) TableName() string {

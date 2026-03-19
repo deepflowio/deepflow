@@ -3492,12 +3492,18 @@ inputs:
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | int |
-| Range | [1, 65535] |
+| Type | string |
 
 **详细描述**:
 
 对指定端口的流，相邻的两个TCP分段 Packet 聚合在一起解析应用日志
+
+配置示例：
+
+packet_segmentation_reassembly:
+- 1000
+- 2000-2010
+- 5000
 
 ### 物理网络流量镜像 {#inputs.cbpf.physical_mirror}
 
@@ -9328,6 +9334,12 @@ processors:
 
 deepflow-agent 有可能会错误的判断长流的方向，如果某个端口一定是服务端端口，
 可配置在此处避免误判断。
+
+服务端判定优先级从高到低为：
+- TCP Flags 中 SYN|ACK、GPID
+- L7 层解析
+- `server_ports` 配置 
+- Packet 计数（发送包数多的为服务端）
 
 ##### 云流量忽略 MAC {#processors.flow_log.conntrack.flow_generation.cloud_traffic_ignore_mac}
 

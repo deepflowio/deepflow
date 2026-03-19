@@ -26,10 +26,7 @@ import (
 
 func (g *Genesis) getAZ() (model.AZ, error) {
 	log.Debug("get az starting", logger.NewORGPrefix(g.orgID))
-	azName := common.DEFAULT_REGION_NAME
-	if g.regionLcuuid != common.DEFAULT_REGION {
-		azName = g.Name
-	}
+	azName := g.Name
 	azLcuuid := common.GetUUIDByOrgID(g.orgID, azName)
 
 	g.cloudStatsd.RefreshAPIMoniter("az", 0, time.Time{})

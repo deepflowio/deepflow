@@ -68,7 +68,7 @@ pub mod l7 {
                     Url(&'a str),
                     Header(&'a str, &'a str),
                     Payload(PayloadType, &'a [u8]),
-                    Sql(&'a str),
+                    Sql(&'a str, Option<&'a [u8]>),
                     // used as a 'policy trigger' when the protocol only supports save payload
                     Dummy,
                 }
@@ -288,27 +288,25 @@ pub mod l7 {
                 pub resp_0x04_extra_byte: bool,
             }
 
-            pub struct Frame {
+            pub struct Frame<'a> {
                 pub packet_type: TnsPacketType,
                 pub length: usize,
                 pub body: Body,
+                pub payload: &'a [u8],
             }
 
-            #[derive(Default)]
-            pub struct OracleParser {
-                pub frames: Vec<Frame>,
-            }
+            pub struct OracleParser;
 
             impl OracleParser {
-                pub fn check_payload(
-                    &mut self,
-                    _: &[u8],
-                    _: &OracleParseConfig,
-                ) -> Option<LogMessageType> {
+                pub fn check_payload(_: &[u8], _: &OracleParseConfig) -> Option<LogMessageType> {
                     unimplemented!()
                 }
 
-                pub fn parse_payload(&mut self, _: &[u8], _: bool, _: &OracleParseConfig) -> bool {
+                pub fn parse_payload<'a>(
+                    _: &'a [u8],
+                    _: bool,
+                    _: &OracleParseConfig,
+                ) -> Vec<Frame<'a>> {
                     unimplemented!()
                 }
             }
