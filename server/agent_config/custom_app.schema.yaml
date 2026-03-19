@@ -298,8 +298,14 @@ $defs:
           save_request_header:
             title@en: Save Request Header
             title@ch: 保存请求标头
-            description@en: Save HTTP request header as attribute. Default attribute name is `request_header`.
-            description@ch: 将 HTTP 请求的标头保存为属性。默认属性名为 `request_header`。
+            description@en: |-
+              Save HTTP request header as attribute. Default attribute name is `request_header`.
+
+              Supported only when `Protocol Name` (`l7_protocol`) is `HTTP` (`http`) or `HTTP2` (`http2`).
+            description@ch: |-
+              将 HTTP 请求的标头保存为属性。默认属性名为 `request_header`。
+
+              仅当 `协议名称`（`l7_protocol`）为 `HTTP`（`http`）或 `HTTP2`（`http2`）时支持。
             $ref: '#/$defs/raw_save_config'
           save_request_payload:
             title@en: Save Request Payload
@@ -308,16 +314,26 @@ $defs:
               Save HTTP request payload as attribute. Default attribute name is `request_payload`.
 
               For HTTP protocol, only save the payload part (excluding the header).
+
+              Supported only when `Protocol Name` (`l7_protocol`) is `HTTP` (`http`), `HTTP2` (`http2`), or `Redis` (`redis`). Other protocols ignore this setting.
             description@ch: |-
               将请求的负载保存为属性。默认属性名为 `request_payload`。
 
               对于 HTTP 协议来说，只保存 HTTP 负载的部分（即不包含标头）。
+
+              仅当 `协议名称`（`l7_protocol`）为 `HTTP`（`http`）、`HTTP2`（`http2`）或 `Redis`（`redis`）时支持。其他协议会忽略该配置。
             $ref: '#/$defs/raw_save_config'
           save_response_header:
             title@en: Save Response Header
             title@ch: 保存响应标头
-            description@en: Save HTTP response header as attribute. Default attribute name is `response_header`.
-            description@ch: 将 HTTP 响应的标头保存为属性。默认属性名为 `response_header`。
+            description@en: |-
+              Save HTTP response header as attribute. Default attribute name is `response_header`.
+
+              Supported only when `Protocol Name` (`l7_protocol`) is `HTTP` (`http`) or `HTTP2` (`http2`).
+            description@ch: |-
+              将 HTTP 响应的标头保存为属性。默认属性名为 `response_header`。
+
+              仅当 `协议名称`（`l7_protocol`）为 `HTTP`（`http`）或 `HTTP2`（`http2`）时支持。
             $ref: '#/$defs/raw_save_config'
           save_response_payload:
             title@en: Save Response Payload
@@ -326,10 +342,14 @@ $defs:
               Save HTTP response payload as attribute. Default attribute name is `response_payload`.
 
               For HTTP protocol, only save the payload part (excluding the header).
+
+              Supported only when `Protocol Name` (`l7_protocol`) is `HTTP` (`http`), `HTTP2` (`http2`), or `Redis` (`redis`). Other protocols ignore this setting.
             description@ch: |-
               将响应的负载保存为属性。默认属性名为 `response_payload`。
 
               对于 HTTP 协议来说，只保存 HTTP 负载的部分（即不包含标头）。
+
+              仅当 `协议名称`（`l7_protocol`）为 `HTTP`（`http`）、`HTTP2`（`http2`）或 `Redis`（`redis`）时支持。其他协议会忽略该配置。
             $ref: '#/$defs/raw_save_config'
       fields:
         type: array
@@ -1018,7 +1038,8 @@ $defs:
         description@en: >-
           This field will appear in request log as `attribute.<attribute_name>`.
           Default value is empty, this field will not be added to attribute when empty.
-        description@ch: 该字段将会出现在调用日志的 `attribute.<attribute_name>` 中，默认值为空，为空时该字段不会加入到 attribute 内。
+          Supported when `Protocol Name` (`l7_protocol`) is `HTTP` (`http`), `HTTP2` (`http2`), `Dubbo` (`dubbo`), `MySQL` (`mysql`), `Oracle` (`oracle`), or `Custom` (`custom`); `Redis` (`redis`) ignores this setting.
+        description@ch: 该字段将会出现在调用日志的 `attribute.<attribute_name>` 中，默认值为空，为空时该字段不会加入到 attribute 内。仅当 `协议名称`（`l7_protocol`）为 `HTTP`（`http`）、`HTTP2`（`http2`）、`Dubbo`（`dubbo`）、`MySQL`（`mysql`）、`Oracle`（`oracle`）或 `自定义协议`（`custom`）时支持；`Redis`（`redis`）会忽略该配置。
       metric_name:
         type: string
         title@en: Metric Name
@@ -1026,11 +1047,24 @@ $defs:
         description@en: >-
           This field will appear in request log as `metrics.<metric_name>`.
           Default value is empty, this field will not be added to metrics when empty.
-        description@ch: 该字段将会出现在调用日志的 `metrics.<metric_name>` 中，默认值为空，为空时该字段不会加入到 metrics 内。
+          Supported when `Protocol Name` (`l7_protocol`) is `HTTP` (`http`), `HTTP2` (`http2`), `Dubbo` (`dubbo`), or `Custom` (`custom`); `MySQL` (`mysql`), `Oracle` (`oracle`), and `Redis` (`redis`) ignore this setting.
+        description@ch: 该字段将会出现在调用日志的 `metrics.<metric_name>` 中，默认值为空，为空时该字段不会加入到 metrics 内。仅当 `协议名称`（`l7_protocol`）为 `HTTP`（`http`）、`HTTP2`（`http2`）、`Dubbo`（`dubbo`）或 `自定义协议`（`custom`）时支持；`MySQL`（`mysql`）、`Oracle`（`oracle`）和 `Redis`（`redis`）会忽略该配置。
       rewrite_native_tag:
         type: object
         title@en: Rewrite Native Tag
         title@ch: 重写原生字段
+        description@en: |-
+          Rewrite a native request log field using the extracted value.
+
+          Supported when `Protocol Name` (`l7_protocol`) is `HTTP` (`http`), `HTTP2` (`http2`), `Dubbo` (`dubbo`), `MySQL` (`mysql`), `Oracle` (`oracle`), or `Custom` (`custom`); `Redis` (`redis`) ignores this setting.
+
+          Individual native tags still require support from the corresponding protocol.
+        description@ch: |-
+          使用提取值重写调用日志中的原生字段。
+
+          仅当 `协议名称`（`l7_protocol`）为 `HTTP`（`http`）、`HTTP2`（`http2`）、`Dubbo`（`dubbo`）、`MySQL`（`mysql`）、`Oracle`（`oracle`）或 `自定义协议`（`custom`）时支持；`Redis`（`redis`）会忽略该配置。
+
+          具体可重写哪些原生字段仍取决于对应协议自身是否支持。
         properties:
           name:
             title@en: Name
@@ -1128,8 +1162,14 @@ $defs:
         type: object
         title@en: Rewrite Response Status (response_status)
         title@ch: 重写响应状态（response_status）
-        description@en: Match the following array content based on extraction value, if matched, set response_status to corresponding value.
-        description@ch: 根据提取值匹配下列数组内容，如果匹配到，则将 response_status 设置为对应的值。
+        description@en: |-
+          Match the following array content based on extraction value, if matched, set response_status to corresponding value.
+
+          Supported when `Protocol Name` (`l7_protocol`) is `HTTP` (`http`), `HTTP2` (`http2`), `Dubbo` (`dubbo`), `MySQL` (`mysql`), `Oracle` (`oracle`), or `Custom` (`custom`); `Redis` (`redis`) ignores this setting.
+        description@ch: |-
+          根据提取值匹配下列数组内容，如果匹配到，则将 response_status 设置为对应的值。
+
+          仅当 `协议名称`（`l7_protocol`）为 `HTTP`（`http`）、`HTTP2`（`http2`）、`Dubbo`（`dubbo`）、`MySQL`（`mysql`）、`Oracle`（`oracle`）或 `自定义协议`（`custom`）时支持；`Redis`（`redis`）会忽略该配置。
         properties:
           ok_values:
             title@en: OK Values
