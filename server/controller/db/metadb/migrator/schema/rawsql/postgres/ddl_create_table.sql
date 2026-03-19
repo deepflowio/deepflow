@@ -2416,6 +2416,9 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     monitoring_interval     VARCHAR(64) DEFAULT '1m',
     trigger_info_event      INTEGER DEFAULT 0,
     trigger_recovery_event  INTEGER DEFAULT 1,
+    trigger_mode            INTEGER DEFAULT 1,
+    trigger_count           INTEGER DEFAULT 1,
+    trigger_window_minutes  INTEGER DEFAULT 0,
     recovery_event_levels   TEXT,
     lcuuid                  VARCHAR(64)
 );
@@ -2429,6 +2432,9 @@ COMMENT ON COLUMN alarm_policy.contrast_type IS '1.abs 2.baseline';
 COMMENT ON COLUMN alarm_policy.data_level IS '1s or 1m';
 COMMENT ON COLUMN alarm_policy.agg IS '0-聚合; 1-不聚合';
 COMMENT ON COLUMN alarm_policy.delay IS '0-不延迟; 1-延迟';
+COMMENT ON COLUMN alarm_policy.trigger_mode IS '1-连续次数 2-时间窗口';
+COMMENT ON COLUMN alarm_policy.trigger_count IS '触发次数';
+COMMENT ON COLUMN alarm_policy.trigger_window_minutes IS '时间窗口(分钟)';
 
 CREATE TABLE IF NOT EXISTS silence_policy (
     id                      SERIAL PRIMARY KEY,
@@ -2484,6 +2490,21 @@ CREATE TABLE IF NOT EXISTS alarm_event (
     lcuuid                  VARCHAR(64)
 );
 TRUNCATE TABLE alarm_event;
+
+CREATE TABLE IF NOT EXISTS alarm_event_state (
+    id                      SERIAL PRIMARY KEY,
+    event_id                VARCHAR(64) NOT NULL,
+    state                   INTEGER,
+    event_payload           TEXT,
+    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (event_id)
+);
+TRUNCATE TABLE alarm_event_state;
+
+COMMENT ON COLUMN alarm_event_state.event_id IS '聚合事件ID';
+COMMENT ON COLUMN alarm_event_state.state IS '0-ongoing 1-ended';
+COMMENT ON COLUMN alarm_event_state.event_payload IS '事件JSON';
 
 CREATE TABLE IF NOT EXISTS report_policy (
     id                      SERIAL PRIMARY KEY,
