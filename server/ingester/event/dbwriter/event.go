@@ -69,6 +69,7 @@ type EventStore struct {
 	ProcessKName     string `json:"process_kname" category:"$tag" sub:"service_info"` // us
 
 	GProcessID uint32 `json:"gprocess_id" category:"$tag" sub:"universal_tag"`
+	RootPID    uint32
 
 	RegionID     uint16 `json:"region_id" category:"$tag" sub:"universal_tag"`
 	AZID         uint16 `json:"az_id" category:"$tag" sub:"universal_tag"`
@@ -296,6 +297,12 @@ func GenEventCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, co
 		partition = DefaultFileEventPartition
 	}
 
+	aggr1S := true
+	switch table {
+	case common.FILE_AGG_EVENT.TableName(), common.FILE_MGMT_EVENT.TableName(), common.PROC_PERM_EVENT.TableName(), common.PROC_OPS_EVENT.TableName():
+		aggr1S = false
+	}
+
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
 		Database:        EVENT_DB,
@@ -312,7 +319,7 @@ func GenEventCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, co
 		ColdStorage:     *coldStorage,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
-		Aggr1S:          true,
+		Aggr1S:          aggr1S,
 		AggrTableSuffix: "_metrics",
 		AggrCounted:     true,
 	}

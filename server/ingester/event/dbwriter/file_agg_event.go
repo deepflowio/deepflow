@@ -50,6 +50,9 @@ func (e *FileAggEventStore) Release() {
 
 func FileAggEventColumns() []*ckdb.Column {
 	columns := EventColumns(true)
-	columns = append(columns, ckdb.NewColumn("event_count", ckdb.UInt32).SetAggrSum().SetAggrSum())
+	columns = append(columns,
+		ckdb.NewColumn("root_pid", ckdb.UInt32).SetGroupBy(),
+		ckdb.NewColumn("event_count", ckdb.UInt32).SetAggrSum().SetAggrSum(),
+	)
 	return columns
 }

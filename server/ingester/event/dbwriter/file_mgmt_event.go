@@ -53,6 +53,7 @@ func (e *FileMgmtEventStore) Release() {
 func FileMgmtEventColumns() []*ckdb.Column {
 	columns := EventColumns(true)
 	columns = append(columns,
+		ckdb.NewColumn("root_pid", ckdb.UInt32).SetGroupBy(),
 		ckdb.NewColumn("target_uid", ckdb.UInt32).SetGroupBy(),
 		ckdb.NewColumn("target_gid", ckdb.UInt32).SetGroupBy(),
 		ckdb.NewColumn("target_mode", ckdb.UInt32).SetGroupBy(),

@@ -17,7 +17,7 @@ agent                      , agent                     , agent                  
 signal_source              , signal_source             , signal_source             , int_enum       , file_event_signal_source, Capture Info    , 111             , 0
 pid                        , pid                       , pid                       , int            ,                       , Event Info      , 111             , 0
 parent_pid                 , parent_pid                , parent_pid                , int            ,                       , Event Info      , 111             , 0
-ai_agent_root_pid          , ai_agent_root_pid         , ai_agent_root_pid         , int            ,                       , Event Info      , 111             , 0
+root_pid          , root_pid         , root_pid         , int            ,                       , Event Info      , 111             , 0
 uid                        , uid                       , uid                       , int            ,                       , Event Info      , 111             , 0
 gid                        , gid                       , gid                       , int            ,                       , Event Info      , 111             , 0
 cmdline                    , cmdline                   , cmdline                   , string         ,                       , Event Info      , 111             , 0

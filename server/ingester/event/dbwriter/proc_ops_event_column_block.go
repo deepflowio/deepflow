@@ -9,7 +9,7 @@ type ProcOpsEventBlock struct {
 	EventBlock
 	ColPid              proto.ColUInt32
 	ColParentPid        proto.ColUInt32
-	ColAiAgentRootPid   proto.ColUInt32
+	ColRootPID          proto.ColUInt32
 	ColUID              proto.ColUInt32
 	ColGID              proto.ColUInt32
 	ColCmdline          proto.ColStr
@@ -22,7 +22,7 @@ func (b *ProcOpsEventBlock) Reset() {
 	b.EventBlock.Reset()
 	b.ColPid.Reset()
 	b.ColParentPid.Reset()
-	b.ColAiAgentRootPid.Reset()
+	b.ColRootPID.Reset()
 	b.ColUID.Reset()
 	b.ColGID.Reset()
 	b.ColCmdline.Reset()
@@ -36,7 +36,7 @@ func (b *ProcOpsEventBlock) ToInput(input proto.Input) proto.Input {
 	return append(input,
 		proto.InputColumn{Name: "pid", Data: &b.ColPid},
 		proto.InputColumn{Name: "parent_pid", Data: &b.ColParentPid},
-		proto.InputColumn{Name: "ai_agent_root_pid", Data: &b.ColAiAgentRootPid},
+		proto.InputColumn{Name: "root_pid", Data: &b.ColRootPID},
 		proto.InputColumn{Name: "uid", Data: &b.ColUID},
 		proto.InputColumn{Name: "gid", Data: &b.ColGID},
 		proto.InputColumn{Name: "cmdline", Data: &b.ColCmdline},
@@ -57,7 +57,7 @@ func (n *ProcOpsEventStore) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	n.EventStore.AppendToColumnBlock(&block.EventBlock)
 	block.ColPid.Append(n.Pid)
 	block.ColParentPid.Append(n.ParentPid)
-	block.ColAiAgentRootPid.Append(n.AiAgentRootPid)
+	block.ColRootPID.Append(n.RootPID)
 	block.ColUID.Append(n.UID)
 	block.ColGID.Append(n.GID)
 	block.ColCmdline.Append(n.Cmdline)

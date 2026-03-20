@@ -19,13 +19,12 @@ var procOpsEventPool = pool.NewLockFreePool(func() *ProcOpsEventStore {
 type ProcOpsEventStore struct {
 	EventStore
 
-	Pid            uint32
-	ParentPid      uint32
-	AiAgentRootPid uint32
-	UID            uint32
-	GID            uint32
-	Cmdline        string
-	ExecPath       string
+	Pid       uint32
+	ParentPid uint32
+	UID       uint32
+	GID       uint32
+	Cmdline   string
+	ExecPath  string
 }
 
 func AcquireProcOpsEventStore() *ProcOpsEventStore {
@@ -57,7 +56,7 @@ func ProcOpsEventColumns() []*ckdb.Column {
 	columns = append(columns,
 		ckdb.NewColumn("pid", ckdb.UInt32).SetGroupBy(),
 		ckdb.NewColumn("parent_pid", ckdb.UInt32).SetGroupBy(),
-		ckdb.NewColumn("ai_agent_root_pid", ckdb.UInt32).SetGroupBy(),
+		ckdb.NewColumn("root_pid", ckdb.UInt32).SetGroupBy(),
 		ckdb.NewColumn("uid", ckdb.UInt32).SetGroupBy(),
 		ckdb.NewColumn("gid", ckdb.UInt32).SetGroupBy(),
 		ckdb.NewColumn("cmdline", ckdb.String).SetIgnoredInAggrTable(),
