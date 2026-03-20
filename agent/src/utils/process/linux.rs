@@ -600,10 +600,10 @@ fn fetch_ai_agent_pids(feature: &str) -> Vec<u32> {
     if feature == "proc.gprocess_info" || feature == "proc.socket_list" {
         if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
             let pids = registry.get_all_pids();
-            debug!("AI Agent: {} fetch {} pids", feature, pids.len());
+            trace!("AI Agent: {} fetch {} pids", feature, pids.len());
             return pids;
         }
-        debug!("AI Agent: {} registry not initialized", feature);
+        trace!("AI Agent: {} registry not initialized", feature);
     }
     Vec::new()
 }
@@ -637,7 +637,7 @@ fn merge_ai_agent_processes(
             process_datas.push(process_data);
             existing_pids.insert(*pid);
         } else {
-            debug!(
+            trace!(
                 "AI Agent: pid {} not found in process cache, skip gprocess sync",
                 pid
             );
