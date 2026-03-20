@@ -13,6 +13,9 @@ func makeRawFileEvent(processKName, eventType, fileName string, bytes uint32) *d
 	e.IsFileEvent = true
 	e.ProcessKName = processKName
 	e.EventType = eventType
+	e.VTAPID = 1
+	e.RootPID = 42
+	e.GProcessID = 100
 	e.FileDir = "/tmp/"
 	e.FileName = fileName
 	e.Bytes = bytes
@@ -77,4 +80,42 @@ func TestFileAggReducerFlushesOnKeyChange(t *testing.T) {
 	if last == nil || last.FileName != "codex-tui.log" {
 		t.Fatalf("expected pending aggregate for codex-tui.log, got %+v", last)
 	}
+}
+
+func TestFileAggReducerFlushesOnDifferentGProcessID(t *testing.T) {
+	reducer := NewFileAggReducer()
+	first := makeRawFileEvent("codex", "write", "same.txt", 8)
+	second := makeRawFileEvent("codex", "write", "same.txt", 8)
+	second.GProcessID = 200
+
+	if flushed := reducer.Add(first); flushed != nil {
+		t.Fatalf("unexpected flush on first event")
+	}
+	flushed := reducer.Add(second)
+	if flushed == nil {
+		t.Fatalf("expected flush when gprocess_id changes")
+	}
+	if flushed.GProcessID != 100 {
+		t.Fatalf("flushed gprocess_id = %d, want 100", flushed.GProcessID)
+	}
+	flushed.Release()
+}
+
+func TestFileAggReducerFlushesOnDifferentAgentID(t *testing.T) {
+	reducer := NewFileAggReducer()
+	first := makeRawFileEvent("codex", "write", "same.txt", 8)
+	second := makeRawFileEvent("codex", "write", "same.txt", 8)
+	second.VTAPID = 2
+
+	if flushed := reducer.Add(first); flushed != nil {
+		t.Fatalf("unexpected flush on first event")
+	}
+	flushed := reducer.Add(second)
+	if flushed == nil {
+		t.Fatalf("expected flush when agent_id changes")
+	}
+	if flushed.VTAPID != 1 {
+		t.Fatalf("flushed agent_id = %d, want 1", flushed.VTAPID)
+	}
+	flushed.Release()
 }

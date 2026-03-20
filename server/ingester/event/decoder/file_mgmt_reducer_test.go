@@ -8,6 +8,7 @@ import (
 
 func makeFileMgmtEvent(processKName, eventType, fileName string) *dbwriter.FileMgmtEventStore {
 	e := dbwriter.AcquireFileMgmtEventStore()
+	e.VTAPID = 1
 	e.ProcessKName = processKName
 	e.EventType = eventType
 	e.FileDir = "/tmp/"
@@ -45,6 +46,25 @@ func TestFileMgmtReducerSuppressesDuplicateCreateUntilDelete(t *testing.T) {
 	third := makeFileMgmtEvent("bash", "create", "dup.txt")
 	if out := reducer.Add(third); out == nil {
 		t.Fatalf("create after delete should pass through again")
+	} else {
+		out.Release()
+	}
+}
+
+func TestFileMgmtReducerKeepsDifferentAgentCreatesSeparate(t *testing.T) {
+	reducer := NewFileMgmtReducer()
+	first := makeFileMgmtEvent("bash", "create", "dup.txt")
+	second := makeFileMgmtEvent("bash", "create", "dup.txt")
+	second.VTAPID = 2
+
+	if out := reducer.Add(first); out == nil {
+		t.Fatalf("first create should pass through")
+	} else {
+		out.Release()
+	}
+
+	if out := reducer.Add(second); out == nil {
+		t.Fatalf("create from another agent should not be suppressed")
 	} else {
 		out.Release()
 	}

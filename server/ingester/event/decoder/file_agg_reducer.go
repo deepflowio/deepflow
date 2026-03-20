@@ -29,7 +29,10 @@ func sameFileAggKey(a, b *dbwriter.FileAggEventStore) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	return a.EventType == b.EventType &&
+	return a.VTAPID == b.VTAPID &&
+		a.RootPID == b.RootPID &&
+		a.GProcessID == b.GProcessID &&
+		a.EventType == b.EventType &&
 		a.ProcessKName == b.ProcessKName &&
 		a.AppInstance == b.AppInstance &&
 		a.FileDir == b.FileDir &&
