@@ -36,6 +36,7 @@ func NewChPolicy() *ChPolicy {
 }
 
 func (p *ChPolicy) generateNewData(db *metadb.DB) (map[PolicyKey]metadbmodel.ChPolicy, bool) {
+	log.Infof("generate data for %s", p.resourceTypeName, db.LogPrefixORGID)
 	var (
 		pcapPolicys []metadbmodel.PcapPolicy
 		npbPolicys  []metadbmodel.NpbPolicy
