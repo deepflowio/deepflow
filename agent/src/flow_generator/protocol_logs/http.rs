@@ -304,7 +304,7 @@ pub struct HttpInfo {
     #[serde(skip_serializing_if = "value_is_default")]
     pub grpc_status_code: Option<u16>,
 
-    endpoint: Option<String>,
+    pub endpoint: Option<String>,
     // set by wasm plugin
     #[l7_log(response_result)]
     custom_result: Option<String>,
@@ -2020,6 +2020,13 @@ impl HttpLog {
         let Some(vm) = vm_ref.as_mut() else {
             return;
         };
+        // HTTP responses don't carry endpoint information. Look it up from the cached
+        // request so that on_http_resp wasm hooks can access it via HttpRespCtx.Endpoint.
+        if param.direction == PacketDirection::ServerToClient && info.endpoint.is_none() {
+            if let Some(endpoint) = info.load_endpoint_from_cache(param, info.is_reversed) {
+                info.endpoint = Some(endpoint);
+            }
+        }
         match param.direction {
             PacketDirection::ClientToServer => vm.on_http_req(payload, param, info),
             PacketDirection::ServerToClient => vm.on_http_resp(payload, param, info),
