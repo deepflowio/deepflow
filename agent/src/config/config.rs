@@ -1275,9 +1275,28 @@ impl Default for NicOptimizeConfig {
 }
 
 impl NicOptimizeConfig {
+    fn validate(&self) -> Result<(), String> {
+        if !(XDP_QUEUE_SIZE_MIN..=XDP_QUEUE_SIZE_MAX).contains(&self.xdp_queue_size) {
+            return Err(format!(
+                "xdp_queue_size {} for interface {} not in [{}, {}]",
+                self.xdp_queue_size, self.interface, XDP_QUEUE_SIZE_MIN, XDP_QUEUE_SIZE_MAX,
+            ));
+        }
+
+        Ok(())
+    }
+
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[cfg(feature = "extended_observability")]
     pub fn apply(&self) {
+        if let Err(e) = self.validate() {
+            warn!(
+                "Skip NIC optimization for interface '{}': {}",
+                self.interface, e
+            );
+            return;
+        }
+
         let to_cstring = |field: &str, value: &str| {
             CString::new(value)
                 .map_err(|_| {
@@ -3327,12 +3346,7 @@ impl UserConfig {
         }
 
         for nic in &self.inputs.ebpf.network.nic_optimize {
-            if !(XDP_QUEUE_SIZE_MIN..=XDP_QUEUE_SIZE_MAX).contains(&nic.xdp_queue_size) {
-                return Err(ConfigError::RuntimeConfigInvalid(format!(
-                    "xdp_queue_size {} for interface {} not in [{}, {}]",
-                    nic.xdp_queue_size, nic.interface, XDP_QUEUE_SIZE_MIN, XDP_QUEUE_SIZE_MAX,
-                )));
-            }
+            nic.validate().map_err(ConfigError::RuntimeConfigInvalid)?;
         }
 
         Ok(())
