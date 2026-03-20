@@ -39,6 +39,7 @@ func NewChLbListener(resourceTypeToIconID map[IconKey]int) *ChLbListener {
 }
 
 func (l *ChLbListener) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChLBListener, bool) {
+	log.Infof("generate data for %s", l.resourceTypeName, db.LogPrefixORGID)
 	var lbListeners []metadbmodel.LBListener
 	var lbTargetServers []metadbmodel.LBTargetServer
 	err := db.Unscoped().Find(&lbListeners).Error
