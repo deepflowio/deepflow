@@ -41,6 +41,7 @@ func NewChIPRelation() *ChIPRelation {
 }
 
 func (i *ChIPRelation) generateNewData(db *mysql.DB) (map[IPRelationKey]mysqlmodel.ChIPRelation, bool) {
+	log.Infof("generate data for %s", i.resourceTypeName, db.LogPrefixORGID)
 	toolDS, ok := i.newToolDataSet(db)
 	if !ok {
 		return nil, false

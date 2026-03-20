@@ -38,6 +38,7 @@ func NewChOSAppTag() *ChOSAppTag {
 }
 
 func (o *ChOSAppTag) generateNewData(db *mysql.DB) (map[IDKeyKey]mysqlmodel.ChOSAppTag, bool) {
+	log.Infof("generate data for %s", o.resourceTypeName, db.LogPrefixORGID)
 	var processes []mysqlmodel.Process
 	keyToItem := make(map[IDKeyKey]mysqlmodel.ChOSAppTag)
 	gidToOsAppTagMap := make(map[int]map[string]string)
