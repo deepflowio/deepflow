@@ -16,7 +16,7 @@ func NewFileMgmtReducer() *FileMgmtReducer {
 
 func (r *FileMgmtReducer) key(e *dbwriter.FileMgmtEventStore) string {
 	return fmt.Sprintf("%d|%d|%s|%s|%s|%s",
-		e.RootPID, e.GProcessID, e.MountSource, e.MountPoint, e.FileDir, e.FileName,
+		e.VTAPID, e.RootPID, e.MountSource, e.MountPoint, e.FileDir, e.FileName,
 	)
 }
 
