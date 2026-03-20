@@ -2421,7 +2421,6 @@ int set_ai_agent_data_limit_max(int limit_size)
 	memset(values, 0, sizeof(values));
 
 	if (!bpf_table_get_value(tracer, MAP_TRACER_CTX_NAME, 0, values)) {
-		ebpf_warning("Get map '%s' failed.\n", MAP_TRACER_CTX_NAME);
 		return ETR_NOTEXIST;
 	}
 
@@ -2431,7 +2430,6 @@ int set_ai_agent_data_limit_max(int limit_size)
 
 	if (!bpf_table_set_value
 	    (tracer, MAP_TRACER_CTX_NAME, 0, (void *)&values)) {
-		ebpf_warning("Set '%s' failed\n", MAP_TRACER_CTX_NAME);
 		return ETR_UPDATE_MAP_FAILD;
 	}
 
