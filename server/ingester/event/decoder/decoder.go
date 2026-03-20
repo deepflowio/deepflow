@@ -130,6 +130,7 @@ type Decoder struct {
 	eventWriter         *dbwriter.EventWriter
 	procEventWriters    *ProcEventWriters
 	fileAggReducer      *FileAggReducer
+	fileMgmtReducer     *FileMgmtReducer
 	exporters           *exporters.Exporters
 	debugEnabled        bool
 	config              *config.Config
@@ -176,6 +177,7 @@ func NewDecoder(
 		eventWriter:         eventWriter,
 		procEventWriters:    procEventWriters,
 		fileAggReducer:      NewFileAggReducer(),
+		fileMgmtReducer:     NewFileMgmtReducer(),
 		exporters:           exporters,
 		config:              config,
 		aiAgentRootPidCache: aiAgentRootPidCache,
@@ -428,6 +430,7 @@ func (d *Decoder) writeRawFileEvent(vtapId uint16, e *pb.ProcEvent) {
 	s.Bytes = ioData.BytesCount
 	s.AccessPermission = ioData.AccessPermission
 	s.Duration = uint64(s.EndTime - s.StartTime)
+	s.RootPID = e.AiAgentRootPid
 
 	d.export(s)
 	d.rawFileWriter().Write(s)
@@ -465,8 +468,16 @@ func (d *Decoder) writeFileMgmtEvent(vtapId uint16, e *pb.ProcEvent) {
 	if data.OpType == pb.FileOpType_FileOpChmod {
 		s.AccessPermission = data.Mode
 	}
+	s.RootPID = e.AiAgentRootPid
 	s.SyscallThread = e.ThreadId
 	s.SyscallCoroutine = e.CoroutineId
+
+	if d.fileMgmtReducer != nil {
+		if reduced := d.fileMgmtReducer.Add(s); reduced == nil {
+			s.Release()
+			return
+		}
+	}
 
 	if d.procEventWriters != nil && d.procEventWriters.FileMgmtWriter != nil {
 		d.procEventWriters.FileMgmtWriter.WriteCKItem(s)
@@ -483,7 +494,7 @@ func (d *Decoder) writeProcPermEvent(vtapId uint16, e *pb.ProcEvent) {
 	s.EventType = strings.ToLower(data.OpType.String())
 	s.ProcessKName = string(e.ProcessKname)
 	s.Pid = e.Pid
-	s.AiAgentRootPid = e.AiAgentRootPid
+	s.RootPID = e.AiAgentRootPid
 	s.OldUID = data.OldUid
 	s.OldGID = data.OldGid
 	s.NewUID = data.NewUid
@@ -507,7 +518,7 @@ func (d *Decoder) writeProcOpsEvent(vtapId uint16, e *pb.ProcEvent) {
 	s.ProcessKName = string(data.Comm)
 	s.Pid = data.Pid
 	s.ParentPid = data.ParentPid
-	s.AiAgentRootPid = e.AiAgentRootPid
+	s.RootPID = e.AiAgentRootPid
 	s.UID = data.Uid
 	s.GID = data.Gid
 	s.Cmdline, s.ExecPath = extractProcOpsCommandData(e)

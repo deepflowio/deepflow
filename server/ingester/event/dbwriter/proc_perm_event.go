@@ -19,12 +19,11 @@ var procPermEventPool = pool.NewLockFreePool(func() *ProcPermEventStore {
 type ProcPermEventStore struct {
 	EventStore
 
-	Pid            uint32
-	AiAgentRootPid uint32
-	OldUID         uint32
-	OldGID         uint32
-	NewUID         uint32
-	NewGID         uint32
+	Pid    uint32
+	OldUID uint32
+	OldGID uint32
+	NewUID uint32
+	NewGID uint32
 }
 
 func AcquireProcPermEventStore() *ProcPermEventStore {
@@ -55,7 +54,7 @@ func ProcPermEventColumns() []*ckdb.Column {
 	columns := EventColumns(false)
 	columns = append(columns,
 		ckdb.NewColumn("pid", ckdb.UInt32).SetGroupBy(),
-		ckdb.NewColumn("ai_agent_root_pid", ckdb.UInt32).SetGroupBy(),
+		ckdb.NewColumn("root_pid", ckdb.UInt32).SetGroupBy(),
 		ckdb.NewColumn("old_uid", ckdb.UInt32).SetGroupBy(),
 		ckdb.NewColumn("old_gid", ckdb.UInt32).SetGroupBy(),
 		ckdb.NewColumn("new_uid", ckdb.UInt32).SetGroupBy(),

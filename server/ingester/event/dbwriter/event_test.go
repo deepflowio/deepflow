@@ -5,6 +5,7 @@ import (
 
 	eventcommon "github.com/deepflowio/deepflow/server/ingester/event/common"
 	exporterconfig "github.com/deepflowio/deepflow/server/ingester/exporters/config"
+	"github.com/deepflowio/deepflow/server/libs/ckdb"
 )
 
 func TestEventStoreDataSourceForNewAiAgentTables(t *testing.T) {
@@ -44,6 +45,28 @@ func TestEventStoreDataSourceForNewAiAgentTables(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.store.DataSource(); got != tt.want {
 				t.Fatalf("DataSource() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGenEventCKTableDisables1SAggrForNewAiAgentTables(t *testing.T) {
+	tests := []struct {
+		table string
+		want  bool
+	}{
+		{eventcommon.FILE_EVENT.TableName(), true},
+		{eventcommon.FILE_AGG_EVENT.TableName(), false},
+		{eventcommon.FILE_MGMT_EVENT.TableName(), false},
+		{eventcommon.PROC_PERM_EVENT.TableName(), false},
+		{eventcommon.PROC_OPS_EVENT.TableName(), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.table, func(t *testing.T) {
+			table := GenEventCKTable("test_cluster", "policy", tt.table, "clickhouse", 24, &ckdb.ColdStorage{})
+			if table.Aggr1S != tt.want {
+				t.Fatalf("table %s Aggr1S = %v, want %v", tt.table, table.Aggr1S, tt.want)
 			}
 		})
 	}

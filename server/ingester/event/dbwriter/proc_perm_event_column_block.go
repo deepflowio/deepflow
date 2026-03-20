@@ -8,7 +8,7 @@ import (
 type ProcPermEventBlock struct {
 	EventBlock
 	ColPid              proto.ColUInt32
-	ColAiAgentRootPid   proto.ColUInt32
+	ColRootPID          proto.ColUInt32
 	ColOldUID           proto.ColUInt32
 	ColOldGID           proto.ColUInt32
 	ColNewUID           proto.ColUInt32
@@ -20,7 +20,7 @@ type ProcPermEventBlock struct {
 func (b *ProcPermEventBlock) Reset() {
 	b.EventBlock.Reset()
 	b.ColPid.Reset()
-	b.ColAiAgentRootPid.Reset()
+	b.ColRootPID.Reset()
 	b.ColOldUID.Reset()
 	b.ColOldGID.Reset()
 	b.ColNewUID.Reset()
@@ -33,7 +33,7 @@ func (b *ProcPermEventBlock) ToInput(input proto.Input) proto.Input {
 	input = b.EventBlock.ToInput(input)
 	return append(input,
 		proto.InputColumn{Name: "pid", Data: &b.ColPid},
-		proto.InputColumn{Name: "ai_agent_root_pid", Data: &b.ColAiAgentRootPid},
+		proto.InputColumn{Name: "root_pid", Data: &b.ColRootPID},
 		proto.InputColumn{Name: "old_uid", Data: &b.ColOldUID},
 		proto.InputColumn{Name: "old_gid", Data: &b.ColOldGID},
 		proto.InputColumn{Name: "new_uid", Data: &b.ColNewUID},
@@ -53,7 +53,7 @@ func (n *ProcPermEventStore) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block := b.(*ProcPermEventBlock)
 	n.EventStore.AppendToColumnBlock(&block.EventBlock)
 	block.ColPid.Append(n.Pid)
-	block.ColAiAgentRootPid.Append(n.AiAgentRootPid)
+	block.ColRootPID.Append(n.RootPID)
 	block.ColOldUID.Append(n.OldUID)
 	block.ColOldGID.Append(n.OldGID)
 	block.ColNewUID.Append(n.NewUID)

@@ -16,7 +16,7 @@ app_instance               , app_instance              , app_instance           
 agent                      , agent                     , agent                     , resource       ,                       , Capture Info    , 111             , 0
 signal_source              , signal_source             , signal_source             , int_enum       , file_event_signal_source, Capture Info    , 111             , 0
 pid                        , pid                       , pid                       , int            ,                       , Event Info      , 111             , 0
-ai_agent_root_pid          , ai_agent_root_pid         , ai_agent_root_pid         , int            ,                       , Event Info      , 111             , 0
+root_pid          , root_pid         , root_pid         , int            ,                       , Event Info      , 111             , 0
 old_uid                    , old_uid                   , old_uid                   , int            ,                       , Event Info      , 111             , 0
 old_gid                    , old_gid                   , old_gid                   , int            ,                       , Event Info      , 111             , 0
 new_uid                    , new_uid                   , new_uid                   , int            ,                       , Event Info      , 111             , 0
