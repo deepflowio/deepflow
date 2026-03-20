@@ -36,6 +36,7 @@ func NewChNodeType() *ChNodeType {
 }
 
 func (n *ChNodeType) generateNewData(db *mysql.DB) (map[NodeTypeKey]mysqlmodel.ChNodeType, bool) {
+	log.Infof("generate data for %s", n.resourceTypeName, db.LogPrefixORGID)
 	keyToItem := make(map[NodeTypeKey]mysqlmodel.ChNodeType)
 	for resourceType, nodeType := range RESOURCE_TYPE_TO_NODE_TYPE {
 		keyToItem[NodeTypeKey{ResourceType: resourceType}] = mysqlmodel.ChNodeType{

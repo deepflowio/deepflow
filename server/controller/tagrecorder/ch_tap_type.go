@@ -38,6 +38,7 @@ func NewChTapType(resourceTypeToIconID map[IconKey]int) *ChTapType {
 }
 
 func (t *ChTapType) generateNewData(db *mysql.DB) (map[TapTypeKey]mysqlmodel.ChTapType, bool) {
+	log.Infof("generate data for %s", t.resourceTypeName, db.LogPrefixORGID)
 	var tapTypes []mysqlmodel.TapType
 	err := db.Unscoped().Find(&tapTypes).Error
 	if err != nil {

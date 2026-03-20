@@ -37,6 +37,7 @@ func NewChStringEnum() *ChStringEnum {
 }
 
 func (e *ChStringEnum) generateNewData(dbClient *mysql.DB) (map[StringEnumTagKey]mysqlmodel.ChStringEnum, bool) {
+	log.Infof("generate data for %s", e.resourceTypeName, dbClient.LogPrefixORGID)
 	sql := "show tag all_string_enum values from tagrecorder"
 	db := "tagrecorder"
 	table := "tagrecorder"

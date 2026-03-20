@@ -39,6 +39,7 @@ func NewChLbListener(resourceTypeToIconID map[IconKey]int) *ChLbListener {
 }
 
 func (l *ChLbListener) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChLBListener, bool) {
+	log.Infof("generate data for %s", l.resourceTypeName, db.LogPrefixORGID)
 	var lbListeners []mysqlmodel.LBListener
 	var lbTargetServers []mysqlmodel.LBTargetServer
 	err := db.Unscoped().Find(&lbListeners).Error

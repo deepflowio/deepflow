@@ -55,6 +55,7 @@ func NewChVTapPort() *ChVTapPort {
 	return updater
 }
 func (v *ChVTapPort) generateNewData(db *metadb.DB) (map[VtapPortKey]metadbmodel.ChVTapPort, bool) {
+	log.Infof("generate data for %s", v.resourceTypeName, db.LogPrefixORGID)
 	var vTaps []metadbmodel.VTap
 	err := db.Where("type = ?", common.VTAP_TYPE_DEDICATED).Unscoped().Find(&vTaps).Error
 	if err != nil {

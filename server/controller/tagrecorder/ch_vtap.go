@@ -41,6 +41,7 @@ func NewChVTap(resourceTypeToIconID map[IconKey]int) *ChVTap {
 	return updater
 }
 func (v *ChVTap) generateNewData(db *mysql.DB) (map[IDKey]mysqlmodel.ChVTap, bool) {
+	log.Infof("generate data for %s", v.resourceTypeName, db.LogPrefixORGID)
 	var vTaps []mysqlmodel.VTap
 	err := db.Unscoped().Select("id", "type", "team_id", "name").Find(&vTaps).Error
 	if err != nil {
