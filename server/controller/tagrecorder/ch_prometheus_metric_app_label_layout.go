@@ -37,6 +37,7 @@ func NewChPrometheusMetricAPPLabelLayout() *ChPrometheusMetricAPPLabelLayout {
 }
 
 func (l *ChPrometheusMetricAPPLabelLayout) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChPrometheusMetricAPPLabelLayout, bool) {
+	log.Infof("generate data for %s", l.resourceTypeName, db.LogPrefixORGID)
 	var prometheusMetricAPPLabelLayout []metadbmodel.PrometheusMetricAPPLabelLayout
 
 	err := db.Unscoped().Find(&prometheusMetricAPPLabelLayout).Error

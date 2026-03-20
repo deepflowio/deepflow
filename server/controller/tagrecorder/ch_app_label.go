@@ -39,6 +39,7 @@ func NewChAPPLabel() *ChAPPLabel {
 }
 
 func (l *ChAPPLabel) generateNewData(db *metadb.DB) (map[PrometheusAPPLabelKey]metadbmodel.ChAPPLabel, bool) {
+	log.Infof("generate data for %s", l.resourceTypeName, db.LogPrefixORGID)
 	var prometheusLabels []metadbmodel.PrometheusLabel
 	err := db.Unscoped().Find(&prometheusLabels).Error
 

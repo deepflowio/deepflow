@@ -39,6 +39,7 @@ func NewChPrometheusTargetLabelLayout() *ChPrometheusTargetLabelLayout {
 }
 
 func (l *ChPrometheusTargetLabelLayout) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChPrometheusTargetLabelLayout, bool) {
+	log.Infof("generate data for %s", l.resourceTypeName, db.LogPrefixORGID)
 	var prometheusTargets []metadbmodel.PrometheusTarget
 	err := db.Unscoped().Find(&prometheusTargets).Error
 	if err != nil {

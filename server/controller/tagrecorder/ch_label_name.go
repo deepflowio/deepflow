@@ -38,6 +38,7 @@ func NewChPrometheusLabelName() *ChPrometheusLabelName {
 
 func (l *ChPrometheusLabelName) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChPrometheusLabelName, bool) {
 	var prometheusLabelName []metadbmodel.PrometheusLabelName
+	log.Infof("generate data for %s", l.resourceTypeName, db.LogPrefixORGID)
 	err := db.Unscoped().Find(&prometheusLabelName).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)

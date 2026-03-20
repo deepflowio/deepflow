@@ -37,6 +37,7 @@ func NewChPrometheusMetricNames() *ChPrometheusMetricName {
 }
 
 func (l *ChPrometheusMetricName) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChPrometheusMetricName, bool) {
+	log.Infof("generate data for %s", l.resourceTypeName, db.LogPrefixORGID)
 	var prometheusMetricName []metadbmodel.PrometheusMetricName
 	err := db.Unscoped().Find(&prometheusMetricName).Error
 	if err != nil {

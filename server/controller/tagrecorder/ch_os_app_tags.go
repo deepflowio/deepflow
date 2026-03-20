@@ -39,6 +39,7 @@ func NewChOSAppTags() *ChOSAppTags {
 }
 
 func (o *ChOSAppTags) generateNewData(db *metadb.DB) (map[IDKey]metadbmodel.ChOSAppTags, bool) {
+	log.Infof("generate data for %s", o.resourceTypeName, db.LogPrefixORGID)
 	var processes []metadbmodel.Process
 	keyToItem := make(map[IDKey]metadbmodel.ChOSAppTags)
 	gidToOsAppTagMap := make(map[int]map[string]string)
