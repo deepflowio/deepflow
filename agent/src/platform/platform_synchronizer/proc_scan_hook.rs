@@ -18,7 +18,10 @@ use super::ProcessData;
 
 pub fn proc_scan_hook(_proc_root: &str, _process_datas: &mut Vec<ProcessData>) {
     // Enterprise: clean dead AI Agent PIDs and mark alive ones with biz_type
-    #[cfg(feature = "enterprise")]
+    #[cfg(all(
+        feature = "enterprise",
+        any(target_os = "linux", target_os = "android")
+    ))]
     {
         use std::collections::HashSet;
 
