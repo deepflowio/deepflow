@@ -5898,6 +5898,61 @@ processors:
           #   ch: |-
           #     是否解析 XML 数据内容。
           parse_xml_enabled: true
+          # type: bool
+          # name:
+          #   en: Decompress Payload
+          #   ch: 解压数据包
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     Some web_sphere_mq messages use zlib compression. When this option is enabled,
+          #     the agent will decompress the data packets during parsing.
+          #   ch: |-
+          #     部分 web_sphere_mq 的消息中使用 zlib 压缩，开启此选项后，agent 在解析时会对数据包进行解压。
+          decompress_enabled: true
+          # type: bool
+          # name:
+          #   en: Attribute Field Filter
+          #   ch: 属性字段过滤器
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #      Enabling this option will cause the agent to retain only the following fields in the XML during parsing, reducing data storage.
+          #      - Document.ComConf.ConfInf.MT
+          #      - Document.ComConf.ConfInf.MsgId
+          #      - Document.ComConf.ConfInf.MsgPrcCd
+          #      - Document.ComConf.ConfInf.MsgRefId
+          #      - Document.ComConf.ConfInf.OrigSndDt
+          #      - Document.ComConf.ConfInf.OrigSndr
+          #      - Document.ComuCnfm.MsgId
+          #      - Document.ComuCnfm.MsgProCd
+          #      - Document.ComuCnfm.MsgRefId
+          #      - Document.ComuCnfm.MsgTp
+          #      - Document.ComuCnfm.OrigSndDt
+          #      - Document.ComuCnfm.OrigSndr
+          #   ch: |-
+          #     开启此选项后，agent 在解析时 XML 仅保留如下字段，减少数据存储。
+          #     - Document.ComConf.ConfInf.MT
+          #     - Document.ComConf.ConfInf.MsgId
+          #     - Document.ComConf.ConfInf.MsgPrcCd
+          #     - Document.ComConf.ConfInf.MsgRefId
+          #     - Document.ComConf.ConfInf.OrigSndDt
+          #     - Document.ComConf.ConfInf.OrigSndr
+          #     - Document.ComuCnfm.MsgId
+          #     - Document.ComuCnfm.MsgProCd
+          #     - Document.ComuCnfm.MsgRefId
+          #     - Document.ComuCnfm.MsgTp
+          #     - Document.ComuCnfm.OrigSndDt
+          #     - Document.ComuCnfm.OrigSndr
+          filter_attributes_enabled: true
         # type: section
         # name: MySQL
         # description:

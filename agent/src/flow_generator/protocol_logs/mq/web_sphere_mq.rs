@@ -291,8 +291,9 @@ pub struct WebSphereMqLog {
 }
 
 impl L7ProtocolParserInterface for WebSphereMqLog {
-    fn check_payload(&mut self, payload: &[u8], _param: &ParseParam) -> Option<LogMessageType> {
-        self.parser.check_payload(payload)
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> Option<LogMessageType> {
+        self.parser
+            .check_payload(payload, param.web_sphere_mq_parse_conf.decompress_enabled)
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
@@ -303,6 +304,9 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
 
         let custom_policies =
             config.get_custom_field_policies(L7Protocol::WebSphereMq.into(), param);
+        let parse_xml_enabled = param.web_sphere_mq_parse_conf.parse_xml_enabled;
+        let decompress_enabled = param.web_sphere_mq_parse_conf.decompress_enabled;
+        let filter_attributes_enabled = param.web_sphere_mq_parse_conf.filter_attributes_enabled;
         let mut pos = 0;
         let mut loop_count = 0;
         let mut results: Vec<L7ProtocolInfo> = Vec::with_capacity(Self::INIT_L7_RESULT_CAPACITY);
@@ -311,10 +315,16 @@ impl L7ProtocolParserInterface for WebSphereMqLog {
             let parsed_size = self.parser.parse_payload(
                 &payload[pos..],
                 param.direction,
-                param.web_sphere_mq_parse_conf.parse_xml_enabled,
+                parse_xml_enabled,
+                decompress_enabled,
+                filter_attributes_enabled,
             );
             if parsed_size == 0 {
                 break;
+            }
+            if self.parser.skip_frame {
+                pos += parsed_size;
+                continue;
             }
             let mut info = WebSphereMqInfo::default();
             info.is_tls = param.is_tls();

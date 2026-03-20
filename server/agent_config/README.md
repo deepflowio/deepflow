@@ -8297,6 +8297,79 @@ processors:
 
 Whether to parse XML.
 
+###### Decompress Payload {#processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.decompress_enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.decompress_enabled`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        web_sphere_mq:
+          decompress_enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Some web_sphere_mq messages use zlib compression. When this option is enabled,
+the agent will decompress the data packets during parsing.
+
+###### Attribute Field Filter {#processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.filter_attributes_enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.web_sphere_mq.filter_attributes_enabled`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        web_sphere_mq:
+          filter_attributes_enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Enabling this option will cause the agent to retain only the following fields in the XML during parsing, reducing data storage.
+- Document.ComConf.ConfInf.MT
+- Document.ComConf.ConfInf.MsgId
+- Document.ComConf.ConfInf.MsgPrcCd
+- Document.ComConf.ConfInf.MsgRefId
+- Document.ComConf.ConfInf.OrigSndDt
+- Document.ComConf.ConfInf.OrigSndr
+- Document.ComuCnfm.MsgId
+- Document.ComuCnfm.MsgProCd
+- Document.ComuCnfm.MsgRefId
+- Document.ComuCnfm.MsgTp
+- Document.ComuCnfm.OrigSndDt
+- Document.ComuCnfm.OrigSndr
+
 ##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
 
 ###### Decompress MySQL Payload {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}
