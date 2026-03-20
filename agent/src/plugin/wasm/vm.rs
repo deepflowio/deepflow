@@ -383,28 +383,34 @@ impl From<(&ParseParam<'_>, &HttpInfo, &[u8])> for VmHttpReqCtx {
 /*
     correspond to go struct HttpRespCtx:
 
-    type HttpReqCtx struct {
-        BaseCtx ParseCtx
+    type HttpRespCtx struct {
+        BaseCtx  ParseCtx
         Code     uint16
+        Status   RespStatus
+        Endpoint string
     }
 */
 pub struct VmHttpRespCtx {
     pub base_ctx: VmCtxBase,
     pub code: u16,
     pub status: L7ResponseStatus,
+    pub endpoint: String,
 }
 
 impl VmHttpRespCtx {
     /*
-      code:      2 bytes
-      status:    1 bytes
+      code:         2 bytes
+      status:       1 byte
+      // appended when buf has room (>= 5 bytes), for backward compat with old wasm (3-byte buf):
+      endpoint len: 2 bytes
+      endpoint:     $(endpoint len) bytes
     */
-    const BUF_SIZE: usize = 3;
+    const MIN_BUF_SIZE: usize = 3;
     pub(super) fn serialize_to_bytes(&self, buf: &mut [u8]) -> Result<usize> {
-        if buf.len() < Self::BUF_SIZE {
+        if buf.len() < Self::MIN_BUF_SIZE {
             return Err(Error::WasmSerializeFail(format!(
-                "serialize http resp ctx fail, need at lease {} bytes but buf only {} bytes",
-                Self::BUF_SIZE,
+                "serialize http resp ctx fail, need at least {} bytes but buf only {} bytes",
+                Self::MIN_BUF_SIZE,
                 buf.len()
             )));
         }
@@ -414,6 +420,11 @@ impl VmHttpRespCtx {
         off += 2;
         buf[off] = self.status as u8;
         off += 1;
+
+        // Only write endpoint if the buffer is large enough (old wasm allocates exactly 3 bytes)
+        if buf.len() >= off + 2 + self.endpoint.len() {
+            serialize_str_ctx!(self, buf, off, endpoint);
+        }
         Ok(off)
     }
 }
@@ -425,6 +436,7 @@ impl From<(&ParseParam<'_>, &HttpInfo, &[u8])> for VmHttpRespCtx {
             base_ctx: VmCtxBase::from((param, info.proto as u8, payload)),
             code: info.status_code.unwrap_or_default(),
             status: info.status,
+            endpoint: info.endpoint.clone().unwrap_or_default(),
         }
     }
 }
