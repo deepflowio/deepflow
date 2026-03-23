@@ -45,12 +45,12 @@ impl<T: Debug> Throttle<T> {
     // return false, indicates that the throttle has been reached
     // and the item or cached items will be discarded
     pub fn send(&mut self, item: T) -> bool {
-        if self.buffer.len() > BUFFER_SIZE {
+        if self.buffer.len() >= BUFFER_SIZE {
             self.flush();
             self.period_count = 0;
         }
 
-        self.period_count += 1;
+        self.period_count = self.period_count.saturating_add(1);
         if self.leaky_bucket.acquire(1) {
             self.buffer.push(item);
         } else {
