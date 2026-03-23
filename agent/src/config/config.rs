@@ -616,6 +616,20 @@ impl Default for Proc {
                     ..Default::default()
                 },
                 ProcessMatcher {
+                    match_regex: Regex::new(
+                        r"\bjava( +\S+)* +-(?:cp|classpath) +\S+ +(?P<CLASS_NAME>[$_A-Za-z][$_0-9A-Za-z]*(?:\.[$_A-Za-z][$_0-9A-Za-z]*)*)",
+                    )
+                    .unwrap(),
+                    only_in_container: false,
+                    match_type: ProcessMatchType::CmdWithArgs,
+                    rewrite_name: "${CLASS_NAME}".to_string(),
+                    enabled_features: vec![
+                        "ebpf.profile.on_cpu".to_string(),
+                        "proc.gprocess_info".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ProcessMatcher {
                     match_regex: Regex::new(r"\bpython(\S)*( +-\S+)* +(\S*/)*([^ /]+)").unwrap(),
                     only_in_container: false,
                     match_type: ProcessMatchType::CmdWithArgs,
@@ -3915,6 +3929,23 @@ mod tests {
 
     use std::fs;
 
+    fn process_data_for_cmdline(cmdline: &str) -> ProcessData {
+        ProcessData {
+            name: "java".to_string(),
+            pid: 1,
+            ppid: 0,
+            process_name: "java".to_string(),
+            cmd: "/usr/bin/java".to_string(),
+            cmd_with_args: cmdline.split(' ').map(ToString::to_string).collect(),
+            user_id: 0,
+            user: "root".to_string(),
+            start_time: Duration::ZERO,
+            os_app_tags: vec![],
+            netns_id: 0,
+            container_id: "".to_string(),
+        }
+    }
+
     #[test]
     fn read_yaml_file() {
         // TODO: improve test cases
@@ -4004,6 +4035,51 @@ enabled: true
 "#;
         let proc: Proc = serde_yaml::from_str(default_matcher_yaml).unwrap();
         assert_eq!(proc.process_matcher, Proc::default().process_matcher);
+    }
+
+    #[test]
+    fn java_classpath_process_matcher_rewrites_to_class_name() {
+        let matcher = &Proc::default().process_matcher[1];
+        let cmdlines = [
+            "/usr/bin/java -Xms512m -classpath /app/app.jar:/app/lib/* com.example.Main arg1",
+            "/usr/bin/java -Xms512m -cp /app/app.jar:/app/lib/* com.example.Main arg1",
+        ];
+
+        for cmdline in cmdlines {
+            let rewritten = matcher
+                .get_process_data(&process_data_for_cmdline(cmdline), &HashMap::new())
+                .unwrap();
+            assert_eq!(rewritten.name, "com.example.Main");
+        }
+    }
+
+    #[test]
+    fn parse_java_classpath_process_matcher_and_rewrite() {
+        let yaml = r#"
+process_matcher:
+- match_regex: \bjava( +\S+)* +-(?:cp|classpath) +\S+ +(?P<CLASS_NAME>[$_A-Za-z][$_0-9A-Za-z]*(?:\.[$_A-Za-z][$_0-9A-Za-z]*)*)
+  match_type: cmdline_with_args
+  match_languages: []
+  match_usernames: []
+  only_in_container: false
+  only_with_tag: false
+  ignore: false
+  rewrite_name: ${CLASS_NAME}
+  enabled_features: [ebpf.profile.on_cpu, proc.gprocess_info]
+"#;
+        let proc: Proc = serde_yaml::from_str(yaml).unwrap();
+        let matcher = &proc.process_matcher[0];
+
+        assert_eq!(matcher.rewrite_name, "${CLASS_NAME}");
+        let rewritten = matcher
+            .get_process_data(
+                &process_data_for_cmdline(
+                    "/usr/bin/java -classpath /app/app.jar:/app/lib/* com.example.Main arg1",
+                ),
+                &HashMap::new(),
+            )
+            .unwrap();
+        assert_eq!(rewritten.name, "com.example.Main");
     }
 
     #[test]

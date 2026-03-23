@@ -1874,6 +1874,13 @@ inputs:
     - enabled_features:
       - ebpf.profile.on_cpu
       - proc.gprocess_info
+      match_regex: \bjava( +\S+)* +-(?:cp|classpath) +\S+ +(?P<CLASS_NAME>[$_A-Za-z][$_0-9A-Za-z]*(?:\.[$_A-Za-z][$_0-9A-Za-z]*)*)
+      match_type: cmdline_with_args
+      only_in_container: false
+      rewrite_name: ${CLASS_NAME}
+    - enabled_features:
+      - ebpf.profile.on_cpu
+      - proc.gprocess_info
       match_regex: \bpython(\S)*( +-\S+)* +(\S*/)*([^ /]+)
       match_type: cmdline_with_args
       only_in_container: false
