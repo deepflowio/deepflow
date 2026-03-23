@@ -16,15 +16,11 @@
 
 use std::{
     fmt,
-    fs::File,
-    io::{self, BufRead, BufReader},
-    net::IpAddr,
     path::Path,
     sync::{atomic::AtomicI64, Arc},
     time::Duration,
 };
 
-use nom::IResult;
 use pcap::{self, Linktype};
 
 use public::{
@@ -48,9 +44,16 @@ use crate::{
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "libtrace")] {
+        use std::{
+            fs::File,
+            io::{self, BufRead, BufReader},
+            net::IpAddr,
+        };
+
         use std::mem::MaybeUninit;
 
         use chrono::NaiveDateTime;
+        use nom::IResult;
 
         use public::l7_protocol::L7Protocol;
 
