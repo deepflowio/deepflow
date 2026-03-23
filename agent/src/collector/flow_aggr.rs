@@ -556,7 +556,7 @@ impl ThrottlingQueue {
     }
 
     pub fn send_with_throttling(&mut self, f: Box<TaggedFlow>) -> bool {
-        self.period_count += 1;
+        self.period_count = self.period_count.saturating_add(1);
         if self.cache_with_throttling.len() < self.throttle as usize {
             self.cache_with_throttling.push(BoxedTaggedFlow(f));
             true
