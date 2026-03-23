@@ -1181,12 +1181,20 @@ impl DubboHeader {
         self.status_code = payload[3];
         self.request_id = read_u64_be(&payload[4..]) as i64;
         self.data_length = read_u32_be(&payload[12..]) as i32;
+        if self.is_event() {
+            return Err(Error::DubboHeaderParseFailed);
+        }
+
         Ok(())
     }
 
+    pub fn is_event(&self) -> bool {
+        self.event == 1
+    }
+
     pub fn check(&self) -> bool {
-        // 不通过响应识别Dubbo
-        if self.data_type == 0 {
+        // 不通过响应和事件识别Dubbo
+        if self.data_type == 0 || self.is_event() {
             return false;
         }
         // 请求时状态码一定是0
