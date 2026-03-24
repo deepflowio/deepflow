@@ -76,8 +76,8 @@ type AlertEventStore struct {
 
 	// New fields for AlertEvent
 	EventId   string
-	StartTime uint64
-	EndTime   uint64
+	StartTime uint32
+	EndTime   uint32
 	Duration  uint32
 	State     uint32
 	AlertTime uint64
@@ -118,8 +118,8 @@ func AlertEventColumns() []*ckdb.Column {
 
 		// New columns
 		ckdb.NewColumn("event_id", ckdb.String),
-		ckdb.NewColumn("start_time", ckdb.UInt64),
-		ckdb.NewColumn("end_time", ckdb.UInt64),
+		ckdb.NewColumn("start_time", ckdb.DateTime),
+		ckdb.NewColumn("end_time", ckdb.DateTime),
 		ckdb.NewColumn("duration", ckdb.UInt32),
 		ckdb.NewColumn("state", ckdb.UInt32),
 		ckdb.NewColumn("alert_time", ckdb.UInt64),
@@ -204,12 +204,24 @@ func (e *AlertEventStore) GenerateNewFlowTags(cache *flow_tag.FlowTagCache) {
 }
 
 // GenAlertEventCKTable creates the alert_event table definition.
-// Engine: ReplacingMergeTree(_id), ORDER BY (time, event_id).
+//
+// Design rationale:
+//   - Engine: ReplacingMergeTree(time) — for the same ORDER BY key, keep the row
+//     with the highest _id (i.e., the most recently written row).
+//   - ORDER BY (event_id): dedup key is event_id alone, guaranteeing globally
+//     unique event_id. ClickHouse ReplacingMergeTree dedup key == ORDER BY key,
+//     so time cannot be added to ORDER BY without making it part of the dedup key.
+//   - PARTITION BY toYYYYMM(time) (TimeFuncDay): provides time-based partition
+//     pruning for fast time-range queries without requiring time in ORDER BY.
+//     Queries with a time filter skip entire month partitions automatically.
 func GenAlertEventCKTable(cluster, storagePolicy, ckdbType string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	table := common.ALERT_EVENT.TableName()
 	timeKey := "time"
 	engine := ckdb.ReplacingMergeTree
-	orderKeys := []string{"time", "event_id"}
+	// Dedup key is event_id only — guarantees at most one row per event_id
+	// within each daily partition (same event_id always has the same time,
+	// so it always lands in the same partition → globally unique event_id).
+	orderKeys := []string{"event_id"}
 
 	return &ckdb.Table{
 		Version:         basecommon.CK_VERSION,
@@ -219,9 +231,9 @@ func GenAlertEventCKTable(cluster, storagePolicy, ckdbType string, ttl int, cold
 		GlobalName:      table,
 		Columns:         AlertEventColumns(),
 		TimeKey:         timeKey,
-		ReplacingKey:    "_id",
+		ReplacingKey:    "time",
 		TTL:             ttl,
-		PartitionFunc:   DefaultPartition,
+		PartitionFunc:   DefaultAlertEventPartition,
 		Engine:          engine,
 		Cluster:         cluster,
 		StoragePolicy:   storagePolicy,
