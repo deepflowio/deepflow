@@ -395,7 +395,7 @@ pub struct LogCacheKey(pub u128);
 
 impl LogCacheKey {
     pub fn is_reversed(&self) -> bool {
-        self.0 & (1 << 63) == 1
+        self.0 & (1 << 63) != 0
     }
 
     pub fn new(param: &ParseParam, session_id: Option<u32>, is_reversed: bool) -> Self {
@@ -403,14 +403,8 @@ impl LogCacheKey {
             if session id is some: flow id 64bit | is_reversed 1 bit | 0 31bit | session id 32bit
             if session id is none: flow id 64bit | is_reversed 1 bit | packet_seq 63bit
         */
-        let key = match session_id {
-            Some(sid) => {
-                if is_reversed {
-                    ((param.flow_id as u128) << 64) | 1 << 63 | sid as u128
-                } else {
-                    ((param.flow_id as u128) << 64) | sid as u128
-                }
-            }
+        let mut key = match session_id {
+            Some(sid) => ((param.flow_id as u128) << 64) | sid as u128,
             None => {
                 ((param.flow_id as u128) << 64)
                     | (if param.ebpf_type != EbpfType::None {
@@ -427,16 +421,18 @@ impl LogCacheKey {
                             param.packet_start_seq
                         };
 
-                        if is_reversed {
-                            1 << 63 | seq & 0x7fffffff_ffffffff
-                        } else {
-                            seq & 0x7fffffff_ffffffff
-                        }
+                        seq
                     } else {
                         0
                     }) as u128
             }
         };
+
+        if is_reversed {
+            key |= 1 << 63;
+        } else {
+            key &= !(1 << 63);
+        }
 
         Self(key)
     }
