@@ -47,8 +47,8 @@ type AlertEventBlock struct {
 	ColUserId           proto.ColUInt32
 	// New columns
 	ColEventId   proto.ColStr
-	ColStartTime proto.ColUInt64
-	ColEndTime   proto.ColUInt64
+	ColStartTime proto.ColDateTime
+	ColEndTime   proto.ColDateTime
 	ColDuration  proto.ColUInt32
 	ColState     proto.ColUInt32
 	ColAlertTime proto.ColUInt64
@@ -155,8 +155,8 @@ func (n *AlertEventStore) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColTeamId.Append(n.TeamID)
 	block.ColUserId.Append(n.UserId)
 	block.ColEventId.Append(n.EventId)
-	block.ColStartTime.Append(n.StartTime)
-	block.ColEndTime.Append(n.EndTime)
+	ckdb.AppendColDateTime(&block.ColStartTime, n.StartTime)
+	ckdb.AppendColDateTime(&block.ColEndTime, n.EndTime)
 	block.ColDuration.Append(n.Duration)
 	block.ColState.Append(n.State)
 	block.ColAlertTime.Append(n.AlertTime)
