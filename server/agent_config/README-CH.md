@@ -4140,7 +4140,7 @@ inputs:
   ebpf:
     socket:
       preprocess:
-        out_of_order_reassembly_cache_size: 16
+        out_of_order_reassembly_cache_size: 256
 ```
 
 **模式**:
@@ -7539,6 +7539,35 @@ processors:
 部分 MySQL 数据包采用 LZ77 压缩，开启此选项后，agent 在解析时会对数据包进行解压。
 设置为 false 以关闭解压，提升性能。
 参考：[MySQL Source Code Documentation](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_compression.html)
+
+###### 提取 Endpoint 开关 {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.endpoint_disabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.mysql.endpoint_disabled`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        mysql:
+          endpoint_disabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+关闭后不会提取 SQL 语句中的动作和表名放入 endpoint 中
 
 ##### Grpc {#processors.request_log.application_protocol_inference.protocol_special_config.grpc}
 

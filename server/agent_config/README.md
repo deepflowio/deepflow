@@ -4231,7 +4231,7 @@ inputs:
   ebpf:
     socket:
       preprocess:
-        out_of_order_reassembly_cache_size: 16
+        out_of_order_reassembly_cache_size: 256
 ```
 
 **Schema**:
@@ -7706,6 +7706,35 @@ processors:
 Some MySQL packets have payload compressed with LZ77 algorithm. Enable this option to decompress payload on parsing.
 Set to false to disable decompression for better performance.
 ref: [MySQL Source Code Documentation](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_compression.html)
+
+###### Endpoint Disabled {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.endpoint_disabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.mysql.endpoint_disabled`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        mysql:
+          endpoint_disabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+After turning it off, the actions and table names in the SQL statement will not be extracted into the endpoint.
 
 ##### Grpc {#processors.request_log.application_protocol_inference.protocol_special_config.grpc}
 

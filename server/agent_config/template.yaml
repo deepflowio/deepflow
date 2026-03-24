@@ -3146,7 +3146,7 @@ inputs:
         #     条事件数据占用的字节数上限受 `processors.request_log.tunning.payload_truncation` 控制）。在 Syscall 数据乱序较严重
         #     导致应用调用采集不全的环境中，可适当调大该参数。
         # upgrade_from: static_config.ebpf.syscall-out-of-order-cache-size
-        out_of_order_reassembly_cache_size: 16
+        out_of_order_reassembly_cache_size: 256
         # type: string
         # name:
         #   en: OOOR Protocols
@@ -5403,6 +5403,21 @@ processors:
           #     设置为 false 以关闭解压，提升性能。
           #     参考：[MySQL Source Code Documentation](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_compression.html)
           decompress_payload: true
+          # type: bool
+          # name:
+          #   en: Endpoint Disabled 
+          #   ch: 提取 Endpoint 开关 
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     After turning it off, the actions and table names in the SQL statement will not be extracted into the endpoint.
+          #   ch: |-
+          #     关闭后不会提取 SQL 语句中的动作和表名放入 endpoint 中
+          endpoint_disabled: true
         # type: section
         # name: Grpc
         # description:
