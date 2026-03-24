@@ -1399,7 +1399,11 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 			if e.DataSource != "" {
 				e.AddTable(fmt.Sprintf("%s.`%s.%s`", newDB, table, e.DataSource))
 			} else {
-				e.AddTable(fmt.Sprintf("%s.`%s`", newDB, table))
+				newDBTableStr := fmt.Sprintf("%s.`%s`", newDB, table)
+				if table == chCommon.TABLE_NAME_ALERT_EVENT {
+					newDBTableStr = newDBTableStr + " FINAL"
+				}
+				e.AddTable(newDBTableStr)
 			}
 			virtualTableFilter, ok := GetVirtualTableFilter(e.DB, e.Table)
 			if ok {
