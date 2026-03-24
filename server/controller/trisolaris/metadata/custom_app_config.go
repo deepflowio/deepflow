@@ -266,6 +266,58 @@ func (c *CustomAppConfig) GetCustomAppConfigByte(teamID, agentGroupID int) []byt
 				log.Error(errMessage, logger.NewORGPrefix(c.orgID))
 				return []byte("# " + errMessage)
 			}
+			if policyYaml.Exists("enabled") && !policyYaml.Bool("enabled") {
+				log.Debugf("policy (%s) is not enabled, skip it", p.Name, logger.NewORGPrefix(c.orgID))
+				continue
+			}
+
+			// fields
+			policyFieldYamls := []map[string]interface{}{}
+			for _, field := range policyYaml.Slices(common.CONFIG_KEY_FIELDS) {
+				if field.Exists("enabled") && !field.Bool("enabled") {
+					log.Debugf("field (%s) in policy (%s) is not enabled, skip it", field.String("name"), p.Name, logger.NewORGPrefix(c.orgID))
+					continue
+				}
+				policyFieldYamls = append(policyFieldYamls, field.Raw())
+			}
+			err = policyYaml.Set(common.CONFIG_KEY_FIELDS, policyFieldYamls)
+			if err != nil {
+				errMessage := fmt.Sprintf("set fields for policy (%s) failed: %s", p.Name, err.Error())
+				log.Error(errMessage, logger.NewORGPrefix(c.orgID))
+				return []byte("# " + errMessage)
+			}
+
+			// const fields
+			policyConstFieldYamls := []map[string]interface{}{}
+			for _, field := range policyYaml.Slices(common.CONFIG_KEY_CONST_FIELDS) {
+				if field.Exists("enabled") && !field.Bool("enabled") {
+					log.Debugf("const field (%s) in policy (%s) is not enabled, skip it", field.String("name"), p.Name, logger.NewORGPrefix(c.orgID))
+					continue
+				}
+				policyConstFieldYamls = append(policyConstFieldYamls, field.Raw())
+			}
+			err = policyYaml.Set(common.CONFIG_KEY_CONST_FIELDS, policyConstFieldYamls)
+			if err != nil {
+				errMessage := fmt.Sprintf("set const fields for policy (%s) failed: %s", p.Name, err.Error())
+				log.Error(errMessage, logger.NewORGPrefix(c.orgID))
+				return []byte("# " + errMessage)
+			}
+
+			// compound fields
+			policyCompoundFieldYamls := []map[string]interface{}{}
+			for _, field := range policyYaml.Slices(common.CONFIG_KEY_COMPOUND_FIELDS) {
+				if field.Exists("enabled") && !field.Bool("enabled") {
+					log.Debugf("compound field (%s) in policy (%s) is not enabled, skip it", field.String("name"), p.Name, logger.NewORGPrefix(c.orgID))
+					continue
+				}
+				policyCompoundFieldYamls = append(policyCompoundFieldYamls, field.Raw())
+			}
+			err = policyYaml.Set(common.CONFIG_KEY_COMPOUND_FIELDS, policyCompoundFieldYamls)
+			if err != nil {
+				errMessage := fmt.Sprintf("set compound fields for policy (%s) failed: %s", p.Name, err.Error())
+				log.Error(errMessage, logger.NewORGPrefix(c.orgID))
+				return []byte("# " + errMessage)
+			}
 			policyYamls = append(policyYamls, policyYaml.Raw())
 		}
 		err := k.Set(common.CONFIG_KEY_BIZ_FIELD_POLICIES, policyYamls)
