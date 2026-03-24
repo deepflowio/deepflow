@@ -129,6 +129,9 @@ const (
 )
 
 const (
+	CONFIG_KEY_FIELDS                 = "fields"
+	CONFIG_KEY_CONST_FIELDS           = "const_fields"
+	CONFIG_KEY_COMPOUND_FIELDS        = "compound_fields"
 	CONFIG_KEY_BIZ_PROTOCOL_POLICIES  = "biz_protocol_policies"
 	CONFIG_KEY_BIZ_FIELD_DICTIONARIES = "biz_field.dictionaries"
 	CONFIG_KEY_BIZ_FIELD_POLICIES     = "biz_field.policies"
