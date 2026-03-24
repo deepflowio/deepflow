@@ -1381,7 +1381,7 @@ pub struct EbpfSocketPreprocess {
 impl Default for EbpfSocketPreprocess {
     fn default() -> Self {
         Self {
-            out_of_order_reassembly_cache_size: 16,
+            out_of_order_reassembly_cache_size: 256,
             out_of_order_reassembly_protocols: vec![],
             out_of_order_reassembly_timeout: Duration::from_millis(100),
             segmentation_reassembly_protocols: vec![],
@@ -1885,12 +1885,14 @@ impl Default for WebSphereMqConfig {
 #[serde(default)]
 pub struct MysqlConfig {
     pub decompress_payload: bool,
+    pub endpoint_disabled: bool,
 }
 
 impl Default for MysqlConfig {
     fn default() -> Self {
         Self {
             decompress_payload: true,
+            endpoint_disabled: true,
         }
     }
 }

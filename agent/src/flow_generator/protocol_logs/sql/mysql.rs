@@ -133,6 +133,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 #[l7_log(request_type.getter = "MysqlInfo::get_command")]
 #[l7_log(request_domain.skip = "true")]
 #[l7_log(trace_id.getter = "MysqlInfo::get_trace_id", trace_id.setter = "MysqlInfo::set_trace_id")]
+#[l7_log(endpoint.getter = "MysqlInfo::endpoint_field", endpoint.setter = "MysqlInfo::set_endpoint")]
 #[l7_log(response_result.skip = "true")]
 #[l7_log(x_request_id.skip = "true")]
 #[l7_log(http_proxy_client.skip = "true")]
@@ -245,7 +246,7 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        match L7Log::get_endpoint(self) {
+        match self.endpoint_field() {
             Field::Str(s) => Some(s.into_owned()),
             _ => None,
         }
@@ -326,6 +327,21 @@ impl MysqlInfo {
         }
     }
 
+    fn endpoint_field(&self) -> Field<'_> {
+        match self.endpoint.as_deref() {
+            Some(endpoint) => Field::Str(Cow::Borrowed(endpoint)),
+            None if !self.context.is_empty() => Field::Str(Cow::Borrowed(&self.context)),
+            None => Field::None,
+        }
+    }
+
+    fn set_endpoint(&mut self, endpoint: FieldSetter) {
+        match endpoint.into_inner() {
+            Field::Str(s) if !s.is_empty() => self.endpoint = Some(s.into_owned()),
+            _ => self.endpoint = None,
+        }
+    }
+
     fn get_table_name_from_sql(
         sql: &mut SplitWhitespace,
         key: &'static str,
@@ -356,13 +372,13 @@ impl MysqlInfo {
     }
 
     fn generate_endpoint(&mut self) {
+        self.endpoint = None;
         if self.context.is_empty() {
             return;
         }
 
         let mut words = self.context.split_whitespace();
         let Some(action) = words.next() else {
-            self.endpoint = Some(self.context.clone());
             return;
         };
 
@@ -430,7 +446,6 @@ impl MysqlInfo {
             }
             _ => {}
         }
-        self.endpoint = Some(self.context.clone());
     }
 
     fn request_string(
@@ -441,6 +456,9 @@ impl MysqlInfo {
         #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) -> Result<()> {
         let config = param.parse_config.as_ref();
+        let endpoint_disabled = config
+            .map(|c| c.mysql_endpoint_disabled)
+            .unwrap_or_else(|| LogParserConfig::default().mysql_endpoint_disabled);
         let payload = mysql_string(payload);
         if (self.command == COM_QUERY || self.command == COM_STMT_PREPARE) && !is_mysql(payload) {
             return Err(Error::InvalidSqlStatement);
@@ -463,12 +481,13 @@ impl MysqlInfo {
             self.extract_trace_and_span_id(&c.l7_log_dynamic, sql_string);
         }
         let obfuscator = CachedObfuscator::new(param.obfuscate_cache.clone());
-        let context = match obfuscator.apply(sql_string) {
-            Ok(obfuscated) => obfuscated.to_string(),
+        self.context = match obfuscator.apply(sql_string) {
+            Ok(obfuscated) => obfuscated.into_owned(),
             _ => sql_string.to_string(),
         };
-        self.context = context;
-        self.generate_endpoint();
+        if !endpoint_disabled {
+            self.generate_endpoint();
+        }
         Ok(())
     }
 
@@ -787,7 +806,7 @@ impl L7ProtocolParserInterface for MysqlLog {
             let mut perf_stat = L7PerfStats::default();
             if info.msg_type == LogMessageType::Response {
                 if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
-                    info.endpoint = Some(endpoint.to_string());
+                    info.endpoint = Some(endpoint);
                 }
             }
             if let Some(stats) = info.perf_stats(param) {
@@ -1164,7 +1183,11 @@ impl MysqlLog {
         str::from_utf8(&payload[..n]).ok()
     }
 
-    fn login(payload: &[u8], mut info: Option<&mut MysqlInfo>) -> Result<()> {
+    fn login(
+        payload: &[u8],
+        mut info: Option<&mut MysqlInfo>,
+        endpoint_disabled: bool,
+    ) -> Result<()> {
         if payload.len() < LOGIN_USERNAME_OFFSET {
             return Err(Error::Truncated(TruncationType::Login));
         }
@@ -1212,7 +1235,10 @@ impl MysqlLog {
                 } else {
                     format!("Login username: {}", username)
                 };
-                info.generate_endpoint();
+
+                if !endpoint_disabled {
+                    info.generate_endpoint();
+                }
             }
         }
 
@@ -1234,6 +1260,9 @@ impl MysqlLog {
         let decompress = config
             .map(|c| c.mysql_decompress_payload)
             .unwrap_or_else(|| LogParserConfig::default().mysql_decompress_payload);
+        let endpoint_disabled = config
+            .map(|c| c.mysql_endpoint_disabled)
+            .unwrap_or_else(|| LogParserConfig::default().mysql_endpoint_disabled);
 
         let mut parser = match PayloadParser::new(decompress, has_compressed_header, payload) {
             Ok(parser) => parser,
@@ -1263,7 +1292,7 @@ impl MysqlLog {
                 let context = mysql_string(&payload[1..]);
                 context.is_ascii() && is_mysql(context)
             }
-            _ if header.seq_id != 0 => MysqlLog::login(payload, None).is_ok(),
+            _ if header.seq_id != 0 => MysqlLog::login(payload, None, endpoint_disabled).is_ok(),
             _ => false,
         }
     }
@@ -1312,6 +1341,9 @@ impl MysqlLog {
         let decompress = config
             .map(|c| c.mysql_decompress_payload)
             .unwrap_or_else(|| LogParserConfig::default().mysql_decompress_payload);
+        let endpoint_disabled = config
+            .map(|c| c.mysql_endpoint_disabled)
+            .unwrap_or_else(|| LogParserConfig::default().mysql_endpoint_disabled);
 
         let mut parser =
             PayloadParser::new(decompress, self.has_compressed_header.unwrap(), payload)?;
@@ -1366,7 +1398,7 @@ impl MysqlLog {
             LogMessageType::Request
                 if direction == PacketDirection::ClientToServer && header.seq_id == 1 =>
             {
-                Self::login(payload, Some(info))?;
+                Self::login(payload, Some(info), endpoint_disabled)?;
                 self.has_login = true;
             }
             LogMessageType::Response

@@ -1193,6 +1193,7 @@ pub struct LogParserConfig {
     pub l7_log_blacklist_trie: HashMap<L7Protocol, BlacklistTrie>,
     pub unconcerned_dns_nxdomain_trie: DomainNameTrie,
     pub mysql_decompress_payload: bool,
+    pub mysql_endpoint_disabled: bool,
     pub custom_app: CustomAppConfig,
 }
 
@@ -1212,6 +1213,7 @@ impl Default for LogParserConfig {
             l7_log_blacklist_trie: HashMap::new(),
             unconcerned_dns_nxdomain_trie: DomainNameTrie::default(),
             mysql_decompress_payload: true,
+            mysql_endpoint_disabled: true,
             custom_app: CustomAppConfig::default(),
         }
     }
@@ -1258,6 +1260,7 @@ impl fmt::Debug for LogParserConfig {
                 &self.unconcerned_dns_nxdomain_trie,
             )
             .field("mysql_decompress_payload", &self.mysql_decompress_payload)
+            .field("mysql_endpoint_disabled", &self.mysql_endpoint_disabled)
             .field("custom_app", &self.custom_app)
             .finish()
     }
@@ -2361,6 +2364,13 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .protocol_special_config
                     .mysql
                     .decompress_payload,
+                mysql_endpoint_disabled: conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .protocol_special_config
+                    .mysql
+                    .endpoint_disabled,
                 #[cfg(not(feature = "enterprise"))]
                 custom_app: CustomAppConfig::default(),
                 #[cfg(feature = "enterprise")]
