@@ -32,6 +32,7 @@ biz_field:
     default: value3
   policies:
   - policy_name: "my_policy"
+    enabled: true
     l7_protocol: http
     biz_protocol: "my_protocol"
     filters:
@@ -57,6 +58,7 @@ biz_field:
           attribute_name: response_payload
     fields:
     - name: "tlv_field"
+      enabled: true
       type: "payload_tlv_value"
       match:
         type: "hex" # string, hex
@@ -71,6 +73,7 @@ biz_field:
       output:
         attribute_name: "tlv_c5"
     - name: "my_field"
+      enabled: false
       type: "http_url_field"
       match:
         type: "string"
@@ -85,7 +88,7 @@ biz_field:
       - type: obfuscate
         settings:
         - key: mask
-          value: *
+          value: "*"
         - key: preset
           value: id-card-name
         - key: range

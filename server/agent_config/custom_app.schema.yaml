@@ -206,6 +206,13 @@ $defs:
         type: string
         title@en: Policy Name
         title@ch: 策略名称
+      enabled:
+        type: boolean
+        title@en: Enabled
+        title@ch: 启用
+        default: true
+        description@en: 'Whether to enable this business decoding policy. Default: true.'
+        description@ch: 是否启用该业务解码策略。默认值：true。
       l7_protocol:
         type: string
         enum:
@@ -368,6 +375,13 @@ $defs:
               title@ch: 引用名
               description@en: Primarily used to reference this field in `Compound Fields` (`compound_fields`).
               description@ch: 主要用于在 `复合字段`（`compound_fields`）中引用本字段。
+            enabled:
+              type: boolean
+              title@en: Enabled
+              title@ch: 启用
+              default: true
+              description@en: 'Whether to enable this field extraction rule. Default: true.'
+              description@ch: 是否启用该字段提取规则。默认值：true。
             type:
               type: string
               enum:
@@ -580,6 +594,13 @@ $defs:
               type: string
               title@en: Constant Field Reference Name
               title@ch: 常量字段引用名
+            enabled:
+              type: boolean
+              title@en: Enabled
+              title@ch: 启用
+              default: true
+              description@en: 'Whether to enable this constant field. Default: true.'
+              description@ch: 是否启用该常量字段。默认值：true。
             value:
               type: string
               title@en: Constant Value
@@ -626,6 +647,13 @@ $defs:
               type: string
               title@en: Compound Field Reference Name
               title@ch: 复合字段引用名
+            enabled:
+              type: boolean
+              title@en: Enabled
+              title@ch: 启用
+              default: true
+              description@en: 'Whether to enable this compound field. Default: true.'
+              description@ch: 是否启用该复合字段。默认值：true。
             format:
               type: string
               title@en: Format
