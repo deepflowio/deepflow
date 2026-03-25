@@ -306,6 +306,10 @@ static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 	// Periodic trigger for timeout checks on cached data
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
 
+	// If file I/O event collection is not enabled, hook installation will be skipped
+	if (io_event_collect_mode == IO_EVENT_COLLECT_DISABLE)	
+		return;
+
         // file R/W probes
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pread64");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_preadv");
@@ -386,7 +390,11 @@ static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 
 	// Periodic trigger for timeout checks on cached data
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
-	
+
+	// If file I/O event collection is not enabled, hook installation will be skipped
+	if (io_event_collect_mode == IO_EVENT_COLLECT_DISABLE)	
+		return;
+
         // file R/W probes
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pread64");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_preadv");
@@ -433,10 +441,12 @@ static void config_probes_for_kprobe(struct tracer_probes_conf *tps)
 	probes_set_symbol(tps, "__sys_sendmmsg");
 	probes_set_symbol(tps, "__sys_recvmsg");
 	probes_set_symbol(tps, "__sys_recvmmsg");
-	probes_set_symbol(tps, "ksys_pread64");
-	probes_set_symbol(tps, "do_preadv");
-	probes_set_symbol(tps, "ksys_pwrite64");
-	probes_set_symbol(tps, "do_pwritev");
+	if (io_event_collect_mode != IO_EVENT_COLLECT_DISABLE) {
+		probes_set_symbol(tps, "ksys_pread64");
+		probes_set_symbol(tps, "do_preadv");
+		probes_set_symbol(tps, "ksys_pwrite64");
+		probes_set_symbol(tps, "do_pwritev");
+	}
 
 	if (k_version == KERNEL_VERSION(3, 10, 0)) {
 		/*
@@ -2379,6 +2389,8 @@ int set_io_event_collect_mode(uint32_t mode)
 {
 	io_event_collect_mode = mode;
 
+	ebpf_info("Set io_event_collect_mode %d\n", io_event_collect_mode);
+
 	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
 	if (tracer == NULL) {
 		return 0;
@@ -2404,7 +2416,6 @@ int set_io_event_collect_mode(uint32_t mode)
 		return ETR_UPDATE_MAP_FAILD;
 	}
 
-	ebpf_info("Set io_event_collect_mode %d\n", io_event_collect_mode);
 	return 0;
 }
 
