@@ -22,6 +22,10 @@
 #define CACHE_LINE_SIZE 64
 #endif
 
+#define IO_EVENT_COLLECT_DISABLE	0  // Disable collection: no file I/O events are captured
+#define IO_EVENT_COLLECT_LIFECYCLE	1  // Lifecycle mode: collect file I/O events only during process lifetime
+#define IO_EVENT_COLLECT_ALL		2  // Full mode: collect all file I/O events
+
 #define SYSCALL_FORK_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_fork"
 #define SYSCALL_CLONE_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_exit_clone"
 #define SYSCALL_PRWV2_TP_PATH "/sys/kernel/debug/tracing/events/syscalls/sys_enter_preadv2"
