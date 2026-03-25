@@ -320,7 +320,7 @@ const (
 	DEFAULT_ENCRYPTION_PASSWORD = "******"
 	DEFAULT_ALL_MATCH_REGEX     = ".*"
 	DEFAULT_NOT_MATCH_REGEX     = "^$"
-	DEFAULT_PORT_NAME_REGEX     = "^(cni|flannel|vxlan.calico|tunl|en[ospx])"
+	DEFAULT_PORT_NAME_REGEX     = "^(cni|flannel|vxlan.calico|tunl|eth|en[ospx])"
 
 	OPENSTACK         = 1
 	VSPHERE           = 2
