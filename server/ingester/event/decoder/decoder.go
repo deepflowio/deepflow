@@ -487,8 +487,8 @@ func (d *Decoder) writeAlertEvent(event *alert_event.AlertEvent) {
 
 	// New fields
 	s.EventId = event.GetEventId()
-	s.StartTime = event.GetStartTime()
-	s.EndTime = event.GetEndTime()
+	s.StartTime = uint32(event.GetStartTime())
+	s.EndTime = uint32(event.GetEndTime())
 	s.Duration = event.GetDuration()
 	s.State = event.GetState()
 	s.AlertTime = event.GetAlertTime()
