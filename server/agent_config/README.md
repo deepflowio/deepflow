@@ -5311,6 +5311,35 @@ inputs:
 Disable Node.js (V8) interpreter profiling. When disabled, Node.js process stack traces will not be collected,
 saving approximately 6.4 MB of kernel memory (v8_unwind_info_map).
 
+##### Lua profiling disabled {#inputs.ebpf.profile.languages.lua_disabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.languages.lua_disabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      languages:
+        lua_disabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Disable Lua interpreter profiling. When disabled, Lua process stack traces will not be collected,
+saving approximately 13 MB of kernel memory (lua_tstate_map, lua_lang_flags_map, lua_unwind_info_map, lua_offsets_map, luajit_offsets_map).
+
 ### Network {#inputs.ebpf.network}
 
 #### NIC optimization Enabled {#inputs.ebpf.network.nic_opt_enabled}
