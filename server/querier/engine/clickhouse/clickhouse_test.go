@@ -692,6 +692,60 @@ func TestGetSql(t *testing.T) {
 	}
 }
 
+func TestParseSQLUsesGProcessBizTypeTranslator(t *testing.T) {
+	if err := Load(); err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+
+	e := CHEngine{DB: "flow_log", Language: "en"}
+	e.Context = context.Background()
+	e.Init()
+
+	parser := parse.Parser{Engine: &e}
+	input := "select Enum(`gprocess.biz_type_0`) from l7_flow_log where Enum(`gprocess.biz_type_0`)='AI-Agent' limit 10"
+	if err := parser.ParseSQL(input); err != nil {
+		t.Fatalf("parse sql failed: %v", err)
+	}
+
+	got := parser.Engine.ToSQLString()
+	checks := []string{
+		"dictGet('flow_tag.gprocess_map', 'biz_type', (toUInt64(gprocess_id_0)))",
+		"dictGetOrDefault('flow_tag.int_enum_map', 'name_en', ('biz_type'",
+		"tag_name='biz_type'",
+		"`Enum(gprocess.biz_type_0)`",
+	}
+	for _, want := range checks {
+		if !strings.Contains(got, want) {
+			t.Fatalf("sql missing %q: %s", want, got)
+		}
+	}
+	if strings.Contains(got, "toUInt64(gprocess.biz_type_0)") {
+		t.Fatalf("sql should not use peer enum translator for gprocess.biz_type: %s", got)
+	}
+}
+
+func TestParseSQLKeepsBizTypeAsRawIntField(t *testing.T) {
+	if err := Load(); err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+
+	e := CHEngine{DB: "flow_log", Language: "en"}
+	e.Context = context.Background()
+	e.Init()
+
+	parser := parse.Parser{Engine: &e}
+	input := "select biz_type from l7_flow_log where biz_type=1 limit 10"
+	if err := parser.ParseSQL(input); err != nil {
+		t.Fatalf("parse sql failed: %v", err)
+	}
+
+	got := parser.Engine.ToSQLString()
+	want := "SELECT biz_type FROM flow_log.`l7_flow_log` WHERE biz_type = 1 LIMIT 10"
+	if got != want {
+		t.Fatalf("unexpected sql\n got: %s\nwant: %s", got, want)
+	}
+}
+
 /* func TestGetSqltest(t *testing.T) {
 	 for _, pcase := range parsetest {
 		 e := CHEngine{DB: "flow_log"}

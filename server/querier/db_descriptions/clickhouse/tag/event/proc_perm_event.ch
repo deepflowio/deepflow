@@ -7,6 +7,7 @@ end_time                  , end_time                    ,
 region                    , region                      ,
 pod                       , pod                         ,
 gprocess                  , gprocess                    ,
+gprocess.biz_type         , 进程业务类型                  ,
 ip                        , ip                          ,
 is_ipv4                   , is_ipv4                     ,
 
