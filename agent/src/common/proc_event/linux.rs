@@ -175,6 +175,11 @@ impl From<FileOpEventData> for metric::FileOpEventData {
 
 // ── PermOpEventData offsets (packed __ai_agent_perm_event) ──────────────
 // Layout: event_type(1) + pid(4) + old_uid(4) + old_gid(4) + new_uid(4) + new_gid(4) + timestamp(8)
+// Semantics:
+//   setuid   -> new_uid=uid,  new_gid=0
+//   setgid   -> new_uid=0,    new_gid=gid
+//   setreuid -> new_uid=ruid, new_gid=euid
+//   setregid -> new_uid=rgid, new_gid=egid
 const PERM_OP_SIZE: usize = 29;
 const PERM_OP_PID_OFF: usize = 1;
 const PERM_OP_OLD_UID_OFF: usize = 5;
