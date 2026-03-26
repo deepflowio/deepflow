@@ -28,6 +28,7 @@ auto_instance              , auto_instance             , auto_instance          
 auto_service_type          , auto_service_type         , auto_service_type         , int_enum      , auto_service_type    , Universal Tag     , 111           , 0
 auto_service               , auto_service              , auto_service              , resource      ,                      , Universal Tag     , 111           , 0
 gprocess                   , gprocess                  , gprocess                  , resource      ,                      , Universal Tag     , 111           , 0
+gprocess.biz_type          , gprocess.biz_type         , gprocess.biz_type         , int_enum      , biz_type             , Business Info     , 111           , 0
 host_ip                    , host_ip                   , host_ip                   , resource      ,                      , Universal Tag     , 111           , 0
 host_hostname              , host_hostname             , host_hostname             , resource      ,                      , Universal Tag     , 111           , 0
 chost_ip                   , chost_ip                  , chost_ip                  , resource      ,                      , Universal Tag     , 111           , 0
@@ -60,4 +61,4 @@ agent                      , agent                     , agent                  
 signal_source              , signal_source             , signal_source             , int_enum      , l7_signal_source     , Capture Info      , 111           , 0
 role                       , role                      , role                      , int_enum      , role                 , Capture Info      , 111           , 0
 
-biz_type                   , biz_type                  , biz_type                  , int_enum      , biz_type             , Business Info     , 111           , 0
+biz_type                   , biz_type                  , biz_type                  , int           ,                      , Business Info     , 111           , 0

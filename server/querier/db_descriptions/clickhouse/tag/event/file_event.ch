@@ -30,6 +30,7 @@ auto_instance              , 自动实例                   , IP 对应的实例
 auto_service_type          , 自动服务类型                , `auto_service`实例对应的类型。
 auto_service               , 自动服务                   , 在`auto_instance`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务，实例为IP时，auto_service_id显示为子网ID。
 gprocess                   , 进程                       ,
+gprocess.biz_type          , 进程业务类型                ,
 host_ip                    , 宿主机                     , 宿主机的管理 IP。
 host_hostname              , 宿主机                     , 宿主机的 Hostname。
 chost_ip                   , 云主机                     , 云主机的主 IP。
