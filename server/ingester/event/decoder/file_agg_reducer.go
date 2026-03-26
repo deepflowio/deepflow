@@ -1,16 +1,47 @@
 package decoder
 
 import (
+	"time"
+
 	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/ingester/event/dbwriter"
 )
 
+const fileAggIdleGap = int64(100 * time.Millisecond / time.Microsecond)
+
+type fileAggKey struct {
+	vtapID           uint16
+	rootPID          uint32
+	gprocessID       uint32
+	eventType        string
+	processKName     string
+	appInstance      string
+	fileDir          string
+	fileName         string
+	mountSource      string
+	mountPoint       string
+	fileType         uint8
+	accessPermission uint32
+	syscallThread    uint32
+	syscallCoroutine uint32
+}
+
+type fileAggFileKey struct {
+	vtapID   uint16
+	rootPID  uint32
+	fileDir  string
+	fileName string
+}
+
 type FileAggReducer struct {
-	pending *dbwriter.FileAggEventStore
+	pending map[fileAggKey]*dbwriter.FileAggEventStore
+	order   []fileAggKey
 }
 
 func NewFileAggReducer() *FileAggReducer {
-	return &FileAggReducer{}
+	return &FileAggReducer{
+		pending: make(map[fileAggKey]*dbwriter.FileAggEventStore),
+	}
 }
 
 func cloneRawFileEventToAgg(raw *dbwriter.EventStore) *dbwriter.FileAggEventStore {
@@ -25,58 +56,125 @@ func cloneRawFileEventToAgg(raw *dbwriter.EventStore) *dbwriter.FileAggEventStor
 	return agg
 }
 
-func sameFileAggKey(a, b *dbwriter.FileAggEventStore) bool {
-	if a == nil || b == nil {
-		return false
+func newFileAggKey(e *dbwriter.FileAggEventStore) fileAggKey {
+	return fileAggKey{
+		vtapID:           e.VTAPID,
+		rootPID:          e.RootPID,
+		gprocessID:       e.GProcessID,
+		eventType:        e.EventType,
+		processKName:     e.ProcessKName,
+		appInstance:      e.AppInstance,
+		fileDir:          e.FileDir,
+		fileName:         e.FileName,
+		mountSource:      e.MountSource,
+		mountPoint:       e.MountPoint,
+		fileType:         e.FileType,
+		accessPermission: e.AccessPermission,
+		syscallThread:    e.SyscallThread,
+		syscallCoroutine: e.SyscallCoroutine,
 	}
-	return a.VTAPID == b.VTAPID &&
-		a.RootPID == b.RootPID &&
-		a.GProcessID == b.GProcessID &&
-		a.EventType == b.EventType &&
-		a.ProcessKName == b.ProcessKName &&
-		a.AppInstance == b.AppInstance &&
-		a.FileDir == b.FileDir &&
-		a.FileName == b.FileName &&
-		a.MountSource == b.MountSource &&
-		a.MountPoint == b.MountPoint &&
-		a.FileType == b.FileType &&
-		a.AccessPermission == b.AccessPermission &&
-		a.SyscallThread == b.SyscallThread &&
-		a.SyscallCoroutine == b.SyscallCoroutine
 }
 
-func (r *FileAggReducer) Add(raw *dbwriter.EventStore) *dbwriter.FileAggEventStore {
+func newFileAggFileKey(vtapID uint16, rootPID uint32, fileDir, fileName string) fileAggFileKey {
+	return fileAggFileKey{
+		vtapID:   vtapID,
+		rootPID:  rootPID,
+		fileDir:  fileDir,
+		fileName: fileName,
+	}
+}
+
+func newFileAggFileKeyFromEvent(e *dbwriter.FileAggEventStore) fileAggFileKey {
+	return newFileAggFileKey(e.VTAPID, e.RootPID, e.FileDir, e.FileName)
+}
+
+func (r *FileAggReducer) removeOrderKey(target fileAggKey) {
+	if len(r.order) == 0 {
+		return
+	}
+	next := r.order[:0]
+	for _, key := range r.order {
+		if key == target {
+			continue
+		}
+		next = append(next, key)
+	}
+	r.order = next
+}
+
+func shouldSplitFileAggByIdleGap(current, next *dbwriter.FileAggEventStore) bool {
+	if current == nil || next == nil {
+		return false
+	}
+	if current.EndTime <= 0 || next.StartTime <= 0 || next.StartTime <= current.EndTime {
+		return false
+	}
+	return next.StartTime-current.EndTime > fileAggIdleGap
+}
+
+func (r *FileAggReducer) Add(raw *dbwriter.EventStore) []*dbwriter.FileAggEventStore {
 	next := cloneRawFileEventToAgg(raw)
 	if next == nil {
 		return nil
 	}
-	if r.pending == nil {
-		r.pending = next
-		return nil
-	}
-	if sameFileAggKey(r.pending, next) {
-		r.pending.EventCount++
-		r.pending.Bytes += next.Bytes
-		r.pending.Duration += next.Duration
-		if next.EndTime > r.pending.EndTime {
-			r.pending.EndTime = next.EndTime
+	key := newFileAggKey(next)
+	if current, ok := r.pending[key]; ok {
+		if shouldSplitFileAggByIdleGap(current, next) {
+			delete(r.pending, key)
+			r.removeOrderKey(key)
+			r.pending[key] = next
+			r.order = append(r.order, key)
+			return []*dbwriter.FileAggEventStore{current}
 		}
-		if next.Offset > r.pending.Offset {
-			r.pending.Offset = next.Offset
+		current.EventCount++
+		current.Bytes += next.Bytes
+		current.Duration += next.Duration
+		if next.EndTime > current.EndTime {
+			current.EndTime = next.EndTime
+		}
+		if next.Offset > current.Offset {
+			current.Offset = next.Offset
 		}
 		next.Release()
 		return nil
 	}
-	flushed := r.pending
-	r.pending = next
+	r.pending[key] = next
+	r.order = append(r.order, key)
+	return nil
+}
+
+func (r *FileAggReducer) FlushFile(vtapID uint16, rootPID uint32, fileDir, fileName string) []*dbwriter.FileAggEventStore {
+	if len(r.order) == 0 {
+		return nil
+	}
+	target := newFileAggFileKey(vtapID, rootPID, fileDir, fileName)
+	var flushed []*dbwriter.FileAggEventStore
+	for _, key := range r.order {
+		item, ok := r.pending[key]
+		if !ok {
+			continue
+		}
+		if newFileAggFileKeyFromEvent(item) != target {
+			continue
+		}
+		flushed = append(flushed, item)
+		delete(r.pending, key)
+		r.removeOrderKey(key)
+	}
 	return flushed
 }
 
-func (r *FileAggReducer) Flush() *dbwriter.FileAggEventStore {
-	if r.pending == nil {
+func (r *FileAggReducer) Flush() []*dbwriter.FileAggEventStore {
+	if len(r.order) == 0 {
 		return nil
 	}
-	flushed := r.pending
-	r.pending = nil
+	flushed := make([]*dbwriter.FileAggEventStore, 0, len(r.order))
+	for _, key := range r.order {
+		if item, ok := r.pending[key]; ok {
+			flushed = append(flushed, item)
+		}
+	}
+	r.pending = make(map[fileAggKey]*dbwriter.FileAggEventStore)
+	r.order = r.order[:0]
 	return flushed
 }
