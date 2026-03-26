@@ -395,19 +395,41 @@ func (d *Decoder) fileAggWriter() *dbwriter.EventWriter {
 	return nil
 }
 
+func splitFilePath(fullPath string) (string, string) {
+	if idx := strings.LastIndex(fullPath, "/"); idx >= 0 {
+		return fullPath[:idx+1], fullPath[idx+1:]
+	}
+	return "", fullPath
+}
+
+func (d *Decoder) emitFileAggItems(items []*dbwriter.FileAggEventStore) {
+	if len(items) == 0 {
+		return
+	}
+	if writer := d.fileAggWriter(); writer != nil {
+		for _, item := range items {
+			writer.WriteCKItem(item)
+		}
+		return
+	}
+	for _, item := range items {
+		item.Release()
+	}
+}
+
 func (d *Decoder) flushFileAggEvent() {
 	if d.fileAggReducer == nil {
 		return
 	}
-	flushed := d.fileAggReducer.Flush()
-	if flushed == nil {
+	d.emitFileAggItems(d.fileAggReducer.Flush())
+}
+
+func (d *Decoder) flushFileAggEventByFile(vtapId uint16, rootPID uint32, fullPath string) {
+	if d.fileAggReducer == nil || fullPath == "" {
 		return
 	}
-	if writer := d.fileAggWriter(); writer != nil {
-		writer.WriteCKItem(flushed)
-		return
-	}
-	flushed.Release()
+	fileDir, fileName := splitFilePath(fullPath)
+	d.emitFileAggItems(d.fileAggReducer.FlushFile(vtapId, rootPID, fileDir, fileName))
 }
 
 func (d *Decoder) writeRawFileEvent(vtapId uint16, e *pb.ProcEvent) {
@@ -435,14 +457,7 @@ func (d *Decoder) writeRawFileEvent(vtapId uint16, e *pb.ProcEvent) {
 	d.export(s)
 	d.rawFileWriter().Write(s)
 	if d.fileAggReducer != nil {
-		flushed := d.fileAggReducer.Add(s)
-		if flushed != nil {
-			if writer := d.fileAggWriter(); writer != nil {
-				writer.WriteCKItem(flushed)
-			} else {
-				flushed.Release()
-			}
-		}
+		d.emitFileAggItems(d.fileAggReducer.Add(s))
 	}
 }
 
@@ -458,12 +473,7 @@ func (d *Decoder) writeFileMgmtEvent(vtapId uint16, e *pb.ProcEvent) {
 	s.EventType = strings.ToLower(opStr)
 	s.ProcessKName = string(e.ProcessKname)
 	fullPath := string(data.Filename)
-	if idx := strings.LastIndex(fullPath, "/"); idx >= 0 {
-		s.FileDir = fullPath[:idx+1]
-		s.FileName = fullPath[idx+1:]
-	} else {
-		s.FileName = fullPath
-	}
+	s.FileDir, s.FileName = splitFilePath(fullPath)
 	s.TargetUID, s.TargetGID, s.TargetMode = extractFileMgmtTargets(data)
 	if data.OpType == pb.FileOpType_FileOpChmod {
 		s.AccessPermission = data.Mode
@@ -539,13 +549,13 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 			d.writeRawFileEvent(vtapId, e)
 		}
 	case common.FILE_MGMT_EVENT:
-		d.flushFileAggEvent()
+		if e.FileOpEventData != nil {
+			d.flushFileAggEventByFile(vtapId, e.AiAgentRootPid, string(e.FileOpEventData.Filename))
+		}
 		d.writeFileMgmtEvent(vtapId, e)
 	case common.PROC_PERM_EVENT:
-		d.flushFileAggEvent()
 		d.writeProcPermEvent(vtapId, e)
 	case common.PROC_OPS_EVENT:
-		d.flushFileAggEvent()
 		d.writeProcOpsEvent(vtapId, e)
 	}
 }
