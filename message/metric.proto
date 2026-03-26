@@ -299,6 +299,11 @@ message PermOpEventData {
     uint32 pid = 2;
     uint32 old_uid = 3;
     uint32 old_gid = 4;
+    // Event-specific target arguments:
+    //   setuid   : new_uid = uid,  new_gid = 0
+    //   setgid   : new_uid = 0,    new_gid = gid
+    //   setreuid : new_uid = ruid, new_gid = euid
+    //   setregid : new_uid = rgid, new_gid = egid
     uint32 new_uid = 5;
     uint32 new_gid = 6;
     uint64 timestamp = 7;
