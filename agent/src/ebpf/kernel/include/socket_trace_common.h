@@ -23,6 +23,11 @@
 #define DF_BPF_SOCKET_TRACE_COMMON_H
 #define CAP_DATA_SIZE 1024	// For no-brust send buffer
 #define BURST_DATA_BUF_SIZE  16384	// For brust send buffer
+/*
+ * "Unlimited" here only means "do not stop at the AI-agent logical payload
+ * limit". The actual bytes that can be pushed in one event are still bounded
+ * by the fixed transport buffer size (BURST_DATA_BUF_SIZE).
+ */
 #define AI_AGENT_DATA_LIMIT_MAX_UNLIMITED 0x7fffffff
 
 #include "../config.h"
@@ -129,7 +134,12 @@ struct __socket_data {
 	__u32 fd;
 	__u16 data_type;	// HTTP, DNS, MySQL ...
 	__u16 data_len;		// 数据长度
-	__u32 reasm_bytes;	// 重组后的累计字节数
+	/*
+	 * Reassembly-accounted bytes tracked by the tracer for this socket.
+	 * This is capped by the current data_max_sz window rather than the
+	 * unbounded raw syscall length.
+	 */
+	__u32 reasm_bytes;
 	__u8 socket_role;	// this message is created by: 0:unkonwn 1:client(connect) 2:server(accept)
 	char data[BURST_DATA_BUF_SIZE];
 } __attribute__ ((packed));

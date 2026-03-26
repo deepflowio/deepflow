@@ -1628,6 +1628,10 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		 * Below, confirm the actual size of the data to be transmitted after
 		 * enabling data reassembly. The data transmission size is limited by
 		 * the maximum transmission configuration value.
+		 *
+		 * socket_info_ptr->reasm_bytes records the cumulative bytes accepted
+		 * into the current reassembly budget, not the raw unbounded syscall
+		 * length seen from user space.
 		 */
 		if (sk_info->allow_reassembly
 		    && socket_info_ptr->reasm_bytes < data_max_sz) {
