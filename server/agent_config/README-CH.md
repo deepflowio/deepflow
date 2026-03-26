@@ -5893,7 +5893,7 @@ inputs:
 **详细描述**:
 
 开关开启后，deepflow-agent 将开启外部数据的接收服务接口，以集成来自 Prometheus、
-Telegraf、OpenTelemetry 和 Skywalking 的数据。
+Telegraf、OpenTelemetry 和 Skywalking、Vector 的数据。
 
 ### 监听端口 {#inputs.integration.listen_port}
 
@@ -6278,10 +6278,15 @@ sources:
     scrape_interval_secs: 10
     namespace: node
 transforms:
+  host_process_filter:
+    type: filter
+    condition: '!starts_with(string!(.name), "process_")'
+    inputs:
+    - host_metrics
   host_metrics_relabel:
     type: remap
     inputs:
-    - host_metrics
+    - host_process_filter
     source: |
       .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
       host_name, _ = get_env_var("K8S_NODE_NAME_FOR_DEEPFLOW")

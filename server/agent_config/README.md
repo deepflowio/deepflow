@@ -6047,7 +6047,7 @@ inputs:
 **Description**:
 
 Whether to enable receiving external data sources such as Prometheus,
-Telegraf, OpenTelemetry, and SkyWalking.
+Telegraf, OpenTelemetry, SkyWalking and Vector.
 
 ### Listen Port {#inputs.integration.listen_port}
 
@@ -6435,10 +6435,15 @@ sources:
     scrape_interval_secs: 10
     namespace: node
 transforms:
+  host_process_filter:
+    type: filter
+    condition: '!starts_with(string!(.name), "process_")'
+    inputs:
+    - host_metrics
   host_metrics_relabel:
     type: remap
     inputs:
-    - host_metrics
+    - host_process_filter
     source: |
       .tags.instance = "${K8S_NODE_IP_FOR_DEEPFLOW}"
       host_name, _ = get_env_var("K8S_NODE_NAME_FOR_DEEPFLOW")
