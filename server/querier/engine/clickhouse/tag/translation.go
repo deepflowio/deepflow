@@ -2049,7 +2049,6 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			"",
 			"toUInt64(state) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
 			"toUInt64(state) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
-			"state",
 		),
 	}
 
