@@ -28,6 +28,7 @@ auto_instance              , auto_instance_0           , auto_instance_1        
 auto_service_type          , auto_service_type_0       , auto_service_type_1       , int_enum      , auto_service_type      , Universal Tag   , 111           , 0
 auto_service               , auto_service_0            , auto_service_1            , resource      ,                        , Universal Tag   , 111           , 0
 gprocess                   , gprocess_0                , gprocess_1                , resource      ,                        , Universal Tag   , 111           , 0
+gprocess.biz_type          , gprocess.biz_type_0       , gprocess.biz_type_1       , int_enum      , biz_type               , Business Info   , 111           , 0
 tap_port_host              , tap_port_host             , tap_port_host             , resource      ,                        , Universal Tag   , 111           , 1
 tap_port_chost             , tap_port_chost            , tap_port_chost            , resource      ,                        , Universal Tag   , 111           , 1
 tap_port_pod_node          , tap_port_pod_node         , tap_port_pod_node         , resource      ,                        , Universal Tag   , 111           , 1
@@ -77,4 +78,4 @@ tap_side                   , tap_side                  , tap_side               
 observation_point          , observation_point         , observation_point         , string_enum   , observation_point      , Capture Info    , 111           , 0
 signal_source              , signal_source             , signal_source             , int_enum      , l7_signal_source       , Capture Info    , 111           , 0
 
-biz_type                   , biz_type                  , biz_type                  , int_enum      , biz_type               , Business Info   , 111           , 0
+biz_type                   , biz_type                  , biz_type                  , int           ,                        , Business Info   , 111           , 0

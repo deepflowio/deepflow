@@ -63,7 +63,7 @@ var HOSTNAME_IP_DEVICE_MAP = map[string]struct {
 var INT_ENUM_TAG = []string{
 	"close_type", "eth_type", "signal_source", "is_ipv4", "l7_ip_protocol", "type", "l7_protocol",
 	"protocol", "response_status", "server_port", "status", "capture_nic_type", "tunnel_tier",
-	"tunnel_type", "instance_type", "nat_source", "role", "event_level", "policy_level", "biz_type",
+	"tunnel_type", "instance_type", "nat_source", "role", "event_level", "policy_level",
 	"policy_app_type", "is_tls", "is_async", "is_reversed", "severity_number", "file_type", "state",
 }
 var INT_ENUM_PEER_TAG = []string{"tcp_flags_bit", "auto_instance_type", "auto_service_type"}

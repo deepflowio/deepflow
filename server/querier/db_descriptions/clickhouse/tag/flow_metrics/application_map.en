@@ -28,6 +28,7 @@ auto_instance              , Auto Instance Tag             , The instance of IP,
 auto_service_type          , Auto Service Type             , The type of 'auto_service'.
 auto_service               , Auto Service Tag              , On the basis of 'auto_instance', aggregate K8s service ClusterIP and workload into service, when the instance is an IP, auto_service_id displayed as a subnet ID.
 gprocess                   , Process                       ,
+gprocess.biz_type          , Process Business Type         ,
 tap_port_host              , Tap Port Host                 ,
 tap_port_chost             , Tap Port Cloud Host           ,
 tap_port_pod_node          , Tap Port K8s Node             ,
