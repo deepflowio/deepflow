@@ -522,41 +522,39 @@ func (i *Issu) updateTablesForByConity() {
 // and global tables so they are recreated on startup with the correct engine.
 // This handles the migration from the old MergeTree-based alert_event table to
 // the new ReplacingMergeTree(update_time) table.
-func (i *Issu) RunDropAlertEventTableIfNotReplacingMergeTree() {
-	const db = "event"
+func (i *Issu) RunDropAlertEventTableIfNotReplacingMergeTree(connect *sql.DB, orgPrefix string) {
+	db := orgPrefix + "event"
 	const localTable = "alert_event_local"
 	const globalTable = "alert_event"
 
-	for _, connect := range i.Connections {
-		sql := fmt.Sprintf(
-			"SELECT engine FROM system.tables WHERE database='%s' AND name='%s'",
-			db, localTable)
-		rows, err := Query(connect, sql)
-		if err != nil {
-			log.Warningf("query alert_event engine failed: %s", err)
-			continue
+	sql := fmt.Sprintf(
+		"SELECT engine FROM system.tables WHERE database='%s' AND name='%s'",
+		db, localTable)
+	rows, err := Query(connect, sql)
+	if err != nil {
+		log.Warningf("query alert_event engine failed: %s", err)
+		return
+	}
+	var engine string
+	for rows.Next() {
+		if e := rows.Scan(&engine); e != nil {
+			log.Warningf("scan alert_event engine failed: %s", e)
 		}
-		var engine string
-		for rows.Next() {
-			if e := rows.Scan(&engine); e != nil {
-				log.Warningf("scan alert_event engine failed: %s", e)
-			}
-		}
-		if engine == "" {
-			// table does not exist yet – nothing to drop
-			continue
-		}
-		if strings.Contains(engine, "ReplacingMergeTree") {
-			log.Infof("alert_event table already uses ReplacingMergeTree, skipping drop")
-			continue
-		}
-		log.Infof("alert_event table engine is %q (not ReplacingMergeTree), dropping tables to trigger recreation", engine)
-		for _, tbl := range []string{localTable, globalTable} {
-			dropSQL := fmt.Sprintf("DROP TABLE IF EXISTS %s.`%s`", db, tbl)
-			log.Info(dropSQL)
-			if _, e := Exec(connect, dropSQL); e != nil {
-				log.Warningf("drop alert_event table %s failed: %s", tbl, e)
-			}
+	}
+	if engine == "" {
+		// table does not exist yet – nothing to drop
+		return
+	}
+	if strings.Contains(engine, "ReplacingMergeTree") {
+		log.Infof("alert_event table already uses ReplacingMergeTree, skipping drop")
+		return
+	}
+	log.Infof("alert_event table engine is %q (not ReplacingMergeTree), dropping tables to trigger recreation", engine)
+	for _, tbl := range []string{localTable, globalTable} {
+		dropSQL := fmt.Sprintf("DROP TABLE IF EXISTS %s.`%s`", db, tbl)
+		log.Info(dropSQL)
+		if _, e := Exec(connect, dropSQL); e != nil {
+			log.Warningf("drop alert_event table %s failed: %s", tbl, e)
 		}
 	}
 }
@@ -1428,6 +1426,11 @@ func (i *Issu) Start() error {
 		orgIDPrefixs[index], err = i.getOrgIDPrefixsWithoutDefault(connect)
 		if err != nil {
 			return fmt.Errorf("get orgIDs failed, err: %s", err)
+		}
+
+		i.RunDropAlertEventTableIfNotReplacingMergeTree(connect, "")
+		for _, prefix := range orgIDPrefixs[index] {
+			i.RunDropAlertEventTableIfNotReplacingMergeTree(connect, prefix)
 		}
 	}
 
