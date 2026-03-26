@@ -4908,10 +4908,10 @@ inputs:
     # description:
     #   en: |-
     #     Whether to enable receiving external data sources such as Prometheus,
-    #     Telegraf, OpenTelemetry, and SkyWalking.
+    #     Telegraf, OpenTelemetry, SkyWalking and Vector.
     #   ch: |-
     #     开关开启后，deepflow-agent 将开启外部数据的接收服务接口，以集成来自 Prometheus、
-    #     Telegraf、OpenTelemetry 和 Skywalking 的数据。
+    #     Telegraf、OpenTelemetry 和 Skywalking、Vector 的数据。
     # upgrade_from: external_agent_http_proxy_enabled
     enabled: true
     # type: int
