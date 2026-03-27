@@ -520,9 +520,10 @@ func (v *VTapInfo) GetVTapConfigByNameOrShortUUID(nameOrShortUUID string) *VTapC
 	if v == nil {
 		return nil
 	}
+
 	lcuuid, ok := v.vtapGroupNameOrShortIDToLcuuid[nameOrShortUUID]
-	if !ok {
-		return nil
+	if !ok || lcuuid == "" {
+		lcuuid = v.getDefaultVTapGroup()
 	}
 
 	return v.vtapGroupLcuuidToConfiguration[lcuuid]
