@@ -144,13 +144,14 @@ func (e *AlertEventStore) WriteBlock(block *ckdb.Block) {
 		e.TagStrValues,
 		e.TagIntKeys,
 		e.TagIntValues,
-		e.XTargetUid,
-		e.XQueryRegion,
 
 		e.TriggerThreshold,
 		e.MetricUnit,
 		e.CustomTagKeys,
 		e.CustomTagValues,
+
+		e.XTargetUid,
+		e.XQueryRegion,
 
 		e.TeamID,
 		e.UserId,
