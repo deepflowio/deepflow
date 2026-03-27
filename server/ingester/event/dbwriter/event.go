@@ -35,10 +35,11 @@ import (
 )
 
 const (
-	DefaultPartition          = ckdb.TimeFuncTwelveHour
-	DefaultFileEventPartition = ckdb.TimeFuncHour
-	IO_EVENT_TYPE_READ        = "read"
-	IO_EVENT_TYPE_WRITE       = "write"
+	DefaultPartition           = ckdb.TimeFuncTwelveHour
+	DefaultAlertEventPartition = ckdb.TimeFuncDay
+	DefaultFileEventPartition  = ckdb.TimeFuncHour
+	IO_EVENT_TYPE_READ         = "read"
+	IO_EVENT_TYPE_WRITE        = "write"
 )
 
 type SignalSource uint8

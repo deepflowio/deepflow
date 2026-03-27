@@ -174,6 +174,7 @@ type Table struct {
 	Columns         []*Column    // 表列结构
 	TimeKey         string       // 时间字段名，用来设置partition和ttl
 	SummingKey      string       // When using SummingMergeEngine, this field is used for Summing aggregation
+	ReplacingKey    string       // When using ReplacingMergeTree, this field is used as the version column (defaults to TimeKey if empty)
 	TTL             int          // 数据默认保留时长。 单位:小时
 	ColdStorage     ColdStorage  // 冷存储配置
 	PartitionFunc   TimeFuncType // partition函数作用于Time,
@@ -231,7 +232,11 @@ func (t *Table) makeLocalTableCreateSQL(database string) string {
 	if t.Engine == ReplicatedMergeTree || t.Engine == ReplicatedAggregatingMergeTree {
 		engine = fmt.Sprintf(t.Engine.String(), t.Database, t.LocalName)
 	} else if t.Engine == ReplacingMergeTree || t.Engine == CnchReplacingMergeTree {
-		engine = fmt.Sprintf(t.Engine.String(), t.TimeKey)
+		replacingKey := t.ReplacingKey
+		if replacingKey == "" {
+			replacingKey = t.TimeKey
+		}
+		engine = fmt.Sprintf(t.Engine.String(), replacingKey)
 	} else if t.Engine == SummingMergeTree || t.Engine == CnchSummingMergeTree {
 		engine = fmt.Sprintf(t.Engine.String(), t.SummingKey)
 	}

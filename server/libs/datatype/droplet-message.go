@@ -51,12 +51,13 @@ const (
 	MESSAGE_TYPE_RAW_PCAP
 	MESSAGE_TYPE_PROFILE
 	MESSAGE_TYPE_PROC_EVENT
-	MESSAGE_TYPE_ALERT_EVENT
+	MESSAGE_TYPE_ALERT_RECORD
 	MESSAGE_TYPE_K8S_EVENT
 	MESSAGE_TYPE_APPLICATION_LOG
 	MESSAGE_TYPE_AGENT_LOG
 	MESSAGE_TYPE_SKYWALKING
 	MESSAGE_TYPE_DATADOG // 20
+	MESSAGE_TYPE_ALERT_EVENT
 	MESSAGE_TYPE_MAX
 )
 
@@ -78,12 +79,13 @@ var MessageTypeString = [MESSAGE_TYPE_MAX]string{
 	MESSAGE_TYPE_RAW_PCAP:                 "raw_pcap",
 	MESSAGE_TYPE_PROFILE:                  "profile",
 	MESSAGE_TYPE_PROC_EVENT:               "proc_event",
-	MESSAGE_TYPE_ALERT_EVENT:              "alert_event",
+	MESSAGE_TYPE_ALERT_RECORD:             "alert_record",
 	MESSAGE_TYPE_K8S_EVENT:                "k8s_event",
 	MESSAGE_TYPE_APPLICATION_LOG:          "application_log",
 	MESSAGE_TYPE_AGENT_LOG:                "agent_log",
 	MESSAGE_TYPE_SKYWALKING:               "skywalking",
 	MESSAGE_TYPE_DATADOG:                  "datadog",
+	MESSAGE_TYPE_ALERT_EVENT:              "alert_event",
 }
 
 func (m MessageType) String() string {
@@ -123,12 +125,13 @@ var MessageHeaderTypes = [MESSAGE_TYPE_MAX]MessageHeaderType{
 	MESSAGE_TYPE_RAW_PCAP:                 HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_PROFILE:                  HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_PROC_EVENT:               HEADER_TYPE_LT_VTAP,
-	MESSAGE_TYPE_ALERT_EVENT:              HEADER_TYPE_LT_VTAP,
+	MESSAGE_TYPE_ALERT_RECORD:             HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_K8S_EVENT:                HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_APPLICATION_LOG:          HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_AGENT_LOG:                HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_SKYWALKING:               HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_DATADOG:                  HEADER_TYPE_LT_VTAP,
+	MESSAGE_TYPE_ALERT_EVENT:              HEADER_TYPE_LT_VTAP,
 }
 
 func (m MessageType) HeaderType() MessageHeaderType {

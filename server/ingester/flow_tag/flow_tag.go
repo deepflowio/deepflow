@@ -50,6 +50,7 @@ type FieldType uint8
 const (
 	FieldTag FieldType = iota
 	FieldMetrics
+	FieldCustomTag
 )
 
 func (t FieldType) String() string {
@@ -58,6 +59,8 @@ func (t FieldType) String() string {
 		return "tag"
 	case FieldMetrics:
 		return "metrics"
+	case FieldCustomTag:
+		return "custom_tag"
 	default:
 		return "invalid field type"
 	}

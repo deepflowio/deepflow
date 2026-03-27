@@ -77,7 +77,7 @@ var DatasourceModifiedOnlyIDMap = map[DatasourceModifiedOnly]DatasourceInfo{
 	PROMETHEUS:         {int(flow_metrics.METRICS_TABLE_ID_MAX) + 7, "prometheus", []string{"samples"}, []string{"prometheus_custom_field", "prometheus_custom_field_value"}},
 	EVENT_EVENT:        {int(flow_metrics.METRICS_TABLE_ID_MAX) + 8, "event", []string{"event"}, []string{}},
 	EVENT_FILE_EVENT:   {int(flow_metrics.METRICS_TABLE_ID_MAX) + 9, "event", []string{"file_event"}, []string{}},
-	EVENT_ALERT_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alert_event"}, []string{}},
+	EVENT_ALERT_EVENT:  {int(flow_metrics.METRICS_TABLE_ID_MAX) + 10, "event", []string{"alert_event", "alert_record"}, []string{}},
 	PROFILE:            {int(flow_metrics.METRICS_TABLE_ID_MAX) + 11, "profile", []string{"in_process"}, []string{}},
 	APPLOG:             {int(flow_metrics.METRICS_TABLE_ID_MAX) + 12, "application_log", []string{"log"}, []string{}},
 	DEEPFLOW_TENANT:    {int(flow_metrics.METRICS_TABLE_ID_MAX) + 13, "deepflow_tenant", []string{"deepflow_collector"}, []string{}},
