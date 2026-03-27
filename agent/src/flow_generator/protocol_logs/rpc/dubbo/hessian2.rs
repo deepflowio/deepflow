@@ -59,6 +59,11 @@ fn lookup_str(payload: &[u8], trace_type: &TraceType) -> Option<String> {
         {
             return Some(context);
         }
+        if let (Some(context), _) =
+            Hessian2Decoder::decode_list_first_string(payload, start + index + tag.len())
+        {
+            return Some(context);
+        }
         start += index + tag.len();
     }
     return None;
@@ -196,6 +201,30 @@ fn apply_custom_field_policies(
             info,
             cf_ctx.direction.into(),
             Source::Payload(PayloadType::HESSIAN2, payload),
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::flow_generator::protocol_logs::rpc::dubbo::TraceType;
+    use crate::flow_generator::protocol_logs::DubboInfo;
+
+    #[test]
+    fn decode_trace_id() {
+        let payload = [
+            0x74, 0x00, 0x07, 0x78, 0x2d, 0x67, 0x2d, 0x72, 0x69, 0x64, 0x74, 0x00, 0x28, 0x33,
+            0x38, 0x62, 0x61, 0x66, 0x65, 0x36, 0x36, 0x38, 0x63, 0x32, 0x62, 0x65, 0x64, 0x62,
+            0x36, 0x64, 0x33, 0x64, 0x32, 0x62, 0x35, 0x30, 0x66, 0x63, 0x66, 0x31, 0x37, 0x61,
+            0x37, 0x33, 0x34, 0x35, 0x32, 0x31, 0x30, 0x62, 0x66, 0x31, 0x34, 0x00, 0x00,
+        ];
+        let trace_type = TraceType::Customize("x-g-rid".to_string());
+        let mut info = DubboInfo::default();
+        super::decode_trace_ids(&payload, &trace_type, &mut info);
+        assert_eq!(info.trace_ids.to_strings().len(), 1);
+        assert_eq!(
+            info.trace_ids.to_strings()[0],
+            "38bafe668c2bedb6d3d2b50fcf17a7345210bf14"
         );
     }
 }
