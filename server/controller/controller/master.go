@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service"
 	resoureservice "github.com/deepflowio/deepflow/server/controller/http/service/resource"
 	"github.com/deepflowio/deepflow/server/controller/monitor"
+	"github.com/deepflowio/deepflow/server/controller/monitor/bill"
 	"github.com/deepflowio/deepflow/server/controller/monitor/license"
 	"github.com/deepflowio/deepflow/server/controller/monitor/vtap"
 	"github.com/deepflowio/deepflow/server/controller/prometheus"
@@ -96,6 +97,7 @@ func checkAndStartMasterFunctions(
 	vtapCheck := vtap.NewVTapCheck(cfg.MonitorCfg, ctx)
 	vtapRebalanceCheck := vtap.NewRebalanceCheck(cfg.MonitorCfg, ctx)
 	vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg, ctx)
+	billCheck := bill.NewBillCheck(cfg.BillingMethod, cfg.MonitorCfg, ctx)
 	recorderResource := recorder.GetResource()
 	domainChecker := resoureservice.NewDomainCheck(ctx)
 	prometheus := prometheus.GetSingleton()
@@ -150,6 +152,9 @@ func checkAndStartMasterFunctions(
 				if cfg.BillingMethod == common.BILLING_METHOD_LICENSE {
 					vtapLicenseAllocation.Start(sCtx)
 				}
+
+				// bill check
+				billCheck.Start(sCtx)
 
 				// 资源数据清理
 				recorderResource.Cleaners.Start(sCtx)
