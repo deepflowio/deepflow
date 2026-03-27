@@ -288,9 +288,9 @@ static inline void config_probes_for_ai_agent(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setgid");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setreuid");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setregid");
+	/* fork propagation is AI-agent-specific; exec/exit are already covered by
+	 * config_probes_for_proc_event(). */
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_fork");
-	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
-	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
 }
 #else
 static inline void config_probes_for_ai_agent(struct tracer_probes_conf *tps)
