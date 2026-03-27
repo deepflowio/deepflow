@@ -2473,7 +2473,8 @@ CREATE TABLE IF NOT EXISTS alarm_event (
     end_value               TEXT,
     value_unit              CHAR(64),
     endpoint_results        TEXT,
-    lcuuid                  CHAR(64)
+    lcuuid                  CHAR(64),
+    updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE alarm_event;
 
