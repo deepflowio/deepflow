@@ -24,7 +24,8 @@ use std::{
     process,
     sync::{
         atomic::{AtomicBool, Ordering::Relaxed},
-        Arc, Mutex, RwLock,
+        mpsc::{self, Receiver, Sender, TryRecvError},
+        Arc, Mutex, OnceLock, RwLock,
     },
     thread::{self, JoinHandle},
     time::Duration,
@@ -32,10 +33,36 @@ use std::{
 
 use log::{debug, error, info, trace};
 use nix::sys::utsname::uname;
-use procfs::process::all_processes_with_root;
+use procfs::process::{all_processes_with_root, Process};
 
 use crate::config::ProcessMatcher;
+use crate::ebpf;
 use crate::platform::{get_os_app_tag_by_exec, ProcessData, ProcessDataOp};
+
+// Global sender for process exec/exit events from the eBPF C callback.
+// The C callback (running on the sk-reader thread) sends (pid, event_type)
+// tuples through this channel. The ProcessListener drains them in its loop.
+static PROCESS_EVENT_SENDER: OnceLock<Mutex<Sender<(u32, u32)>>> = OnceLock::new();
+
+/// Callback invoked from the C eBPF layer on process exec/exit events.
+/// This runs on the sk-reader C thread, so it must be non-blocking.
+/// The function pointer signature matches `void (*fn)(void *)` in the C API;
+/// the Rust FFI declaration in mod.rs declares it as
+/// `extern "C" fn(data: *mut PROCESS_EVENT)`.
+pub extern "C" fn process_event_callback(data: *mut ebpf::PROCESS_EVENT) {
+    if data.is_null() {
+        return;
+    }
+    let (pid, event_type) = unsafe { ((*data).pid, (*data).event_type) };
+
+    if let Some(sender) = PROCESS_EVENT_SENDER.get() {
+        if let Ok(sender) = sender.lock() {
+            // Non-blocking send: if the channel is disconnected, we silently
+            // drop the event. The 10-second full scan will catch it.
+            let _ = sender.send((pid, event_type));
+        }
+    }
+}
 
 //返回当前进程占用内存RSS单位（字节）
 pub fn get_memory_rss() -> Result<u64> {
@@ -304,6 +331,9 @@ pub struct ProcessListener {
     config: Arc<RwLock<Config>>,
 
     thread_handle: Mutex<Option<JoinHandle<()>>>,
+    // Receiver end of the channel for eBPF process exec/exit events.
+    // Created in new(), the sender is stored in the global PROCESS_EVENT_SENDER.
+    event_receiver: Arc<Mutex<Receiver<(u32, u32)>>>,
 }
 
 impl ProcessListener {
@@ -316,11 +346,17 @@ impl ProcessListener {
         user: String,
         command: Vec<String>,
     ) -> Self {
+        // Create a channel for eBPF process events.
+        // The sender is stored in a global static so the C callback can reach it.
+        let (tx, rx) = mpsc::channel();
+        let _ = PROCESS_EVENT_SENDER.set(Mutex::new(tx));
+
         let listener = Self {
             features: Default::default(),
             running: Arc::new(AtomicBool::new(false)),
             thread_handle: Mutex::new(None),
             config: Arc::new(RwLock::new(Config::new(proc_root, user, command))),
+            event_receiver: Arc::new(Mutex::new(rx)),
         };
 
         listener.set(process_blacklist, process_matcher);
@@ -516,14 +552,167 @@ impl ProcessListener {
         }
     }
 
+    /// Handle a single PID event (exec or exit) from the eBPF layer.
+    ///
+    /// For EXEC events: reads /proc/<pid> to build ProcessData, matches against
+    /// each feature's process_matcher list, and if a feature matches and the PID
+    /// is not already in its list, adds it and invokes the callback.
+    ///
+    /// For EXIT events: removes the PID from all feature lists and invokes
+    /// callbacks for any feature whose PID list changed.
+    fn process_single_pid(
+        pid: u32,
+        event_type: u32,
+        process_data_cache: &mut HashMap<i32, ProcessData>,
+        features: &mut Features,
+        user: &str,
+        command: &[String],
+    ) {
+        let (blacklist, features) = (&mut features.blacklist, &mut features.features);
+        if features.is_empty() {
+            return;
+        }
+
+        if event_type & ebpf::EVENT_TYPE_PROC_EXEC != 0 {
+            // EXEC event: read process info from /proc and match against features
+            let proc_pid = pid as i32;
+            let process = match Process::new(proc_pid) {
+                Ok(p) => p,
+                Err(e) => {
+                    debug!("process_single_pid: failed to read /proc/{}: {}", pid, e);
+                    return;
+                }
+            };
+
+            // Check blacklist
+            match process.status().map(|s| s.name) {
+                Ok(name) if blacklist.binary_search(&name).is_ok() => {
+                    trace!("process_single_pid: process {name} (pid#{pid}) in blacklist, skipping");
+                    return;
+                }
+                Ok(_) => (),
+                Err(e) => {
+                    debug!(
+                        "process_single_pid: failed to get status for pid {}: {}",
+                        pid, e
+                    );
+                    return;
+                }
+            }
+
+            // Build ProcessData for this PID
+            let pdata = match ProcessData::try_from(&process) {
+                Ok(d) => d,
+                Err(e) => {
+                    debug!(
+                        "process_single_pid: failed to build ProcessData for pid {}: {}",
+                        pid, e
+                    );
+                    return;
+                }
+            };
+            process_data_cache.insert(proc_pid, pdata);
+
+            // Get tags (may be empty if command is not configured)
+            let tags_map = match get_os_app_tag_by_exec(user, command) {
+                Ok(tags) => tags,
+                Err(_) => HashMap::new(),
+            };
+
+            // Match the new PID against each feature
+            for (key, node) in features.iter_mut() {
+                if node.process_matcher.is_empty() || node.callback.is_none() {
+                    continue;
+                }
+
+                let pdata = match process_data_cache.get(&proc_pid) {
+                    Some(d) => d,
+                    None => continue,
+                };
+
+                let mut matched = false;
+                let mut is_ignored = false;
+                let mut matched_process_data = None;
+
+                for matcher in &node.process_matcher {
+                    if let Some(process_data) = matcher.get_process_data(pdata, &tags_map) {
+                        if matcher.ignore {
+                            is_ignored = true;
+                            break;
+                        }
+                        matched = true;
+                        matched_process_data = Some(process_data);
+                        break;
+                    }
+                }
+
+                if is_ignored || !matched {
+                    continue;
+                }
+
+                let pid_u32 = pid;
+                // Check if PID is already in the list (binary search since list is sorted)
+                if node.pids.binary_search(&pid_u32).is_ok() {
+                    continue;
+                }
+
+                // Add PID and re-sort
+                node.pids.push(pid_u32);
+                node.pids.sort();
+                node.pids.dedup();
+
+                if let Some(pd) = matched_process_data {
+                    node.process_datas.push(pd);
+                    node.process_datas.sort_by_key(|x| x.pid);
+                    node.process_datas.merge_and_dedup();
+                }
+
+                debug!(
+                    "process_single_pid: Feature {} added pid {}, total {} pids.",
+                    key,
+                    pid,
+                    node.pids.len()
+                );
+                node.callback.as_ref().unwrap()(&node.pids, &node.process_datas);
+            }
+        } else if event_type & ebpf::EVENT_TYPE_PROC_EXIT != 0 {
+            // EXIT event: remove PID from all feature lists
+            let pid_u32 = pid;
+            let proc_pid = pid as i32;
+
+            // Remove from process_data_cache
+            process_data_cache.remove(&proc_pid);
+
+            for (key, node) in features.iter_mut() {
+                if node.callback.is_none() {
+                    continue;
+                }
+
+                if let Ok(idx) = node.pids.binary_search(&pid_u32) {
+                    node.pids.remove(idx);
+                    node.process_datas.retain(|pd| pd.pid != pid as u64);
+
+                    debug!(
+                        "process_single_pid: Feature {} removed pid {}, remaining {} pids.",
+                        key,
+                        pid,
+                        node.pids.len()
+                    );
+                    node.callback.as_ref().unwrap()(&node.pids, &node.process_datas);
+                }
+            }
+        }
+    }
+
     pub fn start(&self) {
         if self.running.swap(true, Relaxed) {
             return;
         }
-        info!("Startting process listener ...");
+        info!("Starting process listener ...");
         let features = self.features.clone();
         let running = self.running.clone();
         let config = self.config.clone();
+        let event_receiver = self.event_receiver.clone();
 
         running.store(true, Relaxed);
         *self.thread_handle.lock().unwrap() = Some(
@@ -534,6 +723,47 @@ impl ProcessListener {
                     let mut process_data = HashMap::new();
                     while running.load(Relaxed) {
                         thread::sleep(Duration::from_secs(1));
+
+                        // Drain all pending eBPF process events (non-blocking).
+                        // Each event triggers an incremental PID update.
+                        if let Ok(receiver) = event_receiver.lock() {
+                            let mut event_count = 0u32;
+                            loop {
+                                match receiver.try_recv() {
+                                    Ok((pid, event_type)) => {
+                                        let current_config = config.read().unwrap();
+                                        let mut features = features.write().unwrap();
+                                        Self::process_single_pid(
+                                            pid,
+                                            event_type,
+                                            &mut process_data,
+                                            &mut features,
+                                            &current_config.user,
+                                            &current_config.command,
+                                        );
+                                        drop(features);
+                                        drop(current_config);
+                                        event_count += 1;
+                                    }
+                                    Err(TryRecvError::Empty) => break,
+                                    Err(TryRecvError::Disconnected) => {
+                                        debug!(
+                                            "process event channel disconnected, \
+                                             falling back to polling only"
+                                        );
+                                        break;
+                                    }
+                                }
+                            }
+                            if event_count > 0 {
+                                debug!(
+                                    "process listener drained {} eBPF events in this cycle",
+                                    event_count
+                                );
+                            }
+                        }
+
+                        // Full /proc scan every INTERVAL seconds as fallback
                         count += 1;
                         if count < Self::INTERVAL {
                             continue;
