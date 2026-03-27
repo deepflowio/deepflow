@@ -309,6 +309,39 @@ impl Hessian2Decoder {
         }
     }
 
+    pub fn decode_list_first_string(bytes: &[u8], start: usize) -> (Option<String>, usize) {
+        if start >= bytes.len() {
+            return (None, 0);
+        }
+        let mut offset = 0;
+        let bytes = &bytes[start..];
+
+        if !(BC_LIST_FIXED_TYPED_LEN_TAG_MIN..=BC_LIST_FIXED_TYPED_LEN_TAG_MAX)
+            .contains(&bytes[offset])
+        {
+            return (None, 0);
+        }
+        offset += 1;
+
+        let (_, type_len) = Self::decode_string(bytes, offset);
+        offset += type_len;
+
+        if offset >= bytes.len() {
+            return (None, 0);
+        }
+
+        let len = bytes[offset] as usize;
+        offset += 1;
+
+        if offset + len >= bytes.len() {
+            return (None, 0);
+        }
+        let Ok(value) = std::str::from_utf8(&bytes[offset..offset + len]) else {
+            return (None, 0);
+        };
+        (Some(value.to_string()), offset + len)
+    }
+
     // https://github.com/apache/dubbo-go-hessian2/blob/master/int.go#L60
     pub fn decode_i32(payload: &[u8], index: usize) -> (i32, usize) {
         let tag = payload[index];
