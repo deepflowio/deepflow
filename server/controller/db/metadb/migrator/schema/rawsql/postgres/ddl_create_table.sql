@@ -2580,7 +2580,8 @@ CREATE TABLE IF NOT EXISTS alarm_event (
     value_unit              VARCHAR(64),
     endpoint_results        TEXT,
     event_level             INTEGER,
-    lcuuid                  VARCHAR(64)
+    lcuuid                  VARCHAR(64),
+    updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE alarm_event;
 
