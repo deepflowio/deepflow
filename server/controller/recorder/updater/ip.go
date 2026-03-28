@@ -31,7 +31,7 @@ type IP struct {
 	lanIPUpdater *LANIP
 }
 
-func NewIP(cache *cache.Cache, cloudData []cloudmodel.IP, domainToolDataSet *tool.DataSet) *IP {
+func NewIP(cache *cache.Cache, cloudData []cloudmodel.IP, domainToolDataSet *tool.Tool) *IP {
 	return &IP{
 		cache:        cache,
 		cloudData:    cloudData,
@@ -77,7 +77,8 @@ func (i *IP) splitToWANAndLAN(cloudData []cloudmodel.IP) ([]cloudmodel.IP, []clo
 	wanCloudData := []cloudmodel.IP{}
 	lanCloudData := []cloudmodel.IP{}
 	for _, cloudItem := range cloudData {
-		vt, exists := i.cache.ToolDataSet.GetVInterfaceTypeByLcuuid(cloudItem.VInterfaceLcuuid)
+		vinterfaceItem := i.cache.Tool().Vinterface().GetByLcuuid(cloudItem.VInterfaceLcuuid)
+		vt, exists := vinterfaceItem.IfType(), vinterfaceItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,

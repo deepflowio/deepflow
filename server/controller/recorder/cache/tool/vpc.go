@@ -7,41 +7,41 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// VPC defines cache data structure.
-type VPC struct {
+// Vpc defines cache data structure.
+type Vpc struct {
 	lcuuid string
 	id     int
 }
 
-func (t *VPC) IsValid() bool {
+func (t *Vpc) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *VPC) Lcuuid() string {
+func (t *Vpc) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *VPC) ID() int {
+func (t *Vpc) Id() int {
 	return t.id
 }
 
-func (t *VPC) reset(dbItem *metadbmodel.VPC, tool *Tool) {
+func (t *Vpc) reset(dbItem *metadbmodel.VPC, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 }
 
-func NewVPCCollection(t *Tool) *VPCCollection {
-	c := new(VPCCollection)
-	c.collection = newCollectionBuilder[*VPC]().
+func NewVpcCollection(t *Tool) *VpcCollection {
+	c := new(VpcCollection)
+	c.collection = newCollectionBuilder[*Vpc]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_VPC_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.VPC { return new(metadbmodel.VPC) }).
-		withCacheItemFactory(func() *VPC { return new(VPC) }).
+		withCacheItemFactory(func() *Vpc { return new(Vpc) }).
 		build()
 	return c
 }
 
-// VPCCollection defines a collection that maps individual fields to the VPC cache data structure.
-type VPCCollection struct {
-	collection[*VPC, *metadbmodel.VPC]
+// VpcCollection defines a collection that maps individual fields to the Vpc cache data structure.
+type VpcCollection struct {
+	collection[*Vpc, *metadbmodel.VPC]
 }

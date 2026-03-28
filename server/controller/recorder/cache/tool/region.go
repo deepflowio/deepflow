@@ -21,7 +21,7 @@ func (t *Region) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *Region) ID() int {
+func (t *Region) Id() int {
 	return t.id
 }
 

@@ -56,38 +56,25 @@ func (i *WANIP) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { //
 			err               error
 		)
 
-		vifLcuuid, ok := md.GetToolDataSet().GetVInterfaceLcuuidByID(item.VInterfaceID)
-		if ok {
-			deviceType, ok = md.GetToolDataSet().GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
-			if !ok {
-				log.Errorf("device type for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, md.LogPrefixes)
-			}
-			deviceID, ok = md.GetToolDataSet().GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
-			if !ok {
-				log.Errorf("device id for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, md.LogPrefixes)
-			}
-			mac, ok = md.GetToolDataSet().GetMacByVInterfaceLcuuid(vifLcuuid)
-			if !ok {
-				log.Errorf("mac for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, md.LogPrefixes)
-			}
-			deviceName, err = md.GetToolDataSet().GetDeviceNameByDeviceID(deviceType, deviceID)
-			if err != nil {
-				log.Errorf("device name for %s (lcuuid: %s) not found, %v", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err, md.LogPrefixes)
-			}
+		vifItem := md.GetToolDataSet().Vinterface().GetById(item.VInterfaceID)
+		if vifItem.IsValid() {
+			deviceType = vifItem.DeviceType()
+			deviceID = vifItem.DeviceId()
+			mac = vifItem.Mac()
+			deviceName = vifItem.DeviceName()
 			deviceRelatedOpts, err = i.tool.GetDeviceOptionsByDeviceID(md, deviceType, deviceID)
 			if err != nil {
-				log.Errorf("releated options for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, md.LogPrefixes)
+				log.Errorf("releated options for %s (id: %d) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, md.LogPrefixes)
 			}
-			networkID, ok = md.GetToolDataSet().GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
-			if !ok {
-				log.Errorf("network id for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, md.LogPrefixes)
-			}
-			networkName, ok = md.GetToolDataSet().GetNetworkNameByID(networkID)
-			if !ok {
-				log.Errorf("network name for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, md.LogPrefixes)
+			networkID = vifItem.NetworkId()
+			nwItem := md.GetToolDataSet().Network().GetById(networkID)
+			if nwItem.IsValid() {
+				networkName = nwItem.Name()
+			} else {
+				log.Errorf("network name for %s (id: %d) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, md.LogPrefixes)
 			}
 		} else {
-			log.Errorf("%s lcuuid (id: %d) for %s not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, md.LogPrefixes)
+			log.Errorf("%s (id: %d) for %s not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, md.LogPrefixes)
 		}
 
 		opts = append(opts, []eventapi.TagFieldOption{
@@ -100,9 +87,9 @@ func (i *WANIP) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { //
 		opts = append(opts, deviceRelatedOpts...)
 
 		if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD_NODE {
-			podNodeInfo, err := md.GetToolDataSet().GetPodNodeInfoByID(deviceID)
-			if err != nil {
-				log.Error(err)
+			pnItem := md.GetToolDataSet().PodNode().GetById(deviceID)
+			if !pnItem.IsValid() {
+				log.Errorf("pod_node(id=%d) not found", deviceID, md.LogPrefixes)
 			} else {
 				l3DeviceOpts, ok := i.tool.getL3DeviceOptionsByPodNodeID(md, deviceID)
 				if ok {
@@ -111,7 +98,7 @@ func (i *WANIP) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { //
 					i.enqueueInstanceIfInsertIntoMetadbFailed(
 						md,
 						item.Lcuuid,
-						podNodeInfo.DomainLcuuid,
+						pnItem.DomainLcuuid(),
 						eventapi.RESOURCE_EVENT_TYPE_ATTACH_IP,
 						deviceName,
 						deviceType,
@@ -122,18 +109,18 @@ func (i *WANIP) OnResourceBatchAdded(md *message.Metadata, msg interface{}) { //
 				}
 			}
 		} else if deviceType == ctrlrcommon.VIF_DEVICE_TYPE_POD {
-			podInfo, err := md.GetToolDataSet().GetPodInfoByID(deviceID)
-			if err != nil {
-				log.Error(err)
+			podItem := md.GetToolDataSet().Pod().GetById(deviceID)
+			if !podItem.IsValid() {
+				log.Errorf("pod(id=%d) not found", deviceID, md.LogPrefixes)
 			} else {
-				l3DeviceOpts, ok := i.tool.getL3DeviceOptionsByPodNodeID(md, podInfo.PodNodeID)
+				l3DeviceOpts, ok := i.tool.getL3DeviceOptionsByPodNodeID(md, podItem.PodNodeId())
 				if ok {
 					opts = append(opts, l3DeviceOpts...)
 				} else {
 					i.enqueueInstanceIfInsertIntoMetadbFailed(
 						md,
 						item.Lcuuid,
-						podInfo.DomainLcuuid,
+						podItem.DomainLcuuid(),
 						eventapi.RESOURCE_EVENT_TYPE_ATTACH_IP,
 						deviceName,
 						deviceType,
@@ -165,41 +152,29 @@ func (i *WANIP) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 			deviceName  string
 			networkID   int
 			networkName string
-			err         error
 		)
 		vifID := item.VInterfaceID
 		ip := item.IP
 
-		vifLcuuid, ok := md.GetToolDataSet().GetVInterfaceLcuuidByID(vifID)
-		if ok {
-			deviceType, ok = md.GetToolDataSet().GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
-			if !ok {
-				log.Errorf("device type for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, md.LogPrefixes)
-			}
-			deviceID, ok = md.GetToolDataSet().GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
-			if !ok {
-				log.Errorf("device id for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, md.LogPrefixes)
-			}
-			mac, ok = md.GetToolDataSet().GetMacByVInterfaceLcuuid(vifLcuuid)
-			if !ok {
-				log.Errorf("mac for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, md.LogPrefixes)
-			}
-			deviceName, err = md.GetToolDataSet().GetDeviceNameByDeviceID(deviceType, deviceID)
-			if err != nil {
-				log.Errorf("device name for %s (lcuuid: %s) not found, %v", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err, md.LogPrefixes)
+		vifItem := md.GetToolDataSet().Vinterface().GetById(vifID)
+		if vifItem.IsValid() {
+			deviceType = vifItem.DeviceType()
+			deviceID = vifItem.DeviceId()
+			mac = vifItem.Mac()
+			deviceName = vifItem.DeviceName()
+			if deviceName == "" {
 				deviceName = i.tool.getDeviceNameFromAllByID(md, deviceType, deviceID)
 			}
-			networkID, ok = md.GetToolDataSet().GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
-			if !ok {
-				log.Errorf("network id for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, md.LogPrefixes)
-			}
-			networkName, ok = md.GetToolDataSet().GetNetworkNameByID(networkID)
-			if !ok {
-				log.Errorf("network name for %s (lcuuid: %s) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, md.LogPrefixes)
+			networkID = vifItem.NetworkId()
+			nwItem := md.GetToolDataSet().Network().GetById(networkID)
+			if nwItem.IsValid() {
+				networkName = nwItem.Name()
+			} else {
+				log.Errorf("network name for %s (id: %d) not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifID, md.LogPrefixes)
 			}
 
 		} else {
-			log.Errorf("%s lcuuid (id: %d) for %s not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifID, ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, md.LogPrefixes)
+			log.Errorf("%s (id: %d) for %s not found", ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, vifID, ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, md.LogPrefixes)
 		}
 
 		i.createInstanceAndEnqueue(md,

@@ -41,16 +41,16 @@ type CloudModel interface {
 
 // 资源用于比对的缓存对象
 type DiffBase interface {
-	*diffbase.Region | *diffbase.AZ | *diffbase.SubDomain | *diffbase.Host | *diffbase.VM |
-		*diffbase.VPC | *diffbase.Network | *diffbase.Subnet | *diffbase.VRouter | *diffbase.RoutingTable |
-		*diffbase.DHCPPort | *diffbase.VInterface | *diffbase.WANIP | *diffbase.LANIP | *diffbase.FloatingIP |
-		*diffbase.NATGateway | *diffbase.NATRule | *diffbase.NATVMConnection | *diffbase.LB |
-		*diffbase.LBListener | *diffbase.LBTargetServer | *diffbase.LBVMConnection | *diffbase.CEN |
-		*diffbase.PeerConnection | *diffbase.RDSInstance | *diffbase.RedisInstance | *diffbase.PodCluster |
-		*diffbase.PodNode | *diffbase.VMPodNodeConnection | *diffbase.PodNamespace | *diffbase.PodIngress |
+	*diffbase.Region | *diffbase.Az | *diffbase.SubDomain | *diffbase.Host | *diffbase.Vm |
+		*diffbase.Vpc | *diffbase.Network | *diffbase.Subnet | *diffbase.Vrouter | *diffbase.RoutingTable |
+		*diffbase.DhcpPort | *diffbase.Vinterface | *diffbase.WanIp | *diffbase.LanIp | *diffbase.FloatingIp |
+		*diffbase.NatGateway | *diffbase.NatRule | *diffbase.NatVmConnection | *diffbase.Lb |
+		*diffbase.LbListener | *diffbase.LbTargetServer | *diffbase.LbVmConnection | *diffbase.Cen |
+		*diffbase.PeerConnection | *diffbase.RdsInstance | *diffbase.RedisInstance | *diffbase.PodCluster |
+		*diffbase.PodNode | *diffbase.VmPodNodeConnection | *diffbase.PodNamespace | *diffbase.PodIngress |
 		*diffbase.PodIngressRule | *diffbase.PodIngressRuleBackend | *diffbase.PodService |
 		*diffbase.PodServicePort | *diffbase.PodGroup | *diffbase.ConfigMap | *diffbase.PodGroupConfigMapConnection |
-		*diffbase.PodGroupPort | *diffbase.PodReplicaSet | *diffbase.Pod | *diffbase.Process | *diffbase.VIP
+		*diffbase.PodGroupPort | *diffbase.PodReplicaSet | *diffbase.Pod | *diffbase.Process | *diffbase.Vip
 
 	GetSequence() int
 	SetSequence(sequence int)

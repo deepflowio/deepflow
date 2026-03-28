@@ -7,65 +7,65 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// DHCPPort defines cache data structure.
-type DHCPPort struct {
+// DhcpPort defines cache data structure.
+type DhcpPort struct {
 	lcuuid   string
 	id       int
 	name     string
-	regionID int
-	azID     int
-	vpcID    int
+	regionId int
+	azId     int
+	vpcId    int
 }
 
-func (t *DHCPPort) IsValid() bool {
+func (t *DhcpPort) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *DHCPPort) Lcuuid() string {
+func (t *DhcpPort) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *DHCPPort) ID() int {
+func (t *DhcpPort) Id() int {
 	return t.id
 }
 
-func (t *DHCPPort) Name() string {
+func (t *DhcpPort) Name() string {
 	return t.name
 }
 
-func (t *DHCPPort) Region() int {
-	return t.regionID
+func (t *DhcpPort) RegionId() int {
+	return t.regionId
 }
 
-func (t *DHCPPort) AZ() int {
-	return t.azID
+func (t *DhcpPort) AzId() int {
+	return t.azId
 }
 
-func (t *DHCPPort) VPCID() int {
-	return t.vpcID
+func (t *DhcpPort) VpcId() int {
+	return t.vpcId
 }
 
-func (t *DHCPPort) reset(dbItem *metadbmodel.DHCPPort, tool *Tool) {
+func (t *DhcpPort) reset(dbItem *metadbmodel.DHCPPort, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.vpcID = dbItem.VPCID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.vpcId = dbItem.VPCID
 }
 
-func NewDHCPPortCollection(t *Tool) *DHCPPortCollection {
-	c := new(DHCPPortCollection)
-	c.collection = newCollectionBuilder[*DHCPPort]().
+func NewDhcpPortCollection(t *Tool) *DhcpPortCollection {
+	c := new(DhcpPortCollection)
+	c.collection = newCollectionBuilder[*DhcpPort]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.DHCPPort { return new(metadbmodel.DHCPPort) }).
-		withCacheItemFactory(func() *DHCPPort { return new(DHCPPort) }).
+		withCacheItemFactory(func() *DhcpPort { return new(DhcpPort) }).
 		build()
 	return c
 }
 
-// DHCPPortCollection defines a collection that maps individual fields to the DHCPPort cache data structure.
-type DHCPPortCollection struct {
-	collection[*DHCPPort, *metadbmodel.DHCPPort]
+// DhcpPortCollection defines a collection that maps individual fields to the DhcpPort cache data structure.
+type DhcpPortCollection struct {
+	collection[*DhcpPort, *metadbmodel.DHCPPort]
 }

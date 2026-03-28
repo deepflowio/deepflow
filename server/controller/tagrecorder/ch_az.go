@@ -27,12 +27,12 @@ import (
 
 type ChAZ struct {
 	SubscriberComponent[
-		*message.AddedAZs,
-		message.AddedAZs,
-		*message.UpdatedAZ,
-		message.UpdatedAZ,
-		*message.DeletedAZs,
-		message.DeletedAZs,
+		*message.AddedAzs,
+		message.AddedAzs,
+		*message.UpdatedAz,
+		message.UpdatedAz,
+		*message.DeletedAzs,
+		message.DeletedAzs,
 		metadbmodel.AZ,
 		metadbmodel.ChAZ,
 		IDKey,
@@ -44,12 +44,12 @@ type ChAZ struct {
 func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) *ChAZ {
 	mng := &ChAZ{
 		newSubscriberComponent[
-			*message.AddedAZs,
-			message.AddedAZs,
-			*message.UpdatedAZ,
-			message.UpdatedAZ,
-			*message.DeletedAZs,
-			message.DeletedAZs,
+			*message.AddedAzs,
+			message.AddedAzs,
+			*message.UpdatedAz,
+			message.UpdatedAz,
+			*message.DeletedAzs,
+			message.DeletedAzs,
 			metadbmodel.AZ,
 			metadbmodel.ChAZ,
 			IDKey,
@@ -65,7 +65,7 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (a *ChAZ) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedAZ) {
+func (a *ChAZ) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedAz) {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator

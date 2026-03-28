@@ -61,7 +61,7 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 			ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN,
 			wholeCache,
 			db.NewSubDomain().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.SubDomains,
+			wholeCache.DiffBases().SubDomain().GetAll(),
 			cloudData,
 		),
 	}

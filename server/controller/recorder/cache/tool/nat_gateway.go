@@ -7,65 +7,65 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// NATGateway defines cache data structure.
-type NATGateway struct {
+// NatGateway defines cache data structure.
+type NatGateway struct {
 	lcuuid   string
 	id       int
 	name     string
-	regionID int
-	azID     int
-	vpcID    int
+	regionId int
+	azId     int
+	vpcId    int
 }
 
-func (t *NATGateway) IsValid() bool {
+func (t *NatGateway) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *NATGateway) Lcuuid() string {
+func (t *NatGateway) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *NATGateway) ID() int {
+func (t *NatGateway) Id() int {
 	return t.id
 }
 
-func (t *NATGateway) Name() string {
+func (t *NatGateway) Name() string {
 	return t.name
 }
 
-func (t *NATGateway) RegionID() int {
-	return t.regionID
+func (t *NatGateway) RegionId() int {
+	return t.regionId
 }
 
-func (t *NATGateway) AZID() int {
-	return t.azID
+func (t *NatGateway) AzId() int {
+	return t.azId
 }
 
-func (t *NATGateway) VPCID() int {
-	return t.vpcID
+func (t *NatGateway) VpcId() int {
+	return t.vpcId
 }
 
-func (t *NATGateway) reset(dbItem *metadbmodel.NATGateway, tool *Tool) {
+func (t *NatGateway) reset(dbItem *metadbmodel.NATGateway, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.vpcID = dbItem.VPCID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.vpcId = dbItem.VPCID
 }
 
-func NewNATGatewayCollection(t *Tool) *NATGatewayCollection {
-	c := new(NATGatewayCollection)
-	c.collection = newCollectionBuilder[*NATGateway]().
+func NewNatGatewayCollection(t *Tool) *NatGatewayCollection {
+	c := new(NatGatewayCollection)
+	c.collection = newCollectionBuilder[*NatGateway]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.NATGateway { return new(metadbmodel.NATGateway) }).
-		withCacheItemFactory(func() *NATGateway { return new(NATGateway) }).
+		withCacheItemFactory(func() *NatGateway { return new(NatGateway) }).
 		build()
 	return c
 }
 
-// NATGatewayCollection defines a collection that maps individual fields to the NATGateway cache data structure.
-type NATGatewayCollection struct {
-	collection[*NATGateway, *metadbmodel.NATGateway]
+// NatGatewayCollection defines a collection that maps individual fields to the NatGateway cache data structure.
+type NatGatewayCollection struct {
+	collection[*NatGateway, *metadbmodel.NATGateway]
 }

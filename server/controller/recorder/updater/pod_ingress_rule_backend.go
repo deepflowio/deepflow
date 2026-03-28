@@ -61,7 +61,7 @@ func NewPodIngressRuleBackend(wholeCache *cache.Cache, cloudData []cloudmodel.Po
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
 			wholeCache,
 			db.NewPodIngressRuleBackend().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.PodIngressRuleBackends,
+			wholeCache.DiffBases().PodIngressRuleBackend().GetAll(),
 			cloudData,
 		),
 	}
@@ -76,7 +76,8 @@ func NewPodIngressRuleBackend(wholeCache *cache.Cache, cloudData []cloudmodel.Po
 
 // Implement DataGenerator interface
 func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRuleBackend) (*metadbmodel.PodIngressRuleBackend, bool) {
-	podIngressRuleID, exists := b.cache.ToolDataSet.GetPodIngressRuleIDByLcuuid(cloudItem.PodIngressRuleLcuuid)
+	podIngressRuleItem := b.cache.Tool().PodIngressRule().GetByLcuuid(cloudItem.PodIngressRuleLcuuid)
+	podIngressRuleID, exists := podIngressRuleItem.Id(), podIngressRuleItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, cloudItem.PodIngressRuleLcuuid,
@@ -84,7 +85,8 @@ func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIng
 		), b.metadata.LogPrefixes)
 		return nil, false
 	}
-	podIngressID, exists := b.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
+	podIngressItem := b.cache.Tool().PodIngress().GetByLcuuid(cloudItem.PodIngressLcuuid)
+	podIngressID, exists := podIngressItem.Id(), podIngressItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
@@ -92,7 +94,8 @@ func (b *PodIngressRuleBackend) generateDBItemToAdd(cloudItem *cloudmodel.PodIng
 		), b.metadata.LogPrefixes)
 		return nil, false
 	}
-	podServiceID, exists := b.cache.ToolDataSet.GetPodServiceIDByLcuuid(cloudItem.PodServiceLcuuid)
+	podServiceItem := b.cache.Tool().PodService().GetByLcuuid(cloudItem.PodServiceLcuuid)
+	podServiceID, exists := podServiceItem.Id(), podServiceItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.PodServiceLcuuid,

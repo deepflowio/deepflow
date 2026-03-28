@@ -35,37 +35,37 @@ import (
 type WANIPMessageFactory struct{}
 
 func (f *WANIPMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedWANIPs{}
+	return &message.AddedWanIps{}
 }
 
 func (f *WANIPMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedWANIP{}
+	return &message.UpdatedWanIp{}
 }
 
 func (f *WANIPMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedWANIPs{}
+	return &message.DeletedWanIps{}
 }
 
 func (f *WANIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedWANIPFields{}
+	return &message.UpdatedWanIpFields{}
 }
 
 type WANIP struct {
 	UpdaterBase[
 		cloudmodel.IP,
-		*diffbase.WANIP,
+		*diffbase.WanIp,
 		*metadbmodel.WANIP,
 		metadbmodel.WANIP,
 	]
 }
 
-func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
+func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.Tool) *WANIP {
 	updater := &WANIP{
 		UpdaterBase: newUpdaterBase(
 			ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN,
 			wholeCache,
 			db.NewWANIP().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.WANIPs,
+			wholeCache.DiffBases().WANIP().GetAll(),
 			[]cloudmodel.IP(nil),
 		),
 	}
@@ -84,7 +84,8 @@ func (i *WANIP) SetCloudData(cloudData []cloudmodel.IP) {
 }
 
 func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.WANIP, bool) {
-	vinterfaceID, exists := i.cache.ToolDataSet.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
+	vinterfaceItem := i.cache.Tool().Vinterface().GetByLcuuid(cloudItem.VInterfaceLcuuid)
+	vinterfaceID, exists := vinterfaceItem.Id(), vinterfaceItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
@@ -121,8 +122,8 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*metadbmodel.WANI
 	return dbItem, true
 }
 
-func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WANIP, cloudItem *cloudmodel.IP) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedWANIPFields)
+func (i *WANIP) generateUpdateInfo(diffBase *diffbase.WanIp, cloudItem *cloudmodel.IP) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedWanIpFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid

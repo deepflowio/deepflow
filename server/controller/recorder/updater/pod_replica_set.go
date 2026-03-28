@@ -61,7 +61,7 @@ func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplica
 			ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN,
 			wholeCache,
 			db.NewPodReplicaSet().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.PodReplicaSets,
+			wholeCache.DiffBases().PodReplicaSet().GetAll(),
 			cloudData,
 		),
 	}
@@ -76,7 +76,8 @@ func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplica
 
 // Implement DataGenerator interface
 func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet) (*metadbmodel.PodReplicaSet, bool) {
-	podNamespaceID, exists := r.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
+	podNamespaceItem := r.cache.Tool().PodNamespace().GetByLcuuid(cloudItem.PodNamespaceLcuuid)
+	podNamespaceID, exists := podNamespaceItem.Id(), podNamespaceItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
@@ -84,7 +85,8 @@ func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet)
 		), r.metadata.LogPrefixes)
 		return nil, false
 	}
-	podClusterID, exists := r.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
+	podClusterItem := r.cache.Tool().PodCluster().GetByLcuuid(cloudItem.PodClusterLcuuid)
+	podClusterID, exists := podClusterItem.Id(), podClusterItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
@@ -92,7 +94,8 @@ func (r *PodReplicaSet) generateDBItemToAdd(cloudItem *cloudmodel.PodReplicaSet)
 		), r.metadata.LogPrefixes)
 		return nil, false
 	}
-	podGroupID, exists := r.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
+	podGroupItem := r.cache.Tool().PodGroup().GetByLcuuid(cloudItem.PodGroupLcuuid)
+	podGroupID, exists := podGroupItem.Id(), podGroupItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,

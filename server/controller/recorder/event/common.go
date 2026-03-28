@@ -25,6 +25,7 @@ import (
 	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/recorder/cache/tool"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/metadata"
@@ -76,31 +77,31 @@ func (i *IPTool) GetDeviceOptionsByDeviceID(md *message.Metadata, deviceType, de
 }
 
 func (i *IPTool) getHostOptionsByID(md *message.Metadata, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := md.GetToolDataSet().GetHostInfoByID(id)
-	if err != nil {
-		return nil, err
+	item := md.GetToolDataSet().Host().GetById(id)
+	if !item.IsValid() {
+		return nil, fmt.Errorf("host(id=%d) not found", id)
 	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(info.RegionID),
-		eventapi.TagAZID(info.AZID),
+		eventapi.TagRegionID(item.RegionId()),
+		eventapi.TagAZID(item.AzId()),
 	}...)
 	return opts, nil
 }
 
 func (i *IPTool) getVMOptionsByID(md *message.Metadata, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := md.GetToolDataSet().GetVMInfoByID(id)
-	if err != nil {
-		return nil, err
+	item := md.GetToolDataSet().Vm().GetById(id)
+	if !item.IsValid() {
+		return nil, fmt.Errorf("vm(id=%d) not found", id)
 	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(info.RegionID),
-		eventapi.TagAZID(info.AZID),
-		eventapi.TagVPCID(info.VPCID),
-		eventapi.TagHostID(info.HostID),
+		eventapi.TagRegionID(item.RegionId()),
+		eventapi.TagAZID(item.AzId()),
+		eventapi.TagVPCID(item.VpcId()),
+		eventapi.TagHostID(item.HostId()),
 		eventapi.TagL3DeviceType(ctrlrcommon.VIF_DEVICE_TYPE_VM),
 		eventapi.TagL3DeviceID(id),
 	}...)
@@ -108,25 +109,25 @@ func (i *IPTool) getVMOptionsByID(md *message.Metadata, id int) ([]eventapi.TagF
 }
 
 func (i *IPTool) getVRouterOptionsByID(md *message.Metadata, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := md.GetToolDataSet().GetVRouterInfoByID(id)
-	if err != nil {
-		return nil, err
+	item := md.GetToolDataSet().Vrouter().GetById(id)
+	if !item.IsValid() {
+		return nil, fmt.Errorf("vrouter(id=%d) not found", id)
 	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(info.RegionID),
-		eventapi.TagVPCID(info.VPCID),
+		eventapi.TagRegionID(item.RegionId()),
+		eventapi.TagVPCID(item.VpcId()),
 		eventapi.TagL3DeviceType(ctrlrcommon.VIF_DEVICE_TYPE_VROUTER),
 		eventapi.TagL3DeviceID(id),
 	}...)
 
-	hostID, ok := md.GetToolDataSet().GetHostIDByIP(info.GWLaunchServer)
-	if !ok {
-		log.Error(idByIPNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, info.GWLaunchServer))
+	host := md.GetToolDataSet().Host().GetByIp(item.GwLaunchServer())
+	if !host.IsValid() {
+		log.Error(idByIPNotFound(ctrlrcommon.RESOURCE_TYPE_HOST_EN, item.GwLaunchServer()))
 	} else {
 		opts = append(opts, []eventapi.TagFieldOption{
-			eventapi.TagHostID(hostID),
+			eventapi.TagHostID(host.Id()),
 		}...)
 	}
 
@@ -134,16 +135,16 @@ func (i *IPTool) getVRouterOptionsByID(md *message.Metadata, id int) ([]eventapi
 }
 
 func (i *IPTool) getDHCPPortOptionsByID(md *message.Metadata, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := md.GetToolDataSet().GetDHCPPortInfoByID(id)
-	if err != nil {
-		return nil, err
+	item := md.GetToolDataSet().DhcpPort().GetById(id)
+	if !item.IsValid() {
+		return nil, fmt.Errorf("dhcp_port(id=%d) not found", id)
 	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(info.RegionID),
-		eventapi.TagAZID(info.AZID),
-		eventapi.TagVPCID(info.VPCID),
+		eventapi.TagRegionID(item.RegionId()),
+		eventapi.TagAZID(item.AzId()),
+		eventapi.TagVPCID(item.VpcId()),
 		eventapi.TagL3DeviceType(ctrlrcommon.VIF_DEVICE_TYPE_DHCP_PORT),
 		eventapi.TagL3DeviceID(id),
 	}...)
@@ -151,16 +152,16 @@ func (i *IPTool) getDHCPPortOptionsByID(md *message.Metadata, id int) ([]eventap
 }
 
 func (i *IPTool) getNatGateWayOptionsByID(md *message.Metadata, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := md.GetToolDataSet().GetNATGatewayInfoByID(id)
-	if err != nil {
-		return nil, err
+	item := md.GetToolDataSet().NatGateway().GetById(id)
+	if !item.IsValid() {
+		return nil, fmt.Errorf("nat_gateway(id=%d) not found", id)
 	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(info.RegionID),
-		eventapi.TagAZID(info.AZID),
-		eventapi.TagVPCID(info.VPCID),
+		eventapi.TagRegionID(item.RegionId()),
+		eventapi.TagAZID(item.AzId()),
+		eventapi.TagVPCID(item.VpcId()),
 		eventapi.TagL3DeviceType(ctrlrcommon.VIF_DEVICE_TYPE_NAT_GATEWAY),
 		eventapi.TagL3DeviceID(id),
 	}...)
@@ -168,15 +169,15 @@ func (i *IPTool) getNatGateWayOptionsByID(md *message.Metadata, id int) ([]event
 }
 
 func (i *IPTool) getLBOptionsByID(md *message.Metadata, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := md.GetToolDataSet().GetLBInfoByID(id)
-	if err != nil {
-		return nil, err
+	item := md.GetToolDataSet().Lb().GetById(id)
+	if !item.IsValid() {
+		return nil, fmt.Errorf("lb(id=%d) not found", id)
 	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(info.RegionID),
-		eventapi.TagVPCID(info.VPCID),
+		eventapi.TagRegionID(item.RegionId()),
+		eventapi.TagVPCID(item.VpcId()),
 		eventapi.TagL3DeviceType(ctrlrcommon.VIF_DEVICE_TYPE_LB),
 		eventapi.TagL3DeviceID(id),
 	}...)
@@ -184,16 +185,16 @@ func (i *IPTool) getLBOptionsByID(md *message.Metadata, id int) ([]eventapi.TagF
 }
 
 func (i *IPTool) getRDSInstanceOptionsByID(md *message.Metadata, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := md.GetToolDataSet().GetRDSInstanceInfoByID(id)
-	if err != nil {
-		return nil, err
+	item := md.GetToolDataSet().RdsInstance().GetById(id)
+	if !item.IsValid() {
+		return nil, fmt.Errorf("rds_instance(id=%d) not found", id)
 	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(info.RegionID),
-		eventapi.TagAZID(info.AZID),
-		eventapi.TagVPCID(info.VPCID),
+		eventapi.TagRegionID(item.RegionId()),
+		eventapi.TagAZID(item.AzId()),
+		eventapi.TagVPCID(item.VpcId()),
 		eventapi.TagL3DeviceType(ctrlrcommon.VIF_DEVICE_TYPE_RDS_INSTANCE),
 		eventapi.TagL3DeviceID(id),
 	}...)
@@ -201,16 +202,16 @@ func (i *IPTool) getRDSInstanceOptionsByID(md *message.Metadata, id int) ([]even
 }
 
 func (i *IPTool) getRedisInstanceOptionsByID(md *message.Metadata, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := md.GetToolDataSet().GetRedisInstanceInfoByID(id)
-	if err != nil {
-		return nil, err
+	item := md.GetToolDataSet().RedisInstance().GetById(id)
+	if !item.IsValid() {
+		return nil, fmt.Errorf("redis_instance(id=%d) not found", id)
 	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(info.RegionID),
-		eventapi.TagAZID(info.AZID),
-		eventapi.TagVPCID(info.VPCID),
+		eventapi.TagRegionID(item.RegionId()),
+		eventapi.TagAZID(item.AzId()),
+		eventapi.TagVPCID(item.VpcId()),
 		eventapi.TagL3DeviceType(ctrlrcommon.VIF_DEVICE_TYPE_REDIS_INSTANCE),
 		eventapi.TagL3DeviceID(id),
 	}...)
@@ -218,76 +219,77 @@ func (i *IPTool) getRedisInstanceOptionsByID(md *message.Metadata, id int) ([]ev
 }
 
 func (i *IPTool) getPodNodeOptionsByID(md *message.Metadata, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := md.GetToolDataSet().GetPodNodeInfoByID(id)
-	if err != nil {
-		return nil, err
+	item := md.GetToolDataSet().PodNode().GetById(id)
+	if !item.IsValid() {
+		return nil, fmt.Errorf("pod_node(id=%d) not found", id)
 	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(info.RegionID),
-		eventapi.TagAZID(info.AZID),
-		eventapi.TagVPCID(info.VPCID),
-		eventapi.TagPodClusterID(info.PodClusterID),
+		eventapi.TagRegionID(item.RegionId()),
+		eventapi.TagAZID(item.AzId()),
+		eventapi.TagVPCID(item.VpcId()),
+		eventapi.TagPodClusterID(item.PodClusterId()),
 		eventapi.TagPodNodeID(id),
 	}...)
 	return opts, nil
 }
 
 func (i *IPTool) getPodServiceOptionsByID(md *message.Metadata, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := md.GetToolDataSet().GetPodServiceInfoByID(id)
-	if err != nil {
-		return nil, err
+	item := md.GetToolDataSet().PodService().GetById(id)
+	if !item.IsValid() {
+		return nil, fmt.Errorf("pod_service(id=%d) not found", id)
 	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(info.RegionID),
-		eventapi.TagAZID(info.AZID),
-		eventapi.TagVPCID(info.VPCID),
+		eventapi.TagRegionID(item.RegionId()),
+		eventapi.TagAZID(item.AzId()),
+		eventapi.TagVPCID(item.VpcId()),
 		eventapi.TagL3DeviceType(ctrlrcommon.VIF_DEVICE_TYPE_POD_SERVICE),
 		eventapi.TagL3DeviceID(id),
-		eventapi.TagPodClusterID(info.PodClusterID),
-		eventapi.TagPodNSID(info.PodNamespaceID),
+		eventapi.TagPodClusterID(item.PodClusterId()),
+		eventapi.TagPodNSID(item.PodNamespaceId()),
 		eventapi.TagPodServiceID(id), // TODO 此字段在 ingester 中并未被使用，待删除
 	}...)
 	return opts, nil
 }
 
 func (i *IPTool) getPodOptionsByID(md *message.Metadata, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := md.GetToolDataSet().GetPodInfoByID(id)
-	if err != nil {
-		return nil, err
+	item := md.GetToolDataSet().Pod().GetById(id)
+	if !item.IsValid() {
+		return nil, fmt.Errorf("pod(id=%d) not found", id)
 	}
-	podGroupType, ok := md.GetToolDataSet().GetPodGroupTypeByID(info.PodGroupID)
-	if !ok {
-		log.Errorf("db pod_group type(id: %d) not found", info.PodGroupID, md.LogPrefixes)
+	podGroup := md.GetToolDataSet().PodGroup().GetById(item.PodGroupId())
+	if !podGroup.IsValid() {
+		log.Errorf("db pod_group type(id: %d) not found", item.PodGroupId(), md.LogPrefixes)
 	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(info.RegionID),
-		eventapi.TagAZID(info.AZID),
-		eventapi.TagVPCID(info.VPCID),
-		eventapi.TagPodClusterID(info.PodClusterID),
-		eventapi.TagPodNSID(info.PodNamespaceID),
-		eventapi.TagPodGroupID(info.PodGroupID),
-		eventapi.TagPodGroupType(metadata.PodGroupTypeMap[podGroupType]),
-		eventapi.TagPodNodeID(info.PodNodeID),
+		eventapi.TagRegionID(item.RegionId()),
+		eventapi.TagAZID(item.AzId()),
+		eventapi.TagVPCID(item.VpcId()),
+		eventapi.TagPodClusterID(item.PodClusterId()),
+		eventapi.TagPodNSID(item.PodNamespaceId()),
+		eventapi.TagPodGroupID(item.PodGroupId()),
+		eventapi.TagPodGroupType(metadata.PodGroupTypeMap[podGroup.GType()]),
+		eventapi.TagPodNodeID(item.PodNodeId()),
 		eventapi.TagPodID(id),
 	}...)
 	return opts, nil
 }
 
 func (i *IPTool) getL3DeviceOptionsByPodNodeID(md *message.Metadata, id int) (opts []eventapi.TagFieldOption, ok bool) {
-	vmID, ok := md.GetToolDataSet().GetVMIDByPodNodeID(id)
+	vmID := md.GetToolDataSet().PodNode().GetById(id).VmId()
+	ok = vmID != 0
 	if ok {
 		opts = append(opts, []eventapi.TagFieldOption{eventapi.TagL3DeviceType(ctrlrcommon.VIF_DEVICE_TYPE_VM), eventapi.TagL3DeviceID(vmID)}...)
-		vmInfo, err := md.GetToolDataSet().GetVMInfoByID(vmID)
-		if err != nil {
-			log.Error(err)
+		vmItem := md.GetToolDataSet().Vm().GetById(vmID)
+		if !vmItem.IsValid() {
+			log.Errorf("vm(id=%d) not found", vmID)
 		} else {
-			opts = append(opts, eventapi.TagHostID(vmInfo.HostID))
+			opts = append(opts, eventapi.TagHostID(vmItem.HostId()))
 		}
 	}
 	return
@@ -377,6 +379,23 @@ func (i *IPTool) getDeviceNameFromAllByID(md *message.Metadata, deviceType, devi
 		return ""
 	}
 	return ""
+}
+
+// getDeviceIPNetworks returns all IPs and their network IDs for a device (VM or Pod).
+func getDeviceIPNetworks(t *tool.Tool, deviceType, deviceID int) (networkIDs []uint32, ips []string) {
+	vifs := t.Vinterface().GetByDeviceKey(deviceType, deviceID)
+	for _, vif := range vifs {
+		nID := vif.NetworkId()
+		for _, lanIP := range t.LanIP().GetByVInterfaceID(vif.Id()) {
+			networkIDs = append(networkIDs, uint32(nID))
+			ips = append(ips, lanIP.Ip())
+		}
+		for _, wanIP := range t.WanIP().GetByVInterfaceID(vif.Id()) {
+			networkIDs = append(networkIDs, uint32(nID))
+			ips = append(ips, wanIP.Ip())
+		}
+	}
+	return
 }
 
 func findFromAllByID[MT constraint.MetadbSoftDeleteModel](db *metadb.DB, id int) *MT {

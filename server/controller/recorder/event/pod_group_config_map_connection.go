@@ -40,10 +40,11 @@ func NewPodGroupConfigMapConnection(q *queue.OverwriteQueue) *PodGroupConfigMapC
 
 func (p *PodGroupConfigMapConnection) OnResourceBatchAdded(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbModel.PodGroupConfigMapConnection) {
-		configMapName, ok := md.GetToolDataSet().GetNameByConfigMapID(item.ConfigMapID)
-		if !ok {
+		cmItem := md.GetToolDataSet().ConfigMap().GetById(item.ConfigMapID)
+		if !cmItem.IsValid() {
 			log.Errorf("config map name %d not found", item.ConfigMapID, md.LogPrefixes)
 		}
+		configMapName := cmItem.Name()
 
 		opts := []eventapi.TagFieldOption{
 			eventapi.TagPodGroupID(item.PodGroupID),
@@ -61,10 +62,11 @@ func (p *PodGroupConfigMapConnection) OnResourceBatchAdded(md *message.Metadata,
 
 func (p *PodGroupConfigMapConnection) OnResourceBatchDeleted(md *message.Metadata, msg interface{}) {
 	for _, item := range msg.([]*metadbModel.PodGroupConfigMapConnection) {
-		configMapName, ok := md.GetToolDataSet().GetNameByConfigMapID(item.ConfigMapID)
-		if !ok {
+		cmItem := md.GetToolDataSet().ConfigMap().GetById(item.ConfigMapID)
+		if !cmItem.IsValid() {
 			log.Errorf("config map name %d not found", item.ConfigMapID, md.LogPrefixes)
 		}
+		configMapName := cmItem.Name()
 		opts := []eventapi.TagFieldOption{
 			eventapi.TagPodGroupID(item.PodGroupID),
 			eventapi.TagConfigMapID(uint32(item.ConfigMapID)),
