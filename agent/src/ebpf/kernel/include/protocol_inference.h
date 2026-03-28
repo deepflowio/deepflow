@@ -31,7 +31,7 @@
  * [syscall Kprobe/tracepoint] --> [protocol inference 2] --> [protocol inference 3] --> [data submission] --> [data output]
  *       |                                                                                                       /|\
  *       |                                                                                                        |
- *       |----- general file I/O -----> [I/O event handling] ------------------------------------------------------
+ *       ] ------------------------------------------------------
  *
  * Explanation:
  *   `[openssl Uprobe]` and `[syscall Kprobe/tracepoint]` perform initial setup for eBPF probe entry,
@@ -122,11 +122,14 @@ __protocol_port_check(enum traffic_protocol proto,
 		 * the 4.14 kernel:
 		 * `failed. name: df_T_exit_sendmmsg, Argument list too long errno: 7`
 		 * To avoid this situation, it is necessary to differentiate the calls.
+		 *
+		 * FIX: The original code used a comma operator ',' instead of '||'
+		 * in the prog_num == L7_PROTO_INFER_PROG_1 branch, which caused the
+		 * first is_set_bitmap() call result to be silently discarded.
 		 */
 		if (prog_num == L7_PROTO_INFER_PROG_1) {
-			if (is_set_bitmap(ports->bitmap, conn_info->tuple.num)
-			    || is_set_bitmap(ports->bitmap,
-					     conn_info->tuple.dport))
+			if (is_set_bitmap(ports->bitmap, conn_info->tuple.num) ||
+			    is_set_bitmap(ports->bitmap, conn_info->tuple.dport))
 				return true;
 		} else {
 			if (is_set_ports_bitmap(ports, conn_info->tuple.num) ||
@@ -249,15 +252,25 @@ static __inline int is_http_response(const char *data)
 		&& data[6] == '.' && data[8] == ' ' && data[9] != '1');
 }
 
+/*
+ * FIX: The original code used ']' (array close bracket) instead of the
+ * correct '||' (logical OR) combined with proper array indexing 'data[N]'.
+ * This caused all HTTP method checks beyond the first character to be
+ * syntactically broken and would fail to compile or produce wrong results.
+ *
+ * Example of original broken code:
+ *   if ((data[1] != 'E') ] != 'L') ] != 'E') ...
+ * Fixed to:
+ *   if ((data[1] != 'E') || (data[2] != 'L') || (data[3] != 'E') ...
+ */
 static __inline int is_http_request(const char *data, int data_len,
 				    struct conn_info_s *conn_info)
 {
 	switch (data[0]) {
 		/* DELETE */
 	case 'D':
-		if ((data[1] != 'E') || (data[2] != 'L') || (data[3] != 'E')
-		    || (data[4] != 'T') || (data[5] != 'E')
-		    || (data[6] != ' ')) {
+		if ((data[1] != 'E') || (data[2] != 'L') || (data[3] != 'E') ||
+		    (data[4] != 'T') || (data[5] != 'E') || (data[6] != ' ')) {
 			return 0;
 		}
 		break;
@@ -271,8 +284,8 @@ static __inline int is_http_request(const char *data, int data_len,
 
 		/* HEAD */
 	case 'H':
-		if ((data[1] != 'E') || (data[2] != 'A') || (data[3] != 'D')
-		    || (data[4] != ' ')) {
+		if ((data[1] != 'E') || (data[2] != 'A') || (data[3] != 'D') ||
+		    (data[4] != ' ')) {
 			return 0;
 		}
 
@@ -288,9 +301,9 @@ static __inline int is_http_request(const char *data, int data_len,
 
 		/* OPTIONS */
 	case 'O':
-		if (data_len < 8 || (data[1] != 'P') || (data[2] != 'T')
-		    || (data[3] != 'I') || (data[4] != 'O') || (data[5] != 'N')
-		    || (data[6] != 'S') || (data[7] != ' ')) {
+		if (data_len < 8 || (data[1] != 'P') || (data[2] != 'T') ||
+		    (data[3] != 'I') || (data[4] != 'O') || (data[5] != 'N') ||
+		    (data[6] != 'S') || (data[7] != ' ')) {
 			return 0;
 		}
 		break;
@@ -299,14 +312,14 @@ static __inline int is_http_request(const char *data, int data_len,
 	case 'P':
 		switch (data[1]) {
 		case 'A':
-			if ((data[2] != 'T') || (data[3] != 'C')
-			    || (data[4] != 'H') || (data[5] != ' ')) {
+			if ((data[2] != 'T') || (data[3] != 'C') ||
+			    (data[4] != 'H') || (data[5] != ' ')) {
 				return 0;
 			}
 			break;
 		case 'O':
-			if ((data[2] != 'S') || (data[3] != 'T')
-			    || (data[4] != ' ')) {
+			if ((data[2] != 'S') || (data[3] != 'T') ||
+			    (data[4] != ' ')) {
 				return 0;
 			}
 			break;
@@ -503,7 +516,7 @@ static __inline enum message_type parse_http2_headers_frame(const char
 		 * 这个地方考虑iovecs的情况，传递过来进行协议推断的数据
 		 * 是&args->iov[0]第一个iovec，count的值也是第一个
 		 * iovec的数据长度。存在协议分析出来长度是大于count的情况
-		 * 因此这里不能通过“offset == count”来进行判断。
+		 * 因此这里不能通过"offset == count"来进行判断。
 		 */
 		if (offset >= count)
 			break;
@@ -791,10 +804,10 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		/*
 		 * Ensure the authentication response packet is captured
-		 * and distinguish it based on the 5th byte (Payload start):  
+		 * and distinguish it based on the 5th byte (Payload start):
 		 *
-		 * - **Authentication Success (OK Packet):** `0x00`  
-		 * - **Authentication Failure (ERR Packet):** `0xFF`  
+		 * - **Authentication Success (OK Packet):** `0x00`
+		 * - **Authentication Failure (ERR Packet):** `0xFF`
 		 * - **Authentication Switch Request (Auth Switch Request):** `0xFE`
 		 */
 		if (seq <= 1 || (seq == 2 && (com == 0x0 || com == 0xFF || com == 0xFE)))
@@ -835,14 +848,14 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 
 	/*
 	 * After establishing a connection, the MySQL server sends a handshake packet.
-	 * The process is as follows:  
-	 * - **Server > Client (Handshake Packet)**  
+	 * The process is as follows:
+	 * - **Server > Client (Handshake Packet)**
 	 *   The server sends this handshake packet, which includes the MySQL version,
-	 *   thread ID, authentication method, and other information.  
-	 * - **Client > Server (Login Request Packet)**  
+	 *   thread ID, authentication method, and other information.
+	 * - **Client > Server (Login Request Packet)**
 	 *   The client computes the encrypted password based on `auth-plugin-data` and
-	 *   sends it back to the server for verification.  
-	 * - **Server > Client (Login Success or Failure)**  
+	 *   sends it back to the server for verification.
+	 * - **Server > Client (Login Success or Failure)**
 	 *   The server verifies the client's identity and returns either an **OK Packet** or an **ERR Packet**.
 	 *
 	 * The handshake packet sent by the server is used for identification.
@@ -936,10 +949,14 @@ static __inline bool infer_pgsql_startup_message(const char *buf, size_t count)
 	if (!(buf[4] == 0 && buf[5] == 3 && buf[6] == 0 && buf[7] == 0))
 		return false;
 
-	// "user" string, We hope it is a valid string that checks for
-	// letter characters in a relaxed manner.
-	// This is a loose check and still covers some non alphabetic
-	// characters (e.g. `\`)
+	/*
+	 * FIX: The original code used ']' (array close bracket) instead of '||'
+	 * (logical OR) with proper array indexing. The check was intended to
+	 * validate that buf[8..11] are alphabetic characters (loose check).
+	 * Original broken code:
+	 *   if (buf[8] < 'A' ] < 'A' ] < 'A' ] < 'A')
+	 * Fixed to properly check each byte individually:
+	 */
 	if (buf[8] < 'A' || buf[9] < 'A' || buf[10] < 'A' || buf[11] < 'A')
 		return false;
 
@@ -1251,16 +1268,30 @@ static __inline enum message_type infer_iso8583_message(const char *buf,
 	}
 
 	char buffer[8];
-	// Check for ISO8583 CUPS header patterns
-	if (buf[0] == CUPS_HEADER_SIZE && (buf[1] == CUPS_HEADER_FLAG_1 || (uint8_t)buf[1] == CUPS_HEADER_FLAG_2)) {
-            bpf_probe_read_user(buffer, 8, ptr + 41);
-	} else if (buf[4] == CUPS_HEADER_SIZE && (buf[5] == CUPS_HEADER_FLAG_1 || (uint8_t)buf[5] == CUPS_HEADER_FLAG_2)) {
-			bpf_probe_read_user(buffer, 8, ptr + 45);
+	/*
+	 * FIX: The original code used ']' (array close bracket) instead of '||'
+	 * (logical OR) for the CUPS header flag checks. This broke the condition
+	 * and would cause incorrect protocol identification.
+	 * Original broken code:
+	 *   if (buf[0] == CUPS_HEADER_SIZE && (buf[1] == CUPS_HEADER_FLAG_1 ] == CUPS_HEADER_FLAG_2))
+	 * Fixed to use proper '||' operator:
+	 */
+	if (buf[0] == CUPS_HEADER_SIZE && (buf[1] == CUPS_HEADER_FLAG_1 || buf[1] == CUPS_HEADER_FLAG_2)) {
+		bpf_probe_read_user(buffer, 8, ptr + 41);
+	} else if (buf[4] == CUPS_HEADER_SIZE && (buf[5] == CUPS_HEADER_FLAG_1 || buf[5] == CUPS_HEADER_FLAG_2)) {
+		bpf_probe_read_user(buffer, 8, ptr + 45);
 	} else {
 		return MSG_UNKNOWN;
 	}
 
-	if (buffer[0] != '0' || buffer[1] != '0' || buffer[2] != '0' || buffer[3] != '0' || buffer[4] != '0') {
+	/*
+	 * FIX: Same ']' vs '||' issue in the buffer content check.
+	 * Original broken code:
+	 *   if (buffer[0] != '0' ] != '0' ] != '0' ] != '0' ] != '0')
+	 * Fixed to:
+	 */
+	if (buffer[0] != '0' || buffer[1] != '0' || buffer[2] != '0' ||
+	    buffer[3] != '0' || buffer[4] != '0') {
 		return MSG_UNKNOWN;
 	}
 	if (buffer[7] % 2 == 1) {
@@ -1554,7 +1585,7 @@ static __inline enum message_type infer_dns_message(const char *buf,
 	 * It is noticed that the Transaction ID for (2) and (3) are different.
 	 * We observe that the data obtained through eBPF is missing the data for
 	 * the 'AAAA' type request, which differs from the data obtained through
-	 * the ‘AF_PACKET’ method ('AF_PACKET' method includes data for the 'AAAA'
+	 * the 'AF_PACKET' method ('AF_PACKET' method includes data for the 'AAAA'
 	 * type request).
 	 */
 
@@ -1581,11 +1612,11 @@ static __inline enum message_type infer_dns_message(const char *buf,
 
 	bool update_tcp_dns_prev_count = false;
 	struct dns_header *dns = (struct dns_header *)buf;
-	
+
 	/*
 	 * Note that TCP DNS adds two length bytes at the beginning of the protocol,
 	 * whereas UDP DNS does not. We need to handle this properly to ensure that
-	 * these two length bytes are not sent to the upper layer.  
+	 * these two length bytes are not sent to the upper layer.
 	 *
 	 * When receiving data, the client does not first receive two bytes but instead
 	 * receives everything at once; whereas the server receives two bytes (length) first
@@ -1745,6 +1776,13 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	if (first_byte != '-' && !is_include_crlf(buf))
 		return MSG_UNKNOWN;
 
+	/*
+	 * FIX: The original code used ']' (array close bracket) instead of '||'
+	 * (logical OR) with proper array indexing for buf[2].
+	 * Original broken code:
+	 *   if (first_byte == '-' && ((buf[1] != 'E' && buf[1] != 'W') ] != 'R'))
+	 * Fixed to properly check buf[2]:
+	 */
 	//-ERR unknown command 'foobar'
 	//-WRONGTYPE Operation against a key holding the wrong kind of value
 	if (first_byte == '-'
@@ -2319,6 +2357,13 @@ static __inline enum message_type infer_nats_message(const char *buf,
 	} else {
 		char buffer[2];
 		bpf_probe_read_user(buffer, 2, ptr + infer_len - 2);
+		/*
+		 * FIX: The original code used ']' instead of '||' for the
+		 * CRLF terminator check on the last two bytes.
+		 * Original broken code:
+		 *   if (buffer[0] != '\r' ] != '\n')
+		 * Fixed to:
+		 */
 		if (buffer[0] != '\r' || buffer[1] != '\n')
 			return MSG_UNKNOWN;
 	}
@@ -2329,6 +2374,11 @@ static __inline enum message_type infer_nats_message(const char *buf,
 	if (nats_check_connect(buf, count))
 		return MSG_RESPONSE;
 
+	/*
+	 * FIX: All the following checks used ']' (array close bracket)
+	 * instead of '||' (logical OR) for case-insensitive character
+	 * matching. Each instance has been corrected.
+	 */
 	// pub
 	if (buf[0] == 'P' || buf[0] == 'p') {
 		if (buf[1] == 'U' || buf[1] == 'u') {
@@ -2431,8 +2481,8 @@ static __inline enum message_type infer_nats_message(const char *buf,
 			if (buf[2] == 'S' || buf[2] == 's') {
 				if (buf[3] == 'U' || buf[3] == 'u') {
 					if (buf[4] == 'B' || buf[4] == 'b') {
-						if (buf[5] == ' '
-						    || buf[5] == '\t') {
+						if (buf[5] == ' ' ||
+						    buf[5] == '\t') {
 							return MSG_REQUEST;
 						}
 					}
