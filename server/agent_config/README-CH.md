@@ -8356,6 +8356,7 @@ processors:
         RocketMQ: 1-65535
         SofaRPC: 1-65535
         SomeIP: 1-65535
+        SqlServer: 1433
         TLS: 443,6443
         Tars: 1-65535
         WebSphereMQ: 1-65535
@@ -8384,7 +8385,7 @@ HTTP2: 1-65535
 注意：
 1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe 有效，对 Uprobe 无效；
    - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
-   - <mark>Oracle 和 TLS 仅在企业版中支持。</mark>
+   - <mark>Oracle、SqlServer 和 TLS 仅在企业版中支持。</mark>
 2. 如需控制 `gRPC` 协议，请使用 `HTTP2` 配置。
 
 #### Tag 过滤器 {#processors.request_log.filters.tag_filters}
@@ -8428,6 +8429,7 @@ processors:
         RocketMQ: []
         SOFARPC: []
         SomeIP: []
+        SqlServer: []
         TLS: []
         Tars: []
         WebSphereMQ: []
@@ -8509,7 +8511,7 @@ blacklist. Including business request logs might lead to breaks in the distribut
 
 Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
 
-<mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+<mark>Oracle, SqlServer and TLS is only supported in the Enterprise Edition.</mark>
 
 ###### 字段名 {#processors.request_log.filters.tag_filters.HTTP.field_name}
 
