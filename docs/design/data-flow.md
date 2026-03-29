@@ -1,5 +1,12 @@
 # 1. Data Collection
 
+DeepFlow uses two complementary data collection technologies:
+
+- **cBPF/AF_PACKET (Dispatcher)**: Classic BPF for network packet capture at L3/L4
+- **eBPF (EbpfCollector)**: Extended BPF for syscall tracing and L7 protocol parsing
+
+For a detailed explanation of these technologies, see [eBPF and cBPF Overview](../eBPF-cBPF-Overview.md).
+
 ## 1.1. Overview
 
 ```mermaid
