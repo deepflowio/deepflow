@@ -29,6 +29,10 @@ type FusionComputeConfig struct {
 	DailyTriggerTime string `default:"" yaml:"daily_trigger_time"` // %H:%M 05:00
 }
 
+type HuaWeiPrivateConfig struct {
+	Version string `default:"8.2.1" yaml:"version"` // 华为私有云 ManagerOne 版本
+}
+
 type CloudConfig struct {
 	KubernetesGatherInterval uint32              `default:"30" yaml:"kubernetes_gather_interval"`
 	AliyunRegionName         string              `default:"cn-beijing" yaml:"aliyun_region_name"`
@@ -41,6 +45,7 @@ type CloudConfig struct {
 	DebugEnabled             bool                `default:"false" yaml:"debug_enabled"`
 	QingCloudConfig          QingCloudConfig     `yaml:"qingcloud_config"`
 	FusionComputeConfig      FusionComputeConfig `yaml:"fusioncompute_config"`
+	HuaWeiPrivateConfig      HuaWeiPrivateConfig `yaml:"huaweiprivate_config"`
 }
 
 func SetCloudGlobalConfig(c CloudConfig) {
@@ -55,5 +60,6 @@ func SetCloudGlobalConfig(c CloudConfig) {
 		ProcessNameLenMax:   c.ProcessNameLenMax,
 		QingCloudConfig:     c.QingCloudConfig,
 		FusionComputeConfig: c.FusionComputeConfig,
+		HuaWeiPrivateConfig: c.HuaWeiPrivateConfig,
 	}
 }
