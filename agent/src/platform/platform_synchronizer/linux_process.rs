@@ -63,6 +63,8 @@ pub struct ProcessData {
     pub netns_id: u32,
     // pod container id in kubernetes
     pub container_id: String,
+    // business type, e.g. BIZ_TYPE_AI_AGENT = 1
+    pub biz_type: u8,
 }
 
 impl ProcessDataOp for Vec<ProcessData> {
@@ -195,6 +197,7 @@ impl TryFrom<&Process> for ProcessData {
             os_app_tags: vec![],
             netns_id: get_proc_netns(proc).unwrap_or_default() as u32,
             container_id: get_container_id(proc).unwrap_or("".to_string()),
+            biz_type: 0,
         })
     }
 }
@@ -221,6 +224,7 @@ impl From<&ProcessData> for ProcessInfo {
             },
             netns_id: Some(p.netns_id),
             container_id: Some(p.container_id.clone()),
+            biz_type: Some(p.biz_type as u32),
         }
     }
 }
@@ -364,7 +368,7 @@ pub(crate) fn get_all_process_in(conf: &OsProcScanConfig, ret: &mut Vec<ProcessD
         ret.push(process_data);
     }
     fill_child_proc_tag_by_parent(ret.as_mut());
-    proc_scan_hook(ret);
+    proc_scan_hook(proc_root, ret);
 }
 
 pub(super) fn get_self_proc() -> ProcResult<ProcessData> {
@@ -565,6 +569,7 @@ mod test {
                     }],
                     netns_id: 1,
                     container_id: "".into(),
+                    biz_type: 0,
                 },
                 ProcessData {
                     name: "parent".into(),
@@ -582,6 +587,7 @@ mod test {
                     }],
                     netns_id: 1,
                     container_id: "".into(),
+                    biz_type: 0,
                 },
                 ProcessData {
                     name: "child".into(),
@@ -599,6 +605,7 @@ mod test {
                     }],
                     netns_id: 1,
                     container_id: "".into(),
+                    biz_type: 0,
                 },
                 ProcessData {
                     name: "other".into(),
@@ -616,6 +623,7 @@ mod test {
                     }],
                     netns_id: 1,
                     container_id: "".into(),
+                    biz_type: 0,
                 },
             ];
 

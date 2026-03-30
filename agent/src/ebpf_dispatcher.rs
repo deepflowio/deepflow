@@ -61,6 +61,8 @@ use crate::common::l7_protocol_log::{
     get_all_protocol, L7ProtocolBitmap, L7ProtocolParserInterface,
 };
 use crate::common::meta_packet::{MetaPacket, SegmentFlags};
+#[cfg(feature = "enterprise")]
+use crate::common::proc_event::PROC_LIFECYCLE_FORK;
 use crate::common::proc_event::{BoxedProcEvents, EventType, ProcEvent};
 use crate::common::{FlowAclListener, FlowAclListenerId};
 use crate::config::handler::{CollectorAccess, EbpfAccess, EbpfConfig, LogParserAccess};
@@ -116,6 +118,29 @@ pub struct EbpfCounter {
 
 pub struct SyncEbpfCounter {
     counter: Arc<EbpfCounter>,
+}
+
+#[cfg(feature = "enterprise")]
+fn register_ai_agent_child(event: &BoxedProcEvents) {
+    if let Some(info) = event.0.proc_lifecycle_info() {
+        if info.lifecycle_type != PROC_LIFECYCLE_FORK {
+            return;
+        }
+        if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
+            let now = Duration::from_nanos(event.0.start_time());
+            registry.register_child(info.parent_pid, info.pid, now);
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn fill_ai_agent_root_pid(event: &mut BoxedProcEvents) {
+    if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
+        let root_pid = registry.get_root_pid(event.0.pid);
+        if root_pid != 0 {
+            event.0.ai_agent_root_pid = root_pid;
+        }
+    }
 }
 
 impl OwnedCountable for SyncEbpfCounter {
@@ -644,6 +669,10 @@ impl EbpfCollector {
                 if let Some(policy) = POLICY_GETTER.as_ref() {
                     event.0.pod_id = policy.lookup_pod_id(&container_id);
                 }
+                #[cfg(feature = "enterprise")]
+                register_ai_agent_child(&event);
+                #[cfg(feature = "enterprise")]
+                fill_ai_agent_root_pid(&mut event);
                 if let Err(e) = PROC_EVENT_SENDER.as_mut().unwrap().send(event) {
                     warn!("event send ebpf error: {:?}", e);
                 }
@@ -1076,7 +1105,7 @@ impl EbpfCollector {
             return Err(Error::EbpfRunningError);
         }
 
-        Self::ebpf_on_config_change(config.l7_log_packet_size);
+        Self::ebpf_on_config_change(config.l7_log_packet_size, config.ai_agent_max_payload_size);
 
         let ebpf_conf = &config.ebpf;
         let on_cpu = &ebpf_conf.profile.on_cpu;
@@ -1291,10 +1320,26 @@ impl EbpfCollector {
 
         ebpf::bpf_tracer_finish();
 
+        // Wire AI Agent PID → BPF map fd after all tracers are loaded
+        #[cfg(feature = "enterprise")]
+        {
+            use enterprise_utils::ai_agent::global_registry;
+            let fd = unsafe {
+                ebpf::bpf_table_get_map_fd(c"socket-trace".as_ptr(), c"__ai_agent_pids".as_ptr())
+            };
+            if fd >= 0 {
+                if let Some(registry) = global_registry() {
+                    registry.set_bpf_map_fd(fd);
+                }
+            } else {
+                warn!("AI Agent: could not find __ai_agent_pids BPF map (fd={}), file I/O monitoring will not work", fd);
+            }
+        }
+
         Ok(handle)
     }
 
-    fn ebpf_on_config_change(l7_log_packet_size: usize) {
+    fn ebpf_on_config_change(l7_log_packet_size: usize, ai_agent_max_payload_size: usize) {
         unsafe {
             let n = ebpf::set_data_limit_max(l7_log_packet_size as c_int);
             if n < 0 {
@@ -1306,6 +1351,24 @@ impl EbpfCollector {
                 info!(
                     "ebpf set l7_log_packet_size to {}, actual effective configuration is {}.",
                     l7_log_packet_size, n
+                );
+            }
+
+            let ai_agent_limit = if ai_agent_max_payload_size == 0 {
+                0
+            } else {
+                ai_agent_max_payload_size.min(i32::MAX as usize) as c_int
+            };
+            let n = ebpf::set_ai_agent_data_limit_max(ai_agent_limit);
+            if n < 0 {
+                warn!(
+                    "ebpf set ai_agent_max_payload_size({}) failed.",
+                    ai_agent_max_payload_size
+                );
+            } else if ai_agent_limit != 0 && n != ai_agent_limit {
+                info!(
+                    "ebpf set ai_agent_max_payload_size to {}, actual effective configuration is {}.",
+                    ai_agent_max_payload_size, n
                 );
             }
         }
@@ -1516,7 +1579,10 @@ impl EbpfCollector {
                 }
             }
 
-            Self::ebpf_on_config_change(config.l7_log_packet_size);
+            Self::ebpf_on_config_change(
+                config.l7_log_packet_size,
+                config.ai_agent_max_payload_size,
+            );
 
             #[cfg(feature = "extended_observability")]
             {

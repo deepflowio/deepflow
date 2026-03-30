@@ -72,6 +72,9 @@ if #[cfg(feature = "enterprise")] {
         use public::l7_protocol::NativeTag;
 
         use crate::flow_generator::protocol_logs::{auto_merge_custom_field, CUSTOM_FIELD_POLICY_PRIORITY};
+
+        use enterprise_utils::ai_agent::match_ai_agent_endpoint;
+        use crate::common::flow::BIZ_TYPE_AI_AGENT;
     }
 }
 
@@ -307,6 +310,9 @@ pub struct HttpInfo {
     pub grpc_status_code: Option<u16>,
 
     pub endpoint: Option<String>,
+    // set when AI Agent URL is detected (enterprise only)
+    #[serde(skip)]
+    protocol_str: Option<String>,
     // set by wasm plugin
     #[l7_log(response_result)]
     custom_result: Option<String>,
@@ -913,6 +919,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 user_agent: f.user_agent,
                 referer: f.referer,
                 rpc_service: f.service_name,
+                protocol_str: f.protocol_str,
                 attributes: {
                     if f.attributes.is_empty() {
                         None
@@ -1225,6 +1232,72 @@ impl HttpLog {
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    fn set_endpoint_by_config<F>(
+        &mut self,
+        param: &ParseParam,
+        config: &LogParserConfig,
+        info: &mut HttpInfo,
+        ai_matcher: F,
+    ) where
+        F: FnOnce(&[String], &str, u32, u8, std::time::Duration) -> Option<String>,
+    {
+        if info.path.is_empty() {
+            return;
+        }
+
+        // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
+        let endpoint_already_set = matches!(info.endpoint.as_ref(), Some(p) if !p.is_empty());
+        let path_owned = if let Some(p) = info.endpoint.as_ref().filter(|p| !p.is_empty()) {
+            p.clone()
+        } else {
+            info.path.clone()
+        };
+
+        // Priority chain: WASM/biz_field > AI Agent detection > http_endpoint Trie
+        let ai_agent_matched = if !endpoint_already_set {
+            if let Some(matched_path) = ai_matcher(
+                &config.ai_agent_endpoints,
+                path_owned.as_str(),
+                param.process_id,
+                param.socket_role,
+                std::time::Duration::from_micros(param.time),
+            ) {
+                info.endpoint = Some(matched_path);
+                info.biz_type = BIZ_TYPE_AI_AGENT;
+                info.protocol_str = Some("LLM".to_string());
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if !ai_agent_matched && !config.http_endpoint_disabled {
+            info.endpoint = Some(handle_endpoint(config, &path_owned));
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    fn set_endpoint_by_config(
+        &mut self,
+        _param: &ParseParam,
+        config: &LogParserConfig,
+        info: &mut HttpInfo,
+    ) {
+        if config.http_endpoint_disabled || info.path.is_empty() {
+            return;
+        }
+
+        let path_owned = if let Some(p) = info.endpoint.as_ref().filter(|p| !p.is_empty()) {
+            p.clone()
+        } else {
+            info.path.clone()
+        };
+        info.endpoint = Some(handle_endpoint(config, &path_owned));
+    }
+
     fn set_info_by_config(
         &mut self,
         param: &ParseParam,
@@ -1246,14 +1319,10 @@ impl HttpLog {
             }
         }
         info.service_name = info.grpc_package_service_name();
-        if !config.http_endpoint_disabled && info.path.len() > 0 {
-            // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
-            let path = match info.endpoint.as_ref() {
-                Some(p) if !p.is_empty() => p,
-                _ => &info.path,
-            };
-            info.endpoint = Some(handle_endpoint(config, path));
-        }
+        #[cfg(feature = "enterprise")]
+        self.set_endpoint_by_config(param, config, info, match_ai_agent_endpoint);
+        #[cfg(not(feature = "enterprise"))]
+        self.set_endpoint_by_config(param, config, info);
 
         let l7_dynamic_config = &config.l7_log_dynamic;
         if param.direction == PacketDirection::ServerToClient {
@@ -2519,6 +2588,50 @@ mod tests {
 
     const FILE_DIR: &str = "resources/test/flow_generator/http";
 
+    #[cfg(all(feature = "enterprise", feature = "libtrace"))]
+    fn make_ai_agent_parse_param<'a>(
+        config: &'a LogParserConfig,
+        process_id: u32,
+        socket_role: u8,
+    ) -> ParseParam<'a> {
+        ParseParam {
+            l4_protocol: IpProtocol::TCP,
+            ip_src: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            ip_dst: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            port_src: 0,
+            port_dst: 0,
+            flow_id: 0,
+            direction: PacketDirection::ClientToServer,
+            ebpf_type: EbpfType::GoHttp2Uprobe,
+            ebpf_param: Some(crate::common::l7_protocol_log::EbpfParam {
+                is_tls: false,
+                is_req_end: false,
+                is_resp_end: false,
+                process_kname: "",
+            }),
+            packet_start_seq: 0,
+            packet_end_seq: 0,
+            time: 0,
+            parse_perf: false,
+            parse_log: true,
+            parse_config: Some(config),
+            l7_perf_cache: None,
+            wasm_vm: Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            so_func: Default::default(),
+            stats_counter: None,
+            rrt_timeout: Duration::from_secs(10).as_micros() as usize,
+            buf_size: 0,
+            captured_byte: 0,
+            oracle_parse_conf: OracleConfig::default(),
+            iso8583_parse_conf: Iso8583ParseConfig::default(),
+            web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
+            icmp_data: None,
+            process_id,
+            socket_role,
+        }
+    }
+
     struct ValidateInfo<'a>(&'a HttpInfo);
 
     impl<'a> fmt::Display for ValidateInfo<'a> {
@@ -2817,6 +2930,8 @@ mod tests {
             iso8583_parse_conf: Iso8583ParseConfig::default(),
             web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
             icmp_data: None,
+            process_id: 0,
+            socket_role: 0,
         };
 
         //测试长度不正确
@@ -3246,6 +3361,29 @@ mod tests {
         let path = String::from("/api/v1/users/123?query=456");
         let expected_output = "/api/v1"; // prefixes match, but the keep_segments is 0, use the default value 2 segments
         assert_eq!(handle_endpoint(&config, &path), expected_output.to_string());
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "libtrace"))]
+    #[test]
+    fn test_ai_agent_endpoint_ignores_http_endpoint_disabled() {
+        let mut parser = HttpLog::new_v1();
+        let mut config = LogParserConfig::default();
+        config.http_endpoint_disabled = true;
+
+        let param = make_ai_agent_parse_param(&config, 42, 1);
+        let mut info = HttpInfo::default();
+        info.path = "/v1/chat/completions?model=gpt-4o".to_string();
+
+        parser.set_endpoint_by_config(
+            &param,
+            &config,
+            &mut info,
+            |_endpoints, _path, _pid, _socket_role, _now| Some("/v1/chat/completions".to_string()),
+        );
+
+        assert_eq!(info.endpoint.as_deref(), Some("/v1/chat/completions"));
+        assert_eq!(info.biz_type, BIZ_TYPE_AI_AGENT);
+        assert_eq!(info.protocol_str.as_deref(), Some("LLM"));
     }
 
     #[test]

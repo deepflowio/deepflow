@@ -469,6 +469,7 @@ type ChGProcess struct {
 	IconID          int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
 	CHostID         int    `gorm:"column:chost_id;type:int;not null" json:"CHOST_ID"`
 	L3EPCID         int    `gorm:"column:l3_epc_id;type:int" json:"L3_EPC_ID"`
+	BizType         int    `gorm:"column:biz_type;type:int;default:0" json:"BIZ_TYPE"`
 	TeamID          int    `gorm:"column:team_id;type:int;not null" json:"TEAM_ID"`
 	DomainID        int    `gorm:"column:domain_id;type:int;not null" json:"DOMAIN_ID"`
 	SubDomainID     int    `gorm:"column:sub_domain_id;type:int;default:0" json:"SUB_DOMAIN_ID"`

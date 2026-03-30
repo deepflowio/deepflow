@@ -245,6 +245,7 @@ pub struct MetaPacket<'a> {
     pub socket_id: u64,
     pub cap_start_seq: u64,
     pub cap_end_seq: u64,
+    pub reasm_bytes: u32,
     pub l7_protocol_from_ebpf: L7Protocol,
     //  流结束标识, 目前只有 go http2 uprobe 用到
     pub is_request_end: bool,
@@ -1035,6 +1036,9 @@ impl<'a> MetaPacket<'a> {
     #[inline]
     pub fn get_captured_byte(&self) -> usize {
         if self.tap_port.is_from(TapPort::FROM_EBPF) {
+            if self.reasm_bytes > 0 {
+                return self.reasm_bytes as usize;
+            }
             return self.packet_len as usize - 54;
         }
 
@@ -1083,6 +1087,13 @@ impl<'a> MetaPacket<'a> {
         self.payload_len += packet.payload_len;
         self.l4_payload_len += packet.l4_payload_len;
         self.cap_end_seq = packet.cap_start_seq;
+        // eBPF reassembly: propagate the latest cumulative reassembly bytes.
+        // `reasm_bytes` reflects the total bytes reassembled in the kernel for
+        // this flow. When we merge multiple MSG_REASM_* segments, we must keep
+        // the newest cumulative value, otherwise `get_captured_byte()` will
+        // stay at the first segment's size (e.g., HTTP headers only) and
+        // `captured_request_byte` will be incorrect for large bodies.
+        self.reasm_bytes = self.reasm_bytes.max(packet.reasm_bytes);
     }
 
     #[cfg(all(unix, feature = "libtrace"))]
@@ -1147,6 +1158,7 @@ impl<'a> MetaPacket<'a> {
         packet.signal_source = SignalSource::EBPF;
         packet.cap_start_seq = data.cap_seq;
         packet.cap_end_seq = data.cap_seq;
+        packet.reasm_bytes = data.reasm_bytes;
         packet.process_id = data.process_id;
         packet.thread_id = data.thread_id;
         packet.coroutine_id = data.coroutine_id;
@@ -1596,5 +1608,15 @@ mod tests {
             "packet size incorrect for\n{}",
             pkt
         );
+    }
+
+    #[test]
+    fn get_captured_byte_prefers_reasm_bytes_for_ebpf() {
+        let mut pkt = MetaPacket::default();
+        pkt.tap_port = TapPort::from_ebpf(1, 0);
+        pkt.packet_len = 54 + 16;
+        pkt.reasm_bytes = 200_000;
+
+        assert_eq!(pkt.get_captured_byte(), 200_000);
     }
 }
