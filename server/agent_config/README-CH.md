@@ -5172,6 +5172,35 @@ inputs:
 禁用 Node.js（V8）解释器剖析。禁用后将不采集 Node.js 进程的函数调用栈，
 可节省约 6.4 MB 内核内存（v8_unwind_info_map）。
 
+##### 禁用 Lua 剖析 {#inputs.ebpf.profile.languages.lua_disabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.profile.languages.lua_disabled`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    profile:
+      languages:
+        lua_disabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+禁用 Lua 解释器剖析。禁用后将不采集 Lua 进程的函数调用栈，
+可节省约 13 MB 内核内存（lua_tstate_map、lua_lang_flags_map、lua_unwind_info_map、lua_offsets_map、luajit_offsets_map）。
+
 ### 网络 {#inputs.ebpf.network}
 
 #### NIC optimization Enabled {#inputs.ebpf.network.nic_opt_enabled}
