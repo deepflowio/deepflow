@@ -1036,6 +1036,13 @@ impl<'a> MetaPacket<'a> {
     #[inline]
     pub fn get_captured_byte(&self) -> usize {
         if self.tap_port.is_from(TapPort::FROM_EBPF) {
+            // For eBPF reassembly segments, upper layers merge multiple packets
+            // by accumulating each segment's captured length. `reasm_bytes` is a
+            // cumulative counter on the socket, so using it here would double
+            // count across segment merges (100 + 200 + 300 ...).
+            if self.is_reassembly_segment() {
+                return self.l4_payload_len as usize;
+            }
             if self.reasm_bytes > 0 {
                 return self.reasm_bytes as usize;
             }
@@ -1063,6 +1070,16 @@ impl<'a> MetaPacket<'a> {
         }
 
         0
+    }
+
+    #[cfg(all(unix, feature = "libtrace"))]
+    fn is_reassembly_segment(&self) -> bool {
+        self.segment_flags != SegmentFlags::None
+    }
+
+    #[cfg(not(all(unix, feature = "libtrace")))]
+    fn is_reassembly_segment(&self) -> bool {
+        false
     }
 
     #[inline]
@@ -1435,12 +1452,12 @@ impl CacheItem for MetaPacket<'static> {
         self.l7_protocol_from_ebpf
     }
 
-    #[cfg(feature = "libtrace")]
+    #[cfg(all(unix, feature = "libtrace"))]
     fn is_segment_start(&self) -> bool {
         self.segment_flags == SegmentFlags::Start
     }
 
-    #[cfg(not(feature = "libtrace"))]
+    #[cfg(not(all(unix, feature = "libtrace")))]
     fn is_segment_start(&self) -> bool {
         false
     }
@@ -1618,5 +1635,53 @@ mod tests {
         pkt.reasm_bytes = 200_000;
 
         assert_eq!(pkt.get_captured_byte(), 200_000);
+    }
+
+    #[cfg(all(unix, feature = "libtrace"))]
+    #[test]
+    fn get_captured_byte_for_ebpf_reasm_segment_should_use_current_segment_len() {
+        let mut pkt = MetaPacket::default();
+        pkt.tap_port = TapPort::from_ebpf(1, 0);
+        pkt.segment_flags = SegmentFlags::Seg;
+        pkt.reasm_bytes = 200_000;
+        pkt.raw_from_ebpf = vec![0u8; 4096];
+        pkt.l4_payload_len = 4096;
+
+        assert_eq!(pkt.get_captured_byte(), 4096);
+    }
+
+    #[cfg(all(unix, feature = "libtrace"))]
+    #[test]
+    fn get_captured_byte_for_merged_ebpf_reasm_start_should_use_merged_payload_len() {
+        let mut start = MetaPacket::default();
+        start.tap_port = TapPort::from_ebpf(1, 0);
+        start.ebpf_type = EbpfType::GoHttp2Uprobe;
+        start.segment_flags = SegmentFlags::Start;
+        start.reasm_bytes = 16_384;
+        start.raw_from_ebpf = vec![0u8; 16_384];
+        start.l4_payload_len = 16_384;
+        start.payload_len = 16_384;
+        start.packet_len = 16_384 + 54;
+        start.cap_start_seq = 10;
+        start.cap_end_seq = 10;
+        start.sub_packets.push(SubPacket::default());
+
+        let mut seg = MetaPacket::default();
+        seg.tap_port = TapPort::from_ebpf(1, 0);
+        seg.ebpf_type = EbpfType::GoHttp2Uprobe;
+        seg.segment_flags = SegmentFlags::Seg;
+        seg.reasm_bytes = 32_768;
+        seg.raw_from_ebpf = vec![0u8; 16_384];
+        seg.l4_payload_len = 16_384;
+        seg.payload_len = 16_384;
+        seg.packet_len = 16_384 + 54;
+        seg.cap_start_seq = 11;
+        seg.cap_end_seq = 11;
+
+        start.merge(&mut seg);
+
+        assert_eq!(start.l4_payload_len, 32_768);
+        assert_eq!(start.reasm_bytes, 32_768);
+        assert_eq!(start.get_captured_byte(), 32_768);
     }
 }
