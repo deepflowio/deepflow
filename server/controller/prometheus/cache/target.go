@@ -225,11 +225,11 @@ func (t *target) getTargetLabelNames(tg *metadbmodel.PrometheusTarget) []string 
 }
 
 func (t *target) load() (recorderTargets, selfTargets []*metadbmodel.PrometheusTarget, err error) {
-	err = t.org.DB.Where(&metadbmodel.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Find(&recorderTargets).Error
+	err = t.org.DB.Select("id", "instance", "job", "epc_id", "pod_cluster_id", "other_labels", "create_method").Where(&metadbmodel.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Find(&recorderTargets).Error
 	if err != nil {
 		return
 	}
-	err = t.org.DB.Where(&metadbmodel.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&selfTargets).Error
+	err = t.org.DB.Select("id", "instance", "job", "epc_id", "pod_cluster_id", "other_labels", "create_method").Where(&metadbmodel.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&selfTargets).Error
 	return
 }
 

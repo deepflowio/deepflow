@@ -44,45 +44,61 @@ type appLabelNameToValue map[string]string
 type metricAndAPPLabelLayout struct {
 	org *common.ORG
 
-	layoutKeyToIndex sync.Map
+	mu               sync.RWMutex
+	layoutKeyToIndex map[LayoutKey]uint8
 }
 
 func newMetricAndAPPLabelLayout(org *common.ORG) *metricAndAPPLabelLayout {
 	return &metricAndAPPLabelLayout{
-		org: org,
+		org:              org,
+		layoutKeyToIndex: make(map[LayoutKey]uint8),
 	}
 }
 
-func (mll *metricAndAPPLabelLayout) Get() *sync.Map {
-	return &mll.layoutKeyToIndex
+// GetLayoutKeyToIndex returns a snapshot copy of the layoutKeyToIndex map.
+func (mll *metricAndAPPLabelLayout) GetLayoutKeyToIndex() map[LayoutKey]uint8 {
+	mll.mu.RLock()
+	defer mll.mu.RUnlock()
+	result := make(map[LayoutKey]uint8, len(mll.layoutKeyToIndex))
+	for k, v := range mll.layoutKeyToIndex {
+		result[k] = v
+	}
+	return result
 }
 
 func (mll *metricAndAPPLabelLayout) GetIndexByKey(key LayoutKey) (uint8, bool) {
-	if index, ok := mll.layoutKeyToIndex.Load(key); ok {
-		return index.(uint8), true
-	}
-	return 0, false
+	mll.mu.RLock()
+	defer mll.mu.RUnlock()
+	index, ok := mll.layoutKeyToIndex[key]
+	return index, ok
 }
 
 func (mll *metricAndAPPLabelLayout) Add(batch []*controller.PrometheusMetricAPPLabelLayout) {
+	mll.mu.Lock()
+	defer mll.mu.Unlock()
 	for _, m := range batch {
-		mll.layoutKeyToIndex.Store(NewLayoutKey(m.GetMetricName(), m.GetAppLabelName()), uint8(m.GetAppLabelColumnIndex()))
+		mll.layoutKeyToIndex[NewLayoutKey(m.GetMetricName(), m.GetAppLabelName())] = uint8(m.GetAppLabelColumnIndex())
 	}
 }
 
+// refresh rebuilds the entire cache from DB (snapshot-and-swap).
 func (mll *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
 	metricAPPLabelLayouts, err := mll.load()
 	if err != nil {
 		return err
 	}
+	newMap := make(map[LayoutKey]uint8, len(metricAPPLabelLayouts))
 	for _, l := range metricAPPLabelLayouts {
-		mll.layoutKeyToIndex.Store(NewLayoutKey(l.MetricName, l.APPLabelName), uint8(l.APPLabelColumnIndex))
+		newMap[NewLayoutKey(l.MetricName, l.APPLabelName)] = uint8(l.APPLabelColumnIndex)
 	}
+	mll.mu.Lock()
+	mll.layoutKeyToIndex = newMap
+	mll.mu.Unlock()
 	return nil
 }
 
 func (mml *metricAndAPPLabelLayout) load() ([]*metadbmodel.PrometheusMetricAPPLabelLayout, error) {
 	var metricAPPLabelLayouts []*metadbmodel.PrometheusMetricAPPLabelLayout
-	err := mml.org.DB.Find(&metricAPPLabelLayouts).Error
+	err := mml.org.DB.Select("metric_name", "app_label_name", "app_label_column_index").Find(&metricAPPLabelLayouts).Error
 	return metricAPPLabelLayouts, err
 }

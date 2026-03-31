@@ -19,8 +19,6 @@ package cache
 import (
 	"sync"
 
-	"github.com/cornelk/hashmap"
-
 	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
@@ -29,52 +27,74 @@ import (
 type labelName struct {
 	org *common.ORG
 
-	nameToID sync.Map
-	idToName *hashmap.Map[int, string]
+	mu       sync.RWMutex
+	nameToID map[string]int
+	idToName map[int]string
 }
 
 func newLabelName(org *common.ORG) *labelName {
 	return &labelName{
 		org:      org,
-		idToName: hashmap.New[int, string](),
+		nameToID: make(map[string]int),
+		idToName: make(map[int]string),
 	}
 }
 
 func (ln *labelName) GetIDByName(n string) (int, bool) {
-	if id, ok := ln.nameToID.Load(n); ok {
-		return id.(int), true
-	}
-	return 0, false
+	ln.mu.RLock()
+	defer ln.mu.RUnlock()
+	id, ok := ln.nameToID[n]
+	return id, ok
 }
 
 func (ln *labelName) GetNameByID(id int) (string, bool) {
-	if name, ok := ln.idToName.Get(id); ok {
-		return name, true
+	ln.mu.RLock()
+	defer ln.mu.RUnlock()
+	name, ok := ln.idToName[id]
+	return name, ok
+}
+
+// GetNameToID returns a snapshot copy of the nameToID map.
+func (ln *labelName) GetNameToID() map[string]int {
+	ln.mu.RLock()
+	defer ln.mu.RUnlock()
+	result := make(map[string]int, len(ln.nameToID))
+	for k, v := range ln.nameToID {
+		result[k] = v
 	}
-	return "", false
+	return result
 }
 
 func (ln *labelName) Add(batch []*controller.PrometheusLabelName) {
+	ln.mu.Lock()
+	defer ln.mu.Unlock()
 	for _, item := range batch {
-		ln.nameToID.Store(item.GetName(), int(item.GetId()))
-		ln.idToName.Set(int(item.GetId()), item.GetName())
+		ln.nameToID[item.GetName()] = int(item.GetId())
+		ln.idToName[int(item.GetId())] = item.GetName()
 	}
 }
 
+// refresh rebuilds the entire cache from DB (snapshot-and-swap).
 func (ln *labelName) refresh(args ...interface{}) error {
 	labelNames, err := ln.load()
 	if err != nil {
 		return err
 	}
+	newN2I := make(map[string]int, len(labelNames))
+	newI2N := make(map[int]string, len(labelNames))
 	for _, item := range labelNames {
-		ln.nameToID.Store(item.Name, item.ID)
-		ln.idToName.Set(item.ID, item.Name)
+		newN2I[item.Name] = item.ID
+		newI2N[item.ID] = item.Name
 	}
+	ln.mu.Lock()
+	ln.nameToID = newN2I
+	ln.idToName = newI2N
+	ln.mu.Unlock()
 	return nil
 }
 
 func (ln *labelName) load() ([]*metadbmodel.PrometheusLabelName, error) {
 	var labelNames []*metadbmodel.PrometheusLabelName
-	err := ln.org.DB.Find(&labelNames).Error
+	err := ln.org.DB.Select("id", "name").Find(&labelNames).Error
 	return labelNames, err
 }
