@@ -183,6 +183,18 @@ cfg_if::cfg_if! {
     }
 }
 
+#[cfg(test)]
+mod source_regression_tests {
+    #[test]
+    fn socket_trace_should_not_recheck_reassembly_after_infer_finish() {
+        let src = include_str!("kernel/socket_trace.bpf.c");
+        assert!(
+            !src.contains("check_and_set_data_reassembly(conn_info);"),
+            "post-INFER_FINISH reassembly recheck should not remain in socket_trace.bpf.c",
+        );
+    }
+}
+
 // Message types
 // Currently, except for source=EBPF_TYPE_GO_HTTP2_UPROBE,
 // the correctness of this direction cannot be guaranteed.

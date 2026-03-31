@@ -1913,16 +1913,6 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 
 	if (act == INFER_TERMINATE)
 		return -1;
-
-	if (act == INFER_FINISH &&
-	    conn_info->protocol != PROTO_UNKNOWN &&
-	    is_socket_info_valid(conn_info->socket_info_ptr) &&
-	    !conn_info->socket_info_ptr->allow_reassembly &&
-	    is_proto_reasm_enabled(conn_info->protocol)) {
-		conn_info->socket_info_ptr->allow_reassembly = true;
-		conn_info->socket_info_ptr->reasm_bytes = 0;
-		check_and_set_data_reassembly(conn_info);
-	}
 #if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
 	if (disable_kprobe && extra->source == DATA_SOURCE_SYSCALL)
 		return -1;
