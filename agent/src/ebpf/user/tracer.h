@@ -630,6 +630,7 @@ bool php_profiler_enabled(void);
 bool v8_profiler_enabled(void);
 bool python_profiler_enabled(void);
 int bpf_tracer_init(const char *log_file, bool is_stdout);
+int set_kick_kern_sched_priority(uint32_t priority);
 int tracer_bpf_load(struct bpf_tracer *tracer);
 int tracer_probes_init(struct bpf_tracer *tracer);
 int tracer_hooks_attach(struct bpf_tracer *tracer);
