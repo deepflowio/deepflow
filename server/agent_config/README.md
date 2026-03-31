@@ -5744,6 +5744,46 @@ The number of worker threads refers to how many threads participate
 in data processing in user-space. The actual maximal value is the number
 of CPU logical cores on the host.
 
+#### Kick Thread FIFO Priority {#inputs.ebpf.tunning.kick_kern_sched_priority}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.tunning.kick_kern_sched_priority`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    tunning:
+      kick_kern_sched_priority: 1
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 99] |
+
+**Description**:
+
+Controls the SCHED_FIFO priority of per-CPU kick threads.
+
+These threads wake up after the periodic timer expires and issue a
+lightweight syscall to trigger kernel-side timeout checks that flush
+batched eBPF data.
+
+Pay attention to this option when `metrics.period_push_max_delay`
+under `deepflow_tenant -> deepflow_agent_ebpf_collector` in Metrics
+Center reaches 199 ms. This means the periodic push delay has hit
+the exceeded marker, and the value can be increased appropriately.
+
+Higher values can reduce scheduling delay under CPU contention, but
+also increase the risk of interfering with other workloads.
+
 #### Perf Pages Count {#inputs.ebpf.tunning.perf_pages_count}
 
 **Tags**:

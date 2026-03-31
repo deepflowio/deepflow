@@ -3804,6 +3804,11 @@ impl ConfigHandler {
                     "inputs.ebpf.tunning.kernel_ring_size"
                 ),
                 (
+                    tunning.kick_kern_sched_priority,
+                    new_tunning.kick_kern_sched_priority,
+                    "inputs.ebpf.tunning.kick_kern_sched_priority"
+                ),
+                (
                     tunning.max_socket_entries,
                     new_tunning.max_socket_entries,
                     "inputs.ebpf.tunning.max_socket_entries"
