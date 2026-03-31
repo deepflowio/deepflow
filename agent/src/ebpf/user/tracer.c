@@ -66,6 +66,7 @@ char linux_release[128];	// Record the contents of 'uname -r'
  * Used to manage or inspect per-CPU kick threads.
  */
 kick_thread_info_t kick_threads[MAX_CPU_NR];
+static uint32_t kick_kern_sched_priority = KICK_KERN_SCHED_PRIORITY;
 volatile uint32_t *tracers_lock;
 extern volatile uint64_t sys_boot_time_ns;	// System boot time in nanoseconds
 volatile uint64_t prev_sys_boot_time_ns;	// The last updated system boot time, in nanoseconds
@@ -1638,13 +1639,23 @@ static int boot_time_update(void)
 	return ETR_OK;
 }
 
-/* 
+/*
  * Thread function to periodically trigger a kernel-related action.
  *
- * The kernel uses bundled bursts to send data to the user.  
- * The following method triggers a timeout check on all CPUs  
+ * The kernel uses bundled bursts to send data to the user.
+ * The following method triggers a timeout check on all CPUs
  * to push data residing in the eBPF buffer.
  */
+int set_kick_kern_sched_priority(uint32_t priority)
+{
+	if (priority == 0)
+		return ETR_INVAL;
+
+	kick_kern_sched_priority = priority;
+	ebpf_info("Set kick thread SCHED_FIFO priority to %u.\n", priority);
+	return 0;
+}
+
 static void *kick_kern_push_data(void *arg)
 {
 	int cpu_id = (int)((uintptr_t) arg);	// Extract CPU ID from the argument
@@ -1706,6 +1717,28 @@ retry_bind:
 		ebpf_warning("epoll_ctl failed: %s(%d)\n", strerror(errno),
 			     errno);
 		goto error;
+	}
+
+	/*
+	 * Use a low SCHED_FIFO priority from startup configuration for the per-CPU
+	 * kick thread.
+	 *
+	 * This thread wakes up periodically and issues a lightweight syscall to
+	 * trigger kernel-side timeout checks that flush batched eBPF data. Under
+	 * CPU contention, the default CFS scheduler may delay the dispatch of this
+	 * thread after the timer expires, which increases the actual kick interval.
+	 * Switching to SCHED_FIFO with a low priority helps reduce this wakeup
+	 * latency while limiting interference with other workloads.
+	 */
+	struct sched_param sched_param = {
+		.sched_priority = kick_kern_sched_priority,
+	};
+	if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &sched_param) != 0) {
+		ebpf_warning("Kick thread %d failed to set SCHED_FIFO priority %d: %s(%d)\n",
+			     tid, sched_param.sched_priority, strerror(errno), errno);
+	} else {
+		ebpf_info("Kick thread %d set SCHED_FIFO priority %d.\n",
+			  tid, sched_param.sched_priority);
 	}
 
 	struct epoll_event events[1];

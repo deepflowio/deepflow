@@ -997,6 +997,20 @@ impl EbpfCollector {
 
         ebpf::set_bpf_map_prealloc(!config.ebpf.socket.tunning.map_prealloc_disabled);
 
+        if let Err(e) = config.ebpf.tunning.validate() {
+            warn!(
+                "skip setting kick thread SCHED_FIFO priority to {}: {}",
+                config.ebpf.tunning.kick_kern_sched_priority, e
+            );
+        } else if ebpf::set_kick_kern_sched_priority(config.ebpf.tunning.kick_kern_sched_priority)
+            != 0
+        {
+            warn!(
+                "failed to set kick thread SCHED_FIFO priority to {}",
+                config.ebpf.tunning.kick_kern_sched_priority
+            );
+        }
+
         if config.ebpf.socket.tunning.fentry_enabled {
             ebpf::enable_fentry();
         } else {

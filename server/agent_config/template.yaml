@@ -3748,6 +3748,44 @@ inputs:
       userspace_worker_threads: 1
       # type: int
       # name:
+      #   en: Kick Thread FIFO Priority
+      #   ch: Kick 线程 FIFO 优先级
+      # unit:
+      # range: [1, 99]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Controls the SCHED_FIFO priority of per-CPU kick threads.
+      #
+      #     These threads wake up after the periodic timer expires and issue a
+      #     lightweight syscall to trigger kernel-side timeout checks that flush
+      #     batched eBPF data.
+      #
+      #     Pay attention to this option when `metrics.period_push_max_delay`
+      #     under `deepflow_tenant -> deepflow_agent_ebpf_collector` in Metrics
+      #     Center reaches 199 ms. This means the periodic push delay has hit
+      #     the exceeded marker, and the value can be increased appropriately.
+      #
+      #     Higher values can reduce scheduling delay under CPU contention, but
+      #     also increase the risk of interfering with other workloads.
+      #   ch: |-
+      #     控制每个 CPU 上 kick 线程的 SCHED_FIFO 优先级。
+      #
+      #     这些线程会在周期性定时器到期后唤醒，并通过轻量级 syscall
+      #     触发内核侧超时检查，将批量 eBPF 数据从缓冲区中推送出来。
+      #
+      #     当“指标中心”中 `deepflow_tenant -> deepflow_agent_ebpf_collector`
+      #     下的 `metrics.period_push_max_delay` 达到 199ms 时，需要关注这个
+      #     配置项。这说明周期性 push 延迟已经触发超限标记，此时可以适当提高
+      #     该配置项的取值。
+      #
+      #     更高的取值可以在 CPU 竞争时降低调度延迟，但也会增加对其他负载
+      #     造成干扰的风险。
+      kick_kern_sched_priority: 1
+      # type: int
+      # name:
       #   en: Perf Pages Count
       #   ch: Perf Page 数量
       # unit:

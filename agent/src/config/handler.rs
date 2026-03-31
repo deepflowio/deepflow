@@ -3577,6 +3577,14 @@ impl ConfigHandler {
             tunning.kernel_ring_size = new_tunning.kernel_ring_size;
             restart_agent = !first_run;
         }
+        if tunning.kick_kern_sched_priority != new_tunning.kick_kern_sched_priority {
+            info!(
+                "Update inputs.ebpf.tunning.kick_kern_sched_priority from {:?} to {:?}.",
+                tunning.kick_kern_sched_priority, new_tunning.kick_kern_sched_priority
+            );
+            tunning.kick_kern_sched_priority = new_tunning.kick_kern_sched_priority;
+            restart_agent = !first_run;
+        }
         if tunning.max_socket_entries != new_tunning.max_socket_entries {
             info!(
                 "Update inputs.ebpf.tunning.max_socket_entries from {:?} to {:?}.",

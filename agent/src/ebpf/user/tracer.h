@@ -626,6 +626,7 @@ int set_feature_regex(int feature, const char *pattern);
 bool is_feature_enabled(int feature);
 bool is_feature_matched(int feature, int pid, const char *path);
 int bpf_tracer_init(const char *log_file, bool is_stdout);
+int set_kick_kern_sched_priority(uint32_t priority);
 int tracer_bpf_load(struct bpf_tracer *tracer);
 int tracer_probes_init(struct bpf_tracer *tracer);
 int tracer_hooks_attach(struct bpf_tracer *tracer);
