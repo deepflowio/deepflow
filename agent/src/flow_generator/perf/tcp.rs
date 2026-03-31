@@ -798,10 +798,10 @@ impl TcpPerf {
                 // - B: SYN
                 // - C: SYN_ACK
                 // - D: SYN_ACK
-                // - E: ACK
+                // - E: ACK      // End the handshake
                 // - F: ACK
                 // rtt0: TimeStats{Count: 2, Sum: (C-A)+(D-A), Max: D-A}
-                // rtt1: TimeStats{Count: 2, Sum: (E-C)+(F-C), Max: F-C}
+                // rtt1: TimeStats{Count: 1, Sum: E-C, Max: E-C}
                 if (Self::is_handshake_ack_packet(same_dir, oppo_dir, p) || p.is_syn_ack())
                     && !oppo_dir.first_handshake_timestamp.is_zero()
                 {
@@ -852,12 +852,11 @@ impl TcpPerf {
 
             true
         } else {
-            if !p.is_ack() {
-                same_dir.rtt_calculable = false;
-                oppo_dir.rtt_calculable = false;
-                same_dir.rtt_full_calculable = false;
-            }
-            p.is_ack()
+            same_dir.rtt_calculable = false;
+            oppo_dir.rtt_calculable = false;
+            same_dir.rtt_full_calculable = false;
+
+            false
         };
 
         if Self::is_handshake_ack_packet(same_dir, oppo_dir, p) {
@@ -1924,7 +1923,7 @@ mod tests {
                 ..Default::default()
             },
             rtt_full: Timestamp::from_secs(11),
-            zero_win_count_0: 3,
+            zero_win_count_0: 4,
             zero_win_count_1: 5,
             syn: 1,
             synack: 1,
@@ -1993,13 +1992,36 @@ mod tests {
         .into();
         perf.parse(&packet, true).unwrap();
 
+        let packet = MiniMetaPacket {
+            data_offset: 20,
+            flags: TcpFlags::SYN,
+            seq: 111,
+            ack: 0,
+            timestamp: 3334,
+            ..Default::default()
+        }
+        .into();
+        perf.parse(&packet, true).unwrap();
+
         // SYN/ACK
         let packet = MiniMetaPacket {
             data_offset: 20,
             flags: TcpFlags::SYN_ACK,
             seq: 1111,
             ack: 112,
-            timestamp: 3334,
+            timestamp: 3335,
+            ..Default::default()
+        }
+        .into();
+        perf.parse(&packet, false).unwrap();
+
+        // SYN/ACK
+        let packet = MiniMetaPacket {
+            data_offset: 20,
+            flags: TcpFlags::SYN_ACK,
+            seq: 1111,
+            ack: 112,
+            timestamp: 3336,
             ..Default::default()
         }
         .into();
@@ -2029,32 +2051,44 @@ mod tests {
         .into();
         perf.parse(&packet, true).unwrap();
 
+        // ACK s2c
+        let packet = MiniMetaPacket {
+            data_offset: 20,
+            flags: TcpFlags::ACK,
+            seq: 1112,
+            ack: 113,
+            timestamp: 3354,
+            ..Default::default()
+        }
+        .into();
+        perf.parse(&packet, true).unwrap();
+
         println!("perf: {:?}", &perf.perf_data);
         assert_eq!(
-            perf.perf_data.rtt_0.count, 2,
+            perf.perf_data.rtt_0.count, 1,
             "rtt_0: {:?}",
             perf.perf_data.rtt_0
         );
         assert_eq!(
             perf.perf_data.rtt_0.max.as_secs(),
-            20,
+            9,
             "rtt_0: {:?}",
             perf.perf_data.rtt_0
         );
         assert_eq!(
-            perf.perf_data.rtt_1.count, 1,
+            perf.perf_data.rtt_1.count, 2,
             "rtt_1: {:?}",
             perf.perf_data.rtt_1
         );
         assert_eq!(
             perf.perf_data.rtt_1.max.as_secs(),
-            1,
+            3,
             "rtt_1: {:?}",
             perf.perf_data.rtt_1
         );
         assert_eq!(
             perf.perf_data.rtt_full.as_secs(),
-            21,
+            11,
             "rtt_full: {:?}",
             perf.perf_data.rtt_full
         );
@@ -2147,7 +2181,7 @@ mod tests {
         let mut output = String::new();
 
         let mut perf = TcpPerf::new(Arc::new(FlowPerfCounter::default()));
-        let capture = Capture::load_pcap(file);
+        let capture = Capture::load_pcap(&file);
         let packets = capture.collect::<Vec<_>>();
         assert!(
             packets.len() >= 2,
@@ -2171,7 +2205,12 @@ mod tests {
                 packet,
                 first_packet.lookup_key.src_ip == packet.lookup_key.src_ip,
             );
-            output.push_str(&format!("{}th perf data:\n{:#?}\n", i, perf.perf_data));
+            output.push_str(&format!(
+                "{}th perf data from {:?}:\n{:#?}\n",
+                i + 1,
+                file.as_ref(),
+                perf.perf_data
+            ));
             if check_seq_list {
                 output.push_str(&format!(
                     "\t\tclient seq_list: {:?}\n",
