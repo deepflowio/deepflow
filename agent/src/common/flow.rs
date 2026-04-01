@@ -1033,6 +1033,8 @@ impl Flow {
         if !other.request_domain.is_empty() {
             self.request_domain = other.request_domain.clone();
         }
+
+        self.reconcile_close_type_with_l7();
     }
 
     // FIXME 注意：由于FlowGenerator中TcpPerfStats在Flow方向调整之后才获取到，
@@ -1077,6 +1079,20 @@ impl Flow {
                     && perf.l7.err_server_count == 0
             }
             None => false,
+        }
+    }
+
+    fn reconcile_close_type_with_l7(&mut self) {
+        if self.flow_key.proto != IpProtocol::TCP {
+            return;
+        }
+        if self.close_type == CloseType::TcpClientRst
+            && !self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
+                .total_tcp_flags
+                .contains(TcpFlags::RST)
+            && self.has_l7_successful_response()
+        {
+            self.close_type = CloseType::TcpFinClientRst;
         }
     }
 
@@ -1153,7 +1169,7 @@ impl Flow {
                 );
                 CloseType::Unknown
             }
-        }
+        };
     }
 
     pub fn set_tap_side(
@@ -1652,6 +1668,46 @@ mod tests {
         flow.flow_perf_stats = Some(perf);
 
         flow.update_close_type(FlowState::Reset);
+
+        assert_eq!(flow.close_type, CloseType::TcpClientRst);
+    }
+
+    #[test]
+    fn sequential_merge_forced_report_success_should_reclassify_client_reset() {
+        let mut flow = flow_with_client_rst();
+        flow.flow_id = 100;
+        flow.close_type = CloseType::ForcedReport;
+        let mut perf = FlowPerfStats::default();
+        perf.l7.response_count = 1;
+        flow.flow_perf_stats = Some(perf);
+
+        let mut closed = flow_with_client_rst();
+        closed.flow_id = 100;
+        closed.close_type = CloseType::TcpClientRst;
+        closed.flow_perf_stats = Some(FlowPerfStats::default());
+
+        flow.sequential_merge(&closed);
+
+        assert_eq!(flow.flow_perf_stats.as_ref().unwrap().l7.response_count, 1);
+        assert_eq!(flow.close_type, CloseType::TcpFinClientRst);
+    }
+
+    #[test]
+    fn sequential_merge_forced_report_client_error_should_keep_client_reset() {
+        let mut flow = flow_with_client_rst();
+        flow.flow_id = 101;
+        flow.close_type = CloseType::ForcedReport;
+        let mut perf = FlowPerfStats::default();
+        perf.l7.response_count = 1;
+        perf.l7.err_client_count = 1;
+        flow.flow_perf_stats = Some(perf);
+
+        let mut closed = flow_with_client_rst();
+        closed.flow_id = 101;
+        closed.close_type = CloseType::TcpClientRst;
+        closed.flow_perf_stats = Some(FlowPerfStats::default());
+
+        flow.sequential_merge(&closed);
 
         assert_eq!(flow.close_type, CloseType::TcpClientRst);
     }
