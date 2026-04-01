@@ -16,6 +16,7 @@
 
 mod consts;
 mod hessian2;
+mod java;
 
 use std::{borrow::Cow, mem::replace};
 
@@ -959,6 +960,7 @@ impl DubboLog {
                 #[cfg(feature = "enterprise")]
                 cf_ctx,
             ),
+            JAVA_SERIALIZATION_ID => java::get_req_body_info(config, payload, info),
             KRYO_SERIALIZATION2_ID => kryo::get_req_body_info(config, payload, info),
             KRYO_SERIALIZATION_ID => kryo::get_req_body_info(config, payload, info),
             FASTJSON2_SERIALIZATION_ID => fastjson2::get_req_body_info(config, payload, info),
@@ -1216,6 +1218,7 @@ impl DubboHeader {
 
 #[cfg(test)]
 mod tests {
+    use core::convert::Into;
     use std::cell::RefCell;
     use std::fmt;
     use std::path::Path;
@@ -1290,6 +1293,7 @@ mod tests {
                     x_request_id: vec![],
                     trace_types: vec![
                         TraceType::Customize("EagleEye-TraceID".to_string()),
+                        TraceType::Customize("x-g-rid".to_string()),
                         TraceType::Sw8,
                     ],
                     span_types: vec![
@@ -1530,5 +1534,27 @@ mod tests {
             }
         }
         perf_stat
+    }
+
+    #[test]
+    fn decode_java_trace_id() {
+        let payload = [
+            0x74, 0x00, 0x07, 0x78, 0x2d, 0x67, 0x2d, 0x72, 0x69, 0x64, 0x74, 0x00, 0x28, 0x33,
+            0x38, 0x62, 0x61, 0x66, 0x65, 0x36, 0x36, 0x38, 0x63, 0x32, 0x62, 0x65, 0x64, 0x62,
+            0x36, 0x64, 0x33, 0x64, 0x32, 0x62, 0x35, 0x30, 0x66, 0x63, 0x66, 0x31, 0x37, 0x61,
+            0x37, 0x33, 0x34, 0x35, 0x32, 0x31, 0x30, 0x62, 0x66, 0x31, 0x34, 0x00, 0x00,
+        ];
+        let mut info = DubboInfo::default();
+
+        java::decode_trace_id(
+            &payload,
+            &TraceType::Customize("x-g-rid".to_string()),
+            &mut info,
+        );
+        assert_eq!(info.trace_ids.to_strings().len(), 1);
+        assert_eq!(
+            info.trace_ids.to_strings()[0],
+            "38bafe668c2bedb6d3d2b50fcf17a7345210bf14"
+        );
     }
 }
