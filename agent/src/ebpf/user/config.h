@@ -89,7 +89,7 @@
 #define PROG_ONCPU_OUTPUT_FOR_PE        "df_PE_oncpu_output"
 
 // lua related maps
-#define MAP_LUA_LANG_FLAGS_NAME         "__lang_flags_map"
+#define MAP_LUA_LANG_FLAGS_NAME         "__lua_lang_flags_map"
 #define MAP_LUA_UNWIND_INFO_NAME        "__lua_unwind_info_map"
 #define MAP_LUA_OFFSETS_NAME            "__lua_offsets_map"
 #define MAP_LUAJIT_OFFSETS_NAME         "__luajit_offsets_map"
@@ -181,6 +181,7 @@ enum cfg_feature_idx {
 	FEATURE_PROFILE_PYTHON,
 	FEATURE_PROFILE_PHP,
 	FEATURE_PROFILE_V8,
+	FEATURE_PROFILE_LUA,
 	FEATURE_CPU_BALANCER,
 	FEATURE_MAX,
 };
@@ -196,6 +197,7 @@ enum cfg_feature_idx {
 #define FEATURE_FLAG_PROFILE_PYTHON		(1 << FEATURE_PROFILE_PYTHON)
 #define FEATURE_FLAG_PROFILE_PHP		(1 << FEATURE_PROFILE_PHP)
 #define FEATURE_FLAG_PROFILE_V8			(1 << FEATURE_PROFILE_V8)
+#define FEATURE_FLAG_PROFILE_LUA		(1 << FEATURE_PROFILE_LUA)
 #define FEATURE_FLAG_CPU_BALANCER		(1 << FEATURE_CPU_BALANCER)
 
 #define FEATURE_FLAG_PROFILE				(FEATURE_FLAG_PROFILE_ONCPU | FEATURE_FLAG_PROFILE_OFFCPU | FEATURE_FLAG_PROFILE_MEMORY)
