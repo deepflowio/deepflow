@@ -532,6 +532,12 @@ impl RrtCache {
         let mut backward = L7PerfStats::default();
         for (key, _) in keys {
             if let Some(cache) = self.logs.pop(&key) {
+                // Requests were already counted (req=1) when they first entered the cache;
+                // re-counting them here would double-count. Only Responses need to be
+                // counted here because they were cached with None on arrival.
+                if cache.msg_type != LogMessageType::Response {
+                    continue;
+                }
                 if key.is_reversed() {
                     backward.sequential_merge(&L7PerfStats::from(&cache));
                 } else {

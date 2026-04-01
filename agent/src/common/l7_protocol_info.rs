@@ -397,11 +397,28 @@ where
                 if !cur_info.on_blacklist && cur_info.msg_type == LogMessageType::Request {
                     timeout_counter.in_cache[index] += 1;
                 }
+                let cur_is_req = cur_info.msg_type == LogMessageType::Request;
+                let cur_on_blacklist = cur_info.on_blacklist;
                 let prev_info = rtt_cache.put(key, cur_info).unwrap();
-                if !prev_info.on_blacklist {
-                    Some(L7PerfStats::from(&prev_info))
-                } else {
+                // Requests are counted (req=1) eagerly when they first enter the cache,
+                // so re-emitting a displaced Request here would double-count it.
+                // Responses were cached with None on arrival and must be counted here.
+                let mut result =
+                    if !prev_info.on_blacklist && prev_info.msg_type == LogMessageType::Response {
+                        L7PerfStats::from(&prev_info)
+                    } else {
+                        L7PerfStats::default()
+                    };
+                // A new Request entering the cache via this path (replacing a previous entry)
+                // was never counted by the first-entry path, so emit req=1 now so that
+                // "request accounted before" holds when its response arrives via is_request_of.
+                if !cur_on_blacklist && cur_is_req {
+                    result.inc_req();
+                }
+                if result == L7PerfStats::default() {
                     None
+                } else {
+                    Some(result)
                 }
             }
         } else {
