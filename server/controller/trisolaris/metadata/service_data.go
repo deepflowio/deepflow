@@ -387,11 +387,17 @@ func (r *ServiceRawData) mergeCustomServices(md *MetaData, dbDataCache *dbcache.
 		}
 
 		var ipPorts []customServiceIPPortKey
-		if len(cs.VPCIDs) != 1 {
+		var vpcID int
+		switch len(cs.VPCIDs) {
+		case 0:
+			// VPCIDs 为空，vpcID=0 代表匹配所有 VPC
+			vpcID = 0
+		case 1:
+			vpcID = cs.VPCIDs[0]
+		default:
 			log.Warningf("multi vpcs not supported for ip/port type custom_service (id: %v)", cs.ID)
 			continue
 		}
-		vpcID := cs.VPCIDs[0]
 		if cs.Type == CUSTOM_SERVICE_TYPE_IP {
 			ips := resources
 			for _, ip := range ips {
@@ -896,9 +902,12 @@ func (s *ServiceDataOP) mergeCustomServices(dbDataCache *dbcache.DBDataCache) []
 			service := &trident.ServiceInfo{
 				Type:        &serviceTypeCustomService,
 				Id:          proto.Uint32(uint32(customService.ID)),
-				EpcId:       proto.Uint32(uint32(ipPort.vpcID)),
 				Ips:         []string{ipPort.ip},
 				ServerPorts: serverPorts,
+			}
+			// vpcID=0 代表匹配所有 VPC，不设置 EpcId（保持 nil）
+			if ipPort.vpcID != 0 {
+				service.EpcId = proto.Uint32(uint32(ipPort.vpcID))
 			}
 			services = append(services, service)
 		}
