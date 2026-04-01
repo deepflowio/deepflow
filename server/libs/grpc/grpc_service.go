@@ -194,7 +194,7 @@ func (s *ServiceTable) QueryPodService(t *PlatformInfoTable, orgId uint16, podID
 
 func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ip4 uint32, ip6 net.IP, serverPort uint16, podServiceId, podGroupId, l3DeviceId, podId, podClusterID uint32, l3DeviceType uint8, protocol layers.IPProtocol) uint32 {
 	// for performance optimization, return directly. Since when epcID <= 0, there is no Service information.
-	if epcID <= 0 {
+	if epcID < 0 {
 		return 0
 	}
 	// If server port is 0, protocol is also ignored
@@ -273,7 +273,24 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ip4 uint32, 
 		// secondary query without port
 		if len(s.customServiceClusterIP6Table) != 0 && serverPort != 0 {
 			serviceId = s.customServiceClusterIP6Table[genEpcIDIP6Key(epcID, ip6, 0)]
+			if serviceId > 0 {
+				return serviceId
+			}
 		}
+
+		// thirdly query without epc
+		if len(s.customServiceClusterIP6PortTable) != 0 {
+			serviceId = s.customServiceClusterIP6PortTable[genEpcIDIP6PortKey(0, ip6, serviceProtocol, serverPort)]
+			if serviceId > 0 {
+				return serviceId
+			}
+		}
+
+		// fourthly query without epc/port
+		if len(s.customServiceClusterIP6Table) != 0 && serverPort != 0 {
+			serviceId = s.customServiceClusterIP6Table[genEpcIDIP6Key(0, ip6, 0)]
+		}
+
 		return serviceId
 	}
 
@@ -286,6 +303,20 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ip4 uint32, 
 
 	if len(s.customServiceClusterIP4Table) > 0 && serverPort != 0 {
 		serviceId = s.customServiceClusterIP4Table[genEpcIDIP4Key(epcID, ip4, 0)]
+		if serviceId > 0 {
+			return serviceId
+		}
+	}
+
+	if len(s.customServiceClusterIP4PortTable[serviceProtocol]) > 0 {
+		serviceId = s.customServiceClusterIP4PortTable[serviceProtocol][genEpcIDIP4PortKey(0, ip4, serverPort)]
+		if serviceId > 0 {
+			return serviceId
+		}
+	}
+
+	if len(s.customServiceClusterIP4Table) > 0 && serverPort != 0 {
+		serviceId = s.customServiceClusterIP4Table[genEpcIDIP4Key(0, ip4, 0)]
 	}
 
 	return serviceId
