@@ -55,14 +55,18 @@ func (lv *labelValue) Add(batch []*controller.PrometheusLabelValue) {
 }
 
 func (lv *labelValue) refresh(args ...interface{}) error {
-	labelValues, err := lv.load()
+	data, err := lv.load()
 	if err != nil {
 		return err
 	}
-	for _, item := range labelValues {
+	lv.processLoadedData(data)
+	return nil
+}
+
+func (lv *labelValue) processLoadedData(data []*metadbmodel.PrometheusLabelValue) {
+	for _, item := range data {
 		lv.valueToID.Set(item.Value, item.ID)
 	}
-	return nil
 }
 
 func (lv *labelValue) load() ([]*metadbmodel.PrometheusLabelValue, error) {
