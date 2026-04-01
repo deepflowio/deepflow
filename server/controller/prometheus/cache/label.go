@@ -72,15 +72,19 @@ func (l *label) Add(batch []*controller.PrometheusLabel) {
 }
 
 func (l *label) refresh(args ...interface{}) error {
-	ls, err := l.load()
+	data, err := l.load()
 	if err != nil {
 		return err
 	}
-	for _, item := range ls {
+	l.processLoadedData(data)
+	return nil
+}
+
+func (l *label) processLoadedData(data []*metadbmodel.PrometheusLabel) {
+	for _, item := range data {
 		k := NewLabelKey(item.Name, item.Value)
 		l.keyToID.Set(k, item.ID)
 	}
-	return nil
 }
 
 func (l *label) load() ([]*metadbmodel.PrometheusLabel, error) {
