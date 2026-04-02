@@ -700,8 +700,8 @@ global:
 
 **详细描述**:
 
-操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。无效的 ID 将被忽略。当前仅对
-dispatcher 线程生效。举例：
+操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。无效的 ID 将被忽略。该配置
+会作用于已存在的 deepflow-agent 线程，但 self-managed 的 kick-kern.* eBPF 线程除外。举例：
 ```yaml
 global:
   tunning:
@@ -11431,4 +11431,3 @@ dev:
 **详细描述**:
 
 未发布的采集器特性可以通过该选项开启。
-

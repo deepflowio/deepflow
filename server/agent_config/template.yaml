@@ -489,16 +489,17 @@ global:
     # description:
     #   en: |-
     #     CPU affinity is the tendency of a process to run on a given CPU for as long as possible
-    #     without being migrated to other processors. Invalid ID will be ignored. Currently only
-    #     works for dispatcher threads. Example:
+    #     without being migrated to other processors. Invalid ID will be ignored. The setting
+    #     applies to existing deepflow-agent threads as well, except self-managed kick-kern.*
+    #     eBPF threads. Example:
     #     ```yaml
     #     global:
     #       tunning:
     #         cpu_affinity: [1, 3, 5, 7, 9]
     #     ```
     #   ch: |-
-    #     操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。无效的 ID 将被忽略。当前仅对
-    #     dispatcher 线程生效。举例：
+    #     操作系统尽可能使用指定 ID 的 CPU 核运行 deepflow-agent 进程。无效的 ID 将被忽略。该配置
+    #     会作用于已存在的 deepflow-agent 线程，但 self-managed 的 kick-kern.* eBPF 线程除外。举例：
     #     ```yaml
     #     global:
     #       tunning:

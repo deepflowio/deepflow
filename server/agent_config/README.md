@@ -709,8 +709,9 @@ global:
 **Description**:
 
 CPU affinity is the tendency of a process to run on a given CPU for as long as possible
-without being migrated to other processors. Invalid ID will be ignored. Currently only
-works for dispatcher threads. Example:
+without being migrated to other processors. Invalid ID will be ignored. The setting
+applies to existing deepflow-agent threads as well, except self-managed kick-kern.*
+eBPF threads. Example:
 ```yaml
 global:
   tunning:
@@ -11697,4 +11698,3 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
-
