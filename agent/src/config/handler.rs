@@ -18,7 +18,7 @@ use std::{
     borrow::Cow,
     cmp::{max, min},
     collections::{HashMap, HashSet},
-    fmt, fs,
+    fmt,
     hash::{Hash, Hasher},
     io, iter,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
@@ -44,6 +44,8 @@ use nix::{
     sched::{sched_setaffinity, CpuSet},
     unistd::Pid,
 };
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use procfs::{process::Process, ProcError};
 use sysinfo::SystemExt;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use sysinfo::{CpuRefreshKind, RefreshKind, System};
@@ -2675,28 +2677,15 @@ impl ConfigHandler {
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
-    fn list_thread_ids() -> io::Result<Vec<i32>> {
-        let mut thread_ids = Vec::new();
-        for entry in fs::read_dir("/proc/self/task")? {
-            let entry = entry?;
-            if let Some(thread_id) = entry
-                .file_name()
-                .to_str()
-                .and_then(|name| name.parse::<i32>().ok())
-            {
-                thread_ids.push(thread_id);
-            }
-        }
-        Ok(thread_ids)
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    fn read_thread_name(thread_id: i32) -> io::Result<String> {
-        Ok(
-            fs::read_to_string(format!("/proc/self/task/{thread_id}/comm"))?
-                .trim()
-                .to_string(),
-        )
+    fn procfs_error_to_io(error: ProcError) -> io::Error {
+        let kind = match &error {
+            ProcError::PermissionDenied(_) => io::ErrorKind::PermissionDenied,
+            ProcError::NotFound(_) => io::ErrorKind::NotFound,
+            ProcError::Incomplete(_) => io::ErrorKind::UnexpectedEof,
+            ProcError::Io(inner, _) => inner.kind(),
+            ProcError::Other(_) | ProcError::InternalError(_) => io::ErrorKind::Other,
+        };
+        io::Error::new(kind, error)
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -2714,16 +2703,29 @@ impl ConfigHandler {
 
         for _ in 0..MAX_AFFINITY_SYNC_PASSES {
             let mut saw_new_thread = false;
+            let process = Process::myself().map_err(Self::procfs_error_to_io)?;
+            let tasks = process.tasks().map_err(Self::procfs_error_to_io)?;
 
-            for thread_id in Self::list_thread_ids()? {
-                saw_new_thread |= processed_thread_ids.insert(thread_id);
-
-                let thread_name = match Self::read_thread_name(thread_id) {
-                    Ok(name) => name,
-                    Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
+            for task in tasks {
+                let task = match task {
+                    Ok(task) => task,
+                    Err(ProcError::NotFound(_)) => continue,
                     Err(e) => {
                         if first_error.is_none() {
-                            first_error = Some(e);
+                            first_error = Some(Self::procfs_error_to_io(e));
+                        }
+                        continue;
+                    }
+                };
+                let thread_id = task.tid;
+                saw_new_thread |= processed_thread_ids.insert(thread_id);
+
+                let thread_name = match task.status() {
+                    Ok(status) => status.name,
+                    Err(ProcError::NotFound(_)) => continue,
+                    Err(e) => {
+                        if first_error.is_none() {
+                            first_error = Some(Self::procfs_error_to_io(e));
                         }
                         continue;
                     }
