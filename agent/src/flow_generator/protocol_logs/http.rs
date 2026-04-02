@@ -2503,7 +2503,7 @@ mod tests {
 
     #[cfg(feature = "libtrace")]
     use crate::config::{
-        config::{Iso8583ParseConfig, WebSphereMqParseConfig},
+        config::{Iso8583ParseConfig, NetSignParseConfig, WebSphereMqParseConfig},
         OracleConfig,
     };
     use crate::{
@@ -2816,6 +2816,7 @@ mod tests {
             oracle_parse_conf: OracleConfig::default(),
             iso8583_parse_conf: Iso8583ParseConfig::default(),
             web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
+            net_sign_parse_conf: NetSignParseConfig::default(),
             icmp_data: None,
         };
 

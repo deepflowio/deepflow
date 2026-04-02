@@ -34,7 +34,7 @@ use crate::common::l7_protocol_log::L7PerfCache;
 
 use crate::config::handler::LogParserConfig;
 use crate::config::{
-    config::{Iso8583ParseConfig, WebSphereMqParseConfig},
+    config::{Iso8583ParseConfig, NetSignParseConfig, WebSphereMqParseConfig},
     OracleConfig,
 };
 use crate::flow_generator::protocol_logs::pb_adapter::L7ProtocolSendLog;
@@ -84,6 +84,7 @@ fn get_req_param<'a>(
         oracle_parse_conf: OracleConfig::default(),
         iso8583_parse_conf: Iso8583ParseConfig::default(),
         web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
+        net_sign_parse_conf: NetSignParseConfig::default(),
         icmp_data: None,
     }
 }
@@ -126,6 +127,7 @@ fn get_resq_param<'a>(
         oracle_parse_conf: OracleConfig::default(),
         iso8583_parse_conf: Iso8583ParseConfig::default(),
         web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
+        net_sign_parse_conf: NetSignParseConfig::default(),
         icmp_data: None,
     }
 }

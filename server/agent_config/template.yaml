@@ -6002,6 +6002,25 @@ processors:
           #     - Document.ComuCnfm.OrigSndr
           filter_attributes_enabled: true
         # type: section
+        # name: NetSign
+        # description:
+        net_sign:
+          # type: bool
+          # name:
+          #   en: Extract Biz Data
+          #   ch: 提取 Biz Data
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: true
+          # description:
+          #   en: |-
+          #     Whether to extract the full bizData field into data attributes.
+          #   ch: |-
+          #     是否将完整 bizData 字段提取到数据属性中。
+          extract_biz_data_enabled: false
+        # type: section
         # name: MySQL
         # description:
         mysql:
@@ -6123,6 +6142,7 @@ processors:
         MongoDB: 1-65535
         Memcached: 11211
         ISO8583: 1-65535
+        NetSign: 1-65535
         Kafka: 1-65535
         MQTT: 1-65535
         AMQP: 1-65535
@@ -6286,6 +6306,7 @@ processors:
         MongoDB: []
         Memcached: []
         ISO8583: []
+        NetSign: []
         Kafka: []
         MQTT: []
         AMQP: []

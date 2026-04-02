@@ -131,6 +131,7 @@ cfg_if::cfg_if! {
             PingInfo(PingInfo),
             CustomInfo(CustomInfo),
             Iso8583Info(crate::flow_generator::protocol_logs::rpc::Iso8583Info),
+            NetSignInfo(crate::flow_generator::protocol_logs::rpc::NetSignInfo),
             // add new protocol info below
         );
     }

@@ -51,7 +51,7 @@ cfg_if::cfg_if! {
         pub mod tls;
 
         pub use mq::{WebSphereMqInfo, WebSphereMqLog};
-        pub use rpc::{Iso8583Info, Iso8583Log, SomeIpInfo, SomeIpLog};
+        pub use rpc::{Iso8583Info, Iso8583Log, NetSignInfo, NetSignLog, SomeIpInfo, SomeIpLog};
         pub use sql::{OracleInfo, OracleLog};
         pub use tls::{TlsInfo, TlsLog};
     }

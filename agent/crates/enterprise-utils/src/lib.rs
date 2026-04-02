@@ -357,6 +357,55 @@ pub mod l7 {
     }
 
     pub mod rpc {
+        pub mod net_sign {
+            use public::l7_protocol::LogMessageType;
+
+            pub const PROCESSOR_SIGN: &str = "RAWSignProcessor";
+            pub const PROCESSOR_VERIFY: &str = "PBCRAWVerifyProcessor";
+
+            #[derive(Default, Debug, Clone)]
+            pub struct NetSignFields {
+                pub processor_name: String,
+                pub operation: String,
+                pub result_code: String,
+                pub biz_data_parts: Vec<String>,
+                pub sig_present: bool,
+                pub sig_len: u32,
+                pub cert_id: String,
+                pub cert_serial: String,
+                pub cert_validity: String,
+                pub issuer_dn_ca: String,
+                pub app_ver: String,
+            }
+
+            impl NetSignFields {
+                pub fn trace_id(&self) -> &str {
+                    self.biz_data_parts.get(0).map(|s| s.as_str()).unwrap_or("")
+                }
+                pub fn biz_data(&self) -> String {
+                    self.biz_data_parts.join("|")
+                }
+                pub fn biz_system(&self) -> &str {
+                    self.biz_data_parts.get(6).map(|s| s.as_str()).unwrap_or("")
+                }
+                pub fn signer_id(&self) -> String {
+                    String::new()
+                }
+            }
+
+            #[derive(Default)]
+            pub struct NetSignParser;
+
+            impl NetSignParser {
+                pub fn check_payload(&self, _: &[u8]) -> Option<LogMessageType> {
+                    unimplemented!()
+                }
+                pub fn parse_payload(&self, _: &[u8]) -> Option<NetSignFields> {
+                    unimplemented!()
+                }
+            }
+        }
+
         pub mod iso8583 {
             use public::bitmap::Bitmap;
 
