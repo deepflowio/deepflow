@@ -30,7 +30,9 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
         mod some_ip;
         mod iso8583;
+        mod net_sign;
         pub use some_ip::{SomeIpInfo, SomeIpLog};
         pub use iso8583::{Iso8583Info, Iso8583Log};
+        pub use net_sign::{NetSignInfo, NetSignLog};
     }
 }

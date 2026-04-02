@@ -6118,6 +6118,7 @@ processors:
         MongoDB: 1-65535
         Memcached: 11211
         ISO8583: 1-65535
+        NetSign: 1-65535
         Kafka: 1-65535
         MQTT: 1-65535
         AMQP: 1-65535
@@ -6281,6 +6282,7 @@ processors:
         MongoDB: []
         Memcached: []
         ISO8583: []
+        NetSign: []
         Kafka: []
         MQTT: []
         AMQP: []

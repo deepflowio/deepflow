@@ -1269,6 +1269,56 @@ static __inline enum message_type infer_iso8583_message(const char *buf,
 	return MSG_REQUEST;
 }
 
+// NetSign 签名验签协议推断
+// TCP payload: msgSeq(2B) + outer_type(1B) + outer_len(10 ASCII digits) + inner TLVs + tail(4B)
+// Inner TLV:   tag(1B) + type(1B) + len(12 ASCII digits) + value
+//
+// Known processor names and their lengths:
+//   RAWSignProcessor        (len=16): operation tag at byte[43], len field ends at byte[56]
+//   PBCRAWVerifyProcessor   (len=21): operation tag at byte[48], len field ends at byte[61]
+// operation len last byte: '7' → "request", '8' → "response"
+static __inline enum message_type infer_net_sign_message(const char *buf,
+							  size_t count,
+							  struct conn_info_s
+							  *conn_info)
+{
+	if (!protocol_port_check_2(PROTO_NET_SIGN, conn_info))
+		return MSG_UNKNOWN;
+	if (conn_info->tuple.l4_protocol != IPPROTO_TCP || count < 62)
+		return MSG_UNKNOWN;
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_NET_SIGN)
+			return MSG_UNKNOWN;
+	}
+
+	// outer_len field [3..12] must be ASCII decimal digits
+	if (buf[3] < '0' || buf[3] > '9')
+		return MSG_UNKNOWN;
+	// First inner TLV tag must be TAG_PROCESSOR_NAME (0x01)
+	if ((uint8_t)buf[13] != 0x01)
+		return MSG_UNKNOWN;
+	// processorName len field [15..26]: leading bytes must be ASCII '0'
+	if (buf[15] != '0' || buf[24] != '0')
+		return MSG_UNKNOWN;
+
+	// RAWSignProcessor: processorName len = 16, operation tag at [43]
+	if (buf[25] == '1' && buf[26] == '6' && (uint8_t)buf[43] == 0x02) {
+		if (buf[56] == '7')
+			return MSG_REQUEST;   // operation = "request"
+		if (buf[56] == '8')
+			return MSG_RESPONSE;  // operation = "response"
+	}
+	// PBCRAWVerifyProcessor: processorName len = 21, operation tag at [48]
+	if (buf[25] == '2' && buf[26] == '1' && (uint8_t)buf[48] == 0x02) {
+		if (buf[61] == '7')
+			return MSG_REQUEST;   // operation = "request"
+		if (buf[61] == '8')
+			return MSG_RESPONSE;  // operation = "response"
+	}
+
+	return MSG_UNKNOWN;
+}
+
 #define CSTR_LEN(s) (sizeof(s) / sizeof(char) - 1)
 #define CSTR_MASK(s) ((~0ull) >> (64 - CSTR_LEN(s) * 8))
 // convert const string with length <= 8 for matching
@@ -4146,6 +4196,14 @@ infer_protocol_2(const char *infer_buf, size_t count,
 				       conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_ISO8583;
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_NET_SIGN && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_net_sign_message(infer_buf,
+					   count, conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_NET_SIGN;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_MEMCACHED && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -4490,6 +4548,14 @@ infer_protocol_1(struct ctx_info_s *ctx,
 						syscall_infer_len,
 						conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_ISO8583;
+				return inferred_message;
+			}
+			break;
+		case PROTO_NET_SIGN:
+			if ((inferred_message.type =
+			    infer_net_sign_message(infer_buf, count,
+						   conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_NET_SIGN;
 				return inferred_message;
 			}
 			break;
