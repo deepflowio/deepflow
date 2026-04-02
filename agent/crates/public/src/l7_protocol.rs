@@ -63,6 +63,7 @@ pub enum L7Protocol {
     SomeIp = 47,
     Iso8583 = 48,
     Triple = 49,
+    NetSign = 50,
 
     // SQL
     MySQL = 60,
@@ -149,6 +150,7 @@ impl From<String> for L7Protocol {
             "tls" => Self::TLS,
             "ping" => Self::Ping,
             "some/ip" | "someip" => Self::SomeIp,
+            "netsign" | "net-sign" | "net_sign" => Self::NetSign,
             _ => Self::Unknown,
         }
     }

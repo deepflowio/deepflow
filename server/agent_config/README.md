@@ -8426,6 +8426,38 @@ Enabling this option will cause the agent to retain only the following fields in
 - Document.ComuCnfm.OrigSndDt
 - Document.ComuCnfm.OrigSndr
 
+##### NetSign {#processors.request_log.application_protocol_inference.protocol_special_config.net_sign}
+
+###### Extract Biz Data {#processors.request_log.application_protocol_inference.protocol_special_config.net_sign.extract_biz_data_enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.net_sign.extract_biz_data_enabled`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        net_sign:
+          extract_biz_data_enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to extract the full bizData field into data attributes.
+
 ##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
 
 ###### Decompress MySQL Payload {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}
@@ -8581,6 +8613,7 @@ processors:
         MongoDB: 1-65535
         MySQL: 1-65535
         NATS: 1-65535
+        NetSign: 1-65535
         OpenWire: 1-65535
         Oracle: 1521
         PING: 1-65535
@@ -8654,6 +8687,7 @@ processors:
         MongoDB: []
         MySQL: []
         NATS: []
+        NetSign: []
         OpenWire: []
         Oracle: []
         PING: []
@@ -11741,3 +11775,4 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
+

@@ -1902,6 +1902,20 @@ impl Default for WebSphereMqConfig {
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
+pub struct NetSignConfig {
+    pub extract_biz_data_enabled: bool,
+}
+
+impl Default for NetSignConfig {
+    fn default() -> Self {
+        Self {
+            extract_biz_data_enabled: false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct MysqlConfig {
     pub decompress_payload: bool,
     pub endpoint_disabled: bool,
@@ -1978,6 +1992,7 @@ pub struct ProtocolSpecialConfig {
     pub oracle: OracleConfig,
     pub iso8583: Iso8583Config,
     pub web_sphere_mq: WebSphereMqConfig,
+    pub net_sign: NetSignConfig,
     pub mysql: MysqlConfig,
     pub grpc: GrpcConfig,
 }
@@ -2048,6 +2063,7 @@ impl Default for Filters {
                 ("Tars".to_string(), "1-65535".to_string()),
                 ("SomeIP".to_string(), "1-65535".to_string()),
                 ("ISO8583".to_string(), "1-65535".to_string()),
+                ("NetSign".to_string(), "1-65535".to_string()),
                 ("Triple".to_string(), "1-65535".to_string()),
                 ("MySQL".to_string(), "1-65535".to_string()),
                 ("PostgreSQL".to_string(), "1-65535".to_string()),
@@ -2080,6 +2096,7 @@ impl Default for Filters {
                 ("Tars".to_string(), vec![]),
                 ("SomeIP".to_string(), vec![]),
                 ("ISO8583".to_string(), vec![]),
+                ("NetSign".to_string(), vec![]),
                 ("Triple".to_string(), vec![]),
                 ("MySQL".to_string(), vec![]),
                 ("PostgreSQL".to_string(), vec![]),
@@ -3711,6 +3728,11 @@ impl Default for WebSphereMqParseConfig {
             filter_attributes_enabled: true,
         }
     }
+}
+
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct NetSignParseConfig {
+    pub extract_biz_data_enabled: bool,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]

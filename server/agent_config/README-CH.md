@@ -8238,6 +8238,38 @@ processors:
 - Document.ComuCnfm.OrigSndDt
 - Document.ComuCnfm.OrigSndr
 
+##### NetSign {#processors.request_log.application_protocol_inference.protocol_special_config.net_sign}
+
+###### 提取 Biz Data {#processors.request_log.application_protocol_inference.protocol_special_config.net_sign.extract_biz_data_enabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.net_sign.extract_biz_data_enabled`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        net_sign:
+          extract_biz_data_enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否将完整 bizData 字段提取到数据属性中。
+
 ##### MySQL {#processors.request_log.application_protocol_inference.protocol_special_config.mysql}
 
 ###### 解压 MySQL 数据包 {#processors.request_log.application_protocol_inference.protocol_special_config.mysql.decompress_payload}
@@ -8392,6 +8424,7 @@ processors:
         MongoDB: 1-65535
         MySQL: 1-65535
         NATS: 1-65535
+        NetSign: 1-65535
         OpenWire: 1-65535
         Oracle: 1521
         PING: 1-65535
@@ -8464,6 +8497,7 @@ processors:
         MongoDB: []
         MySQL: []
         NATS: []
+        NetSign: []
         OpenWire: []
         Oracle: []
         PING: []
@@ -11471,3 +11505,4 @@ dev:
 **详细描述**:
 
 未发布的采集器特性可以通过该选项开启。
+

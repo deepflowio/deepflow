@@ -69,6 +69,10 @@ pub const SOCK_DATA_SOME_IP: u16 = 47;
 #[allow(dead_code)]
 pub const SOCK_DATA_ISO8583: u16 = 48;
 #[allow(dead_code)]
+pub const SOCK_DATA_TRIPLE: u16 = 49;
+#[allow(dead_code)]
+pub const SOCK_DATA_NET_SIGN: u16 = 50;
+#[allow(dead_code)]
 pub const SOCK_DATA_MYSQL: u16 = 60;
 #[allow(dead_code)]
 pub const SOCK_DATA_POSTGRESQL: u16 = 61;
