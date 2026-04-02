@@ -53,6 +53,7 @@ use crate::{
     flow_generator::{flow_map::Config, FlowMap},
     handler::PacketHandlerBuilder,
     handler::{MiniPacket, PacketHandler},
+    liveness::{self, ComponentId, ComponentSpec, LivenessRegistry},
     rpc::get_timestamp,
     utils::environment::is_tt_hyper_v_compute,
 };
@@ -418,6 +419,7 @@ pub fn swap_last_timestamp(
 
 pub(super) struct MirrorModeDispatcher {
     pub(super) base: BaseDispatcher,
+    pub(super) liveness_registry: Option<LivenessRegistry>,
     pub(super) dedup: PacketDedupMap,
     pub(super) local_vm_mac_set: Arc<RwLock<HashMap<u32, MacAddr>>>,
     pub(super) local_segment_macs: Vec<MacAddr>,
@@ -543,11 +545,20 @@ impl MirrorModeDispatcher {
     }
 
     pub(super) fn run(&mut self) {
+        let liveness_handle = liveness::register(
+            self.liveness_registry.as_ref(),
+            ComponentSpec {
+                id: ComponentId::new("dispatcher", self.base.is.id as u32),
+                display_name: "dispatcher mirror".into(),
+                timeout_ms: BaseDispatcher::LIVENESS_TIMEOUT_MS,
+                ..Default::default()
+            },
+        );
         let base = &mut self.base.is;
         info!("Start mirror dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
-
+        let mut last_liveness = Duration::ZERO;
         let mut flow_map = FlowMap::new(
             base.id as u32,
             Some(base.flow_output_queue.clone()),
@@ -592,6 +603,7 @@ impl MirrorModeDispatcher {
                 )
             };
             if recved.is_none() {
+                liveness_handle.heartbeat();
                 flow_map.inject_flush_ticker(&config, Duration::ZERO);
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
@@ -604,6 +616,10 @@ impl MirrorModeDispatcher {
                 continue;
             }
             let (mut packet, mut timestamp) = recved.unwrap();
+            if timestamp >= last_liveness + BaseDispatcher::LIVENESS_HEARTBEAT_INTERVAL {
+                liveness_handle.heartbeat();
+                last_liveness = timestamp;
+            }
 
             match swap_last_timestamp(
                 &mut self.last_timestamp_array,
@@ -732,6 +748,7 @@ impl MirrorModeDispatcher {
             base.check_and_update_bpf(&mut self.base.engine);
         }
 
+        liveness_handle.pause();
         self.pipelines.clear();
         self.base.terminate_handler();
         self.last_timestamp_array.clear();

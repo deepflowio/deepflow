@@ -142,6 +142,9 @@ pub(super) struct InternalState {
 }
 
 impl BaseDispatcher {
+    pub(super) const LIVENESS_TIMEOUT_MS: u64 = 60_000;
+    pub(super) const LIVENESS_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
+
     pub(super) fn prepare_flow(
         meta_packet: &mut MetaPacket,
         tap_type: CaptureNetworkType,

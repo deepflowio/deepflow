@@ -50,6 +50,7 @@ use crate::common::{
 };
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
+use crate::liveness::{self, ComponentId, ComponentSpec, LivenessHandle, LivenessRegistry};
 use crate::rpc::get_timestamp;
 use crate::trident::AgentState;
 use crate::utils::environment::get_disk_usage;
@@ -265,9 +266,17 @@ pub struct Guard {
     system: Arc<Mutex<System>>,
     pid: Pid,
     cgroups_disabled: bool,
+    liveness: LivenessHandle,
 }
 
 impl Guard {
+    fn liveness_timeout_ms(guard_interval: Duration) -> u64 {
+        guard_interval
+            .as_millis()
+            .saturating_mul(2)
+            .min(u64::MAX as u128) as u64
+    }
+
     pub fn new(
         config: EnvironmentAccess,
         state: Arc<AgentState>,
@@ -276,10 +285,20 @@ impl Guard {
         cgroup_mount_path: String,
         is_cgroup_v2: bool,
         cgroups_disabled: bool,
+        liveness_registry: Option<LivenessRegistry>,
     ) -> Result<Self, &'static str> {
         let Ok(pid) = get_current_pid() else {
             return Err("get the process' pid failed: {}, deepflow-agent restart...");
         };
+        let liveness = liveness::register(
+            liveness_registry.as_ref(),
+            ComponentSpec {
+                id: ComponentId::new("guard", 0),
+                display_name: "guard".into(),
+                timeout_ms: Self::liveness_timeout_ms(config.load().guard_interval),
+                ..Default::default()
+            },
+        );
         Ok(Self {
             config,
             state,
@@ -294,6 +313,7 @@ impl Guard {
             system: Arc::new(Mutex::new(System::new())),
             pid,
             cgroups_disabled,
+            liveness,
         })
     }
 
@@ -540,9 +560,11 @@ impl Guard {
         #[cfg(target_os = "linux")]
         let mut last_page_reclaim = Instant::now();
         let feed = Arc::new(Feed::default());
+        let mut current_timeout_ms = Self::liveness_timeout_ms(config.load().guard_interval);
 
         self.running_watchdog.store(true, Relaxed);
         self.start_watchdog(feed.clone());
+        let liveness = self.liveness.clone();
 
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             let mut system_load = SystemLoadGuard::new(system.clone(), exception_handler.clone());
@@ -551,20 +573,29 @@ impl Guard {
             let feed = feed.clone();
 
             feed.add(FeedTitle::Init);
+            liveness.heartbeat();
 
             loop {
                 let config = config.load();
+                let timeout_ms = Self::liveness_timeout_ms(config.guard_interval);
+                if timeout_ms != current_timeout_ms {
+                    liveness.set_timeout_ms(timeout_ms);
+                    current_timeout_ms = timeout_ms;
+                }
                 let capture_mode = config.capture_mode;
                 let cpu_limit = config.max_millicpus;
                 let mut system_guard = system.lock().unwrap();
                 feed.add(FeedTitle::SystemGuard);
+                liveness.heartbeat();
                 if !system_guard.refresh_process_specifics(pid, ProcessRefreshKind::new().with_cpu()) {
                     warn!("refresh process with cpu failed");
                 }
                 drop(system_guard);
                 feed.add(FeedTitle::SystemLoad);
+                liveness.heartbeat();
                 system_load.check(config.system_load_circuit_breaker_threshold, config.system_load_circuit_breaker_recover, config.system_load_circuit_breaker_metric);
                 feed.add(FeedTitle::FileSize);
+                liveness.heartbeat();
                 match get_file_and_size_sum(&log_dir) {
                     Ok(file_and_size_sum) => {
                         let file_sizes_sum = file_and_size_sum.file_sizes_sum; // Total size of current log files (unit: B)
@@ -577,6 +608,7 @@ impl Guard {
                             error!("log files' size is over log_file_size_limit, current: {}B, log_file_size_limit: {}B",
                                file_sizes_sum, config.log_file_size);
                             feed.add(FeedTitle::ReleaseLog);
+                            liveness.heartbeat();
                             Self::release_log_files(file_and_size_sum, config.log_file_size);
                             exception_handler.set(Exception::LogFileExceeded, None);
                         } else {
@@ -592,6 +624,7 @@ impl Guard {
                     if cgroups_available && !cgroups_disabled {
                         if check_cgroup_result {
                             feed.add(FeedTitle::CheckCgroups);
+                            liveness.heartbeat();
                             check_cgroup_result = Self::check_cgroups(cgroup_mount_path.clone(), is_cgroup_v2);
                             if !check_cgroup_result {
                                 warn!("check cgroups failed, limit cpu or memory without cgroups");
@@ -599,6 +632,7 @@ impl Guard {
                         }
                         if !check_cgroup_result {
                             feed.add(FeedTitle::CheckCpu1);
+                            liveness.heartbeat();
                             if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                                 if over_cpu_limit {
                                     error!("cpu usage over cpu limit twice, deepflow-agent restart...");
@@ -614,6 +648,7 @@ impl Guard {
                         }
                     } else {
                         feed.add(FeedTitle::CheckCpu2);
+                        liveness.heartbeat();
                         if !Self::check_cpu(system.clone(), pid.clone(), cpu_limit) {
                             if over_cpu_limit {
                                 error!("cpu usage over cpu limit twice, deepflow-agent restart...");
@@ -632,6 +667,7 @@ impl Guard {
                 #[cfg(all(target_os = "linux", target_env = "gnu"))]
                 if config.idle_memory_trimming {
                     feed.add(FeedTitle::MallocTrim);
+                    liveness.heartbeat();
                     unsafe { let _ = malloc_trim(0); }
                 }
 
@@ -639,6 +675,7 @@ impl Guard {
                 if last_page_reclaim.elapsed() >= Duration::from_secs(60) {
                     last_page_reclaim = Instant::now();
                     feed.add(FeedTitle::PageCache);
+                    liveness.heartbeat();
                     let _ = crate::utils::cgroups::page_cache_reclaim_check(config.page_cache_reclaim_percentage);
                 }
 
@@ -651,6 +688,7 @@ impl Guard {
                     let memory_limit = config.max_memory;
                     if memory_limit != 0 {
                         feed.add(FeedTitle::GetMemory);
+                        liveness.heartbeat();
                         match get_memory_rss() {
                             Ok(memory_usage) => {
                                 if memory_usage >= memory_limit {
@@ -678,9 +716,11 @@ impl Guard {
                 }
 
                 feed.add(FeedTitle::SysFree);
+                liveness.heartbeat();
                 Self::check_sys_memory(config.sys_memory_limit as f64, config.sys_memory_metric, &mut under_sys_free_memory_limit, &mut last_exceeded, &exception_handler);
 
                 feed.add(FeedTitle::ThreadNum);
+                liveness.heartbeat();
                 match get_thread_num() {
                     Ok(thread_num) => {
                         let thread_limit = config.thread_threshold;
@@ -706,11 +746,13 @@ impl Guard {
 
                 if !in_container {
                     feed.add(FeedTitle::FreeDisk);
+                    liveness.heartbeat();
                     Self::check_free_disk(config.free_disk_circuit_breaker_percentage_threshold, config.free_disk_circuit_breaker_absolute_threshold,
                     &config.free_disk_circuit_breaker_directories, &exception_handler);
                 }
 
                 feed.add(FeedTitle::Exception);
+                liveness.heartbeat();
                 if exception_handler.has(Exception::SystemLoadCircuitBreaker) {
                     warn!("Set the state to melt_down when the system load exceeds the threshold.");
                     state.melt_down();
@@ -737,6 +779,7 @@ impl Guard {
                 }
 
                 feed.add(FeedTitle::SocketInfo);
+                liveness.heartbeat();
                 #[cfg(target_os = "linux")]
                 match SocketInfo::get() {
                     Ok(SocketInfo { tcp, tcp6, udp, udp6 }) => {
@@ -771,17 +814,20 @@ impl Guard {
                 }
 
                 feed.add(FeedTitle::RunningLock);
+                liveness.heartbeat();
                 let (running, notifier) = &*running_state;
                 let mut rg = running.lock().unwrap();
                 if !*rg {
                     break;
                 }
                 feed.add(FeedTitle::WaitTimeout);
+                liveness.heartbeat();
                 rg = notifier.wait_timeout(rg, config.guard_interval).unwrap().0;
                 if !*rg {
                     break;
                 }
             }
+            liveness.pause();
             info!("guard exited");
         }).unwrap();
 

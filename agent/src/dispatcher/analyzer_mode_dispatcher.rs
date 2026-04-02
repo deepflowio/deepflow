@@ -47,6 +47,7 @@ use crate::{
     },
     flow_generator::{flow_map::Config, FlowMap},
     handler::{MiniPacket, PacketHandler},
+    liveness::{self, ComponentId, ComponentSpec, LivenessRegistry},
     rpc::get_timestamp,
     utils::{
         bytes::read_u32_be,
@@ -153,6 +154,7 @@ pub(super) struct AnalyzerModeDispatcher {
     pub(super) pool_raw_size: usize,
     pub(super) flow_generator_thread_handler: Option<JoinHandle<()>>,
     pub(super) pipeline_thread_handler: Option<JoinHandle<()>>,
+    pub(super) liveness_registry: Option<LivenessRegistry>,
     pub(super) queue_debugger: Arc<QueueDebugger>,
     pub(super) stats_collector: Arc<stats::Collector>,
     pub(super) inner_queue_size: usize,
@@ -270,6 +272,7 @@ impl AnalyzerModeDispatcher {
         let collector_config = base.collector_config.clone();
         let packet_sequence_output_queue = base.packet_sequence_output_queue.clone(); // Enterprise Edition Feature: packet-sequence
         let stats = base.stats.clone();
+        let liveness_registry = self.liveness_registry.clone();
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let cpu_set = base.options.lock().unwrap().cpu_set;
 
@@ -277,6 +280,15 @@ impl AnalyzerModeDispatcher {
             thread::Builder::new()
                 .name("dispatcher-packet-to-flow-generator".to_owned())
                 .spawn(move || {
+                    let liveness = liveness::register(
+                        liveness_registry.as_ref(),
+                        ComponentSpec {
+                            id: ComponentId::new("dispatcher-flow-generator", id as u32),
+                            display_name: "dispatcher analyzer flow generator".into(),
+                            timeout_ms: BaseDispatcher::LIVENESS_TIMEOUT_MS,
+                            ..Default::default()
+                        },
+                    );
                     let mut timestamp_map: HashMap<CaptureNetworkType, Duration> = HashMap::new();
                     let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
                     let mut output_batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
@@ -298,7 +310,6 @@ impl AnalyzerModeDispatcher {
                             warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
                         }
                     }
-
                     while !terminated.load(Ordering::Relaxed) {
                         let config = Config {
                             flow: &flow_map_config.load(),
@@ -309,8 +320,11 @@ impl AnalyzerModeDispatcher {
                         };
 
                         match receiver.recv_all(&mut batch, Some(Duration::from_secs(1))) {
-                            Ok(_) => {}
+                            Ok(_) => {
+                                liveness.heartbeat();
+                            }
                             Err(queue::Error::Timeout) => {
+                                liveness.heartbeat();
                                 flow_map.inject_flush_ticker(&config, Duration::ZERO);
                                 continue;
                             }
@@ -535,6 +549,15 @@ impl AnalyzerModeDispatcher {
     }
 
     pub(super) fn run(&mut self) {
+        let liveness_handle = liveness::register(
+            self.liveness_registry.as_ref(),
+            ComponentSpec {
+                id: ComponentId::new("dispatcher", self.base.is.id as u32),
+                display_name: "dispatcher analyzer".into(),
+                timeout_ms: BaseDispatcher::LIVENESS_TIMEOUT_MS,
+                ..Default::default()
+            },
+        );
         let sender_to_parser = self.setup_inner_thread_and_queue();
         let base = &mut self.base.is;
         info!("Start analyzer dispatcher {}", base.log_id);
@@ -543,6 +566,7 @@ impl AnalyzerModeDispatcher {
         let id = base.id;
         let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
         let mut allocator = Allocator::new(self.raw_packet_block_size);
+        let mut last_liveness = Duration::ZERO;
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let cpu_set = base.options.lock().unwrap().cpu_set;
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -574,6 +598,7 @@ impl AnalyzerModeDispatcher {
                 }
             }
             if recved.is_none() {
+                liveness_handle.heartbeat();
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
@@ -586,6 +611,10 @@ impl AnalyzerModeDispatcher {
             }
 
             let (packet, timestamp) = recved.unwrap();
+            if timestamp >= last_liveness + BaseDispatcher::LIVENESS_HEARTBEAT_INTERVAL {
+                liveness_handle.heartbeat();
+                last_liveness = timestamp;
+            }
 
             // From here on, ANALYZER mode is different from LOCAL mode
             base.counter.rx.fetch_add(1, Ordering::Relaxed);
@@ -615,6 +644,7 @@ impl AnalyzerModeDispatcher {
             let _ = handler.join();
         }
 
+        liveness_handle.pause();
         self.base.terminate_handler();
         info!("Stopped dispatcher {}", self.base.is.log_id);
     }
