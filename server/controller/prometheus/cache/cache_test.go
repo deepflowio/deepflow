@@ -150,9 +150,11 @@ func newTestLabelName() *labelName {
 }
 
 func newTestLabelValue() *labelValue {
-	return &labelValue{
-		valueToID: hashmap.New[string, int](),
+	lv := &labelValue{
+		pending: make(map[string]int),
 	}
+	lv.active.Store(make(map[string]int))
+	return lv
 }
 
 func newTestLayout() *metricAndAPPLabelLayout {
@@ -168,15 +170,9 @@ func countSyncMap(m *sync.Map) int {
 	return count
 }
 
-func countStringIntHashmap(m *hashmap.Map[string, int]) int {
-	count := 0
-	m.Range(func(_ string, _ int) bool {
-		count++
-		return true
-	})
-	return count
+func countStringIntMap(m map[string]int) int {
+	return len(m)
 }
-
 func countLabelConcurrentMap(m map[LabelKey]int) int {
 	return len(m)
 }
@@ -188,12 +184,26 @@ func buildLabelConcurrentMap(n int) map[LabelKey]int {
 	}
 	return m
 }
+func buildLabelValueMap(n int) map[string]int {
+	m := make(map[string]int, n)
+	for i := 0; i < n; i++ {
+		m[fmt.Sprintf("lv_%d", i)] = i + 1
+	}
+	return m
+}
 
 func resetLabelState(l *label, active map[LabelKey]int) {
 	l.mu.Lock()
 	l.pending = make(map[LabelKey]int)
 	l.mu.Unlock()
 	l.replaceActive(active)
+}
+
+func resetLabelValueState(lv *labelValue, active map[string]int) {
+	lv.mu.Lock()
+	lv.pending = make(map[string]int)
+	lv.mu.Unlock()
+	lv.replaceActive(active)
 }
 
 func resetMetricNameSyncMaps(mn *metricName, n int) {
@@ -211,9 +221,7 @@ func refreshLabelCurrent(l *label, batch []*controller.PrometheusLabel) {
 }
 
 func refreshLabelValueCurrent(lv *labelValue, batch []*controller.PrometheusLabelValue) {
-	for _, item := range batch {
-		lv.valueToID.Set(item.GetValue(), int(item.GetId()))
-	}
+	lv.Add(batch)
 }
 
 type labelRefreshEntry struct {
@@ -258,13 +266,13 @@ func refreshLabelEntriesCurrent(l *label, entries []labelRefreshEntry) {
 		l.pending[entry.key] = entry.id
 	}
 }
-
 func refreshLabelValueEntriesCurrent(lv *labelValue, entries []labelValueRefreshEntry) {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
 	for _, entry := range entries {
-		lv.valueToID.Set(entry.value, entry.id)
+		lv.pending[entry.value] = entry.id
 	}
 }
-
 func benchmarkScaleEnabled(env string) bool {
 	return os.Getenv(env) != ""
 }
@@ -372,6 +380,9 @@ func TestLabelValue_AddAndGet(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, int(item.GetId()), id)
 	}
+	// 不存在的 value
+	_, ok := lv.GetIDByValue("nonexistent")
+	assert.False(t, ok)
 }
 
 func TestLayout_AddAndGet(t *testing.T) {
@@ -429,6 +440,30 @@ func TestMetricName_GetNameToID_SnapshotIsolation(t *testing.T) {
 
 	assert.Equal(t, 50, countSyncMap(snapshot)) // 快照隔离
 }
+func TestLabelValue_GetValueToID_SnapshotIsolation(t *testing.T) {
+	lv := newTestLabelValue()
+	lv.Add(generateProtoLabelValues(100))
+
+	// 取快照
+	snapshot := lv.GetValueToID()
+	assert.Equal(t, 100, countStringIntMap(snapshot))
+
+	// 取完快照后追加数据
+	extra := []*controller.PrometheusLabelValue{
+		{Value: proto.String("extra_value"), Id: proto.Uint32(999)},
+	}
+	lv.Add(extra)
+
+	// 快照不受影响
+	assert.Equal(t, 100, countStringIntMap(snapshot))
+	_, exists := snapshot["extra_value"]
+	assert.False(t, exists)
+
+	// 但新查询可以看到
+	id, ok := lv.GetIDByValue("extra_value")
+	assert.True(t, ok)
+	assert.Equal(t, 999, id)
+}
 
 // ============================================================================
 // 第三部分：Snapshot-and-Swap — 模拟 refresh 覆盖
@@ -460,6 +495,21 @@ func TestMetricName_SnapshotSwap_DiscardsOldEntries(t *testing.T) {
 	assert.Equal(t, 50, countSyncMap(mn.Get()))
 	_, ok := mn.GetIDByName("metric_100")
 	assert.False(t, ok)
+}
+func TestLabelValue_SnapshotSwap_DiscardsOldEntries(t *testing.T) {
+	lv := newTestLabelValue()
+
+	// 初始加载 200 条
+	lv.Add(generateProtoLabelValues(200))
+	assert.Equal(t, 200, countStringIntMap(lv.GetValueToID()))
+
+	// 模拟 refresh：只有前 100 条仍在 DB 中，后 100 条已被 Cleaner 删除
+	resetLabelValueState(lv, buildLabelValueMap(100))
+
+	// 验证旧条目已消失
+	assert.Equal(t, 100, countStringIntMap(lv.GetValueToID()))
+	_, ok := lv.GetIDByValue("lv_150")
+	assert.False(t, ok, "deleted entry should not exist after snapshot-swap")
 }
 
 // ============================================================================
@@ -562,27 +612,86 @@ func TestConcurrentLabelValue_ReadDuringSwap(t *testing.T) {
 	lv := newTestLabelValue()
 	lv.Add(generateProtoLabelValues(1000))
 
-	var wg sync.WaitGroup
+	const (
+		numReaders  = 8
+		numSwaps    = 20
+		readsPerRdr = 5000
+	)
 
-	for r := 0; r < 8; r++ {
+	var wg sync.WaitGroup
+	errCount := atomic.Int64{}
+
+	// 持续读
+	for r := 0; r < numReaders; r++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-			for i := 0; i < 5000; i++ {
-				lv.GetIDByValue(fmt.Sprintf("lv_%d", rng.Intn(1000)))
+			for i := 0; i < readsPerRdr; i++ {
+				value := fmt.Sprintf("lv_%d", rng.Intn(1000))
+				if _, ok := lv.GetIDByValue(value); !ok {
+					// refresh 期间旧数据可能暂时不可见，这是预期行为
+					errCount.Add(1)
+				}
 			}
 		}()
 	}
 
+	// 持续 swap
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for s := 0; s < 20; s++ {
-			for i := 0; i < 1000; i++ {
-				lv.valueToID.Set(fmt.Sprintf("lv_%d", i), i+1)
-			}
+		for s := 0; s < numSwaps; s++ {
+			resetLabelValueState(lv, buildLabelValueMap(1000))
 			runtime.Gosched()
+		}
+	}()
+
+	// 持续 Add
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for s := 0; s < numSwaps; s++ {
+			lv.Add([]*controller.PrometheusLabelValue{
+				{Value: proto.String("hot_value"), Id: proto.Uint32(99999)},
+			})
+			runtime.Gosched()
+		}
+	}()
+
+	wg.Wait()
+	t.Logf("reads that missed (expected during swap): %d / %d", errCount.Load(), int64(numReaders*readsPerRdr))
+}
+
+func TestConcurrentLabelValue_SnapshotDuringSwap(t *testing.T) {
+	lv := newTestLabelValue()
+	lv.Add(generateProtoLabelValues(500))
+
+	var wg sync.WaitGroup
+
+	// 读者不断拿快照并遍历
+	for r := 0; r < 4; r++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 100; i++ {
+				snapshot := lv.GetValueToID()
+				// 遍历快照——不应 panic 或 data race
+				count := 0
+				for range snapshot {
+					count++
+				}
+				_ = count
+			}
+		}()
+	}
+
+	// 写者不断 swap
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for s := 0; s < 50; s++ {
+			resetLabelValueState(lv, buildLabelValueMap(500))
 		}
 	}()
 
@@ -719,6 +828,57 @@ func TestLabel_LargeScale_MemoryRelease(t *testing.T) {
 	}
 }
 
+func TestLabelValue_LargeScale_MemoryRelease(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping large-scale test in short mode")
+	}
+
+	const N = 1_000_000
+
+	lv := newTestLabelValue()
+
+	// 阶段1：加载百万条数据
+	batch := make([]*controller.PrometheusLabelValue, N)
+	for i := 0; i < N; i++ {
+		batch[i] = &controller.PrometheusLabelValue{
+			Value: proto.String(fmt.Sprintf("lv_%d", i)),
+			Id:    proto.Uint32(uint32(i + 1)),
+		}
+	}
+	lv.Add(batch)
+
+	require.Equal(t, N, countStringIntMap(lv.GetValueToID()))
+
+	var m1 runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&m1)
+	t.Logf("after loading %d entries: HeapInuse = %d MB", N, m1.HeapInuse/1024/1024)
+
+	// 阶段2：模拟 refresh——只保留 10% 的数据（模拟 Cleaner 删除后 refresh）
+	kept := N / 10
+	newMap := make(map[string]int, kept)
+	for i := 0; i < kept; i++ {
+		newMap[fmt.Sprintf("lv_%d", i)] = i + 1
+	}
+	resetLabelValueState(lv, newMap)
+
+	// 触发 GC 让旧 map 被回收
+	runtime.GC()
+	runtime.GC() // 双次 GC 确保 finalizer 运行
+
+	var m2 runtime.MemStats
+	runtime.ReadMemStats(&m2)
+	t.Logf("after swap to %d entries: HeapInuse = %d MB", kept, m2.HeapInuse/1024/1024)
+
+	require.Equal(t, kept, countStringIntMap(lv.GetValueToID()))
+
+	// 旧 map 被回收后，HeapInuse 应显著下降
+	if m2.HeapInuse >= m1.HeapInuse {
+		t.Logf("WARNING: HeapInuse did not decrease after swap (m1=%d, m2=%d). "+
+			"This may be due to GC timing or other allocations.", m1.HeapInuse, m2.HeapInuse)
+	}
+}
+
 // ============================================================================
 // 第六部分：Benchmark — 性能基准
 // ============================================================================
@@ -815,7 +975,6 @@ func BenchmarkMetricName_GetIDByName(b *testing.B) {
 }
 
 // --- labelValue ---
-
 func BenchmarkLabelValue_GetIDByValue(b *testing.B) {
 	for _, size := range benchmarkLabelValueLookupSizes() {
 		lv := newTestLabelValue()
@@ -828,6 +987,34 @@ func BenchmarkLabelValue_GetIDByValue(b *testing.B) {
 					lv.GetIDByValue(fmt.Sprintf("lv_%d", rng.Intn(size)))
 				}
 			})
+		})
+	}
+}
+
+func BenchmarkLabelValue_GetValueToID_Snapshot(b *testing.B) {
+	for _, size := range []int{1000, 10_000, 100_000} {
+		lv := newTestLabelValue()
+		lv.Add(generateProtoLabelValues(size))
+
+		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_ = lv.GetValueToID()
+			}
+		})
+	}
+}
+
+func BenchmarkLabelValue_SnapshotSwap(b *testing.B) {
+	for _, size := range []int{1000, 10_000, 100_000} {
+		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
+			lv := newTestLabelValue()
+			for i := 0; i < b.N; i++ {
+				newMap := make(map[string]int, size)
+				for j := 0; j < size; j++ {
+					newMap[fmt.Sprintf("lv_%d", j)] = j + 1
+				}
+				resetLabelValueState(lv, newMap)
+			}
 		})
 	}
 }

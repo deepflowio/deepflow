@@ -248,7 +248,7 @@ func TestSelect_LabelValue_LoadOnlyIDAndValue(t *testing.T) {
 	require.NoError(t, err)
 
 	snapshot := lv.GetValueToID()
-	assert.Equal(t, 10000, countStringIntHashmap(snapshot))
+	assert.Equal(t, 10000, countStringIntMap(snapshot))
 	for i := 0; i < 10000; i++ {
 		id, ok := lv.GetIDByValue(fmt.Sprintf("lv_%d", i))
 		assert.True(t, ok, "value lv_%d should exist", i)
@@ -392,7 +392,7 @@ func TestSelect_LabelValue_1M_Refresh(t *testing.T) {
 	runtime.ReadMemStats(&m2)
 
 	snapshot := lv.GetValueToID()
-	assert.Equal(t, N, countStringIntHashmap(snapshot))
+	assert.Equal(t, N, countStringIntMap(snapshot))
 	t.Logf("refresh %d label_values: duration=%v, HeapInuse before=%dMB after=%dMB",
 		N, refreshDuration, m1.HeapInuse/1024/1024, m2.HeapInuse/1024/1024)
 
@@ -420,7 +420,7 @@ func TestSelect_LabelValue_1M_Refresh(t *testing.T) {
 	var m4 runtime.MemStats
 	runtime.ReadMemStats(&m4)
 
-	remaining := countStringIntHashmap(lv.GetValueToID())
+	remaining := countStringIntMap(lv.GetValueToID())
 	assert.Equal(t, N/10, remaining)
 	t.Logf("refresh after delete: remaining=%d, duration=%v, HeapInuse before=%dMB after=%dMB",
 		remaining, refreshDuration2, m3.HeapInuse/1024/1024, m4.HeapInuse/1024/1024)
