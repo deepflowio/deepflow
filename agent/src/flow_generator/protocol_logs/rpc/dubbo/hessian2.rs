@@ -54,7 +54,7 @@ fn lookup_str(payload: &[u8], trace_type: &TraceType) -> Option<String> {
             continue;
         }
 
-        if let (Some(context), _) =
+        if let Some((context, _)) =
             Hessian2Decoder::decode_string(payload, start + index + tag.len())
         {
             return Some(context);
