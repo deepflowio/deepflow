@@ -63,8 +63,8 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (lv *labelValue) processLoadedData(data []*metadbmodel.PrometheusLabelValue) {
-	for _, item := range data {
+func (lv *labelValue) processLoadedData(labelValues []*metadbmodel.PrometheusLabelValue) {
+	for _, item := range labelValues {
 		lv.valueToID.Set(item.Value, item.ID)
 	}
 }
