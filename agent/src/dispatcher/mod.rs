@@ -46,7 +46,7 @@ use log::error;
 use log::{debug, info, warn};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use nix::sched::CpuSet;
-use packet_dedup::*;
+use packet_dedup::PacketDedupMap;
 use public::debug::QueueDebugger;
 use special_recv_engine::Libpcap;
 #[cfg(target_os = "linux")]
@@ -87,6 +87,7 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::AppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
+    liveness::LivenessRegistry,
     policy::PolicyGetter,
     utils::{
         environment::get_mac_by_name,
@@ -768,6 +769,7 @@ pub struct DispatcherBuilder {
     analyzer_raw_packet_block_size: Option<usize>,
     tunnel_type_trim_bitmap: Option<TunnelTypeBitmap>,
     bond_group: Option<Vec<String>>,
+    liveness_registry: Option<LivenessRegistry>,
 }
 
 impl DispatcherBuilder {
@@ -946,6 +948,11 @@ impl DispatcherBuilder {
         self
     }
 
+    pub fn liveness_registry(mut self, v: Option<LivenessRegistry>) -> Self {
+        self.liveness_registry = v;
+        self
+    }
+
     pub fn build(mut self) -> Result<Dispatcher> {
         #[cfg(target_os = "linux")]
         let netns = self.netns.unwrap_or_default();
@@ -1009,6 +1016,12 @@ impl DispatcherBuilder {
             .platform_poller
             .take()
             .ok_or(Error::ConfigIncomplete("no platform poller".into()))?;
+        let dispatcher_config = self
+            .dispatcher_config
+            .take()
+            .ok_or(Error::ConfigIncomplete("no dispatcher config".into()))?;
+        let inner_interface_capture_enabled =
+            dispatcher_config.load().inner_interface_capture_enabled;
 
         let is = InternalState {
             log_id: {
@@ -1092,10 +1105,7 @@ impl DispatcherBuilder {
                 .collector_config
                 .take()
                 .ok_or(Error::ConfigIncomplete("no collector config".into()))?,
-            dispatcher_config: self
-                .dispatcher_config
-                .take()
-                .ok_or(Error::ConfigIncomplete("no dispatcher config".into()))?,
+            dispatcher_config,
             policy_getter: self
                 .policy_getter
                 .ok_or(Error::ConfigIncomplete("no policy".into()))?,
@@ -1146,7 +1156,7 @@ impl DispatcherBuilder {
                         stats_collector: collector.clone(),
                         flow_generator_thread_handler: None,
                         pipeline_thread_handler: None,
-                        pool_raw_size: snap_len,
+                        liveness_registry: self.liveness_registry.clone(),
                         inner_queue_size: self
                             .analyzer_queue_size
                             .take()
@@ -1154,21 +1164,28 @@ impl DispatcherBuilder {
                         raw_packet_block_size: self.analyzer_raw_packet_block_size.take().ok_or(
                             Error::ConfigIncomplete("no analyzer-raw-packet-block-size".into()),
                         )?,
+                        pool_raw_size: snap_len,
                     })
                 } else {
                     #[cfg(target_os = "linux")]
-                    if base
-                        .is
-                        .dispatcher_config
-                        .load()
-                        .inner_interface_capture_enabled
-                    {
-                        DispatcherFlavor::LocalMultins(LocalMultinsModeDispatcher::new(base))
+                    if inner_interface_capture_enabled {
+                        DispatcherFlavor::LocalMultins(LocalMultinsModeDispatcher {
+                            base,
+                            receiver_manager: None,
+                            liveness_registry: self.liveness_registry.clone(),
+                        })
                     } else {
-                        DispatcherFlavor::Local(LocalModeDispatcher { base, extractor })
+                        DispatcherFlavor::Local(LocalModeDispatcher {
+                            base,
+                            liveness_registry: self.liveness_registry.clone(),
+                            extractor,
+                        })
                     }
                     #[cfg(not(target_os = "linux"))]
-                    DispatcherFlavor::Local(LocalModeDispatcher { base })
+                    DispatcherFlavor::Local(LocalModeDispatcher {
+                        base,
+                        liveness_registry: self.liveness_registry.clone(),
+                    })
                 }
             }
             PacketCaptureType::Mirror => {
@@ -1187,6 +1204,7 @@ impl DispatcherBuilder {
                         )),
                         mac: get_mac_by_name(src_interface),
                         flow_generator_thread_handler: None,
+                        liveness_registry: self.liveness_registry.clone(),
                         queue_debugger,
                         inner_queue_size: self
                             .analyzer_queue_size
@@ -1200,13 +1218,14 @@ impl DispatcherBuilder {
                 } else {
                     DispatcherFlavor::Mirror(MirrorModeDispatcher {
                         base,
+                        liveness_registry: self.liveness_registry.clone(),
                         dedup: PacketDedupMap::new(),
                         local_vm_mac_set: Arc::new(RwLock::new(HashMap::new())),
                         local_segment_macs: vec![],
                         tap_bridge_macs: vec![],
-                        pipelines: HashMap::new(),
                         #[cfg(target_os = "linux")]
                         poller: Some(platform_poller),
+                        pipelines: HashMap::new(),
                         updated: Arc::new(AtomicBool::new(false)),
                         agent_type: Arc::new(RwLock::new(
                             self.agent_type
@@ -1234,8 +1253,9 @@ impl DispatcherBuilder {
                     pool_raw_size: snap_len,
                     flow_generator_thread_handler: None,
                     pipeline_thread_handler: None,
-                    stats_collector: collector.clone(),
+                    liveness_registry: self.liveness_registry.clone(),
                     queue_debugger,
+                    stats_collector: collector.clone(),
                     inner_queue_size: self
                         .analyzer_queue_size
                         .take()

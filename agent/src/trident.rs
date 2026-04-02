@@ -38,6 +38,7 @@ use flexi_logger::{
 };
 use log::{debug, error, info, warn};
 use num_enum::{FromPrimitive, IntoPrimitive};
+use serde::Serialize;
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::broadcast;
 use zstd::Encoder as ZstdEncoder;
@@ -78,6 +79,7 @@ use crate::{
         ApplicationLog, BoxedPrometheusExtra, Datadog, MetricServer, OpenTelemetry,
         OpenTelemetryCompressed, Profile, TelegrafMetric,
     },
+    liveness::{self, ComponentId, ComponentSpec, LivenessRegistry, LivenessServer},
     metric::document::BoxedDocument,
     monitor::Monitor,
     platform::synchronizer::Synchronizer as PlatformSynchronizer,
@@ -138,6 +140,8 @@ use public::{netns, packet, queue::Receiver};
 
 const MINUTE: Duration = Duration::from_secs(60);
 const COMMON_DELAY: u64 = 5; // Potential delay from other processing steps in flow_map
+const MAIN_LOOP_LIVENESS_TIMEOUT: Duration = Duration::from_secs(10);
+const MAIN_LOOP_COMPONENT_TIMEOUT_MS: u64 = 60_000;
 const QG_PROCESS_MAX_DELAY: u64 = 5; // FIXME: Potential delay from processing steps in qg, it is an estimated value and is not accurate; the data processing capability of the quadruple_generator should be optimized.
 
 #[derive(Debug, Default)]
@@ -300,6 +304,7 @@ impl AgentState {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct VersionInfo {
     pub name: &'static str,
     pub branch: &'static str,
@@ -747,6 +752,34 @@ impl Trident {
                 .build()
                 .unwrap(),
         );
+        let liveness_registry = config_handler
+            .static_config
+            .liveness_probe_enabled
+            .then(|| LivenessRegistry::new(version_info));
+        let liveness_server = liveness_registry
+            .as_ref()
+            .map(|registry| {
+                let server = LivenessServer::new(
+                    runtime.clone(),
+                    registry.clone(),
+                    config_handler.static_config.liveness_probe_port,
+                );
+                server
+                    .start()
+                    .map_err(|e| anyhow!("start liveness probe failed: {e}"))?;
+                Ok::<_, anyhow::Error>(server)
+            })
+            .transpose()?;
+        let main_loop_liveness = liveness_registry.as_ref();
+        let main_loop_liveness = liveness::register(
+            main_loop_liveness,
+            ComponentSpec {
+                id: ComponentId::new("main-loop", 0),
+                display_name: "main loop".into(),
+                timeout_ms: MAIN_LOOP_COMPONENT_TIMEOUT_MS,
+                ..Default::default()
+            },
+        );
 
         let mut k8s_opaque_id = None;
         if matches!(
@@ -762,7 +795,6 @@ impl Trident {
 
         let (ipmac_tx, _) = broadcast::channel::<IpMacPair>(1);
         let ipmac_tx = Arc::new(ipmac_tx);
-
         let synchronizer = Arc::new(Synchronizer::new(
             runtime.clone(),
             session.clone(),
@@ -781,6 +813,7 @@ impl Trident {
             config_path,
             ipmac_tx.clone(),
             ntp_diff,
+            liveness_registry.clone(),
         ));
         stats_collector.register_countable(
             &stats::NoTagModule("ntp"),
@@ -851,6 +884,7 @@ impl Trident {
             cgroup_mount_path,
             is_cgroup_v2,
             cgroups_disabled,
+            liveness_registry.clone(),
         ) {
             Ok(g) => g,
             Err(e) => {
@@ -926,10 +960,12 @@ impl Trident {
         let mut config_initialized = false;
 
         loop {
+            main_loop_liveness.heartbeat();
             let mut state_guard = state.state.lock().unwrap();
             if state.terminated.load(Ordering::Relaxed) {
                 mem::drop(state_guard);
                 if let Some(mut c) = components {
+                    main_loop_liveness.heartbeat();
                     c.stop();
                     guard.stop();
                     monitor.stop();
@@ -946,10 +982,21 @@ impl Trident {
                         }
                     }
                 }
+                main_loop_liveness.pause();
+                drop(liveness_server);
                 return Ok(());
             }
 
-            state_guard = state.notifier.wait(state_guard).unwrap();
+            let wait_result = state
+                .notifier
+                .wait_timeout(state_guard, MAIN_LOOP_LIVENESS_TIMEOUT)
+                .unwrap();
+            state_guard = wait_result.0;
+            if wait_result.1.timed_out() {
+                mem::drop(state_guard);
+                continue;
+            }
+            main_loop_liveness.heartbeat();
             match State::from(state_guard.0) {
                 State::Running if state_guard.1.is_none() => {
                     mem::drop(state_guard);
@@ -964,6 +1011,7 @@ impl Trident {
                         api_watcher.stop();
                     }
                     if let Some(ref mut c) = components {
+                        main_loop_liveness.heartbeat();
                         c.start();
                     }
                     continue;
@@ -976,6 +1024,7 @@ impl Trident {
                     }
                     if let Some(cfg) = new_config {
                         let agent_id = synchronizer.agent_id.read().clone();
+                        main_loop_liveness.heartbeat();
                         let callbacks = config_handler.on_config(
                             cfg.user_config,
                             &exception_handler,
@@ -989,6 +1038,7 @@ impl Trident {
                             first_run,
                         );
                         first_run = false;
+                        main_loop_liveness.heartbeat();
 
                         #[cfg(target_os = "linux")]
                         if config_handler
@@ -1002,6 +1052,7 @@ impl Trident {
                         }
 
                         if let Some(Components::Agent(c)) = components.as_mut() {
+                            main_loop_liveness.heartbeat();
                             for callback in callbacks {
                                 callback(&config_handler, c);
                             }
@@ -1020,6 +1071,7 @@ impl Trident {
                         if !config_initialized {
                             // start guard on receiving first config to ensure
                             // the meltdown thresholds are set by the config
+                            main_loop_liveness.heartbeat();
                             guard.start();
                             config_initialized = true;
                         }
@@ -1057,6 +1109,7 @@ impl Trident {
             let agent_id = synchronizer.agent_id.read().clone();
             match components.as_mut() {
                 None => {
+                    main_loop_liveness.heartbeat();
                     let callbacks = config_handler.on_config(
                         user_config,
                         &exception_handler,
@@ -1070,6 +1123,7 @@ impl Trident {
                         first_run,
                     );
                     first_run = false;
+                    main_loop_liveness.heartbeat();
 
                     #[cfg(target_os = "linux")]
                     if config_handler
@@ -1082,12 +1136,14 @@ impl Trident {
                         api_watcher.stop();
                     }
 
+                    main_loop_liveness.heartbeat();
                     let mut comp = Components::new(
                         &version_info,
                         &config_handler,
                         stats_collector.clone(),
                         &session,
                         &synchronizer,
+                        liveness_registry.clone(),
                         exception_handler.clone(),
                         #[cfg(target_os = "linux")]
                         libvirt_xml_extractor.clone(),
@@ -1104,6 +1160,7 @@ impl Trident {
                         ipmac_tx.clone(),
                     )?;
 
+                    main_loop_liveness.heartbeat();
                     comp.start();
 
                     if let Components::Agent(components) = &mut comp {
@@ -1113,6 +1170,7 @@ impl Trident {
                             parse_tap_type(components, tap_types);
                         }
 
+                        main_loop_liveness.heartbeat();
                         for callback in callbacks {
                             callback(&config_handler, components);
                         }
@@ -1121,6 +1179,7 @@ impl Trident {
                     components.replace(comp);
                 }
                 Some(Components::Agent(components)) => {
+                    main_loop_liveness.heartbeat();
                     let callbacks: Vec<fn(&ConfigHandler, &mut AgentComponents)> = config_handler
                         .on_config(
                             user_config,
@@ -1135,6 +1194,7 @@ impl Trident {
                             first_run,
                         );
                     first_run = false;
+                    main_loop_liveness.heartbeat();
 
                     #[cfg(target_os = "linux")]
                     if config_handler
@@ -1148,8 +1208,10 @@ impl Trident {
                     }
 
                     components.config = config_handler.candidate_config.clone();
+                    main_loop_liveness.heartbeat();
                     components.start();
 
+                    main_loop_liveness.heartbeat();
                     component_on_config_change(
                         &config_handler,
                         components,
@@ -1161,6 +1223,7 @@ impl Trident {
                         #[cfg(target_os = "linux")]
                         libvirt_xml_extractor.clone(),
                     );
+                    main_loop_liveness.heartbeat();
                     for callback in callbacks {
                         callback(&config_handler, components);
                     }
@@ -1326,6 +1389,7 @@ fn component_on_config_change(
                     components.toa_info_sender.clone(),
                     components.l4_flow_aggr_sender.clone(),
                     components.metrics_sender.clone(),
+                    components.liveness_registry.clone(),
                     #[cfg(target_os = "linux")]
                     netns::NsFile::Root,
                     #[cfg(target_os = "linux")]
@@ -1447,6 +1511,7 @@ fn component_on_config_change(
                     components.toa_info_sender.clone(),
                     components.l4_flow_aggr_sender.clone(),
                     components.metrics_sender.clone(),
+                    components.liveness_registry.clone(),
                     #[cfg(target_os = "linux")]
                     netns::NsFile::Root,
                     #[cfg(target_os = "linux")]
@@ -1833,6 +1898,7 @@ pub struct AgentComponents {
     pub last_dispatcher_component_id: usize,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub process_listener: Arc<ProcessListener>,
+    pub liveness_registry: Option<LivenessRegistry>,
     max_memory: u64,
     capture_mode: PacketCaptureType,
     agent_mode: RunningMode,
@@ -2119,6 +2185,7 @@ impl AgentComponents {
         stats_collector: Arc<stats::Collector>,
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
+        liveness_registry: Option<LivenessRegistry>,
         exception_handler: ExceptionHandler,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
@@ -2676,6 +2743,7 @@ impl AgentComponents {
                 toa_sender.clone(),
                 l4_flow_aggr_sender.clone(),
                 metrics_sender.clone(),
+                liveness_registry.clone(),
                 #[cfg(target_os = "linux")]
                 netns,
                 #[cfg(target_os = "linux")]
@@ -3234,6 +3302,7 @@ impl AgentComponents {
             bpf_options,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             process_listener,
+            liveness_registry,
         })
     }
 
@@ -3438,6 +3507,7 @@ impl Components {
         stats_collector: Arc<stats::Collector>,
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
+        liveness_registry: Option<LivenessRegistry>,
         exception_handler: ExceptionHandler,
         #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
         platform_synchronizer: Arc<PlatformSynchronizer>,
@@ -3461,6 +3531,7 @@ impl Components {
             stats_collector,
             session,
             synchronizer,
+            liveness_registry,
             exception_handler,
             #[cfg(target_os = "linux")]
             libvirt_xml_extractor,
@@ -3551,6 +3622,7 @@ fn build_dispatchers(
     toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
     l4_flow_aggr_sender: DebugSender<BoxedTaggedFlow>,
     metrics_sender: DebugSender<BoxedDocument>,
+    liveness_registry: Option<LivenessRegistry>,
     #[cfg(target_os = "linux")] netns: netns::NsFile,
     #[cfg(target_os = "linux")] kubernetes_poller: Arc<GenericPoller>,
     #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
@@ -3790,6 +3862,7 @@ fn build_dispatchers(
         .pcap_interfaces(pcap_interfaces.clone())
         .tunnel_type_trim_bitmap(dispatcher_config.tunnel_type_trim_bitmap)
         .bond_group(dispatcher_config.bond_group.clone())
+        .liveness_registry(liveness_registry.clone())
         .analyzer_raw_packet_block_size(
             user_config.inputs.cbpf.tunning.raw_packet_buffer_block_size,
         );

@@ -30,6 +30,7 @@ pub mod exception;
 pub mod flow_generator;
 mod handler;
 mod integration_collector;
+mod liveness;
 mod metric;
 mod monitor;
 mod platform;

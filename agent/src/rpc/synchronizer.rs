@@ -71,6 +71,7 @@ use crate::{
     },
     config::{config, UserConfig},
     exception::ExceptionHandler,
+    liveness::{self, ComponentId, ComponentSpec, LivenessRegistry},
     platform,
     rpc::session::Session,
     trident::{self, AgentId, AgentState, ChangedConfig, RunningMode, State, VersionInfo},
@@ -612,10 +613,12 @@ pub struct Synchronizer {
     agent_mode: RunningMode,
     standalone_runtime_config: Option<PathBuf>,
     ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
+    liveness_registry: Option<LivenessRegistry>,
 }
 
 impl Synchronizer {
     const LOG_THRESHOLD: usize = 3;
+    const LIVENESS_TIMEOUT_MS: u64 = 90_000;
 
     pub fn new(
         runtime: Arc<Runtime>,
@@ -635,6 +638,7 @@ impl Synchronizer {
         standalone_runtime_config: Option<PathBuf>,
         ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
         ntp_diff: Arc<AtomicI64>,
+        liveness_registry: Option<LivenessRegistry>,
     ) -> Synchronizer {
         Synchronizer {
             static_config: Arc::new(StaticConfig {
@@ -669,6 +673,39 @@ impl Synchronizer {
             agent_mode,
             standalone_runtime_config,
             ipmac_tx,
+            liveness_registry,
+        }
+    }
+
+    fn sync_liveness_spec() -> ComponentSpec {
+        ComponentSpec {
+            id: ComponentId::new("synchronizer", 0),
+            display_name: "synchronizer sync".into(),
+            // Synchronizer already has escape/restart handling, so liveness here is kept only
+            // for debugging visibility and should not fail the global probe.
+            required: false,
+            timeout_ms: Self::LIVENESS_TIMEOUT_MS,
+            ..Default::default()
+        }
+    }
+
+    fn triggered_liveness_spec() -> ComponentSpec {
+        ComponentSpec {
+            id: ComponentId::new("synchronizer", 1),
+            display_name: "synchronizer triggered".into(),
+            required: false,
+            timeout_ms: Self::LIVENESS_TIMEOUT_MS,
+            ..Default::default()
+        }
+    }
+
+    fn standalone_liveness_spec() -> ComponentSpec {
+        ComponentSpec {
+            id: ComponentId::new("synchronizer", 2),
+            display_name: "synchronizer standalone".into(),
+            required: false,
+            timeout_ms: Self::LIVENESS_TIMEOUT_MS,
+            ..Default::default()
         }
     }
 
@@ -1311,10 +1348,14 @@ impl Synchronizer {
         let flow_acl_listener = self.flow_acl_listener.clone();
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
+        let liveness_registry = self.liveness_registry.clone();
         let mut ntp_receiver = ntp_receiver.take().unwrap();
         self.threads.lock().push(self.runtime.spawn(async move {
+            let liveness =
+                liveness::register(liveness_registry.as_ref(), Self::triggered_liveness_spec());
             let mut grpc_failed_count = 0;
             while running.load(Ordering::SeqCst) {
+                liveness.heartbeat();
                 let response = session
                     .grpc_push_with_statsd(Synchronizer::generate_sync_request(
                         &agent_id,
@@ -1339,6 +1380,7 @@ impl Synchronizer {
 
                 let mut stream = response.unwrap().into_inner();
                 while running.load(Ordering::SeqCst) {
+                    liveness.heartbeat();
                     let message = stream.message().await;
                     if session.get_version() != version {
                         info!("grpc server or config changed");
@@ -1399,6 +1441,7 @@ impl Synchronizer {
                         }
                     }
 
+                    liveness.heartbeat();
                     Self::on_response(
                         session.get_current_server(),
                         message,
@@ -1808,8 +1851,12 @@ impl Synchronizer {
         let mut sync_interval = DEFAULT_SYNC_INTERVAL;
         let standalone_runtime_config = self.standalone_runtime_config.as_ref().unwrap().clone();
         let flow_acl_listener = self.flow_acl_listener.clone();
+        let liveness_registry = self.liveness_registry.clone();
         self.threads.lock().push(self.runtime.spawn(async move {
+            let liveness =
+                liveness::register(liveness_registry.as_ref(), Self::standalone_liveness_spec());
             while running.load(Ordering::SeqCst) {
+                liveness.heartbeat();
                 let mut user_config =
                     match UserConfig::load_from_file(standalone_runtime_config.as_path()) {
                         Ok(c) => c,
@@ -1878,10 +1925,14 @@ impl Synchronizer {
         let max_memory = self.max_memory.clone();
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
+        let liveness_registry = self.liveness_registry.clone();
         let mut ntp_receiver = ntp_receiver.take().unwrap();
         self.threads.lock().push(self.runtime.spawn(async move {
+            let liveness =
+                liveness::register(liveness_registry.as_ref(), Self::sync_liveness_spec());
             let mut grpc_failed_count = 0;
             while running.load(Ordering::SeqCst) {
+                liveness.heartbeat();
                 let upgrade_hostname = |s: &str| {
                     let r = status.upgradable_read();
                     if s.ne(&r.hostname) {
@@ -1919,6 +1970,7 @@ impl Synchronizer {
                 );
                 debug!("grpc sync request: {:?}", request);
 
+                liveness.heartbeat();
                 let response = session.grpc_sync_with_statsd(request).await;
                 if let Err(m) = response {
                     let (ip, port) = session.get_current_server();
@@ -1934,6 +1986,7 @@ impl Synchronizer {
                 session.set_request_failed(false);
                 grpc_failed_count = 0;
 
+                liveness.heartbeat();
                 Self::on_response(
                     session.get_current_server(),
                     response.unwrap().into_inner(),

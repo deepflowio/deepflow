@@ -49,6 +49,7 @@ use crate::{
     config::DispatcherConfig,
     flow_generator::{flow_map::Config, FlowMap},
     handler::MiniPacket,
+    liveness::{self, ComponentId, ComponentSpec, LivenessRegistry},
     rpc::get_timestamp,
     utils::bytes::read_u16_be,
 };
@@ -59,6 +60,7 @@ use public::{
 
 pub(super) struct LocalModeDispatcher {
     pub(super) base: BaseDispatcher,
+    pub(super) liveness_registry: Option<LivenessRegistry>,
     #[cfg(target_os = "linux")]
     pub(super) extractor: Arc<LibvirtXmlExtractor>,
 }
@@ -197,10 +199,20 @@ impl LocalModeDispatcher {
     }
 
     pub(super) fn run(&mut self) {
+        let liveness_handle = liveness::register(
+            self.liveness_registry.as_ref(),
+            ComponentSpec {
+                id: ComponentId::new("dispatcher", self.base.is.id as u32),
+                display_name: "dispatcher local".into(),
+                timeout_ms: BaseDispatcher::LIVENESS_TIMEOUT_MS,
+                ..Default::default()
+            },
+        );
         let base = &mut self.base.is;
         info!("Start dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
+        let mut last_liveness = Duration::ZERO;
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let cpu_set = base.options.lock().unwrap().cpu_set;
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -257,6 +269,7 @@ impl LocalModeDispatcher {
                 )
             };
             if recved.is_none() {
+                liveness_handle.heartbeat();
                 flow_map.inject_flush_ticker(&config, Duration::ZERO);
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
                     base.need_update_bpf.store(true, Ordering::Relaxed);
@@ -269,6 +282,10 @@ impl LocalModeDispatcher {
                 continue;
             }
             let (mut packet, mut timestamp) = recved.unwrap();
+            if timestamp >= last_liveness + BaseDispatcher::LIVENESS_HEARTBEAT_INTERVAL {
+                liveness_handle.heartbeat();
+                last_liveness = timestamp;
+            }
             let Some(meta_packet) = Self::process_packet(
                 base,
                 &config,
@@ -299,6 +316,7 @@ impl LocalModeDispatcher {
             base.check_and_update_bpf(&mut self.base.engine);
         }
 
+        liveness_handle.pause();
         self.base.terminate_handler();
         info!("Stopped dispatcher {}", self.base.is.log_id);
     }

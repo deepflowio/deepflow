@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     ffi::CString,
     mem,
@@ -33,6 +34,7 @@ use crate::{
     config::handler::DispatcherAccess,
     exception::ExceptionHandler,
     flow_generator::{flow_map::Config, FlowMap},
+    liveness::{self, ComponentId, ComponentSpec, LivenessRegistry},
     rpc::get_timestamp,
     utils::stats::QueueStats,
 };
@@ -41,20 +43,23 @@ const PACKET_BATCH_SIZE: usize = 64;
 const SETNS_RETRIES: usize = 3;
 
 pub struct LocalMultinsModeDispatcher {
-    base: BaseDispatcher,
+    pub(super) base: BaseDispatcher,
 
-    receiver_manager: Option<JoinHandle<()>>,
+    pub(super) receiver_manager: Option<JoinHandle<()>>,
+    pub(super) liveness_registry: Option<LivenessRegistry>,
 }
 
 impl LocalMultinsModeDispatcher {
-    pub fn new(base: BaseDispatcher) -> Self {
-        Self {
-            base,
-            receiver_manager: None,
-        }
-    }
-
     pub fn run(&mut self) {
+        let liveness_handle = liveness::register(
+            self.liveness_registry.as_ref(),
+            ComponentSpec {
+                id: ComponentId::new("dispatcher", self.base.is.id as u32),
+                display_name: "dispatcher local multins".into(),
+                timeout_ms: BaseDispatcher::LIVENESS_TIMEOUT_MS,
+                ..Default::default()
+            },
+        );
         info!("Start local multi-namespace dispatcher");
 
         let base = &mut self.base.is;
@@ -84,6 +89,8 @@ impl LocalMultinsModeDispatcher {
             counter: base.counter.clone(),
             ntp_diff: base.ntp_diff.clone(),
             bpf_controls: bpf_controls.clone(),
+            liveness_registry: self.liveness_registry.clone(),
+            liveness_id: id as u32,
             output: packet_input,
         };
         self.receiver_manager.replace(
@@ -129,8 +136,11 @@ impl LocalMultinsModeDispatcher {
             }
 
             match packet_output.recv_all(&mut batch, Some(Duration::from_secs(1))) {
-                Ok(_) => {}
+                Ok(_) => {
+                    liveness_handle.heartbeat();
+                }
                 Err(queue::Error::Timeout) => {
+                    liveness_handle.heartbeat();
                     flow_map.inject_flush_ticker(&config, Duration::ZERO);
                     let mut bpf_controls = bpf_controls.lock().unwrap();
                     if base.need_update_bpf.swap(false, Ordering::Relaxed) {
@@ -225,6 +235,7 @@ impl LocalMultinsModeDispatcher {
                 });
             }
         }
+        liveness_handle.pause();
         info!("Stopping local multi-namespace dispatcher");
         info!("Wait for receiver manager to stop");
         self.receiver_manager.take().unwrap().join().unwrap();
@@ -258,6 +269,7 @@ struct BpfControl {
 struct PktReceiver {
     pause: Arc<AtomicBool>,
     terminated: Arc<AtomicBool>,
+    dispatcher_id: u32,
     netns: NsFile,
 
     config: DispatcherAccess,
@@ -269,6 +281,7 @@ struct PktReceiver {
     exception_handler: ExceptionHandler,
     counter: Arc<PacketCounter>,
     ntp_diff: Arc<AtomicI64>,
+    liveness_registry: Option<LivenessRegistry>,
 
     bpf_control: Arc<BpfControl>,
 
@@ -276,6 +289,20 @@ struct PktReceiver {
 }
 
 impl PktReceiver {
+    fn liveness_id(dispatcher_id: u32, ns_ino: u32) -> u32 {
+        let _ = dispatcher_id;
+        ns_ino
+    }
+
+    fn liveness_display_name(netns: &NsFile) -> Cow<'static, str> {
+        match netns {
+            NsFile::Root => Cow::Borrowed("dispatcher local multins packet receiver (root)"),
+            _ => Cow::Owned(format!(
+                "dispatcher local multins packet receiver ({netns})"
+            )),
+        }
+    }
+
     fn check_and_update_bpf(
         is_root: bool,
         log_prefix: &str,
@@ -357,7 +384,21 @@ impl PktReceiver {
             } else {
                 self.netns.get_inode().unwrap() as u32
             };
+            let is_root = self.netns == NsFile::Root;
             let log_prefix = format!("pkt-rcv({}):", self.netns);
+            let liveness = liveness::register(
+                self.liveness_registry.as_ref(),
+                ComponentSpec {
+                    id: ComponentId::new(
+                        "dispatcher-local-multins-pkt-receiver",
+                        Self::liveness_id(self.dispatcher_id, ns_ino),
+                    ),
+                    display_name: Self::liveness_display_name(&self.netns),
+                    timeout_ms: BaseDispatcher::LIVENESS_TIMEOUT_MS,
+                    ..Default::default()
+                },
+            );
+            let mut last_liveness = Duration::ZERO;
             // try to setns a few times because this can fail when process terminates
             for i in 1..=SETNS_RETRIES {
                 let e = match self.netns.open_and_setns() {
@@ -440,10 +481,11 @@ impl PktReceiver {
                     }
 
                     let Some((ref packet, timestamp)) = recved else {
+                        liveness.heartbeat();
                         drop(recved);
                         if self.bpf_control.need_update.swap(false, Ordering::Relaxed) {
                             Self::check_and_update_bpf(
-                                self.netns == NsFile::Root,
+                                is_root,
                                 &log_prefix,
                                 &self.bpf_control,
                                 &mut engine,
@@ -458,6 +500,10 @@ impl PktReceiver {
 
                     if self.pause.load(Ordering::Relaxed) {
                         continue;
+                    }
+                    if timestamp >= last_liveness + BaseDispatcher::LIVENESS_HEARTBEAT_INTERVAL {
+                        liveness.heartbeat();
+                        last_liveness = timestamp;
                     }
 
                     let buffer = allocator.allocate_with(&packet.data);
@@ -474,7 +520,7 @@ impl PktReceiver {
                     drop(recved);
                     if self.bpf_control.need_update.swap(false, Ordering::Relaxed) {
                         Self::check_and_update_bpf(
-                            self.netns == NsFile::Root,
+                            is_root,
                             &log_prefix,
                             &self.bpf_control,
                             &mut engine,
@@ -513,6 +559,8 @@ struct ReceiverManager {
     exception_handler: ExceptionHandler,
     counter: Arc<PacketCounter>,
     ntp_diff: Arc<AtomicI64>,
+    liveness_registry: Option<LivenessRegistry>,
+    liveness_id: u32,
 
     output: DebugSender<Packet>,
 }
@@ -551,6 +599,15 @@ impl ReceiverManager {
             super::set_cpu_affinity(&self.options);
 
             info!("Receiver manager started");
+            let liveness = liveness::register(
+                self.liveness_registry.as_ref(),
+                ComponentSpec {
+                    id: ComponentId::new("dispatcher-receiver-manager", self.liveness_id),
+                    display_name: "dispatcher receiver manager".into(),
+                    timeout_ms: BaseDispatcher::LIVENESS_TIMEOUT_MS,
+                    ..Default::default()
+                },
+            );
 
             let mut loop_count = 0;
             let mut zombie_threads = vec![];
@@ -563,6 +620,7 @@ impl ReceiverManager {
                     thread::sleep(Duration::from_secs(1));
                     continue;
                 }
+                liveness.heartbeat();
 
                 // check if pkt receiver threads are running
                 let mut bpf_controls = self.bpf_controls.lock().unwrap();
@@ -659,6 +717,8 @@ impl ReceiverManager {
                         exception_handler: self.exception_handler.clone(),
                         counter: self.counter.clone(),
                         ntp_diff: self.ntp_diff.clone(),
+                        liveness_registry: self.liveness_registry.clone(),
+                        dispatcher_id: self.liveness_id,
                         bpf_control: bpf_control.clone(),
                         output: self.output.clone(),
                     };
