@@ -7,7 +7,7 @@ use std::{
         Arc, Mutex,
     },
     thread::{self, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use arc_swap::access::Access;
@@ -33,6 +33,7 @@ use crate::{
     config::handler::DispatcherAccess,
     exception::ExceptionHandler,
     flow_generator::{flow_map::Config, FlowMap},
+    liveness::{DebugInfo, LivenessHandle},
     rpc::get_timestamp,
     utils::stats::QueueStats,
 };
@@ -44,13 +45,15 @@ pub struct LocalMultinsModeDispatcher {
     base: BaseDispatcher,
 
     receiver_manager: Option<JoinHandle<()>>,
+    receiver_manager_liveness: LivenessHandle,
 }
 
 impl LocalMultinsModeDispatcher {
-    pub fn new(base: BaseDispatcher) -> Self {
+    pub fn new(base: BaseDispatcher, receiver_manager_liveness: LivenessHandle) -> Self {
         Self {
             base,
             receiver_manager: None,
+            receiver_manager_liveness,
         }
     }
 
@@ -84,6 +87,7 @@ impl LocalMultinsModeDispatcher {
             counter: base.counter.clone(),
             ntp_diff: base.ntp_diff.clone(),
             bpf_controls: bpf_controls.clone(),
+            liveness: self.receiver_manager_liveness.clone(),
             output: packet_input,
         };
         self.receiver_manager.replace(
@@ -109,9 +113,15 @@ impl LocalMultinsModeDispatcher {
         let tunnel_type_trim_bitmap = base.tunnel_type_trim_bitmap.clone();
         let mut batch = Vec::with_capacity(PACKET_BATCH_SIZE);
         let mut tap_interface_whitelists: HashMap<u64, TapInterfaceWhitelist> = HashMap::new();
+        let mut last_liveness = Instant::now();
 
         super::set_cpu_affinity(&base.options);
+        base.liveness_handle.start(DebugInfo::new("running"));
         while !base.terminated.load(Ordering::Relaxed) {
+            if last_liveness.elapsed() >= Duration::from_secs(1) {
+                base.liveness_handle.heartbeat(DebugInfo::new("running"));
+                last_liveness = Instant::now();
+            }
             let config = Config {
                 flow: &base.flow_map_config.load(),
                 log_parser: &base.log_parser_config.load(),
@@ -225,6 +235,7 @@ impl LocalMultinsModeDispatcher {
                 });
             }
         }
+        base.liveness_handle.stop(DebugInfo::new("stopped"));
         info!("Stopping local multi-namespace dispatcher");
         info!("Wait for receiver manager to stop");
         self.receiver_manager.take().unwrap().join().unwrap();
@@ -513,6 +524,7 @@ struct ReceiverManager {
     exception_handler: ExceptionHandler,
     counter: Arc<PacketCounter>,
     ntp_diff: Arc<AtomicI64>,
+    liveness: LivenessHandle,
 
     output: DebugSender<Packet>,
 }
@@ -551,11 +563,13 @@ impl ReceiverManager {
             super::set_cpu_affinity(&self.options);
 
             info!("Receiver manager started");
+            self.liveness.start(DebugInfo::new("running"));
 
             let mut loop_count = 0;
             let mut zombie_threads = vec![];
             let mut receiver_threads: HashMap<NsFile, PktReceiverHandle> = HashMap::new();
             while !self.terminated.load(Ordering::Relaxed) {
+                self.liveness.heartbeat(DebugInfo::new("running"));
                 loop_count = (loop_count + 1) % Self::INTERVAL_SECS;
                 if loop_count != 1 {
                     // actual interval is (INTERVAL_SECS - 1) to make this simple and less error prone
@@ -762,6 +776,7 @@ impl ReceiverManager {
                 let _ = handle.join_handle.take().unwrap().join();
             }
 
+            self.liveness.stop(DebugInfo::new("stopped"));
             info!("Receiver manager stopped");
         }
     }

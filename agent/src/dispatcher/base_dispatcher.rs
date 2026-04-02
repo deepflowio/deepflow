@@ -54,6 +54,7 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::AppProto,
     handler::PacketHandlerBuilder,
+    liveness::LivenessHandle,
     policy::PolicyGetter,
     rpc::get_timestamp,
     utils::{bytes::read_u16_be, stats::Collector},
@@ -139,6 +140,7 @@ pub(super) struct InternalState {
     // dispatcher id for easy debugging
     pub log_id: String,
     pub promisc_if_indices: Vec<i32>,
+    pub liveness_handle: LivenessHandle,
 }
 
 impl BaseDispatcher {

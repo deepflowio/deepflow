@@ -23,7 +23,7 @@ use std::process::Command;
 use std::str;
 use std::sync::{atomic::Ordering, Arc};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use arc_swap::access::Access;
 use log::{debug, info, log_enabled, warn};
@@ -49,6 +49,7 @@ use crate::{
     config::DispatcherConfig,
     flow_generator::{flow_map::Config, FlowMap},
     handler::MiniPacket,
+    liveness::{DebugInfo, LivenessHandle},
     rpc::get_timestamp,
     utils::{
         bytes::read_u16_be,
@@ -73,6 +74,7 @@ pub(super) struct LocalPlusModeDispatcher {
     pub(super) stats_collector: Arc<stats::Collector>,
     pub(super) flow_generator_thread_handler: Option<JoinHandle<()>>,
     pub(super) pipeline_thread_handler: Option<JoinHandle<()>>,
+    pub(super) flow_generator_liveness: LivenessHandle,
     pub(super) inner_queue_size: usize,
     pub(super) raw_packet_block_size: usize,
     pub(super) pool_raw_size: usize,
@@ -113,6 +115,7 @@ impl LocalPlusModeDispatcher {
         let npb_dedup_enabled = base.npb_dedup_enabled.clone();
         let pool_raw_size = self.pool_raw_size;
         let tunnel_type_trim_bitmap = base.tunnel_type_trim_bitmap.clone();
+        let liveness = self.flow_generator_liveness.clone();
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let cpu_set = base.options.lock().unwrap().cpu_set;
 
@@ -122,6 +125,7 @@ impl LocalPlusModeDispatcher {
                 .spawn(move || {
                     let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
                     let mut output_batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+                    let mut last_liveness = Instant::now();
                     let mut flow_map = FlowMap::new(
                         id as u32,
                         Some(flow_output_queue),
@@ -140,8 +144,13 @@ impl LocalPlusModeDispatcher {
                             warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
                         }
                     }
+                    liveness.start(DebugInfo::new("running"));
 
                     while !terminated.load(Ordering::Relaxed) {
+                        if last_liveness.elapsed() >= Duration::from_secs(1) {
+                            liveness.heartbeat(DebugInfo::new("running"));
+                            last_liveness = Instant::now();
+                        }
                         let config = Config {
                             flow: &flow_map_config.load(),
                             log_parser: &log_parser_config.load(),
@@ -291,6 +300,7 @@ impl LocalPlusModeDispatcher {
                             output_batch.clear();
                         }
                     }
+                    liveness.stop(DebugInfo::new("stopped"));
                 })
                 .unwrap(),
         );
@@ -385,8 +395,14 @@ impl LocalPlusModeDispatcher {
         let id = base.id;
         let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
         let mut allocator = Allocator::new(self.raw_packet_block_size);
+        let mut last_liveness = Instant::now();
+        base.liveness_handle.start(DebugInfo::new("running"));
 
         while !base.terminated.load(Ordering::Relaxed) {
+            if last_liveness.elapsed() >= Duration::from_secs(1) {
+                base.liveness_handle.heartbeat(DebugInfo::new("running"));
+                last_liveness = Instant::now();
+            }
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
                 base.tap_interface_whitelist.reset();
             }
@@ -450,6 +466,7 @@ impl LocalPlusModeDispatcher {
             let _ = handler.join();
         }
 
+        base.liveness_handle.stop(DebugInfo::new("stopped"));
         self.base.terminate_handler();
         info!("Stopped dispatcher {}", self.base.is.log_id);
     }

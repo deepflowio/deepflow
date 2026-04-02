@@ -21,7 +21,7 @@ use std::str;
 use std::sync::atomic::Ordering;
 #[cfg(target_os = "linux")]
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use arc_swap::access::Access;
 use log::{debug, info, log_enabled, warn};
@@ -37,6 +37,7 @@ use super::{
     error::Result,
     TunnelTypeBitmap,
 };
+use crate::liveness::DebugInfo;
 
 #[cfg(target_os = "linux")]
 use crate::platform::{GenericPoller, LibvirtXmlExtractor, Poller};
@@ -201,6 +202,8 @@ impl LocalModeDispatcher {
         info!("Start dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
+        let mut last_liveness = Instant::now();
+        base.liveness_handle.start(DebugInfo::new("running"));
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let cpu_set = base.options.lock().unwrap().cpu_set;
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -228,6 +231,10 @@ impl LocalModeDispatcher {
         let mut collector_config = base.collector_config.load().clone();
 
         while !base.terminated.load(Ordering::Relaxed) {
+            if last_liveness.elapsed() >= Duration::from_secs(1) {
+                base.liveness_handle.heartbeat(DebugInfo::new("running"));
+                last_liveness = Instant::now();
+            }
             if base.need_reload_config.swap(false, Ordering::Relaxed) {
                 info!("dispatcher reload config");
                 flow_config = base.flow_map_config.load().clone();
@@ -299,6 +306,7 @@ impl LocalModeDispatcher {
             base.check_and_update_bpf(&mut self.base.engine);
         }
 
+        base.liveness_handle.stop(DebugInfo::new("stopped"));
         self.base.terminate_handler();
         info!("Stopped dispatcher {}", self.base.is.log_id);
     }

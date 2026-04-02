@@ -87,6 +87,7 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::AppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
+    liveness::LivenessHandle,
     policy::PolicyGetter,
     utils::{
         environment::get_mac_by_name,
@@ -768,6 +769,9 @@ pub struct DispatcherBuilder {
     analyzer_raw_packet_block_size: Option<usize>,
     tunnel_type_trim_bitmap: Option<TunnelTypeBitmap>,
     bond_group: Option<Vec<String>>,
+    liveness_handle: Option<LivenessHandle>,
+    liveness_flow_generator_handle: Option<LivenessHandle>,
+    liveness_receiver_manager_handle: Option<LivenessHandle>,
 }
 
 impl DispatcherBuilder {
@@ -943,6 +947,21 @@ impl DispatcherBuilder {
 
     pub fn bond_group(mut self, v: Vec<String>) -> Self {
         self.bond_group = Some(v);
+        self
+    }
+
+    pub fn liveness_handle(mut self, v: LivenessHandle) -> Self {
+        self.liveness_handle = Some(v);
+        self
+    }
+
+    pub fn liveness_flow_generator_handle(mut self, v: LivenessHandle) -> Self {
+        self.liveness_flow_generator_handle = Some(v);
+        self
+    }
+
+    pub fn liveness_receiver_manager_handle(mut self, v: LivenessHandle) -> Self {
+        self.liveness_receiver_manager_handle = Some(v);
         self
     }
 
@@ -1123,6 +1142,9 @@ impl DispatcherBuilder {
                 .tunnel_type_trim_bitmap
                 .take()
                 .ok_or(Error::ConfigIncomplete("no trim tunnel type".into()))?,
+            liveness_handle: self
+                .liveness_handle
+                .unwrap_or_else(LivenessHandle::disabled),
             bond_group_map,
             promisc_if_indices: vec![],
         };
@@ -1146,6 +1168,10 @@ impl DispatcherBuilder {
                         stats_collector: collector.clone(),
                         flow_generator_thread_handler: None,
                         pipeline_thread_handler: None,
+                        flow_generator_liveness: self
+                            .liveness_flow_generator_handle
+                            .take()
+                            .unwrap_or_else(LivenessHandle::disabled),
                         pool_raw_size: snap_len,
                         inner_queue_size: self
                             .analyzer_queue_size
@@ -1163,7 +1189,12 @@ impl DispatcherBuilder {
                         .load()
                         .inner_interface_capture_enabled
                     {
-                        DispatcherFlavor::LocalMultins(LocalMultinsModeDispatcher::new(base))
+                        DispatcherFlavor::LocalMultins(LocalMultinsModeDispatcher::new(
+                            base,
+                            self.liveness_receiver_manager_handle
+                                .take()
+                                .unwrap_or_else(LivenessHandle::disabled),
+                        ))
                     } else {
                         DispatcherFlavor::Local(LocalModeDispatcher { base, extractor })
                     }
@@ -1187,6 +1218,10 @@ impl DispatcherBuilder {
                         )),
                         mac: get_mac_by_name(src_interface),
                         flow_generator_thread_handler: None,
+                        flow_generator_liveness: self
+                            .liveness_flow_generator_handle
+                            .take()
+                            .unwrap_or_else(LivenessHandle::disabled),
                         queue_debugger,
                         inner_queue_size: self
                             .analyzer_queue_size
@@ -1234,6 +1269,10 @@ impl DispatcherBuilder {
                     pool_raw_size: snap_len,
                     flow_generator_thread_handler: None,
                     pipeline_thread_handler: None,
+                    flow_generator_liveness: self
+                        .liveness_flow_generator_handle
+                        .take()
+                        .unwrap_or_else(LivenessHandle::disabled),
                     stats_collector: collector.clone(),
                     queue_debugger,
                     inner_queue_size: self

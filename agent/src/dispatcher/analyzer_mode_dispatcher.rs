@@ -20,7 +20,7 @@ use std::{
     ops::Add,
     sync::{atomic::Ordering, Arc, RwLock},
     thread::{self, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use arc_swap::access::Access;
@@ -47,6 +47,7 @@ use crate::{
     },
     flow_generator::{flow_map::Config, FlowMap},
     handler::{MiniPacket, PacketHandler},
+    liveness::{DebugInfo, LivenessHandle},
     rpc::get_timestamp,
     utils::{
         bytes::read_u32_be,
@@ -153,6 +154,7 @@ pub(super) struct AnalyzerModeDispatcher {
     pub(super) pool_raw_size: usize,
     pub(super) flow_generator_thread_handler: Option<JoinHandle<()>>,
     pub(super) pipeline_thread_handler: Option<JoinHandle<()>>,
+    pub(super) flow_generator_liveness: LivenessHandle,
     pub(super) queue_debugger: Arc<QueueDebugger>,
     pub(super) stats_collector: Arc<stats::Collector>,
     pub(super) inner_queue_size: usize,
@@ -270,6 +272,7 @@ impl AnalyzerModeDispatcher {
         let collector_config = base.collector_config.clone();
         let packet_sequence_output_queue = base.packet_sequence_output_queue.clone(); // Enterprise Edition Feature: packet-sequence
         let stats = base.stats.clone();
+        let liveness = self.flow_generator_liveness.clone();
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let cpu_set = base.options.lock().unwrap().cpu_set;
 
@@ -280,6 +283,7 @@ impl AnalyzerModeDispatcher {
                     let mut timestamp_map: HashMap<CaptureNetworkType, Duration> = HashMap::new();
                     let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
                     let mut output_batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+                    let mut last_liveness = Instant::now();
                     let mut flow_map = FlowMap::new(
                         id as u32,
                         Some(flow_output_queue),
@@ -298,8 +302,13 @@ impl AnalyzerModeDispatcher {
                             warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
                         }
                     }
+                    liveness.start(DebugInfo::new("running"));
 
                     while !terminated.load(Ordering::Relaxed) {
+                        if last_liveness.elapsed() >= Duration::from_secs(1) {
+                            liveness.heartbeat(DebugInfo::new("running"));
+                            last_liveness = Instant::now();
+                        }
                         let config = Config {
                             flow: &flow_map_config.load(),
                             log_parser: &log_parser_config.load(),
@@ -433,6 +442,7 @@ impl AnalyzerModeDispatcher {
                             output_batch.clear();
                         }
                     }
+                    liveness.stop(DebugInfo::new("stopped"));
                 })
                 .unwrap(),
         );
@@ -543,6 +553,8 @@ impl AnalyzerModeDispatcher {
         let id = base.id;
         let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
         let mut allocator = Allocator::new(self.raw_packet_block_size);
+        let mut last_liveness = Instant::now();
+        base.liveness_handle.start(DebugInfo::new("running"));
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let cpu_set = base.options.lock().unwrap().cpu_set;
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -553,6 +565,10 @@ impl AnalyzerModeDispatcher {
         }
 
         while !base.terminated.load(Ordering::Relaxed) {
+            if last_liveness.elapsed() >= Duration::from_secs(1) {
+                base.liveness_handle.heartbeat(DebugInfo::new("running"));
+                last_liveness = Instant::now();
+            }
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
                 base.tap_interface_whitelist.reset();
             }
@@ -615,6 +631,7 @@ impl AnalyzerModeDispatcher {
             let _ = handler.join();
         }
 
+        base.liveness_handle.stop(DebugInfo::new("stopped"));
         self.base.terminate_handler();
         info!("Stopped dispatcher {}", self.base.is.log_id);
     }

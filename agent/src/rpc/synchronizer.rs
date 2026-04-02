@@ -71,6 +71,7 @@ use crate::{
     },
     config::{config, UserConfig},
     exception::ExceptionHandler,
+    liveness::{DebugInfo, LivenessHandle},
     platform,
     rpc::session::Session,
     trident::{self, AgentId, AgentState, ChangedConfig, RunningMode, State, VersionInfo},
@@ -612,6 +613,9 @@ pub struct Synchronizer {
     agent_mode: RunningMode,
     standalone_runtime_config: Option<PathBuf>,
     ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
+    sync_liveness: LivenessHandle,
+    triggered_liveness: LivenessHandle,
+    standalone_liveness: LivenessHandle,
 }
 
 impl Synchronizer {
@@ -635,6 +639,9 @@ impl Synchronizer {
         standalone_runtime_config: Option<PathBuf>,
         ipmac_tx: Arc<broadcast::Sender<IpMacPair>>,
         ntp_diff: Arc<AtomicI64>,
+        sync_liveness: LivenessHandle,
+        triggered_liveness: LivenessHandle,
+        standalone_liveness: LivenessHandle,
     ) -> Synchronizer {
         Synchronizer {
             static_config: Arc::new(StaticConfig {
@@ -669,6 +676,9 @@ impl Synchronizer {
             agent_mode,
             standalone_runtime_config,
             ipmac_tx,
+            sync_liveness,
+            triggered_liveness,
+            standalone_liveness,
         }
     }
 
@@ -1308,10 +1318,13 @@ impl Synchronizer {
         let flow_acl_listener = self.flow_acl_listener.clone();
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
+        let liveness = self.triggered_liveness.clone();
         let mut ntp_receiver = ntp_receiver.take().unwrap();
         self.threads.lock().push(self.runtime.spawn(async move {
+            liveness.start(DebugInfo::new("running"));
             let mut grpc_failed_count = 0;
             while running.load(Ordering::SeqCst) {
+                liveness.heartbeat(DebugInfo::new("waiting-for-trigger"));
                 let response = session
                     .grpc_push_with_statsd(Synchronizer::generate_sync_request(
                         &agent_id,
@@ -1334,6 +1347,7 @@ impl Synchronizer {
 
                 let mut stream = response.unwrap().into_inner();
                 while running.load(Ordering::SeqCst) {
+                    liveness.heartbeat(DebugInfo::new("waiting-for-stream-message"));
                     let message = stream.message().await;
                     if session.get_version() != version {
                         info!("grpc server or config changed");
@@ -1393,6 +1407,7 @@ impl Synchronizer {
                         }
                     }
 
+                    liveness.heartbeat(DebugInfo::new("handling-triggered-response"));
                     Self::on_response(
                         session.get_current_server(),
                         message,
@@ -1409,6 +1424,7 @@ impl Synchronizer {
                     .await;
                 }
             }
+            liveness.stop(DebugInfo::new("stopped"));
         }));
     }
 
@@ -1802,8 +1818,11 @@ impl Synchronizer {
         let mut sync_interval = DEFAULT_SYNC_INTERVAL;
         let standalone_runtime_config = self.standalone_runtime_config.as_ref().unwrap().clone();
         let flow_acl_listener = self.flow_acl_listener.clone();
+        let liveness = self.standalone_liveness.clone();
         self.threads.lock().push(self.runtime.spawn(async move {
+            liveness.start(DebugInfo::new("running"));
             while running.load(Ordering::SeqCst) {
+                liveness.heartbeat(DebugInfo::new("loading-standalone-config"));
                 let mut user_config =
                     match UserConfig::load_from_file(standalone_runtime_config.as_path()) {
                         Ok(c) => c,
@@ -1853,6 +1872,7 @@ impl Synchronizer {
                 }
                 time::sleep(sync_interval).await;
             }
+            liveness.stop(DebugInfo::new("stopped"));
         }));
     }
 
@@ -1872,10 +1892,13 @@ impl Synchronizer {
         let max_memory = self.max_memory.clone();
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
+        let liveness = self.sync_liveness.clone();
         let mut ntp_receiver = ntp_receiver.take().unwrap();
         self.threads.lock().push(self.runtime.spawn(async move {
+            liveness.start(DebugInfo::new("running"));
             let mut grpc_failed_count = 0;
             while running.load(Ordering::SeqCst) {
+                liveness.heartbeat(DebugInfo::new("waiting-for-sync"));
                 let upgrade_hostname = |s: &str| {
                     let r = status.upgradable_read();
                     if s.ne(&r.hostname) {
@@ -1913,6 +1936,7 @@ impl Synchronizer {
                 );
                 debug!("grpc sync request: {:?}", request);
 
+                liveness.heartbeat(DebugInfo::new("waiting-for-sync-response"));
                 let response = session.grpc_sync_with_statsd(request).await;
                 if let Err(m) = response {
                     exception_handler.set(Exception::ControllerSocketError);
@@ -1927,6 +1951,7 @@ impl Synchronizer {
                 session.set_request_failed(false);
                 grpc_failed_count = 0;
 
+                liveness.heartbeat(DebugInfo::new("handling-sync-response"));
                 Self::on_response(
                     session.get_current_server(),
                     response.unwrap().into_inner(),
@@ -1995,6 +2020,7 @@ impl Synchronizer {
 
                 time::sleep(sync_interval).await;
             }
+            liveness.stop(DebugInfo::new("stopped"));
         }));
     }
 
