@@ -53,6 +53,20 @@ pub struct Hessian2Decoder {
 }
 
 impl Hessian2Decoder {
+    // 将 Option<(T, usize)> 转为 decode_field 的返回格式：
+    // None（解析失败）→ (None, bytes_len)，直接读尽剩余数据
+    // Some((val, len)) → (Some(HessianValue::Xxx(val)), len)
+    fn to_hessian_value<T>(
+        result: Option<(T, usize)>,
+        bytes_len: usize,
+        wrap: impl FnOnce(T) -> HessianValue,
+    ) -> (Option<HessianValue>, usize) {
+        match result {
+            Some((val, len)) => (Some(wrap(val)), len),
+            None => (None, bytes_len),
+        }
+    }
+
     // 返回具体值和读了多少长度，注意 长度返回 1 表示读取了 start 索引
     pub fn decode_field(&mut self, bytes: &[u8], start: usize) -> (Option<HessianValue>, usize) {
         if start >= bytes.len() {
@@ -67,66 +81,70 @@ impl Hessian2Decoder {
             BC_FALSE => (Some(HessianValue::Bool(false)), 1),
             BC_REF => {
                 // ref 意为通过索引号获取一个指向 list/map 的指针
-                let (_, len) = Self::decode_i32(bytes, start);
-                (None, len)
+                if start + 1 >= bytes.len() {
+                    return (None, 1);
+                }
+                match Self::decode_i32(bytes, start + 1) {
+                    Some((_, len)) => (None, 1 + len),
+                    None => (None, bytes.len()),
+                }
             }
             // int
             0x80..=0xbf | 0xc0..=0xcf | 0xd0..=0xd7 | BC_INT => {
-                let (value, len) = Self::decode_i32(bytes, start);
-                (Some(HessianValue::Int(value)), len)
+                Self::to_hessian_value(Self::decode_i32(bytes, start), bytes.len(), HessianValue::Int)
             }
             // long
             0xd8..=0xef | 0xf0..=0xff | 0x38..=0x3f | BC_LONG_INT | BC_LONG => {
-                let (value, len) = Self::decode_i64(bytes, start);
-                (Some(HessianValue::Long(value)), len)
+                Self::to_hessian_value(Self::decode_i64(bytes, start), bytes.len(), HessianValue::Long)
             }
             // date
-            BC_DATE | BC_DATE_MINUTE => {
-                let (value, len) = Self::decode_datetime(bytes, start);
-                (Some(HessianValue::DateTime(value)), len)
-            }
+            BC_DATE | BC_DATE_MINUTE => Self::to_hessian_value(
+                Self::decode_datetime(bytes, start),
+                bytes.len(),
+                HessianValue::DateTime,
+            ),
             // double
             BC_DOUBLE_ZERO | BC_DOUBLE_ONE | BC_DOUBLE_BYTE | BC_DOUBLE_SHORT | BC_DOUBLE_MILL
-            | BC_DOUBLE => {
-                let (value, len) = Self::decode_f64(bytes, start);
-                (Some(HessianValue::Double(value)), len)
-            }
+            | BC_DOUBLE => Self::to_hessian_value(
+                Self::decode_f64(bytes, start),
+                bytes.len(),
+                HessianValue::Double,
+            ),
             // binary
             BC_BINARY_DIRECT..=INT_DIRECT_MAX
             | BC_BINARY_SHORT..=0x37
             | BC_BINARY_CHUNK
-            | BC_BINARY => {
-                let (value, len) = Self::decode_binary(bytes, start);
-                (Some(HessianValue::Binary(value)), len)
-            }
+            | BC_BINARY => Self::to_hessian_value(
+                Self::decode_binary(bytes, start),
+                bytes.len(),
+                HessianValue::Binary,
+            ),
             // string
             BC_STRING_SHORT..=BC_STRING_SHORT_MAX
             | BC_STRING_DIRECT..=STRING_DIRECT_MAX
             | BC_STRING_CHUNK
-            | BC_STRING => {
-                if let (Some(value), len) = Self::decode_string(bytes, start) {
-                    (Some(HessianValue::String(value)), len)
-                } else {
-                    // tag 表示为 string 但无法读出合法的 string，说明数据有异常，剩下的数据也不需要继续读了
-                    (None, bytes.len())
-                }
-            }
+            | BC_STRING => Self::to_hessian_value(
+                Self::decode_string(bytes, start),
+                bytes.len(),
+                HessianValue::String,
+            ),
             // list: 没有实用意义，因为无法按 key 提取数据，但要跳过 list 的长度继续解析
             BC_LIST_DIRECT..=0x77
             | BC_LIST_DIRECT_UNTYPED..=0x7f
             | BC_LIST_FIXED
             | BC_LIST_VARIABLE
             | BC_LIST_FIXED_UNTYPED
-            | BC_LIST_VARIABLE_UNTYPED => (None, self.decode_list(bytes, start)),
+            | BC_LIST_VARIABLE_UNTYPED => match self.decode_list(bytes, start) {
+                Some(len) => (None, len),
+                None => (None, bytes.len()),
+            },
             // hashmap
             BC_MAP | BC_MAP_UNTYPED => {
-                let (value, len) = self.decode_map(bytes, start);
-                (Some(HessianValue::Map(value)), len)
+                Self::to_hessian_value(self.decode_map(bytes, start), bytes.len(), HessianValue::Map)
             }
             // object，只能处理为 hashmap
             BC_OBJECT_DEF | BC_OBJECT | BC_OBJECT_DIRECT..=BC_OBJECT_DIRECT_MAX => {
-                let (value, len) = self.decode_obj(bytes, start);
-                (Some(HessianValue::Map(value)), len)
+                Self::to_hessian_value(self.decode_obj(bytes, start), bytes.len(), HessianValue::Map)
             }
             _ => (None, bytes.len()), // 如果不符合任何一种，表示这个 tag 没有意义，直接丢弃剩余所有数据
         }
@@ -137,25 +155,31 @@ impl Hessian2Decoder {
         &mut self,
         payload: &[u8],
         index: usize,
-    ) -> (HashMap<String, HessianValue>, usize) {
+    ) -> Option<(HashMap<String, HessianValue>, usize)> {
         let mut tag = payload[index];
         let mut start = index + 1;
         let mut map = HashMap::new();
         if start >= payload.len() {
-            return (map, 0);
+            return None;
         }
         if tag == BC_MAP {
             // 即使是 typedmap(标示了类型的 map)，也只能处理成 hashmap<string, string>, 这里忽略实际类型，只跳过读取长度
-            let (_, len) = Self::decode_string(payload, start);
-            if len == 0 {
-                let (_, len) = Self::decode_i32(payload, start);
+            if let Some((_, len)) = Self::decode_string(payload, start) {
+                start += len;
+            } else if let Some((_, len)) = Self::decode_i32(payload, start) {
                 start += len;
             }
         }
         while tag != BC_END {
             let (key, len) = self.decode_field(payload, start);
+            if len == 0 {
+                break;
+            }
             start += len;
             let (value, len) = self.decode_field(payload, start);
+            if len == 0 {
+                break;
+            }
             start += len;
             match (key, value) {
                 (Some(HessianValue::String(k)), Some(v)) => map.insert(k, v),
@@ -168,64 +192,71 @@ impl Hessian2Decoder {
         }
         // 读取完后这里会丢弃下一个 byte，所以 +1
         // ref: https://github.com/apache/dubbo-go-hessian2/blob/master/map.go#L320
-        (map, start - index + 1)
+        Some((map, start - index + 1))
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/list.go#L280
     // 注意：这里 list 具体的值没有用，只是为了解出要读多少 len
-    pub fn decode_list(&mut self, payload: &[u8], index: usize) -> usize {
+    pub fn decode_list(&mut self, payload: &[u8], index: usize) -> Option<usize> {
         let tag = payload[index];
         let mut start = index + 1;
         if start >= payload.len() {
-            return 0;
+            return None;
         }
         let arr_len = match tag {
             BC_LIST_FIXED => {
-                let (_, len) = Self::decode_string(payload, start);
-                start += len;
-                if start >= payload.len() {
-                    return 0;
+                if let Some((_, len)) = Self::decode_string(payload, start) {
+                    start += len;
                 }
-                let (arr_len, len) = Self::decode_i32(payload, start);
+                if start >= payload.len() {
+                    return None;
+                }
+                let (arr_len, len) = Self::decode_i32(payload, start)?;
                 start += len;
                 arr_len as usize
             }
             BC_LIST_VARIABLE => {
-                let (_, len) = Self::decode_string(payload, start);
-                start += len;
+                if let Some((_, len)) = Self::decode_string(payload, start) {
+                    start += len;
+                }
                 if start >= payload.len() {
-                    return start - index;
+                    return Some(start - index);
                 }
                 // 遇到这种情况意味着是未知长度 list，内容一直到第一个 BC_END 为止（也有可能剩下的所有内容都是这个 list）
-                return payload[start..]
-                    .iter()
-                    .position(|&b| b == BC_END)
-                    .unwrap_or(payload.len() - 1)
-                    + 1
-                    - index;
+                return Some(
+                    payload[start..]
+                        .iter()
+                        .position(|&b| b == BC_END)
+                        .unwrap_or(payload.len() - 1)
+                        + 1
+                        - index,
+                );
             }
             BC_LIST_FIXED_TYPED_LEN_TAG_MIN..=BC_LIST_FIXED_TYPED_LEN_TAG_MAX => {
-                let (_, len) = Self::decode_string(payload, start);
-                start += len;
+                if let Some((_, len)) = Self::decode_string(payload, start) {
+                    start += len;
+                }
                 tag.overflowing_sub(BC_LIST_FIXED_TYPED_LEN_TAG_MIN).0 as usize
             }
             BC_LIST_FIXED_UNTYPED => {
-                let (arr_len, len) = Self::decode_i32(payload, start);
+                let (arr_len, len) = Self::decode_i32(payload, start)?;
                 start += len;
                 arr_len as usize
             }
             BC_LIST_VARIABLE_UNTYPED => {
-                return payload[start..]
-                    .iter()
-                    .position(|&b| b == BC_END)
-                    .unwrap_or(payload.len() - 1)
-                    + 1
-                    - index;
+                return Some(
+                    payload[start..]
+                        .iter()
+                        .position(|&b| b == BC_END)
+                        .unwrap_or(payload.len() - 1)
+                        + 1
+                        - index,
+                );
             }
             BC_LIST_FIXED_UNTYPED_LEN_TAG_MIN..=BC_LIST_FIXED_UNTYPED_LEN_TAG_MAX => {
                 tag.overflowing_sub(BC_LIST_FIXED_UNTYPED_LEN_TAG_MIN).0 as usize
             }
-            _ => 0,
+            _ => return None,
         };
         for _ in 0..arr_len {
             if start >= payload.len() {
@@ -234,7 +265,7 @@ impl Hessian2Decoder {
             let (_, len) = self.decode_field(payload, start);
             start += len;
         }
-        start - index
+        Some(start - index)
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/object.go#L567
@@ -242,26 +273,26 @@ impl Hessian2Decoder {
         &mut self,
         payload: &[u8],
         index: usize,
-    ) -> (HashMap<String, HessianValue>, usize) {
+    ) -> Option<(HashMap<String, HessianValue>, usize)> {
         let tag = payload[index];
         let mut start = index + 1;
         let mut object_map = HashMap::new();
         // object 类型的消息一般是 BC_OBJECT_DEF 携带对象定义，紧接着一个 BC_OBJECT/BC_OBJECT_DIRECT 携带实例数据
         match tag {
             BC_OBJECT_DEF => {
-                let (_, len) = Self::decode_string(payload, start);
+                let (_, len) = Self::decode_string(payload, start)?;
                 start += len;
                 if start >= payload.len() {
-                    return (object_map, 0);
+                    return None;
                 }
-                let (field_num, len) = Self::decode_i32(payload, start);
+                let (field_num, len) = Self::decode_i32(payload, start)?;
                 start += len;
                 let mut field_list = Vec::with_capacity(field_num as usize);
                 for _ in 0..field_num {
                     if start >= payload.len() {
                         break;
                     }
-                    if let (Some(field_name), len) = Self::decode_string(payload, start) {
+                    if let Some((field_name, len)) = Self::decode_string(payload, start) {
                         start += len;
                         field_list.push(field_name);
                     } else {
@@ -273,17 +304,13 @@ impl Hessian2Decoder {
                 // 这里会跳到 BC_OBJECT 继续解析
                 let (value, len) = self.decode_field(payload, start);
                 match value {
-                    Some(HessianValue::Map(map)) => {
-                        return (map, start + len - index);
-                    }
-                    _ => {
-                        return (object_map, start + len - index);
-                    }
+                    Some(HessianValue::Map(map)) => Some((map, start + len - index)),
+                    _ => Some((object_map, start + len - index)),
                 }
             }
             BC_OBJECT | BC_OBJECT_DIRECT..=BC_OBJECT_DIRECT_MAX => {
                 let class_index = if tag == BC_OBJECT {
-                    let (idx, len) = Self::decode_i32(payload, start);
+                    let (idx, len) = Self::decode_i32(payload, start)?;
                     start += len;
                     idx as usize
                 } else {
@@ -292,33 +319,35 @@ impl Hessian2Decoder {
                 // 无论 object type 是什么类型，都需要解析为 hashmap (field_name => value)
                 // 但如果是 java 内置类型或自定义类型，都无法解析，如果遇到了会导致后续解析失败
                 if class_index >= self.class_field_info.len() {
-                    return (object_map, 0);
+                    return None;
                 }
                 let field_list = self.class_field_info[class_index].clone();
-                for i in 0..field_list.len() {
-                    let field_name = &field_list[i];
+                for field_name in &field_list {
+                    if start >= payload.len() {
+                        break;
+                    }
                     let (value, len) = self.decode_field(payload, start);
-                    if value.is_some() {
-                        object_map.insert(field_name.to_string(), value.unwrap());
+                    if let Some(v) = value {
+                        object_map.insert(field_name.to_string(), v);
                     }
                     start += len;
                 }
-                (object_map, start - index)
+                Some((object_map, start - index))
             }
-            _ => (object_map, 0),
+            _ => None,
         }
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/int.go#L60
-    pub fn decode_i32(payload: &[u8], index: usize) -> (i32, usize) {
+    pub fn decode_i32(payload: &[u8], index: usize) -> Option<(i32, usize)> {
         let tag = payload[index];
         match tag {
-            0x80..=0xbf => ((tag.overflowing_sub(BC_INT_ZERO).0) as i32, 1),
-            0xc0..=0xcf if index + 1 < payload.len() => (
+            0x80..=0xbf => Some(((tag.overflowing_sub(BC_INT_ZERO).0) as i32, 1)),
+            0xc0..=0xcf if index + 1 < payload.len() => Some((
                 u16::from_be_bytes([tag.overflowing_sub(BC_INT_BYTE_ZERO).0, payload[index + 1]])
                     as i32,
                 2,
-            ),
+            )),
             0xd0..=0xd7 if index + 2 < payload.len() => {
                 let mut buf = [
                     0,
@@ -329,24 +358,24 @@ impl Hessian2Decoder {
                 if buf[1] & 0x80 != 0 {
                     buf[0] = 0xff;
                 }
-                (u32::from_be_bytes(buf) as i32, 3)
+                Some((u32::from_be_bytes(buf) as i32, 3))
             }
-            BC_INT if index + 4 < payload.len() => (
+            BC_INT if index + 4 < payload.len() => Some((
                 i32::from_be_bytes(payload[index + 1..index + 5].try_into().unwrap_or_default()),
                 5,
-            ),
-            _ => (0, 0),
+            )),
+            _ => None,
         }
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/long.go#L63
-    pub fn decode_i64(payload: &[u8], index: usize) -> (i64, usize) {
+    pub fn decode_i64(payload: &[u8], index: usize) -> Option<(i64, usize)> {
         let tag = payload[index];
         match tag {
-            0xd8..=0xef => ((tag.overflowing_sub(BC_LONG_ZERO).0) as i64, 1),
+            0xd8..=0xef => Some(((tag.overflowing_sub(BC_LONG_ZERO).0) as i64, 1)),
             0xf0..=0xff if index + 1 < payload.len() => {
                 let buf = [tag.overflowing_sub(BC_LONG_BYTE_ZERO).0, payload[index + 1]];
-                (u16::from_be_bytes(buf) as i64, 2)
+                Some((u16::from_be_bytes(buf) as i64, 2))
             }
             0x38..=0x3f if index + 2 < payload.len() => {
                 let mut buf = [
@@ -358,70 +387,70 @@ impl Hessian2Decoder {
                 if buf[1] & 0x80 != 0 {
                     buf[0] = 0xff;
                 }
-                (u32::from_be_bytes(buf) as i64, 3)
+                Some((u32::from_be_bytes(buf) as i64, 3))
             }
-            BC_LONG_INT if index + 4 < payload.len() => (
+            BC_LONG_INT if index + 4 < payload.len() => Some((
                 i32::from_be_bytes(payload[index + 1..index + 5].try_into().unwrap_or_default())
                     as i64,
                 5,
-            ),
-            BC_LONG if index + 8 < payload.len() => (
+            )),
+            BC_LONG if index + 8 < payload.len() => Some((
                 i64::from_be_bytes(payload[index + 1..index + 9].try_into().unwrap_or_default()),
                 9,
-            ),
-            _ => (0, 0),
+            )),
+            _ => None,
         }
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/date.go#L60
-    pub fn decode_datetime(payload: &[u8], index: usize) -> (i64, usize) {
+    pub fn decode_datetime(payload: &[u8], index: usize) -> Option<(i64, usize)> {
         let tag = payload[index];
         match tag {
-            BC_DATE if index + 8 < payload.len() => (
+            BC_DATE if index + 8 < payload.len() => Some((
                 u64::from_be_bytes(payload[index + 1..index + 9].try_into().unwrap_or_default())
                     as i64,
                 9,
-            ),
-            BC_DATE_MINUTE if index + 4 < payload.len() => (
+            )),
+            BC_DATE_MINUTE if index + 4 < payload.len() => Some((
                 (u32::from_be_bytes(payload[index + 1..index + 5].try_into().unwrap_or_default())
                     * 60) as i64,
                 5,
-            ),
-            _ => (0, 0),
+            )),
+            _ => None,
         }
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/double.go#L109
-    pub fn decode_f64(payload: &[u8], index: usize) -> (f64, usize) {
+    pub fn decode_f64(payload: &[u8], index: usize) -> Option<(f64, usize)> {
         let tag = payload[index];
         match tag {
-            BC_DOUBLE_ZERO => (0.0, 1),
-            BC_DOUBLE_ONE => (1.0, 1),
-            BC_DOUBLE_BYTE if index + 1 < payload.len() => (
+            BC_DOUBLE_ZERO => Some((0.0, 1)),
+            BC_DOUBLE_ONE => Some((1.0, 1)),
+            BC_DOUBLE_BYTE if index + 1 < payload.len() => Some((
                 u8::from_be_bytes(payload[index + 1..index + 2].try_into().unwrap_or_default())
                     as f64,
                 2,
-            ),
-            BC_DOUBLE_SHORT if index + 2 < payload.len() => (
+            )),
+            BC_DOUBLE_SHORT if index + 2 < payload.len() => Some((
                 u16::from_be_bytes(payload[index + 1..index + 3].try_into().unwrap_or_default())
                     as f64,
                 3,
-            ),
-            BC_DOUBLE_MILL if index + 4 < payload.len() => (
+            )),
+            BC_DOUBLE_MILL if index + 4 < payload.len() => Some((
                 u32::from_be_bytes(payload[index + 1..index + 5].try_into().unwrap_or_default())
                     as f64,
                 5,
-            ),
-            BC_DOUBLE if index + 8 < payload.len() => (
+            )),
+            BC_DOUBLE if index + 8 < payload.len() => Some((
                 f64::from_be_bytes(payload[index + 1..index + 9].try_into().unwrap_or_default()),
                 9,
-            ),
-            _ => (0.0, 0),
+            )),
+            _ => None,
         }
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/binary.go#L124
-    pub fn decode_binary(payload: &[u8], index: usize) -> (Vec<u8>, usize) {
+    pub fn decode_binary(payload: &[u8], index: usize) -> Option<(Vec<u8>, usize)> {
         let mut result = Vec::new();
         let mut start = index;
         let mut tag = payload[start];
@@ -433,14 +462,14 @@ impl Hessian2Decoder {
                 }
                 BC_BINARY_SHORT..=0x37 if start + 1 < payload.len() => {
                     start += 2;
-                    ((tag.overflowing_sub(BC_BINARY_SHORT).0) as usize)
-                        << 8 + payload[start - 1] as usize
+                    (((tag.overflowing_sub(BC_BINARY_SHORT).0) as usize) << 8)
+                        + payload[start - 1] as usize
                 }
                 BC_BINARY_CHUNK | BC_BINARY if start + 2 < payload.len() => {
                     start += 3;
                     ((payload[start - 2] as usize) << 8) + payload[start - 1] as usize
                 }
-                _ => return (result, 0),
+                _ => return None,
             };
             if start >= payload.len() || start + len > payload.len() {
                 break;
@@ -456,11 +485,11 @@ impl Hessian2Decoder {
             }
             tag = payload[start];
         }
-        return (result, start - index);
+        Some((result, start - index))
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/string.go#L204
-    pub fn decode_string(payload: &[u8], index: usize) -> (Option<String>, usize) {
+    pub fn decode_string(payload: &[u8], index: usize) -> Option<(String, usize)> {
         let mut result = Vec::new();
         let mut start = index;
         let mut tag = payload[start];
@@ -480,13 +509,13 @@ impl Hessian2Decoder {
                     start += 3;
                     ((payload[start - 2] as usize) << 8) + payload[start - 1] as usize
                 }
-                _ => return (None, 0),
+                _ => return None,
             };
             if start >= payload.len() || start + len > payload.len() {
                 break;
             }
             if payload[start..start + len].iter().any(|&b| !b.is_ascii()) {
-                return (None, 0);
+                return None;
             }
             result.extend_from_slice(&payload[start..start + len]);
             start += len;
@@ -500,7 +529,7 @@ impl Hessian2Decoder {
             tag = payload[start];
         }
         // checked bytes in result are ascii, so unwrap is safe
-        (Some(String::from_utf8(result).unwrap()), start - index)
+        Some((String::from_utf8(result).unwrap(), start - index))
     }
 }
 
