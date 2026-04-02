@@ -1033,6 +1033,8 @@ impl Flow {
         if !other.request_domain.is_empty() {
             self.request_domain = other.request_domain.clone();
         }
+
+        self.reconcile_close_type_with_l7();
     }
 
     // FIXME 注意：由于FlowGenerator中TcpPerfStats在Flow方向调整之后才获取到，
@@ -1064,6 +1066,36 @@ impl Flow {
             && dst_tcp_flags.contains(TcpFlags::SYN_ACK)
     }
 
+    // Returns true when the flow already has at least one successful L7 response
+    // (response_count > 0 and no client/server errors recorded).
+    //
+    // This is used to distinguish RST-after-successful-L7 (e.g. health-check probes
+    // that use RST for fast teardown) from genuine mid-transfer client resets.
+    fn has_l7_successful_response(&self) -> bool {
+        match self.flow_perf_stats {
+            Some(ref perf) => {
+                perf.l7.response_count > 0
+                    && perf.l7.err_client_count == 0
+                    && perf.l7.err_server_count == 0
+            }
+            None => false,
+        }
+    }
+
+    fn reconcile_close_type_with_l7(&mut self) {
+        if self.flow_key.proto != IpProtocol::TCP {
+            return;
+        }
+        if self.close_type == CloseType::TcpClientRst
+            && !self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
+                .total_tcp_flags
+                .contains(TcpFlags::RST)
+            && self.has_l7_successful_response()
+        {
+            self.close_type = CloseType::TcpFinClientRst;
+        }
+    }
+
     pub fn update_close_type(&mut self, flow_state: FlowState) {
         self.close_type = match flow_state {
             FlowState::Exception => CloseType::Unknown,
@@ -1082,15 +1114,19 @@ impl Flow {
             FlowState::Reset => {
                 if self.is_heartbeat() {
                     CloseType::TcpFinClientRst
+                } else if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
+                    .total_tcp_flags
+                    .contains(TcpFlags::RST)
+                {
+                    CloseType::TcpServerRst
+                } else if self.has_l7_successful_response() {
+                    // Client sent RST to close the connection, but L7 had already
+                    // completed a successful request-response exchange (e.g. an HTTP
+                    // health-check probe that uses RST for fast teardown instead of
+                    // FIN). Treat this as a normal close, not a client error.
+                    CloseType::TcpFinClientRst
                 } else {
-                    if self.flow_metrics_peers[FlowMetricsPeer::DST as usize]
-                        .total_tcp_flags
-                        .contains(TcpFlags::RST)
-                    {
-                        CloseType::TcpServerRst
-                    } else {
-                        CloseType::TcpClientRst
-                    }
+                    CloseType::TcpClientRst
                 }
             }
             FlowState::Syn1 | FlowState::ClientL4PortReuse => {
@@ -1133,7 +1169,7 @@ impl Flow {
                 );
                 CloseType::Unknown
             }
-        }
+        };
     }
 
     pub fn set_tap_side(
@@ -1598,4 +1634,81 @@ fn get_direction(
     }
 
     [src_direct, dst_direct]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn flow_with_client_rst() -> Flow {
+        let mut flow = Flow::default();
+        flow.flow_key.proto = IpProtocol::TCP;
+        flow.flow_metrics_peers[FlowMetricsPeer::SRC as usize].total_tcp_flags = TcpFlags::RST;
+        flow
+    }
+
+    #[test]
+    fn reset_after_successful_l7_is_treated_as_normal_close() {
+        let mut flow = flow_with_client_rst();
+        let mut perf = FlowPerfStats::default();
+        perf.l7.response_count = 1;
+        flow.flow_perf_stats = Some(perf);
+
+        flow.update_close_type(FlowState::Reset);
+
+        assert_eq!(flow.close_type, CloseType::TcpFinClientRst);
+    }
+
+    #[test]
+    fn reset_after_l7_client_error_is_still_treated_as_client_reset() {
+        let mut flow = flow_with_client_rst();
+        let mut perf = FlowPerfStats::default();
+        perf.l7.response_count = 1;
+        perf.l7.err_client_count = 1;
+        flow.flow_perf_stats = Some(perf);
+
+        flow.update_close_type(FlowState::Reset);
+
+        assert_eq!(flow.close_type, CloseType::TcpClientRst);
+    }
+
+    #[test]
+    fn sequential_merge_forced_report_success_should_reclassify_client_reset() {
+        let mut flow = flow_with_client_rst();
+        flow.flow_id = 100;
+        flow.close_type = CloseType::ForcedReport;
+        let mut perf = FlowPerfStats::default();
+        perf.l7.response_count = 1;
+        flow.flow_perf_stats = Some(perf);
+
+        let mut closed = flow_with_client_rst();
+        closed.flow_id = 100;
+        closed.close_type = CloseType::TcpClientRst;
+        closed.flow_perf_stats = Some(FlowPerfStats::default());
+
+        flow.sequential_merge(&closed);
+
+        assert_eq!(flow.flow_perf_stats.as_ref().unwrap().l7.response_count, 1);
+        assert_eq!(flow.close_type, CloseType::TcpFinClientRst);
+    }
+
+    #[test]
+    fn sequential_merge_forced_report_client_error_should_keep_client_reset() {
+        let mut flow = flow_with_client_rst();
+        flow.flow_id = 101;
+        flow.close_type = CloseType::ForcedReport;
+        let mut perf = FlowPerfStats::default();
+        perf.l7.response_count = 1;
+        perf.l7.err_client_count = 1;
+        flow.flow_perf_stats = Some(perf);
+
+        let mut closed = flow_with_client_rst();
+        closed.flow_id = 101;
+        closed.close_type = CloseType::TcpClientRst;
+        closed.flow_perf_stats = Some(FlowPerfStats::default());
+
+        flow.sequential_merge(&closed);
+
+        assert_eq!(flow.close_type, CloseType::TcpClientRst);
+    }
 }
