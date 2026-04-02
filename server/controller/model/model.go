@@ -148,6 +148,7 @@ type Vtap struct {
 	UpgradeRevision           string  `json:"UPGRADE_REVISION"`
 	CompleteRevision          string  `json:"COMPLETE_REVISION"`
 	Exceptions                []int64 `json:"EXCEPTIONS"`
+	ExceptionDescription      string  `json:"EXCEPTION_DESCRIPTION"`
 	VtapGroupLcuuid           string  `json:"VTAP_GROUP_LCUUID"`
 	VtapGroupName             string  `json:"VTAP_GROUP_NAME"`
 	AZ                        string  `json:"AZ"`

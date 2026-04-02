@@ -182,46 +182,47 @@ func NewVTapConfig(agentConfigYaml string) *VTapConfig {
 }
 
 type VTapCache struct {
-	id                 int
-	name               *string
-	rawHostname        *string
-	state              int
-	enable             int
-	vTapType           int
-	owner              *string
-	ctrlIP             *string
-	ctrlMac            *string
-	tapMac             *string
-	tsdbIP             *string
-	curTSDBIP          *string
-	controllerIP       *string
-	curControllerIP    *string
-	launchServer       *string
-	launchServerID     int
-	az                 *string
-	revision           *string
-	syncedControllerAt *time.Time
-	syncedTSDBAt       *time.Time
-	bootTime           int
-	exceptions         int64
-	vTapLcuuid         *string
-	vTapGroupID        int
-	vTapGroupLcuuid    *string
-	vTapGroupShortID   *string
-	cpuNum             int
-	memorySize         int64
-	arch               *string
-	os                 *string
-	kernelVersion      *string
-	processName        *string
-	currentK8sImage    *string
-	licenseType        int
-	tapMode            int
-	teamID             int
-	organizeID         int
-	lcuuid             *string
-	licenseFunctions   *string
-	licenseFunctionSet mapset.Set
+	id                   int
+	name                 *string
+	rawHostname          *string
+	state                int
+	enable               int
+	vTapType             int
+	owner                *string
+	ctrlIP               *string
+	ctrlMac              *string
+	tapMac               *string
+	tsdbIP               *string
+	curTSDBIP            *string
+	controllerIP         *string
+	curControllerIP      *string
+	launchServer         *string
+	launchServerID       int
+	az                   *string
+	revision             *string
+	syncedControllerAt   *time.Time
+	syncedTSDBAt         *time.Time
+	bootTime             int
+	exceptions           int64
+	exceptionDescription *string
+	vTapLcuuid           *string
+	vTapGroupID          int
+	vTapGroupLcuuid      *string
+	vTapGroupShortID     *string
+	cpuNum               int
+	memorySize           int64
+	arch                 *string
+	os                   *string
+	kernelVersion        *string
+	processName          *string
+	currentK8sImage      *string
+	licenseType          int
+	tapMode              int
+	teamID               int
+	organizeID           int
+	lcuuid               *string
+	licenseFunctions     *string
+	licenseFunctionSet   mapset.Set
 	//above db Data
 
 	enabledNetNpb       atomicbool.Bool
@@ -315,6 +316,7 @@ func (c *VTapCache) String() ([]byte, error) {
 		"bootTime":                         c.GetBootTime(),
 		"grpcBufferSize":                   c.GetGRPCBufferSize(),
 		"exceptions":                       c.GetExceptions(),
+		"exceptionDescriptions":            c.GetExceptionDescription(),
 		"vTapGroupID":                      c.GetVTapGroupID(),
 		"vTapGroupLcuuid":                  c.GetVTapGroupLcuuid(),
 		"vTapGroupShortID":                 c.GetVTapGroupShortID(),
@@ -383,6 +385,7 @@ func NewVTapCache(vtap *metadbmodel.VTap, vTapInfo *VTapInfo) *VTapCache {
 	vTapCache.syncedTSDBAt = &syncedTSDBAt
 	vTapCache.bootTime = vtap.BootTime
 	vTapCache.exceptions = vtap.Exceptions
+	vTapCache.exceptionDescription = &vtap.ExceptionDescription
 	vTapCache.vTapLcuuid = proto.String(vtap.VTapLcuuid)
 	vTapCache.vTapGroupID = vTapInfo.vtapGroupLcuuidToID[vtap.VtapGroupLcuuid]
 	vTapCache.vTapGroupLcuuid = proto.String(vtap.VtapGroupLcuuid)
@@ -1337,6 +1340,13 @@ func (c *VTapCache) GetExceptions() int64 {
 	return atomic.LoadInt64(&c.exceptions)
 }
 
+func (c *VTapCache) GetExceptionDescription() string {
+	if c.exceptionDescription != nil {
+		return *c.exceptionDescription
+	}
+	return ""
+}
+
 // 只更新采集器返回的异常，控制器异常不用更新，由控制器处理其异常
 func (c *VTapCache) UpdateExceptions(exceptions int64) {
 	v := c.vTapInfo
@@ -1344,6 +1354,17 @@ func (c *VTapCache) UpdateExceptions(exceptions int64) {
 		"modify vtap(%s) exception %d to %d",
 		c.GetVTapHost(), c.GetExceptions(), exceptions))
 	atomic.StoreInt64(&c.exceptions, int64(exceptions))
+}
+
+func (c *VTapCache) UpdateExceptionDescription(exceptionDescription string) {
+	if c.GetExceptionDescription() == exceptionDescription {
+		return
+	}
+	v := c.vTapInfo
+	log.Infof(v.Logf(
+		"modify vtap(%s) exception description to %s",
+		c.GetVTapHost(), exceptionDescription))
+	c.exceptionDescription = &exceptionDescription
 }
 
 func (c *VTapCache) UpdateSystemInfoFromGrpc(cpuNum int, memorySize int64, arch, os, kernelVersion, processName, currentK8sImage string) {
