@@ -297,6 +297,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "Some/IP";
 	case PROTO_ISO8583:
 		return "ISO-8583";
+	case PROTO_NET_SIGN:
+		return "NetSign";
 	case PROTO_POSTGRESQL:
 		return "PgSQL";
 	case PROTO_ORACLE:
