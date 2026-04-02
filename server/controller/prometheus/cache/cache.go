@@ -146,10 +146,10 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"value_to_id": make(map[string]interface{}),
 		}
-		tempCache.LabelValue.GetValueToID().Range(func(key string, value int) bool {
+
+		for key, value := range tempCache.LabelValue.GetValueToID() {
 			temp["value_to_id"].(map[string]interface{})[key] = value
-			return true
-		})
+		}
 
 		if len(temp["value_to_id"].(map[string]interface{})) > 0 {
 			content["label_value"] = temp
