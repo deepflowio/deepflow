@@ -3586,7 +3586,7 @@ mod tests {
         let key = LogCacheKey::new(
             &ParseParam::new(
                 &packet,
-                Some(flow_map.perf_cache.clone()),
+                flow_map.perf_cache.clone(),
                 Rc::clone(&flow_map.wasm_vm),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Rc::clone(&flow_map.so_plugin),
@@ -3678,7 +3678,7 @@ mod tests {
         let key = LogCacheKey::new(
             &ParseParam::new(
                 &packet,
-                Some(flow_map.perf_cache.clone()),
+                flow_map.perf_cache.clone(),
                 Rc::clone(&flow_map.wasm_vm),
                 #[cfg(any(target_os = "linux", target_os = "android"))]
                 Rc::clone(&flow_map.so_plugin),
