@@ -16,7 +16,7 @@
 
 use nom::FindSubstring;
 
-use public::codecs::hessian2::{consts::*, Hessian2Decoder};
+use public::codecs::hessian2::{consts::*, Hessian2IterDecoder};
 
 use super::consts::*;
 use super::{DubboInfo, BODY_PARAM_MAX, BODY_PARAM_MIN};
@@ -54,9 +54,8 @@ fn lookup_str(payload: &[u8], trace_type: &TraceType) -> Option<String> {
             continue;
         }
 
-        if let (Some(context), _) =
-            Hessian2Decoder::decode_string(payload, start + index + tag.len())
-        {
+        let offset = start + index + tag.len();
+        if let Some(context) = Hessian2IterDecoder::new(&payload[offset..]).decode_string() {
             return Some(context);
         }
         start += index + tag.len();

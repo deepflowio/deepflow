@@ -47,460 +47,473 @@ impl Display for HessianValue {
     }
 }
 
-#[derive(Default)]
-pub struct Hessian2Decoder {
+/// 单次流式解析会话。位置状态由自身维护，所有 decode 方法直接操作 self.pos。
+/// class_field_info 是 per-stream 状态（BC_OBJECT_DEF 先于 BC_OBJECT 出现），也属于会话。
+pub struct Hessian2IterDecoder<'a> {
+    bytes: &'a [u8],
+    pos: usize,
     class_field_info: Vec<Vec<String>>,
 }
 
-impl Hessian2Decoder {
-    // 返回具体值和读了多少长度，注意 长度返回 1 表示读取了 start 索引
-    pub fn decode_field(&mut self, bytes: &[u8], start: usize) -> (Option<HessianValue>, usize) {
-        if start >= bytes.len() {
-            return (None, 0);
-        }
+impl<'a> Hessian2IterDecoder<'a> {
+    pub fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, pos: 0, class_field_info: Vec::new() }
+    }
 
-        match bytes[start] {
-            BC_END => (None, 1),
-            // 实际值就是 null，即未初始化，不要给 None，因为可能解出 map key 但 value = null
-            BC_NULL => (Some(HessianValue::Null), 1),
-            BC_TRUE => (Some(HessianValue::Bool(true)), 1),
-            BC_FALSE => (Some(HessianValue::Bool(false)), 1),
+    fn peek(&self) -> Option<u8> {
+        self.bytes.get(self.pos).copied()
+    }
+
+    fn consume(&mut self) -> Option<u8> {
+        let b = self.bytes.get(self.pos).copied()?;
+        self.pos += 1;
+        Some(b)
+    }
+
+    fn skip_to_end(&mut self) {
+        self.pos = self.bytes.len();
+    }
+
+    // 严格解析当前位置的一个字段，消费对应字节并返回结果。
+    // BC_REF、list 等无实用值的字段返回 None（pos 仍推进）。
+    // 供 decode_map / decode_obj / decode_list 内部使用；外部请用 decode_field。
+    fn decode_one(&mut self) -> Option<HessianValue> {
+        let tag = match self.peek() {
+            None | Some(BC_END) => return None,
+            Some(t) => t,
+        };
+        let prev = self.pos;
+        let result = match tag {
+            BC_NULL => { self.pos += 1; Some(HessianValue::Null) }
+            BC_TRUE => { self.pos += 1; Some(HessianValue::Bool(true)) }
+            BC_FALSE => { self.pos += 1; Some(HessianValue::Bool(false)) }
             BC_REF => {
-                // ref 意为通过索引号获取一个指向 list/map 的指针
-                let (_, len) = Self::decode_i32(bytes, start);
-                (None, len)
+                self.pos += 1; // 跳过 BC_REF tag 本身
+                self.decode_i32(); // 跳过 ref 索引
+                None
             }
             // int
             0x80..=0xbf | 0xc0..=0xcf | 0xd0..=0xd7 | BC_INT => {
-                let (value, len) = Self::decode_i32(bytes, start);
-                (Some(HessianValue::Int(value)), len)
+                Some(HessianValue::Int(self.decode_i32()))
             }
             // long
             0xd8..=0xef | 0xf0..=0xff | 0x38..=0x3f | BC_LONG_INT | BC_LONG => {
-                let (value, len) = Self::decode_i64(bytes, start);
-                (Some(HessianValue::Long(value)), len)
+                Some(HessianValue::Long(self.decode_i64()))
             }
             // date
-            BC_DATE | BC_DATE_MINUTE => {
-                let (value, len) = Self::decode_datetime(bytes, start);
-                (Some(HessianValue::DateTime(value)), len)
-            }
+            BC_DATE | BC_DATE_MINUTE => Some(HessianValue::DateTime(self.decode_datetime())),
             // double
             BC_DOUBLE_ZERO | BC_DOUBLE_ONE | BC_DOUBLE_BYTE | BC_DOUBLE_SHORT | BC_DOUBLE_MILL
-            | BC_DOUBLE => {
-                let (value, len) = Self::decode_f64(bytes, start);
-                (Some(HessianValue::Double(value)), len)
-            }
+            | BC_DOUBLE => Some(HessianValue::Double(self.decode_f64())),
             // binary
             BC_BINARY_DIRECT..=INT_DIRECT_MAX
             | BC_BINARY_SHORT..=0x37
             | BC_BINARY_CHUNK
-            | BC_BINARY => {
-                let (value, len) = Self::decode_binary(bytes, start);
-                (Some(HessianValue::Binary(value)), len)
-            }
+            | BC_BINARY => Some(HessianValue::Binary(self.decode_binary())),
             // string
             BC_STRING_SHORT..=BC_STRING_SHORT_MAX
             | BC_STRING_DIRECT..=STRING_DIRECT_MAX
             | BC_STRING_CHUNK
             | BC_STRING => {
-                if let (Some(value), len) = Self::decode_string(bytes, start) {
-                    (Some(HessianValue::String(value)), len)
+                if let Some(s) = self.decode_string() {
+                    Some(HessianValue::String(s))
                 } else {
-                    // tag 表示为 string 但无法读出合法的 string，说明数据有异常，剩下的数据也不需要继续读了
-                    (None, bytes.len())
+                    // tag 表示为 string 但无法读出合法的 string，数据异常，丢弃剩余
+                    self.skip_to_end();
+                    None
                 }
             }
-            // list: 没有实用意义，因为无法按 key 提取数据，但要跳过 list 的长度继续解析
+            // list: 没有实用意义，跳过即可
             BC_LIST_DIRECT..=0x77
             | BC_LIST_DIRECT_UNTYPED..=0x7f
             | BC_LIST_FIXED
             | BC_LIST_VARIABLE
             | BC_LIST_FIXED_UNTYPED
-            | BC_LIST_VARIABLE_UNTYPED => (None, self.decode_list(bytes, start)),
+            | BC_LIST_VARIABLE_UNTYPED => {
+                self.decode_list();
+                None
+            }
             // hashmap
-            BC_MAP | BC_MAP_UNTYPED => {
-                let (value, len) = self.decode_map(bytes, start);
-                (Some(HessianValue::Map(value)), len)
-            }
-            // object，只能处理为 hashmap
+            BC_MAP | BC_MAP_UNTYPED => Some(HessianValue::Map(self.decode_map())),
+            // object
             BC_OBJECT_DEF | BC_OBJECT | BC_OBJECT_DIRECT..=BC_OBJECT_DIRECT_MAX => {
-                let (value, len) = self.decode_obj(bytes, start);
-                (Some(HessianValue::Map(value)), len)
+                Some(HessianValue::Map(self.decode_obj()))
             }
-            _ => (None, bytes.len()), // 如果不符合任何一种，表示这个 tag 没有意义，直接丢弃剩余所有数据
+            _ => { self.skip_to_end(); None }
+        };
+        // 子解码器遇到字节不足时可能不推进 pos，强制跳过剩余，防止调用方死循环
+        if self.pos == prev {
+            self.skip_to_end();
+        }
+        result
+    }
+
+    // 返回下一个有意义的字段，跳过 BC_REF、list 等无值标记。
+    // 供 Iterator::next 及外部直接使用。
+    pub fn decode_field(&mut self) -> Option<HessianValue> {
+        loop {
+            match self.peek() {
+                None | Some(BC_END) => return None,
+                _ => {}
+            }
+            let prev = self.pos;
+            let value = self.decode_one();
+            if self.pos == prev {
+                return None; // 安全兜底：无进展则终止
+            }
+            if value.is_some() {
+                return value;
+            }
+            // BC_REF、list：pos 已推进但无值，继续找下一个
         }
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/map.go#L240
-    pub fn decode_map(
-        &mut self,
-        payload: &[u8],
-        index: usize,
-    ) -> (HashMap<String, HessianValue>, usize) {
-        let mut tag = payload[index];
-        let mut start = index + 1;
+    pub fn decode_map(&mut self) -> HashMap<String, HessianValue> {
         let mut map = HashMap::new();
-        if start >= payload.len() {
-            return (map, 0);
+        let tag = match self.consume() {
+            None => return map,
+            Some(t) => t,
+        };
+        if self.pos >= self.bytes.len() {
+            return map;
         }
         if tag == BC_MAP {
-            // 即使是 typedmap(标示了类型的 map)，也只能处理成 hashmap<string, string>, 这里忽略实际类型，只跳过读取长度
-            let (_, len) = Self::decode_string(payload, start);
-            if len == 0 {
-                let (_, len) = Self::decode_i32(payload, start);
-                start += len;
+            // typed map：跳过类型字符串，忽略实际类型。
+            // 若类型头不是合法字符串则直接放弃跳过——不做 i32 fallback，
+            // 避免误消费后续的 key 字节。
+            self.decode_string();
+        }
+        loop {
+            match self.peek() {
+                None => break,
+                Some(BC_END) => { self.pos += 1; break; }
+                _ => {}
+            }
+            let before_key = self.pos;
+            let key = self.decode_one();
+            if self.pos == before_key {
+                break; // key 解析无进展，防止死循环
+            }
+            let before_val = self.pos;
+            let value = self.decode_one();
+            if self.pos == before_val {
+                break; // value 解析无进展，防止死循环
+            }
+            if let (Some(HessianValue::String(k)), Some(v)) = (key, value) {
+                map.insert(k, v);
             }
         }
-        while tag != BC_END {
-            let (key, len) = self.decode_field(payload, start);
-            start += len;
-            let (value, len) = self.decode_field(payload, start);
-            start += len;
-            match (key, value) {
-                (Some(HessianValue::String(k)), Some(v)) => map.insert(k, v),
-                _ => None,
-            };
-            if start >= payload.len() {
-                break;
-            }
-            tag = payload[start]
-        }
-        // 读取完后这里会丢弃下一个 byte，所以 +1
-        // ref: https://github.com/apache/dubbo-go-hessian2/blob/master/map.go#L320
-        (map, start - index + 1)
+        map
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/list.go#L280
-    // 注意：这里 list 具体的值没有用，只是为了解出要读多少 len
-    pub fn decode_list(&mut self, payload: &[u8], index: usize) -> usize {
-        let tag = payload[index];
-        let mut start = index + 1;
-        if start >= payload.len() {
-            return 0;
+    // list 具体值无用，只需跳过正确长度
+    pub fn decode_list(&mut self) {
+        let tag = match self.consume() {
+            None => return,
+            Some(t) => t,
+        };
+        if self.pos >= self.bytes.len() {
+            return;
         }
         let arr_len = match tag {
             BC_LIST_FIXED => {
-                let (_, len) = Self::decode_string(payload, start);
-                start += len;
-                if start >= payload.len() {
-                    return 0;
+                self.decode_string(); // 跳过类型字符串
+                if self.pos >= self.bytes.len() {
+                    return;
                 }
-                let (arr_len, len) = Self::decode_i32(payload, start);
-                start += len;
-                arr_len as usize
+                self.decode_i32().max(0) as usize
             }
             BC_LIST_VARIABLE => {
-                let (_, len) = Self::decode_string(payload, start);
-                start += len;
-                if start >= payload.len() {
-                    return start - index;
+                self.decode_string(); // 跳过类型字符串
+                if self.pos >= self.bytes.len() {
+                    return;
                 }
-                // 遇到这种情况意味着是未知长度 list，内容一直到第一个 BC_END 为止（也有可能剩下的所有内容都是这个 list）
-                return payload[start..]
+                // 未知长度，读到第一个 BC_END
+                self.pos += self.bytes[self.pos..]
                     .iter()
                     .position(|&b| b == BC_END)
-                    .unwrap_or(payload.len() - 1)
-                    + 1
-                    - index;
+                    .map(|p| p + 1)
+                    .unwrap_or(self.bytes.len() - self.pos);
+                return;
             }
             BC_LIST_FIXED_TYPED_LEN_TAG_MIN..=BC_LIST_FIXED_TYPED_LEN_TAG_MAX => {
-                let (_, len) = Self::decode_string(payload, start);
-                start += len;
+                self.decode_string(); // 跳过类型字符串
                 tag.overflowing_sub(BC_LIST_FIXED_TYPED_LEN_TAG_MIN).0 as usize
             }
-            BC_LIST_FIXED_UNTYPED => {
-                let (arr_len, len) = Self::decode_i32(payload, start);
-                start += len;
-                arr_len as usize
-            }
+            BC_LIST_FIXED_UNTYPED => self.decode_i32().max(0) as usize,
             BC_LIST_VARIABLE_UNTYPED => {
-                return payload[start..]
+                self.pos += self.bytes[self.pos..]
                     .iter()
                     .position(|&b| b == BC_END)
-                    .unwrap_or(payload.len() - 1)
-                    + 1
-                    - index;
+                    .map(|p| p + 1)
+                    .unwrap_or(self.bytes.len() - self.pos);
+                return;
             }
             BC_LIST_FIXED_UNTYPED_LEN_TAG_MIN..=BC_LIST_FIXED_UNTYPED_LEN_TAG_MAX => {
                 tag.overflowing_sub(BC_LIST_FIXED_UNTYPED_LEN_TAG_MIN).0 as usize
             }
-            _ => 0,
+            _ => return,
         };
         for _ in 0..arr_len {
-            if start >= payload.len() {
+            if self.pos >= self.bytes.len() {
                 break;
             }
-            let (_, len) = self.decode_field(payload, start);
-            start += len;
+            self.decode_one();
         }
-        start - index
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/object.go#L567
-    pub fn decode_obj(
-        &mut self,
-        payload: &[u8],
-        index: usize,
-    ) -> (HashMap<String, HessianValue>, usize) {
-        let tag = payload[index];
-        let mut start = index + 1;
+    pub fn decode_obj(&mut self) -> HashMap<String, HessianValue> {
         let mut object_map = HashMap::new();
-        // object 类型的消息一般是 BC_OBJECT_DEF 携带对象定义，紧接着一个 BC_OBJECT/BC_OBJECT_DIRECT 携带实例数据
+        let tag = match self.consume() {
+            None => return object_map,
+            Some(t) => t,
+        };
         match tag {
             BC_OBJECT_DEF => {
-                let (_, len) = Self::decode_string(payload, start);
-                start += len;
-                if start >= payload.len() {
-                    return (object_map, 0);
+                self.decode_string(); // 跳过类名
+                if self.pos >= self.bytes.len() {
+                    return object_map;
                 }
-                let (field_num, len) = Self::decode_i32(payload, start);
-                start += len;
-                let mut field_list = Vec::with_capacity(field_num as usize);
+                let field_num = self.decode_i32().max(0) as usize;
+                let mut field_list = Vec::with_capacity(field_num);
                 for _ in 0..field_num {
-                    if start >= payload.len() {
+                    if self.pos >= self.bytes.len() {
                         break;
                     }
-                    if let (Some(field_name), len) = Self::decode_string(payload, start) {
-                        start += len;
+                    if let Some(field_name) = self.decode_string() {
                         field_list.push(field_name);
                     } else {
                         break;
                     }
                 }
-                // 需要先把 BC_OBJECT_DEF 的解析加入索引中
+                // 先把 BC_OBJECT_DEF 的字段定义加入索引
                 self.class_field_info.push(field_list);
-                // 这里会跳到 BC_OBJECT 继续解析
-                let (value, len) = self.decode_field(payload, start);
-                match value {
-                    Some(HessianValue::Map(map)) => {
-                        return (map, start + len - index);
-                    }
-                    _ => {
-                        return (object_map, start + len - index);
-                    }
+                // 跳到 BC_OBJECT 继续解析实例数据
+                match self.decode_one() {
+                    Some(HessianValue::Map(map)) => map,
+                    _ => object_map,
                 }
             }
             BC_OBJECT | BC_OBJECT_DIRECT..=BC_OBJECT_DIRECT_MAX => {
                 let class_index = if tag == BC_OBJECT {
-                    let (idx, len) = Self::decode_i32(payload, start);
-                    start += len;
-                    idx as usize
+                    self.decode_i32() as usize
                 } else {
                     tag.overflowing_sub(BC_OBJECT_DIRECT).0 as usize
                 };
-                // 无论 object type 是什么类型，都需要解析为 hashmap (field_name => value)
-                // 但如果是 java 内置类型或自定义类型，都无法解析，如果遇到了会导致后续解析失败
                 if class_index >= self.class_field_info.len() {
-                    return (object_map, 0);
+                    return object_map;
                 }
                 let field_list = self.class_field_info[class_index].clone();
-                for i in 0..field_list.len() {
-                    let field_name = &field_list[i];
-                    let (value, len) = self.decode_field(payload, start);
-                    if value.is_some() {
-                        object_map.insert(field_name.to_string(), value.unwrap());
+                for field_name in &field_list {
+                    if self.pos >= self.bytes.len() {
+                        break;
                     }
-                    start += len;
+                    if let Some(value) = self.decode_one() {
+                        object_map.insert(field_name.clone(), value);
+                    }
                 }
-                (object_map, start - index)
+                object_map
             }
-            _ => (object_map, 0),
+            _ => object_map,
         }
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/int.go#L60
-    pub fn decode_i32(payload: &[u8], index: usize) -> (i32, usize) {
-        let tag = payload[index];
+    pub fn decode_i32(&mut self) -> i32 {
+        let index = self.pos;
+        if index >= self.bytes.len() {
+            return 0;
+        }
+        let tag = self.bytes[index];
         match tag {
-            0x80..=0xbf => ((tag.overflowing_sub(BC_INT_ZERO).0) as i32, 1),
-            0xc0..=0xcf if index + 1 < payload.len() => (
-                u16::from_be_bytes([tag.overflowing_sub(BC_INT_BYTE_ZERO).0, payload[index + 1]])
-                    as i32,
-                2,
-            ),
-            0xd0..=0xd7 if index + 2 < payload.len() => {
-                let mut buf = [
-                    0,
-                    tag.overflowing_sub(BC_INT_SHORT_ZERO).0,
-                    payload[index + 1],
-                    payload[index + 2],
-                ];
-                if buf[1] & 0x80 != 0 {
-                    buf[0] = 0xff;
-                }
-                (u32::from_be_bytes(buf) as i32, 3)
+            0x80..=0xbf => { self.pos += 1; tag.overflowing_sub(BC_INT_ZERO).0 as i32 }
+            0xc0..=0xcf if index + 1 < self.bytes.len() => {
+                self.pos += 2;
+                u16::from_be_bytes([tag.overflowing_sub(BC_INT_BYTE_ZERO).0, self.bytes[index + 1]]) as i32
             }
-            BC_INT if index + 4 < payload.len() => (
-                i32::from_be_bytes(payload[index + 1..index + 5].try_into().unwrap_or_default()),
-                5,
-            ),
-            _ => (0, 0),
+            0xd0..=0xd7 if index + 2 < self.bytes.len() => {
+                self.pos += 3;
+                let mut buf = [0, tag.overflowing_sub(BC_INT_SHORT_ZERO).0, self.bytes[index + 1], self.bytes[index + 2]];
+                if buf[1] & 0x80 != 0 { buf[0] = 0xff; }
+                u32::from_be_bytes(buf) as i32
+            }
+            BC_INT if index + 4 < self.bytes.len() => {
+                self.pos += 5;
+                i32::from_be_bytes(self.bytes[index + 1..index + 5].try_into().unwrap_or_default())
+            }
+            _ => 0
         }
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/long.go#L63
-    pub fn decode_i64(payload: &[u8], index: usize) -> (i64, usize) {
-        let tag = payload[index];
+    pub fn decode_i64(&mut self) -> i64 {
+        let index = self.pos;
+        if index >= self.bytes.len() {
+            return 0;
+        }
+        let tag = self.bytes[index];
         match tag {
-            0xd8..=0xef => ((tag.overflowing_sub(BC_LONG_ZERO).0) as i64, 1),
-            0xf0..=0xff if index + 1 < payload.len() => {
-                let buf = [tag.overflowing_sub(BC_LONG_BYTE_ZERO).0, payload[index + 1]];
-                (u16::from_be_bytes(buf) as i64, 2)
+            0xd8..=0xef => { self.pos += 1; tag.overflowing_sub(BC_LONG_ZERO).0 as i64 }
+            0xf0..=0xff if index + 1 < self.bytes.len() => {
+                self.pos += 2;
+                u16::from_be_bytes([tag.overflowing_sub(BC_LONG_BYTE_ZERO).0, self.bytes[index + 1]]) as i64
             }
-            0x38..=0x3f if index + 2 < payload.len() => {
-                let mut buf = [
-                    0,
-                    tag.overflowing_sub(BC_LONG_SHORT_ZERO).0,
-                    payload[index + 1],
-                    payload[index + 2],
-                ];
-                if buf[1] & 0x80 != 0 {
-                    buf[0] = 0xff;
-                }
-                (u32::from_be_bytes(buf) as i64, 3)
+            0x38..=0x3f if index + 2 < self.bytes.len() => {
+                self.pos += 3;
+                let mut buf = [0, tag.overflowing_sub(BC_LONG_SHORT_ZERO).0, self.bytes[index + 1], self.bytes[index + 2]];
+                if buf[1] & 0x80 != 0 { buf[0] = 0xff; }
+                u32::from_be_bytes(buf) as i64
             }
-            BC_LONG_INT if index + 4 < payload.len() => (
-                i32::from_be_bytes(payload[index + 1..index + 5].try_into().unwrap_or_default())
-                    as i64,
-                5,
-            ),
-            BC_LONG if index + 8 < payload.len() => (
-                i64::from_be_bytes(payload[index + 1..index + 9].try_into().unwrap_or_default()),
-                9,
-            ),
-            _ => (0, 0),
+            BC_LONG_INT if index + 4 < self.bytes.len() => {
+                self.pos += 5;
+                i32::from_be_bytes(self.bytes[index + 1..index + 5].try_into().unwrap_or_default()) as i64
+            }
+            BC_LONG if index + 8 < self.bytes.len() => {
+                self.pos += 9;
+                i64::from_be_bytes(self.bytes[index + 1..index + 9].try_into().unwrap_or_default())
+            }
+            _ => 0
         }
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/date.go#L60
-    pub fn decode_datetime(payload: &[u8], index: usize) -> (i64, usize) {
-        let tag = payload[index];
+    pub fn decode_datetime(&mut self) -> i64 {
+        let index = self.pos;
+        if index >= self.bytes.len() {
+            return 0;
+        }
+        let tag = self.bytes[index];
         match tag {
-            BC_DATE if index + 8 < payload.len() => (
-                u64::from_be_bytes(payload[index + 1..index + 9].try_into().unwrap_or_default())
-                    as i64,
-                9,
-            ),
-            BC_DATE_MINUTE if index + 4 < payload.len() => (
-                (u32::from_be_bytes(payload[index + 1..index + 5].try_into().unwrap_or_default())
-                    * 60) as i64,
-                5,
-            ),
-            _ => (0, 0),
+            BC_DATE if index + 8 < self.bytes.len() => {
+                self.pos += 9;
+                u64::from_be_bytes(self.bytes[index + 1..index + 9].try_into().unwrap_or_default()) as i64
+            }
+            BC_DATE_MINUTE if index + 4 < self.bytes.len() => {
+                self.pos += 5;
+                // fix: 先 cast 再乘，避免 u32 乘法溢出后才 cast 到 i64
+                u32::from_be_bytes(self.bytes[index + 1..index + 5].try_into().unwrap_or_default()) as i64 * 60
+            }
+            _ => 0
         }
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/double.go#L109
-    pub fn decode_f64(payload: &[u8], index: usize) -> (f64, usize) {
-        let tag = payload[index];
+    pub fn decode_f64(&mut self) -> f64 {
+        let index = self.pos;
+        if index >= self.bytes.len() {
+            return 0.0;
+        }
+        let tag = self.bytes[index];
         match tag {
-            BC_DOUBLE_ZERO => (0.0, 1),
-            BC_DOUBLE_ONE => (1.0, 1),
-            BC_DOUBLE_BYTE if index + 1 < payload.len() => (
-                u8::from_be_bytes(payload[index + 1..index + 2].try_into().unwrap_or_default())
-                    as f64,
-                2,
-            ),
-            BC_DOUBLE_SHORT if index + 2 < payload.len() => (
-                u16::from_be_bytes(payload[index + 1..index + 3].try_into().unwrap_or_default())
-                    as f64,
-                3,
-            ),
-            BC_DOUBLE_MILL if index + 4 < payload.len() => (
-                u32::from_be_bytes(payload[index + 1..index + 5].try_into().unwrap_or_default())
-                    as f64,
-                5,
-            ),
-            BC_DOUBLE if index + 8 < payload.len() => (
-                f64::from_be_bytes(payload[index + 1..index + 9].try_into().unwrap_or_default()),
-                9,
-            ),
-            _ => (0.0, 0),
+            BC_DOUBLE_ZERO => { self.pos += 1; 0.0 }
+            BC_DOUBLE_ONE => { self.pos += 1; 1.0 }
+            BC_DOUBLE_BYTE if index + 1 < self.bytes.len() => {
+                self.pos += 2;
+                u8::from_be_bytes(self.bytes[index + 1..index + 2].try_into().unwrap_or_default()) as f64
+            }
+            BC_DOUBLE_SHORT if index + 2 < self.bytes.len() => {
+                self.pos += 3;
+                u16::from_be_bytes(self.bytes[index + 1..index + 3].try_into().unwrap_or_default()) as f64
+            }
+            BC_DOUBLE_MILL if index + 4 < self.bytes.len() => {
+                self.pos += 5;
+                u32::from_be_bytes(self.bytes[index + 1..index + 5].try_into().unwrap_or_default()) as f64
+            }
+            BC_DOUBLE if index + 8 < self.bytes.len() => {
+                self.pos += 9;
+                f64::from_be_bytes(self.bytes[index + 1..index + 9].try_into().unwrap_or_default())
+            }
+            _ => 0.0
         }
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/binary.go#L124
-    pub fn decode_binary(payload: &[u8], index: usize) -> (Vec<u8>, usize) {
+    pub fn decode_binary(&mut self) -> Vec<u8> {
         let mut result = Vec::new();
-        let mut start = index;
-        let mut tag = payload[start];
         loop {
+            let index = self.pos;
+            if index >= self.bytes.len() {
+                break;
+            }
+            let tag = self.bytes[index];
             let len = match tag {
                 BC_BINARY_DIRECT..=INT_DIRECT_MAX => {
-                    start += 1;
-                    (tag.overflowing_sub(BC_BINARY_DIRECT).0) as usize
+                    self.pos += 1;
+                    tag.overflowing_sub(BC_BINARY_DIRECT).0 as usize
                 }
-                BC_BINARY_SHORT..=0x37 if start + 1 < payload.len() => {
-                    start += 2;
-                    ((tag.overflowing_sub(BC_BINARY_SHORT).0) as usize)
-                        << 8 + payload[start - 1] as usize
+                BC_BINARY_SHORT..=0x37 if index + 1 < self.bytes.len() => {
+                    self.pos += 2;
+                    // fix: 原代码 `<< 8 + bytes[...]` 因 Rust 优先级被解析为 `<< (8 + bytes[...])`
+                    (((tag.overflowing_sub(BC_BINARY_SHORT).0) as usize) << 8) + self.bytes[index + 1] as usize
                 }
-                BC_BINARY_CHUNK | BC_BINARY if start + 2 < payload.len() => {
-                    start += 3;
-                    ((payload[start - 2] as usize) << 8) + payload[start - 1] as usize
+                BC_BINARY_CHUNK | BC_BINARY if index + 2 < self.bytes.len() => {
+                    self.pos += 3;
+                    ((self.bytes[index + 1] as usize) << 8) + self.bytes[index + 2] as usize
                 }
-                _ => return (result, 0),
+                _ => break,
             };
-            if start >= payload.len() || start + len > payload.len() {
+            if self.pos + len > self.bytes.len() {
+                self.skip_to_end();
                 break;
             }
-            result.extend_from_slice(&payload[start..start + len]);
-            start += len;
+            result.extend_from_slice(&self.bytes[self.pos..self.pos + len]);
+            self.pos += len;
             if tag != BC_BINARY_CHUNK {
-                // tag == BC_BINARY_CHUNK, continue to read
                 break;
             }
-            if start >= payload.len() {
-                break;
-            }
-            tag = payload[start];
         }
-        return (result, start - index);
+        result
     }
 
     // https://github.com/apache/dubbo-go-hessian2/blob/master/string.go#L204
-    pub fn decode_string(payload: &[u8], index: usize) -> (Option<String>, usize) {
+    pub fn decode_string(&mut self) -> Option<String> {
         let mut result = Vec::new();
-        let mut start = index;
-        let mut tag = payload[start];
         loop {
-            let len = match tag {
-                BC_STRING_DIRECT..=STRING_DIRECT_MAX => {
-                    start += 1;
-                    // 这里应该是 tag-BC_STRNG_DIRECT，但 BC_STRING_DIRECT 刚好等于 0x00，故省略
-                    tag as usize
+            let index = self.pos;
+            if index >= self.bytes.len() {
+                break;
+            }
+            let tag = self.bytes[index];
+            let (data_start, len) = match tag {
+                BC_STRING_DIRECT..=STRING_DIRECT_MAX => (index + 1, tag as usize),
+                BC_STRING_SHORT..=BC_STRING_SHORT_MAX if index + 1 < self.bytes.len() => {
+                    let len = (((self.bytes[index] - BC_STRING_SHORT) as usize) << 8)
+                        + self.bytes[index + 1] as usize;
+                    (index + 2, len)
                 }
-                BC_STRING_SHORT..=BC_STRING_SHORT_MAX if start + 1 < payload.len() => {
-                    start += 2;
-                    (((payload[start - 2] - BC_STRING_SHORT) as usize) << 8)
-                        + payload[start - 1] as usize
+                BC_STRING_CHUNK | BC_STRING if index + 2 < self.bytes.len() => {
+                    let len = ((self.bytes[index + 1] as usize) << 8) + self.bytes[index + 2] as usize;
+                    (index + 3, len)
                 }
-                BC_STRING_CHUNK | BC_STRING if start + 2 < payload.len() => {
-                    start += 3;
-                    ((payload[start - 2] as usize) << 8) + payload[start - 1] as usize
-                }
-                _ => return (None, 0),
+                _ => return None,
             };
-            if start >= payload.len() || start + len > payload.len() {
+            if data_start + len > self.bytes.len() {
+                self.skip_to_end();
                 break;
             }
-            if payload[start..start + len].iter().any(|&b| !b.is_ascii()) {
-                return (None, 0);
+            if self.bytes[data_start..data_start + len].iter().any(|&b| !b.is_ascii()) {
+                // 非 ASCII 不推进 pos，由调用方决定如何处理
+                return None;
             }
-            result.extend_from_slice(&payload[start..start + len]);
-            start += len;
+            result.extend_from_slice(&self.bytes[data_start..data_start + len]);
+            self.pos = data_start + len;
             if tag != BC_STRING_CHUNK {
-                // 非 BC_STRING_CHUNK 直接跳出，BC_STRING_CHUNK 则继续读下一个 CHUNK
                 break;
             }
-            if start >= payload.len() {
-                break;
-            }
-            tag = payload[start];
         }
         // checked bytes in result are ascii, so unwrap is safe
-        (Some(String::from_utf8(result).unwrap()), start - index)
+        Some(String::from_utf8(result).unwrap())
+    }
+}
+
+impl<'a> Iterator for Hessian2IterDecoder<'a> {
+    type Item = HessianValue;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.decode_field()
     }
 }
 
