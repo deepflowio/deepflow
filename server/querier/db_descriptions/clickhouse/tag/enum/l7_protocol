@@ -11,6 +11,7 @@
 47      , Some/IP         ,
 48      , ISO-8583        ,
 49      , Triple          ,
+50      , NetSign         ,
 60      , MySQL           ,
 61      , PostgreSQL      ,
 62      , Oracle          ,

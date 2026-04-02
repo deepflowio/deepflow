@@ -34,7 +34,7 @@ use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
 use crate::common::meta_packet::{IcmpData, ProtocolData};
-use crate::config::config::{Iso8583ParseConfig, WebSphereMqParseConfig};
+use crate::config::config::{Iso8583ParseConfig, NetSignParseConfig, WebSphereMqParseConfig};
 use crate::config::handler::LogParserConfig;
 use crate::config::OracleConfig;
 use crate::flow_generator::flow_map::FlowMapCounter;
@@ -102,6 +102,8 @@ macro_rules! impl_protocol_parser {
                     "Custom"=>Ok(Self::Custom(Default::default())),
                     #[cfg(feature = "enterprise")]
                     "ISO-8583"=>Ok(Self::Iso8583(Default::default())),
+                    #[cfg(feature = "enterprise")]
+                    "NetSign"|"netsign"|"net_sign"=>Ok(Self::NetSign(Default::default())),
                     #[cfg(feature = "enterprise")]
                     "WebSphereMQ"=>Ok(Self::WebSphereMq(Default::default())),
                     $(
@@ -202,6 +204,7 @@ cfg_if::cfg_if! {
                 Tars(TarsLog),
                 Oracle(crate::flow_generator::protocol_logs::OracleLog),
                 Iso8583(crate::flow_generator::protocol_logs::Iso8583Log),
+                NetSign(crate::flow_generator::protocol_logs::NetSignLog),
                 MQTT(MqttLog),
                 AMQP(AmqpLog),
                 NATS(NatsLog),
@@ -691,6 +694,7 @@ pub struct ParseParam<'a> {
     pub oracle_parse_conf: OracleConfig,
     pub iso8583_parse_conf: Iso8583ParseConfig,
     pub web_sphere_mq_parse_conf: WebSphereMqParseConfig,
+    pub net_sign_parse_conf: NetSignParseConfig,
 }
 
 impl<'a> fmt::Debug for ParseParam<'a> {
@@ -723,6 +727,7 @@ impl<'a> fmt::Debug for ParseParam<'a> {
             .field("oracle_parse_conf", &self.oracle_parse_conf)
             .field("iso8583_parse_conf", &self.iso8583_parse_conf)
             .field("web_sphere_mq_parse_conf", &self.web_sphere_mq_parse_conf)
+            .field("net_sign_parse_conf", &self.net_sign_parse_conf)
             .finish()
     }
 }
@@ -796,6 +801,7 @@ impl<'a> ParseParam<'a> {
             oracle_parse_conf: OracleConfig::default(),
             iso8583_parse_conf: Iso8583ParseConfig::default(),
             web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
+            net_sign_parse_conf: NetSignParseConfig::default(),
         }
     }
 }
@@ -841,6 +847,10 @@ impl<'a> ParseParam<'a> {
         self.web_sphere_mq_parse_conf = conf.clone();
     }
 
+    pub fn set_net_sign_conf(&mut self, conf: &NetSignParseConfig) {
+        self.net_sign_parse_conf = *conf;
+    }
+
     pub fn reversed(&self) -> Self {
         Self {
             ip_src: self.ip_dst,
@@ -858,6 +868,7 @@ impl<'a> ParseParam<'a> {
             stats_counter: self.stats_counter.clone(),
             iso8583_parse_conf: self.iso8583_parse_conf.clone(),
             web_sphere_mq_parse_conf: self.web_sphere_mq_parse_conf.clone(),
+            net_sign_parse_conf: self.net_sign_parse_conf,
             ..*self
         }
     }

@@ -34,7 +34,7 @@ use crate::{
         l7_protocol_log::{L7PerfCache, ParseParam},
     },
     config::{
-        config::{Iso8583ParseConfig, WebSphereMqParseConfig},
+        config::{Iso8583ParseConfig, NetSignParseConfig, WebSphereMqParseConfig},
         OracleConfig,
     },
     flow_generator::protocol_logs::{
@@ -92,6 +92,7 @@ fn get_req_param<'a>(
         oracle_parse_conf: OracleConfig::default(),
         iso8583_parse_conf: Iso8583ParseConfig::default(),
         web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
+        net_sign_parse_conf: NetSignParseConfig::default(),
         icmp_data: None,
     }
 }
@@ -133,6 +134,7 @@ fn get_resp_param<'a>(
         oracle_parse_conf: OracleConfig::default(),
         iso8583_parse_conf: Iso8583ParseConfig::default(),
         web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
+        net_sign_parse_conf: NetSignParseConfig::default(),
         icmp_data: None,
     }
 }

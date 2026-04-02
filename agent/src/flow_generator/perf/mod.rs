@@ -290,6 +290,7 @@ impl FlowLog {
             parse_param.set_oracle_conf(flow_config.oracle_parse_conf);
             parse_param.set_iso8583_conf(&flow_config.iso8583_parse_conf);
             parse_param.set_web_sphere_mq_conf(&flow_config.web_sphere_mq_parse_conf);
+            parse_param.set_net_sign_conf(&flow_config.net_sign_parse_conf);
 
             let parser = self.l7_protocol_log_parser.as_mut().unwrap();
 
@@ -389,6 +390,7 @@ impl FlowLog {
             param.set_oracle_conf(flow_config.oracle_parse_conf);
             param.set_iso8583_conf(&flow_config.iso8583_parse_conf);
             param.set_web_sphere_mq_conf(&flow_config.web_sphere_mq_parse_conf);
+            param.set_net_sign_conf(&flow_config.net_sign_parse_conf);
 
             for protocol in checker.possible_protocols(
                 packet.lookup_key.proto.into(),

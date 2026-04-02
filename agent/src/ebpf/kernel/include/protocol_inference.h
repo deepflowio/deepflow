@@ -1269,6 +1269,120 @@ static __inline enum message_type infer_iso8583_message(const char *buf,
 	return MSG_REQUEST;
 }
 
+/*
+ * NetSign (签名验签) protocol identification.
+ *
+ * Wire format (all offsets absolute from TCP payload start):
+ *
+ *   [0]      outer_tag = 0x02
+ *   [1..12]  outer_len (12 ASCII decimal digits)
+ *   [13]     TAG_PROCESSOR_NAME = 0x01
+ *   [14]     type indicator = 0x01 (text)
+ *   [15..26] processorName length (12 ASCII decimal digits)
+ *   [25..26] last two digits of length:
+ *              '1','6' → RAWSignProcessor      (16 B): name at [27..42]
+ *              '2','1' → PBCRAWVerifyProcessor (21 B): name at [27..47]
+ *
+ * Protocol identification uses only the first 32 bytes (buf[0..31]).
+ * Request/response detection requires bytes beyond 32 and is read via
+ * bpf_probe_read_user from conn_info->syscall_infer_addr:
+ *
+ *   RAWSignProcessor:
+ *     op tag at [43] (extra[0]), op len last digit at [56] (extra[13])
+ *   PBCRAWVerifyProcessor:
+ *     op tag at [48] (extra[5]), op len last digit at [61] (extra[18])
+ *
+ * Operation length last digit: '7' → "request", '8' → "response"
+ */
+static __inline enum message_type infer_net_sign_message(const char *buf,
+							  size_t count,
+							  struct conn_info_s
+							  *conn_info)
+{
+	if (!protocol_port_check_2(PROTO_NET_SIGN, conn_info))
+		return MSG_UNKNOWN;
+    // Need 62 bytes minimum to read byte[61] for PBCRAWVerifyProcessor
+	if (conn_info->tuple.l4_protocol != IPPROTO_TCP || count < 62)
+		return MSG_UNKNOWN;
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_NET_SIGN)
+			return MSG_UNKNOWN;
+		/*
+		 * Socket already confirmed as NetSign. Continuation reads (mid-message
+		 * syscall splits) do not start at message offset 0, so the byte-pattern
+		 * checks below would fail. Return MSG_REQUEST unconditionally here; the
+		 * Rust-level parser derives the real message type from the TLV content.
+		 */
+		return MSG_REQUEST;
+	}
+
+	/*
+	 * Protocol identification within the first 32 bytes.
+	 */
+	// Byte 0: outer tag must be 0x02
+	if ((uint8_t)buf[0] != 0x02)
+		return MSG_UNKNOWN;
+	// Byte 1: first digit of outer_len must be ASCII decimal
+	if (buf[1] < '0' || buf[1] > '9')
+		return MSG_UNKNOWN;
+	// Byte 13: first inner TLV tag must be TAG_PROCESSOR_NAME (0x01)
+	if ((uint8_t)buf[13] != 0x01)
+		return MSG_UNKNOWN;
+	// Byte 14: inner TLV type indicator must be 0x01 (text)
+	if ((uint8_t)buf[14] != 0x01)
+		return MSG_UNKNOWN;
+	// processorName len field [15..26]: leading and near-last bytes must be '0'
+	if (buf[15] != '0' || buf[24] != '0')
+		return MSG_UNKNOWN;
+
+	// Bytes [25..26]: last two digits of processorName length.
+	// Also validate the processor name prefix (bytes [27..29]) within 32 bytes.
+	if (buf[25] == '1' && buf[26] == '6') {
+		// RAWSignProcessor (len=16): prefix "RAW" at [27..29]
+		if (buf[27] != 'R' || buf[28] != 'A' || buf[29] != 'W')
+			return MSG_UNKNOWN;
+	} else if (buf[25] == '2' && buf[26] == '1') {
+		// PBCRAWVerifyProcessor (len=21): prefix "PBC" at [27..29]
+		if (buf[27] != 'P' || buf[28] != 'B' || buf[29] != 'C')
+			return MSG_UNKNOWN;
+	} else {
+		return MSG_UNKNOWN;
+	}
+
+	/*
+	 * Request/response detection: read 19 bytes from offset 43 via
+	 * bpf_probe_read_user to cover the operation TLV for both processors.
+	 *
+	 *   extra[0]  = payload[43]: op tag for RAWSignProcessor
+	 *   extra[5]  = payload[48]: op tag for PBCRAWVerifyProcessor
+	 *   extra[13] = payload[56]: op len last digit for RAWSignProcessor
+	 *   extra[18] = payload[61]: op len last digit for PBCRAWVerifyProcessor
+	 */
+	char extra[19];
+	bpf_probe_read_user(extra, sizeof(extra),
+			    conn_info->syscall_infer_addr + 43);
+
+	if (buf[25] == '1' && buf[26] == '6') {
+		// RAWSignProcessor: op tag at extra[0], op len last digit at extra[13]
+		if ((uint8_t)extra[0] != 0x02)
+			return MSG_UNKNOWN;
+		if (extra[13] == '7')
+			return MSG_REQUEST;   // "request"  len=7
+		if (extra[13] == '8')
+			return MSG_RESPONSE;  // "response" len=8
+	} else {
+		// PBCRAWVerifyProcessor: op tag at extra[5], op len last digit at extra[18]
+		if ((uint8_t)extra[5] != 0x02)
+			return MSG_UNKNOWN;
+		if (extra[18] == '7')
+			return MSG_REQUEST;   // "request"  len=7
+		if (extra[18] == '8')
+			return MSG_RESPONSE;  // "response" len=8
+	}
+
+	return MSG_UNKNOWN;
+}
+
 #define CSTR_LEN(s) (sizeof(s) / sizeof(char) - 1)
 #define CSTR_MASK(s) ((~0ull) >> (64 - CSTR_LEN(s) * 8))
 // convert const string with length <= 8 for matching
@@ -4146,6 +4260,14 @@ infer_protocol_2(const char *infer_buf, size_t count,
 				       conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_ISO8583;
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_NET_SIGN && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_net_sign_message(infer_buf,
+					   count, conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_NET_SIGN;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_MEMCACHED && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -4490,6 +4612,14 @@ infer_protocol_1(struct ctx_info_s *ctx,
 						syscall_infer_len,
 						conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_ISO8583;
+				return inferred_message;
+			}
+			break;
+		case PROTO_NET_SIGN:
+			if ((inferred_message.type =
+			    infer_net_sign_message(infer_buf, count,
+						   conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_NET_SIGN;
 				return inferred_message;
 			}
 			break;

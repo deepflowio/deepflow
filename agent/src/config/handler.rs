@@ -54,9 +54,9 @@ use super::config::{Ebpf, EbpfFileIoEvent, ProcessMatcher, SymbolTable};
 use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
-        HttpEndpointMatchRule, Iso8583ParseConfig, OracleConfig, PcapStream, PortConfig,
-        ProcessorsFlowLogTunning, RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts,
-        UserConfig, WebSphereMqParseConfig, GRPC_BUFFER_SIZE_MIN,
+        HttpEndpointMatchRule, Iso8583ParseConfig, NetSignParseConfig, OracleConfig, PcapStream,
+        PortConfig, ProcessorsFlowLogTunning, RequestLogTunning, SessionTimeout, TagFilterOperator,
+        Timeouts, UserConfig, WebSphereMqParseConfig, GRPC_BUFFER_SIZE_MIN,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -525,6 +525,7 @@ pub struct FlowConfig {
     pub oracle_parse_conf: OracleConfig,
     pub iso8583_parse_conf: Iso8583ParseConfig,
     pub web_sphere_mq_parse_conf: WebSphereMqParseConfig,
+    pub net_sign_parse_conf: NetSignParseConfig,
 
     pub obfuscate_enabled_protocols: L7ProtocolBitmap,
     pub server_ports: Vec<u16>,
@@ -782,6 +783,15 @@ impl From<&UserConfig> for FlowConfig {
                     .protocol_special_config
                     .web_sphere_mq
                     .filter_attributes_enabled,
+            },
+            net_sign_parse_conf: NetSignParseConfig {
+                extract_biz_data_enabled: conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .protocol_special_config
+                    .net_sign
+                    .extract_biz_data_enabled,
             },
             obfuscate_enabled_protocols: L7ProtocolBitmap::from(
                 conf.processors
