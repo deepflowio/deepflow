@@ -96,8 +96,7 @@ func (s *Synchronizer) assembleLabelFully() ([]*trident.LabelResponse, error) {
 	ls := make([]*trident.LabelResponse, 0)
 	nonLabelNames := mapset.NewSet[string]()
 	nonLabelValues := mapset.NewSet[string]()
-	for iter := range s.cache.Label.GetKeyToID().IterBuffered() {
-		k := iter.Key
+	for k := range s.cache.Label.GetKeyToID() {
 		ni, ok := s.cache.LabelName.GetIDByName(k.Name)
 		if !ok {
 			nonLabelNames.Add(k.Name)
