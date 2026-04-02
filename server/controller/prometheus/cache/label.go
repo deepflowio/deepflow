@@ -17,7 +17,8 @@
 package cache
 
 import (
-	cmap "github.com/orcaman/concurrent-map/v2"
+	"sync"
+	"sync/atomic"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
@@ -43,31 +44,72 @@ func NewLabelKey(name, value string) LabelKey {
 type label struct {
 	org *common.ORG
 
-	keyToID cmap.ConcurrentMap[LabelKey, int]
+	active  atomic.Value
+	pending map[LabelKey]int
+	mu      sync.RWMutex
 }
 
 func newLabel(org *common.ORG) *label {
-	return &label{
+	l := &label{
 		org:     org,
-		keyToID: cmap.NewStringer[LabelKey, int](),
+		pending: make(map[LabelKey]int),
 	}
+	l.active.Store(make(map[LabelKey]int))
+	return l
 }
 
-func (l *label) GetKeyToID() cmap.ConcurrentMap[LabelKey, int] {
-	return l.keyToID
+func (l *label) getActive() map[LabelKey]int {
+	if active := l.active.Load(); active != nil {
+		return active.(map[LabelKey]int)
+	}
+	return map[LabelKey]int{}
+}
+
+func cloneLabelMap(src map[LabelKey]int, extra int) map[LabelKey]int {
+	dst := make(map[LabelKey]int, len(src)+extra)
+	for key, value := range src {
+		dst[key] = value
+	}
+	return dst
+}
+
+func (l *label) replaceActive(newActive map[LabelKey]int) {
+	l.active.Store(newActive)
+}
+
+func (l *label) GetKeyToID() map[LabelKey]int {
+	active := l.getActive()
+
+	l.mu.RLock()
+	pendingLen := len(l.pending)
+	snapshot := cloneLabelMap(active, pendingLen)
+	for key, value := range l.pending {
+		snapshot[key] = value
+	}
+	l.mu.RUnlock()
+
+	return snapshot
 }
 
 func (l *label) GetIDByKey(key LabelKey) (int, bool) {
-	if item, ok := l.keyToID.Get(key); ok {
+	if item, ok := l.getActive()[key]; ok {
+		return item, true
+	}
+
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	if item, ok := l.pending[key]; ok {
 		return item, true
 	}
 	return 0, false
 }
 
 func (l *label) Add(batch []*controller.PrometheusLabel) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	for _, item := range batch {
 		k := NewLabelKey(item.GetName(), item.GetValue())
-		l.keyToID.Set(k, int(item.GetId()))
+		l.pending[k] = int(item.GetId())
 	}
 }
 
@@ -81,10 +123,21 @@ func (l *label) refresh(args ...interface{}) error {
 }
 
 func (l *label) processLoadedData(data []*metadbmodel.PrometheusLabel) {
+	newActive := make(map[LabelKey]int, len(data))
 	for _, item := range data {
 		k := NewLabelKey(item.Name, item.Value)
-		l.keyToID.Set(k, item.ID)
+		newActive[k] = item.ID
 	}
+
+	l.mu.Lock()
+	pending := l.pending
+	l.pending = make(map[LabelKey]int)
+	for key, value := range pending {
+		newActive[key] = value
+	}
+	l.mu.Unlock()
+
+	l.replaceActive(newActive)
 }
 
 func (l *label) load() ([]*metadbmodel.PrometheusLabel, error) {

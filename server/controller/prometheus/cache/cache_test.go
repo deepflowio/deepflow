@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/cornelk/hashmap"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -137,9 +136,7 @@ func generateMockDBLabelValues(size int) []*metadbmodel.PrometheusLabelValue {
 
 // newTestLabel 创建一个不依赖 DB 的 label 实例
 func newTestLabel() *label {
-	return &label{
-		keyToID: cmap.NewStringer[LabelKey, int](),
-	}
+	return newLabel(nil)
 }
 
 func newTestMetricName() *metricName {
@@ -180,22 +177,24 @@ func countStringIntHashmap(m *hashmap.Map[string, int]) int {
 	return count
 }
 
-func countLabelConcurrentMap(m cmap.ConcurrentMap[LabelKey, int]) int {
-	count := 0
-	for range m.IterBuffered() {
-		count++
-	}
-	return count
+func countLabelConcurrentMap(m map[LabelKey]int) int {
+	return len(m)
 }
 
-func buildLabelConcurrentMap(n int) cmap.ConcurrentMap[LabelKey, int] {
-	m := cmap.NewStringer[LabelKey, int]()
+func buildLabelConcurrentMap(n int) map[LabelKey]int {
+	m := make(map[LabelKey]int, n)
 	for i := 0; i < n; i++ {
-		m.Set(NewLabelKey(fmt.Sprintf("label_name_%d", i), fmt.Sprintf("label_value_%d", i)), i+1)
+		m[NewLabelKey(fmt.Sprintf("label_name_%d", i), fmt.Sprintf("label_value_%d", i))] = i + 1
 	}
 	return m
 }
 
+func resetLabelState(l *label, active map[LabelKey]int) {
+	l.mu.Lock()
+	l.pending = make(map[LabelKey]int)
+	l.mu.Unlock()
+	l.replaceActive(active)
+}
 
 func resetMetricNameSyncMaps(mn *metricName, n int) {
 	mn.nameToID = sync.Map{}
@@ -208,9 +207,7 @@ func resetMetricNameSyncMaps(mn *metricName, n int) {
 }
 
 func refreshLabelCurrent(l *label, batch []*controller.PrometheusLabel) {
-	for _, item := range batch {
-		l.keyToID.Set(NewLabelKey(item.GetName(), item.GetValue()), int(item.GetId()))
-	}
+	l.Add(batch)
 }
 
 func refreshLabelValueCurrent(lv *labelValue, batch []*controller.PrometheusLabelValue) {
@@ -255,8 +252,10 @@ func generateLabelValueRefreshEntries(n int) []labelValueRefreshEntry {
 }
 
 func refreshLabelEntriesCurrent(l *label, entries []labelRefreshEntry) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	for _, entry := range entries {
-		l.keyToID.Set(entry.key, entry.id)
+		l.pending[entry.key] = entry.id
 	}
 }
 
@@ -408,7 +407,7 @@ func TestLabel_GetKeyToID_SnapshotIsolation(t *testing.T) {
 
 	// 快照不受影响
 	assert.Equal(t, 100, countLabelConcurrentMap(snapshot))
-	_, exists := snapshot.Get(NewLabelKey("extra_name", "extra_value"))
+	_, exists := snapshot[NewLabelKey("extra_name", "extra_value")]
 	assert.False(t, exists)
 
 	// 但新查询可以看到
@@ -443,7 +442,7 @@ func TestLabel_SnapshotSwap_DiscardsOldEntries(t *testing.T) {
 	assert.Equal(t, 200, countLabelConcurrentMap(l.GetKeyToID()))
 
 	// 模拟 refresh：只有前 100 条仍在 DB 中，后 100 条已被 Cleaner 删除
-	l.keyToID = buildLabelConcurrentMap(100)
+	resetLabelState(l, buildLabelConcurrentMap(100))
 
 	// 验证旧条目已消失
 	assert.Equal(t, 100, countLabelConcurrentMap(l.GetKeyToID()))
@@ -503,9 +502,7 @@ func TestConcurrentLabel_ReadDuringSwap(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for s := 0; s < numSwaps; s++ {
-			for i := 0; i < 1000; i++ {
-				l.keyToID.Set(NewLabelKey(fmt.Sprintf("label_name_%d", i), fmt.Sprintf("label_value_%d", i)), i+1)
-			}
+			resetLabelState(l, buildLabelConcurrentMap(1000))
 			runtime.Gosched()
 		}
 	}()
@@ -645,7 +642,7 @@ func TestConcurrentLabel_SnapshotDuringSwap(t *testing.T) {
 				snapshot := l.GetKeyToID()
 				// 遍历快照——不应 panic 或 data race
 				count := 0
-				for range snapshot.IterBuffered() {
+				for range snapshot {
 					count++
 				}
 				_ = count
@@ -658,9 +655,7 @@ func TestConcurrentLabel_SnapshotDuringSwap(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for s := 0; s < 50; s++ {
-			for i := 0; i < 500; i++ {
-				l.keyToID.Set(NewLabelKey(fmt.Sprintf("label_name_%d", i), fmt.Sprintf("label_value_%d", i)), i+1)
-			}
+			resetLabelState(l, buildLabelConcurrentMap(500))
 		}
 	}()
 
@@ -700,11 +695,11 @@ func TestLabel_LargeScale_MemoryRelease(t *testing.T) {
 
 	// 阶段2：模拟 refresh——只保留 10% 的数据（模拟 Cleaner 删除后 refresh）
 	kept := N / 10
-	newMap := cmap.NewStringer[LabelKey, int]()
+	newMap := make(map[LabelKey]int, kept)
 	for i := 0; i < kept; i++ {
-		newMap.Set(NewLabelKey(fmt.Sprintf("n_%d", i), fmt.Sprintf("v_%d", i)), i+1)
+		newMap[NewLabelKey(fmt.Sprintf("n_%d", i), fmt.Sprintf("v_%d", i))] = i + 1
 	}
-	l.keyToID = newMap
+	resetLabelState(l, newMap)
 
 	// 触发 GC 让旧 map 被回收
 	runtime.GC()
@@ -777,11 +772,11 @@ func BenchmarkLabel_SnapshotSwap(b *testing.B) {
 		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
 			l := newTestLabel()
 			for i := 0; i < b.N; i++ {
-				newMap := cmap.NewStringer[LabelKey, int]()
+				newMap := make(map[LabelKey]int, size)
 				for j := 0; j < size; j++ {
-					newMap.Set(NewLabelKey(fmt.Sprintf("n_%d", j), fmt.Sprintf("v_%d", j)), j+1)
+					newMap[NewLabelKey(fmt.Sprintf("n_%d", j), fmt.Sprintf("v_%d", j))] = j + 1
 				}
-				l.keyToID = newMap
+				resetLabelState(l, newMap)
 			}
 		})
 	}
@@ -837,6 +832,20 @@ func BenchmarkLabelValue_GetIDByValue(b *testing.B) {
 	}
 }
 
+func BenchmarkLabelValue_Refresh(b *testing.B) {
+	for _, size := range benchmarkRefreshSizes() {
+		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
+			lv := newTestLabelValue()
+			mockData := generateMockDBLabelValues(size)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				lv.processLoadedData(mockData)
+			}
+		})
+	}
+}
+
 // --- layout ---
 
 func BenchmarkLayout_GetIndexByKey(b *testing.B) {
@@ -884,20 +893,6 @@ func BenchmarkLabel_MixedReadWrite(b *testing.B) {
 					}
 				}
 			})
-		})
-	}
-}
-
-func BenchmarkLabelValue_Refresh(b *testing.B) {
-	for _, size := range benchmarkRefreshSizes() {
-		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
-			lv := newTestLabelValue()
-			mockData := generateMockDBLabelValues(size)
-
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				lv.processLoadedData(mockData)
-			}
 		})
 	}
 }
