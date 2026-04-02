@@ -1161,6 +1161,11 @@ func (v *VTapInfo) updateCacheToDB() {
 			tridentExceptions := uint64(VTAP_TRIDENT_EXCEPTIONS_MASK) & uint64(cacheExceptions)
 			controllerException := uint64(VTAP_CONTROLLER_EXCEPTIONS_MASK) & uint64(dbVTap.Exceptions)
 			dbVTap.Exceptions = int64(controllerException | tridentExceptions)
+			exceptionDescription := cacheVTap.GetExceptionDescription()
+			if len(exceptionDescription) > 255 {
+				exceptionDescription = exceptionDescription[:255]
+			}
+			dbVTap.ExceptionDescription = exceptionDescription
 			cacheVTap.UpdateCurControllerIP(hostIP)
 			dbVTap.CurControllerIP = cacheVTap.GetCurControllerIP()
 			dbVTap.ExpectedRevision = cacheVTap.GetExpectedRevision()
