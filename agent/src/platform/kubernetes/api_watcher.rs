@@ -702,8 +702,8 @@ impl ApiWatcher {
             }
             Err(e) => {
                 let err = format!("kubernetes_api_sync grpc call failed: {}", e);
-                exception_handler.set(Exception::ControllerSocketError);
                 error!("{}", err);
+                exception_handler.set(Exception::ControllerSocketError, Some(err.clone()));
                 err_msgs.lock().unwrap().push(err);
                 return;
             }
@@ -739,8 +739,8 @@ impl ApiWatcher {
             .block_on(session.grpc_kubernetes_api_sync_with_statsd(msg))
         {
             let err = format!("kubernetes_api_sync grpc call failed: {}", e);
-            exception_handler.set(Exception::ControllerSocketError);
             error!("{}", err);
+            exception_handler.set(Exception::ControllerSocketError, Some(err.clone()));
             err_msgs.lock().unwrap().push(err);
         }
     }

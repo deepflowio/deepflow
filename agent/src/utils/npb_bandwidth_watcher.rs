@@ -133,7 +133,7 @@ impl Watcher {
     fn npb_stop(&self, nic_name: &str, tx_bps: u64) -> bool {
         self.npb_leaky_bucket.set_rate(Some(1));
         self.traffic_count.fuse_count.fetch_add(1, Relaxed);
-        self.exception_handler.set(Exception::NpbFuse);
+        self.exception_handler.set(Exception::NpbFuse, None);
         warn!("Npb had fused {} tx bandwidth is {} bps.", nic_name, tx_bps);
 
         true

@@ -722,9 +722,10 @@ impl NpbArpTable {
                     let entry = entry.unwrap();
                     table.write().unwrap().get_mut(key).unwrap().update(entry);
                 } else {
-                    exception_handler.set(Exception::NpbNoGwArp);
+                    let error_msg = format!("Arp lookup {} error: {:?}.", key, entry.unwrap_err());
+                    exception_handler.set(Exception::NpbNoGwArp, Some(error_msg.clone()));
                     if *last_lookup {
-                        warn!("Arp lookup {} error: {:?}.", key, entry.unwrap_err());
+                        warn!("{}", error_msg);
                     }
                 }
             }
