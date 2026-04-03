@@ -642,18 +642,18 @@ impl Trident {
     fn kernel_version_check(state: &AgentState, exception_handler: &ExceptionHandler) {
         let action = kernel_version_check();
         if action.contains(ActionFlags::TERMINATE) {
-            exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            exception_handler.set(Exception::KernelVersionCircuitBreaker, None);
             crate::utils::clean_and_exit(1);
         } else if action.contains(ActionFlags::MELTDOWN) {
-            exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            exception_handler.set(Exception::KernelVersionCircuitBreaker, None);
             state.melt_down();
             warn!("kernel check: set MELTDOWN");
         } else if action.contains(ActionFlags::EBPF_MELTDOWN) {
-            exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            exception_handler.set(Exception::KernelVersionCircuitBreaker, None);
             // set ebpf_meltdown
             warn!("kernel check: set EBPF_MELTDOWN");
         } else if action.contains(ActionFlags::EBPF_UPROBE_MELTDOWN) {
-            exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            exception_handler.set(Exception::KernelVersionCircuitBreaker, None);
             // set ebpf_uprobe_meltdown
             warn!("kernel check: set EBPF_UPROBE_MELTDOWN");
         }
@@ -834,8 +834,9 @@ impl Trident {
                     cgroups_controller = Some(cg_controller);
                 }
                 Err(e) => {
-                    warn!("initialize cgroups controller failed: {}, resource utilization will be checked regularly to prevent resource usage from exceeding the limit.", e);
-                    exception_handler.set(Exception::CgroupsConfigError);
+                    let error_msg = format!("initialize cgroups controller failed: {}, resource utilization will be checked regularly to prevent resource usage from exceeding the limit.", e);
+                    warn!("{}", error_msg);
+                    exception_handler.set(Exception::CgroupsConfigError, Some(error_msg));
                 }
             }
         }
