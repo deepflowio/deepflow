@@ -1866,7 +1866,8 @@ static_config:
   ##################
   # Note:
   #   CPU affinity is the tendency of a process to run on a given CPU for as long as possible without being migrated
-  #   to other processors
+  #   to other processors. Invalid IDs will be ignored. The setting applies to existing
+  #   deepflow-agent threads as well, except self-managed kick-kern.* eBPF threads.
   # Example:
   #   cpu-affinity: 1,3,5,7,9,11,13,15
   cpu-affinity:
@@ -1919,4 +1920,3 @@ static_config:
   #################
   # Note: Unreleased deepflow-agent features can be turned on by setting this switch.
   feature-flags:
-
