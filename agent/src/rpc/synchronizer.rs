@@ -780,7 +780,7 @@ impl Synchronizer {
         let boot_time = (boot_time as i64 + time_diff) / 1_000_000_000;
 
         let agent_id = agent_id.read();
-
+        let (exception, exception_description) = exception_handler.take();
         pb::SyncRequest {
             boot_time: Some(boot_time as u32),
             config_accepted: Some(status.config_accepted),
@@ -790,7 +790,8 @@ impl Synchronizer {
             state: Some(pb::State::Running.into()),
             revision: Some(static_config.version_info.revision.to_owned()),
             current_k8s_image: static_config.current_k8s_image.clone(),
-            exception: Some(exception_handler.take()),
+            exception: Some(exception),
+            exception_description,
             process_name: Some(static_config.version_info.name.to_owned()),
             ctrl_mac: Some(agent_id.ipmac.mac.to_string()),
             ctrl_ip: Some(agent_id.ipmac.ip.to_string()),
@@ -1126,11 +1127,12 @@ impl Synchronizer {
         }
         let user_config = serde_yaml::from_str(&config.unwrap());
         if let Err(e) = user_config {
-            warn!(
+            let error_msg = format!(
                 "invalid response from {:?} with invalid config: {}",
                 remote, e
             );
-            exception_handler.set(Exception::InvalidConfiguration);
+            warn!("{}", error_msg);
+            exception_handler.set(Exception::InvalidConfiguration, Some(error_msg));
             return;
         }
         let mut user_config: UserConfig = user_config.unwrap();
@@ -1160,8 +1162,9 @@ impl Synchronizer {
                 };
             }
             Err(e) => {
-                warn!("parse custom_app_config failed: {e}");
-                exception_handler.set(Exception::InvalidConfiguration);
+                let error_msg = format!("parse custom_app_config failed: {e}");
+                warn!("{}", error_msg);
+                exception_handler.set(Exception::InvalidConfiguration, Some(error_msg));
                 return;
             }
             _ => (),
@@ -1243,7 +1246,7 @@ impl Synchronizer {
             }
             if policy_error {
                 warn!("OnPolicyChange error, set exception TOO_MANY_POLICIES.");
-                exception_handler.set(Exception::TooManyPolicies);
+                exception_handler.set(Exception::TooManyPolicies, None);
             } else {
                 exception_handler.clear(Exception::TooManyPolicies);
             }
@@ -1325,8 +1328,10 @@ impl Synchronizer {
                 let version = session.get_version();
 
                 if let Err(m) = response {
-                    exception_handler.set(Exception::ControllerSocketError);
-                    Self::grpc_failed_log(&mut grpc_failed_count, format!("from trigger {:?}", m));
+                    let error_msg = format!("from trigger {:?}", m);
+                    exception_handler
+                        .set(Exception::ControllerSocketError, Some(error_msg.clone()));
+                    Self::grpc_failed_log(&mut grpc_failed_count, error_msg);
                     time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
@@ -1341,11 +1346,10 @@ impl Synchronizer {
                         break;
                     }
                     if let Err(m) = message {
-                        exception_handler.set(Exception::ControllerSocketError);
-                        Self::grpc_failed_log(
-                            &mut grpc_failed_count,
-                            format!("from trigger {:?}", m),
-                        );
+                        let error_msg = format!("from trigger {:?}", m);
+                        exception_handler
+                            .set(Exception::ControllerSocketError, Some(error_msg.clone()));
+                        Self::grpc_failed_log(&mut grpc_failed_count, error_msg);
                         time::sleep(RPC_RECONNECT_INTERVAL).await;
                         break;
                     }
@@ -1361,14 +1365,16 @@ impl Synchronizer {
 
                     match message.status() {
                         pb::Status::Failed => {
-                            exception_handler.set(Exception::ControllerSocketError);
                             let (ip, port) = session.get_current_server();
-                            warn!(
+                            let error_msg = format!(
                                 "server (ip: {} port: {}) responded with {:?}",
                                 ip,
                                 port,
                                 pb::Status::Failed
                             );
+                            warn!("{}", error_msg);
+                            exception_handler
+                                .set(Exception::ControllerSocketError, Some(error_msg));
                             time::sleep(RPC_RETRY_INTERVAL).await;
                             continue;
                         }
@@ -1915,12 +1921,13 @@ impl Synchronizer {
 
                 let response = session.grpc_sync_with_statsd(request).await;
                 if let Err(m) = response {
-                    exception_handler.set(Exception::ControllerSocketError);
                     let (ip, port) = session.get_current_server();
+                    let error_msg = format!("from sync server {} {} unavailable {:?}\"",
+                                    ip, port, &m);
+                    exception_handler.set(Exception::ControllerSocketError, Some(error_msg.clone()));
                     session.set_request_failed(true);
                     Self::grpc_failed_log(&mut grpc_failed_count,
-                        format!("from sync server {} {} unavailable {:?}\"",
-                                    ip, port, &m));
+                        error_msg);
                     time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
@@ -1960,8 +1967,9 @@ impl Synchronizer {
                             }
                             Ok(false) => (), // same version or no valid message
                             Err(e) => {
-                                exception_handler.set(Exception::ControllerSocketError);
-                                error!("upgrade failed: {:?}", e);
+                                let error_msg = format!("upgrade failed: {:?}", e);
+                                error!("{}", error_msg);
+                                exception_handler.set(Exception::ControllerSocketError, Some(error_msg));
                             }
                         }
                         #[cfg(any(target_os = "windows", target_os = "android"))]
@@ -1975,8 +1983,9 @@ impl Synchronizer {
                             },
                             Ok(false) => (), // upgrade terminated
                             Err(e) => {
-                                exception_handler.set(Exception::ControllerSocketError);
-                                error!("upgrade failed: {:?}", e);
+                                let error_msg = format!("upgrade failed: {:?}", e);
+                                error!("{}", error_msg);
+                                exception_handler.set(Exception::ControllerSocketError, Some(error_msg));
                             },
                         }
                     }
