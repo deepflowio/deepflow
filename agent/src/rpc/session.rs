@@ -228,8 +228,10 @@ impl Session {
                 self.client.write().channel.replace(channel);
             }
             Err(e) => {
-                self.exception_handler.set(Exception::ControllerSocketError);
-                error!("{}", e);
+                let error_msg = format!("Failed to dial controller: {}", e);
+                error!("{}", error_msg);
+                self.exception_handler
+                    .set(Exception::ControllerSocketError, Some(error_msg));
             }
         }
     }

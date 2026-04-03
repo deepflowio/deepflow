@@ -292,8 +292,10 @@ impl Interior {
             let mut stream = match client.remote_execute(responser).await {
                 Ok(stream) => stream,
                 Err(e) => {
-                    warn!("calling server remote_execute rpc failed: {:?}", e);
-                    self.exc.set(pb::Exception::ControllerSocketError);
+                    let error_msg = format!("calling server remote_execute rpc failed: {:?}", e);
+                    warn!("{}", error_msg);
+                    self.exc
+                        .set(pb::Exception::ControllerSocketError, Some(error_msg));
                     tokio::time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
@@ -312,8 +314,11 @@ impl Interior {
                         break;
                     }
                     Err(e) => {
-                        warn!("receiving server remote_execute rpc has error: {:?}", e);
-                        self.exc.set(pb::Exception::ControllerSocketError);
+                        let error_msg =
+                            format!("receiving server remote_execute rpc has error: {:?}", e);
+                        warn!("{}", error_msg);
+                        self.exc
+                            .set(pb::Exception::ControllerSocketError, Some(error_msg));
                         tokio::time::sleep(RPC_RECONNECT_INTERVAL).await;
                         break;
                     }
