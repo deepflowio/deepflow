@@ -46,7 +46,7 @@ pub fn free_memory_check(required: u64, exception_handler: &ExceptionHandler) ->
                 exception_handler.clear(Exception::MemNotEnough);
                 Ok(())
             } else {
-                exception_handler.set(Exception::MemNotEnough);
+                exception_handler.set(Exception::MemNotEnough, None);
                 Err(Error::Environment(format!(
                     "need {} more memory to run",
                     ByteSize::b(still_need).to_string_as(true)

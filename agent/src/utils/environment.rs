@@ -120,7 +120,7 @@ pub fn free_space_check<P: AsRef<Path>>(
     }
 
     if required > disk_free_usage {
-        exception_handler.set(Exception::DiskNotEnough);
+        exception_handler.set(Exception::DiskNotEnough, None);
         return Err(Error::Environment(format!(
             "insufficient free space at {}, at least {} required",
             path.as_ref().display(),
