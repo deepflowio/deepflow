@@ -135,7 +135,7 @@ impl SystemLoadGuard {
                 );
                 self.last_exceeded = get_timestamp(0);
                 self.exception_handler
-                    .set(Exception::SystemLoadCircuitBreaker);
+                    .set(Exception::SystemLoadCircuitBreaker, None);
             }
         }
     }
@@ -415,7 +415,7 @@ impl Guard {
         if sys_memory_limit != 0.0 {
             if current_memory_percentage < sys_memory_limit * 0.7 {
                 *last_exceeded = get_timestamp(0);
-                exception_handler.set(Exception::FreeMemExceeded);
+                exception_handler.set(Exception::FreeMemExceeded, None);
                 *under_sys_memory_limit = true;
                 error!(
                     "current system {:?} memory percentage is less than the 70% of sys_memory_limit, current system memory percentage={}%, sys_memory_limit={}%, deepflow-agent restart...",
@@ -424,7 +424,7 @@ impl Guard {
                 crate::utils::clean_and_exit(-1);
             } else if current_memory_percentage < sys_memory_limit {
                 *last_exceeded = get_timestamp(0);
-                exception_handler.set(Exception::FreeMemExceeded);
+                exception_handler.set(Exception::FreeMemExceeded, None);
                 *under_sys_memory_limit = true;
                 error!(
                     "current system {:?} memory percentage is less than sys_memory_limit, current system memory percentage={}%, sys_memory_limit={}%, set the agent to disabled",
@@ -464,7 +464,7 @@ impl Guard {
                     if free_percentage < percentage_trigger_threshold as f64
                         || free < absolute_trigger_threshold
                     {
-                        exception_handler.set(Exception::FreeDiskCircuitBreaker);
+                        exception_handler.set(Exception::FreeDiskCircuitBreaker, None);
                         return;
                     }
 
@@ -578,7 +578,7 @@ impl Guard {
                                file_sizes_sum, config.log_file_size);
                             feed.add(FeedTitle::ReleaseLog);
                             Self::release_log_files(file_and_size_sum, config.log_file_size);
-                            exception_handler.set(Exception::LogFileExceeded);
+                            exception_handler.set(Exception::LogFileExceeded, None);
                         } else {
                             // exception_handler.clear(Exception::LogFileExceeded);
                         }
@@ -694,7 +694,7 @@ impl Guard {
                                 crate::utils::clean_and_exit(NORMAL_EXIT_WITH_RESTART);
                                 break;
                             }
-                            exception_handler.set(Exception::ThreadThresholdExceeded);
+                            exception_handler.set(Exception::ThreadThresholdExceeded, None);
                         } else {
                             exception_handler.clear(Exception::ThreadThresholdExceeded);
                         }

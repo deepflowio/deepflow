@@ -14,15 +14,19 @@
  * limitations under the License.
  */
 
+use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Arc,
+    Arc, Mutex,
 };
 
 use public::proto::agent::Exception;
 
 #[derive(Clone, Debug, Default)]
-pub struct ExceptionHandler(Arc<AtomicU64>);
+pub struct ExceptionHandler {
+    exception: Arc<AtomicU64>,
+    details: Arc<Mutex<HashMap<u64, String>>>,
+}
 
 impl ExceptionHandler {
     const AUTO_CLEAR_BITS: u64 = Exception::NpbNoGwArp as u64
@@ -38,21 +42,52 @@ impl ExceptionHandler {
         | Exception::NpbSocketError as u64
         | Exception::DataBpsThresholdExceeded as u64;
 
-    pub fn set(&self, e: Exception) {
-        self.0.fetch_or(e as u64, Ordering::SeqCst);
+    pub fn set(&self, e: Exception, detail: Option<String>) {
+        self.exception.fetch_or(e as u64, Ordering::SeqCst);
+        if let Some(d) = detail {
+            self.details.lock().unwrap().insert(e as u64, d);
+        }
     }
 
     pub fn has(&self, e: Exception) -> bool {
         let e = e as u64;
-        self.0.load(Ordering::Relaxed) & e == e
+        self.exception.load(Ordering::Relaxed) & e == e
     }
 
     pub fn clear(&self, e: Exception) {
-        self.0.fetch_and(!(e as u64), Ordering::SeqCst);
+        self.exception.fetch_and(!(e as u64), Ordering::SeqCst);
+        self.details.lock().unwrap().remove(&(e as u64));
     }
 
-    pub fn take(&self) -> u64 {
-        self.0.fetch_and(!Self::AUTO_CLEAR_BITS, Ordering::SeqCst)
+    pub fn take(&self) -> (u64, Option<String>) {
+        let bits = self
+            .exception
+            .fetch_and(!Self::AUTO_CLEAR_BITS, Ordering::SeqCst);
+        let mut details = self.details.lock().unwrap();
+        let mut result = vec![];
+        for i in 0..64 {
+            let bit = 1u64 << i;
+            if bits & bit == bit {
+                let mut detail = if bit & Self::AUTO_CLEAR_BITS == bit {
+                    details.remove(&bit)
+                } else {
+                    details.get(&bit).cloned()
+                };
+
+                if let Some(d) = detail.take() {
+                    result.push(d);
+                }
+            }
+        }
+
+        (
+            bits,
+            if result.is_empty() {
+                None
+            } else {
+                Some(result.join(";"))
+            },
+        )
     }
 }
 
@@ -65,9 +100,9 @@ mod tests {
         let mut expected = 0u64;
         let h = ExceptionHandler::default();
 
-        h.set(Exception::DiskNotEnough);
+        h.set(Exception::DiskNotEnough, None);
         expected |= Exception::DiskNotEnough as u64;
-        assert_eq!(h.take(), expected);
+        assert_eq!(h.take().0, expected);
 
         let exceptions = vec![
             Exception::DiskNotEnough,
@@ -79,17 +114,39 @@ mod tests {
         ];
         expected = 0;
         for e in exceptions {
-            h.set(e);
+            h.set(e, None);
             expected |= e as u64;
-            assert_eq!(h.0.load(Ordering::Relaxed), expected);
+            assert_eq!(h.exception.load(Ordering::Relaxed), expected);
         }
 
         h.clear(Exception::DiskNotEnough);
         expected &= !(Exception::DiskNotEnough as u64);
-        assert_eq!(h.0.load(Ordering::Relaxed), expected);
+        assert_eq!(h.exception.load(Ordering::Relaxed), expected);
 
-        assert_eq!(h.take(), expected);
+        assert_eq!(h.take().0, expected);
         expected &= !(ExceptionHandler::AUTO_CLEAR_BITS);
-        assert_eq!(h.0.load(Ordering::Relaxed), expected);
+        assert_eq!(h.exception.load(Ordering::Relaxed), expected);
+
+        let h = ExceptionHandler::default();
+        h.set(
+            Exception::ControllerSocketError,
+            Some("controller socket error".to_string()),
+        );
+        h.set(
+            Exception::MemNotEnough,
+            Some("memory not enough".to_string()),
+        );
+        let (bits, details) = h.take();
+        assert_eq!(
+            bits,
+            (Exception::ControllerSocketError as u64) | (Exception::MemNotEnough as u64)
+        );
+        assert_eq!(
+            details,
+            Some("memory not enough;controller socket error".to_string())
+        );
+        let (bits, details) = h.take();
+        assert_eq!(bits, Exception::MemNotEnough as u64);
+        assert_eq!(details, Some("memory not enough".to_string()));
     }
 }

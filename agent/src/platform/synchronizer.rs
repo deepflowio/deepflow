@@ -330,8 +330,7 @@ impl Synchronizer {
                         }
                     }
                     Err(e) => {
-                        args.exception_handler.set(Exception::ControllerSocketError);
-                        error!(
+                        let error_msg = format!(
                             "send platform {} with genesis_sync grpc call failed: {}",
                             if args.version == args.peer_version {
                                 "heartbeat"
@@ -340,6 +339,9 @@ impl Synchronizer {
                             },
                             e
                         );
+                        error!("{}", error_msg);
+                        args.exception_handler
+                            .set(Exception::ControllerSocketError, Some(error_msg));
                         if !Self::wait_for_running(&args.running, &args.timer, config.sync_interval)
                         {
                             break 'outer;
