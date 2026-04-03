@@ -506,12 +506,16 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 	t.L3EpcID = b.platformData.QueryVtapEpc0(m.OrgId, vtapID)
 	var ip net.IP
 	var hasMatched bool
+	podGroupType := uint8(0)
 	if podName != "" {
 		podInfo := b.platformData.QueryPodInfo(m.OrgId, vtapID, podName)
 		if podInfo != nil {
 			t.PodClusterID = uint16(podInfo.PodClusterId)
 			t.PodID = podInfo.PodId
 			t.L3EpcID = podInfo.EpcId
+			t.PodNSID = uint16(podInfo.PodNsId)
+			t.PodGroupID = podInfo.PodGroupId
+			podGroupType = podInfo.PodGroupType
 			ip = net.ParseIP(podInfo.Ip)
 			// maybe Pod is hostnetwork mode or can't get pod IP, then get pod node IP instead
 			if ip == nil {
@@ -555,14 +559,10 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 	} else {
 		info = b.platformData.QueryIPV4Infos(m.OrgId, t.L3EpcID, t.IP)
 	}
-	podGroupType := uint8(0)
 	if info != nil {
 		t.RegionID = uint16(info.RegionID)
 		t.AZID = uint16(info.AZID)
 		t.HostID = uint16(info.HostID)
-		t.PodGroupID = info.PodGroupID
-		podGroupType = uint8(info.PodGroupType)
-		t.PodNSID = uint16(info.PodNSID)
 		t.PodNodeID = info.PodNodeID
 		t.SubnetID = uint16(info.SubnetID)
 		t.L3DeviceID = info.DeviceID
@@ -572,6 +572,15 @@ func (b *PrometheusSamplesBuilder) fillUniversalTagSlow(m *dbwriter.PrometheusSa
 		}
 		if t.PodID == 0 {
 			t.PodID = info.PodID
+		}
+		if t.PodNSID == 0 {
+			t.PodNSID = uint16(info.PodNSID)
+		}
+		if t.PodGroupID == 0 {
+			t.PodGroupID = info.PodGroupID
+		}
+		if podGroupType == 0 {
+			podGroupType = uint8(info.PodGroupType)
 		}
 
 		// if it is just Pod Node, there is no need to match the service
