@@ -288,8 +288,26 @@ where
             } else {
                 None
             };
-            rtt_cache.put(key, cur_info);
-            return ret;
+            let (_, lru_evicted) = rtt_cache.put(key, cur_info);
+            // If a Response was silently evicted from the per-flow LRU (MAX_RRT_CACHE_PER_FLOW
+            // exceeded), it can no longer be counted by collect_flow_perf_stats at flow end.
+            // Emit its stats immediately so the response count is not permanently lost.
+            return if let Some(evicted) = lru_evicted {
+                if !evicted.on_blacklist && evicted.msg_type == LogMessageType::Response {
+                    let evicted_stats = L7PerfStats::from(&evicted);
+                    match ret {
+                        Some(mut s) => {
+                            s.sequential_merge(&evicted_stats);
+                            Some(s)
+                        }
+                        None => Some(evicted_stats),
+                    }
+                } else {
+                    ret
+                }
+            } else {
+                ret
+            };
         };
 
         let mut keep_prev = false;
@@ -399,7 +417,8 @@ where
                 }
                 let cur_is_req = cur_info.msg_type == LogMessageType::Request;
                 let cur_on_blacklist = cur_info.on_blacklist;
-                let prev_info = rtt_cache.put(key, cur_info).unwrap();
+                let (prev_opt, lru_evicted) = rtt_cache.put(key, cur_info);
+                let prev_info = prev_opt.unwrap();
                 // Requests are counted (req=1) eagerly when they first enter the cache,
                 // so re-emitting a displaced Request here would double-count it.
                 // Responses were cached with None on arrival and must be counted here.
@@ -414,6 +433,13 @@ where
                 // "request accounted before" holds when its response arrives via is_request_of.
                 if !cur_on_blacklist && cur_is_req {
                     result.inc_req();
+                }
+                // If a Response was silently evicted from the per-flow LRU, emit its stats now
+                // so the response count is not permanently lost.
+                if let Some(evicted) = lru_evicted {
+                    if !evicted.on_blacklist && evicted.msg_type == LogMessageType::Response {
+                        result.sequential_merge(&L7PerfStats::from(&evicted));
+                    }
                 }
                 if result == L7PerfStats::default() {
                     None
