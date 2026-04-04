@@ -31,25 +31,25 @@ import (
 type NATRuleMessageFactory struct{}
 
 func (f *NATRuleMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedNATRules{}
+	return &message.AddedNatRules{}
 }
 
 func (f *NATRuleMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedNATRule{}
+	return &message.UpdatedNatRule{}
 }
 
 func (f *NATRuleMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedNATRules{}
+	return &message.DeletedNatRules{}
 }
 
 func (f *NATRuleMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedNATRuleFields{}
+	return &message.UpdatedNatRuleFields{}
 }
 
 type NATRule struct {
 	UpdaterBase[
 		cloudmodel.NATRule,
-		*diffbase.NATRule,
+		*diffbase.NatRule,
 		*metadbmodel.NATRule,
 		metadbmodel.NATRule,
 	]
@@ -61,7 +61,7 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 			ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN,
 			wholeCache,
 			db.NewNATRule().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.NATRules,
+			wholeCache.DiffBases().NATRule().GetAll(),
 			cloudData,
 		),
 	}
@@ -78,7 +78,8 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*metadbmod
 	var natGatewayID int
 	var exists bool
 	if cloudItem.NATGatewayLcuuid != "" {
-		natGatewayID, exists = r.cache.ToolDataSet.GetNATGatewayIDByLcuuid(cloudItem.NATGatewayLcuuid)
+		natGatewayItem := r.cache.Tool().NatGateway().GetByLcuuid(cloudItem.NATGatewayLcuuid)
+		natGatewayID, exists = natGatewayItem.Id(), natGatewayItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, cloudItem.NATGatewayLcuuid,
@@ -89,7 +90,8 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*metadbmod
 	}
 	var vinterfaceID int
 	if cloudItem.VInterfaceLcuuid != "" {
-		vinterfaceID, exists = r.cache.ToolDataSet.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
+		vinterfaceItem := r.cache.Tool().Vinterface().GetByLcuuid(cloudItem.VInterfaceLcuuid)
+		vinterfaceID, exists = vinterfaceItem.Id(), vinterfaceItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
@@ -115,6 +117,6 @@ func (r *NATRule) generateDBItemToAdd(cloudItem *cloudmodel.NATRule) (*metadbmod
 }
 
 // 保留接口
-func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NATRule, cloudItem *cloudmodel.NATRule) (types.UpdatedFields, map[string]interface{}, bool) {
+func (r *NATRule) generateUpdateInfo(diffBase *diffbase.NatRule, cloudItem *cloudmodel.NATRule) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

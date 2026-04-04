@@ -1,0 +1,15 @@
+name: custom_service
+orm_name: CustomService
+
+cache_diffbase:
+  enabled: false
+
+cache_tool:
+  enabled: false
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string

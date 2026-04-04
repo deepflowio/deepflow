@@ -7,53 +7,53 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// VMPodNodeConnection defines cache data structure.
-type VMPodNodeConnection struct {
+// VmPodNodeConnection defines cache data structure.
+type VmPodNodeConnection struct {
 	lcuuid    string
 	id        int
-	vmID      int
-	podNodeID int
+	vmId      int
+	podNodeId int
 }
 
-func (t *VMPodNodeConnection) IsValid() bool {
+func (t *VmPodNodeConnection) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *VMPodNodeConnection) Lcuuid() string {
+func (t *VmPodNodeConnection) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *VMPodNodeConnection) ID() int {
+func (t *VmPodNodeConnection) Id() int {
 	return t.id
 }
 
-func (t *VMPodNodeConnection) VMID() int {
-	return t.vmID
+func (t *VmPodNodeConnection) VmId() int {
+	return t.vmId
 }
 
-func (t *VMPodNodeConnection) PodNodeID() int {
-	return t.podNodeID
+func (t *VmPodNodeConnection) PodNodeId() int {
+	return t.podNodeId
 }
 
-func (t *VMPodNodeConnection) reset(dbItem *metadbmodel.VMPodNodeConnection, tool *Tool) {
+func (t *VmPodNodeConnection) reset(dbItem *metadbmodel.VMPodNodeConnection, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
-	t.vmID = dbItem.VMID
-	t.podNodeID = dbItem.PodNodeID
+	t.vmId = dbItem.VMID
+	t.podNodeId = dbItem.PodNodeID
 }
 
-func NewVMPodNodeConnectionCollection(t *Tool) *VMPodNodeConnectionCollection {
-	c := new(VMPodNodeConnectionCollection)
-	c.collection = newCollectionBuilder[*VMPodNodeConnection]().
+func NewVmPodNodeConnectionCollection(t *Tool) *VmPodNodeConnectionCollection {
+	c := new(VmPodNodeConnectionCollection)
+	c.collection = newCollectionBuilder[*VmPodNodeConnection]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.VMPodNodeConnection { return new(metadbmodel.VMPodNodeConnection) }).
-		withCacheItemFactory(func() *VMPodNodeConnection { return new(VMPodNodeConnection) }).
+		withCacheItemFactory(func() *VmPodNodeConnection { return new(VmPodNodeConnection) }).
 		build()
 	return c
 }
 
-// VMPodNodeConnectionCollection defines a collection that maps individual fields to the VMPodNodeConnection cache data structure.
-type VMPodNodeConnectionCollection struct {
-	collection[*VMPodNodeConnection, *metadbmodel.VMPodNodeConnection]
+// VmPodNodeConnectionCollection defines a collection that maps individual fields to the VmPodNodeConnection cache data structure.
+type VmPodNodeConnectionCollection struct {
+	collection[*VmPodNodeConnection, *metadbmodel.VMPodNodeConnection]
 }

@@ -1,0 +1,30 @@
+name: floating_ip
+orm_name: FloatingIP
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: vpc_lcuuid
+      orm_name: VPCID
+      type: string
+      ref:
+        resource: vpc
+        lookup_by: id
+        target: lcuuid
+
+cache_tool:
+  enabled: false
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: vpc_id
+        type: int
+      - name: vpc_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string

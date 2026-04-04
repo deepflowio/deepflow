@@ -61,7 +61,7 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
 			wholeCache,
 			db.NewPodServicePort().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.PodServicePorts,
+			wholeCache.DiffBases().PodServicePort().GetAll(),
 			cloudData,
 		),
 	}
@@ -76,7 +76,8 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 
 // Implement DataGenerator interface
 func (p *PodServicePort) generateDBItemToAdd(cloudItem *cloudmodel.PodServicePort) (*metadbmodel.PodServicePort, bool) {
-	podServiceID, exists := p.cache.ToolDataSet.GetPodServiceIDByLcuuid(cloudItem.PodServiceLcuuid)
+	podServiceItem := p.cache.Tool().PodService().GetByLcuuid(cloudItem.PodServiceLcuuid)
+	podServiceID, exists := podServiceItem.Id(), podServiceItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.PodServiceLcuuid,

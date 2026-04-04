@@ -31,25 +31,25 @@ import (
 type VMPodNodeConnectionMessageFactory struct{}
 
 func (f *VMPodNodeConnectionMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedVMPodNodeConnections{}
+	return &message.AddedVmPodNodeConnections{}
 }
 
 func (f *VMPodNodeConnectionMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedVMPodNodeConnection{}
+	return &message.UpdatedVmPodNodeConnection{}
 }
 
 func (f *VMPodNodeConnectionMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedVMPodNodeConnections{}
+	return &message.DeletedVmPodNodeConnections{}
 }
 
 func (f *VMPodNodeConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedVMPodNodeConnectionFields{}
+	return &message.UpdatedVmPodNodeConnectionFields{}
 }
 
 type VMPodNodeConnection struct {
 	UpdaterBase[
 		cloudmodel.VMPodNodeConnection,
-		*diffbase.VMPodNodeConnection,
+		*diffbase.VmPodNodeConnection,
 		*metadbmodel.VMPodNodeConnection,
 		metadbmodel.VMPodNodeConnection,
 	]
@@ -61,7 +61,7 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 			ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			wholeCache,
 			db.NewVMPodNodeConnection().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.VMPodNodeConnections,
+			wholeCache.DiffBases().VMPodNodeConnection().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 }
 
 func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNodeConnection) (*metadbmodel.VMPodNodeConnection, bool) {
-	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
+	vmItem := c.cache.Tool().Vm().GetByLcuuid(cloudItem.VMLcuuid)
+	vmID, exists := vmItem.Id(), vmItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
@@ -87,12 +88,12 @@ func (c *VMPodNodeConnection) generateDBItemToAdd(cloudItem *cloudmodel.VMPodNod
 		Domain:    c.metadata.GetDomainLcuuid(),
 		SubDomain: cloudItem.SubDomainLcuuid,
 		VMID:      vmID,
-		PodNodeID: c.cache.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid),
+		PodNodeID: c.cache.Tool().PodNode().GetByLcuuid(cloudItem.PodNodeLcuuid).Id(),
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
 }
 
-func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *diffbase.VMPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (types.UpdatedFields, map[string]interface{}, bool) {
+func (c *VMPodNodeConnection) generateUpdateInfo(diffBase *diffbase.VmPodNodeConnection, cloudItem *cloudmodel.VMPodNodeConnection) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

@@ -1,46 +1,166 @@
 name: pod
-public_name: Pod
+orm_name: Pod
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: label
+      orm_name: Label
+      type: string
+    - name: annotation
+      orm_name: Annotation
+      type: string
+    - name: env
+      orm_name: ENV
+      type: string
+    - name: container_ids
+      orm_name: ContainerIDs
+      type: string
+    - name: state
+      orm_name: State
+      type: int
+    - name: created_at
+      orm_name: CreatedAt
+      type: time.Time
+    - name: pod_node_lcuuid
+      orm_name: PodNodeID
+      type: string
+      ref:
+        resource: pod_node
+        lookup_by: id
+        target: lcuuid
+    - name: pod_replica_set_lcuuid
+      orm_name: PodReplicaSetID
+      type: string
+      ref:
+        resource: pod_replica_set
+        lookup_by: id
+        target: lcuuid
+    - name: pod_group_lcuuid
+      orm_name: PodGroupID
+      type: string
+      ref:
+        resource: pod_group
+        lookup_by: id
+        target: lcuuid
+    - name: pod_service_lcuuid
+      orm_name: PodServiceID
+      type: string
+      ref:
+        resource: pod_service
+        lookup_by: id
+        target: lcuuid
+    - name: vpc_lcuuid
+      orm_name: VPCID
+      type: string
+      ref:
+        resource: vpc
+        lookup_by: id
+        target: lcuuid
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
-  - name: domainLcuuid
-    public_name: DomainLcuuid
+  - name: domain_lcuuid
+    orm_name: Domain
     type: string
-    db_field_name: Domain
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: regionID
-    public_name: RegionID
+  - name: region_id
+    orm_name: Region
     type: int
-    ref: Region
-    db_field_name: Region
-  - name: azID
-    public_name: AZID
+    ref:
+      resource: region
+      lookup_by: lcuuid
+      target: id
+  - name: az_id
+    orm_name: AZ
     type: int
-    ref: AZ
-    db_field_name: AZ
-  - name: vpcID
-    public_name: VPCID
+    ref:
+      resource: az
+      lookup_by: lcuuid
+      target: id
+  - name: vpc_id
+    orm_name: VPCID
     type: int
-  - name: podClusterID
-    public_name: PodClusterID
+  - name: pod_cluster_id
+    orm_name: PodClusterID
     type: int
-  - name: podNamespaceID
-    public_name: PodNamespaceID
+  - name: pod_namespace_id
+    orm_name: PodNamespaceID
     type: int
-  - name: podGroupID
-    public_name: PodGroupID
+  - name: pod_group_id
+    orm_name: PodGroupID
     type: int
-  - name: podNodeID
-    public_name: PodNodeID
+  - name: pod_node_id
+    orm_name: PodNodeID
     type: int
-  has_extension: true
-  collection_extension: true
+  extensions:
+    - collection
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: label
+        type: string
+      - name: state
+        type: int
+      - name: annotation
+        type: string
+      - name: env
+        type: string
+      - name: container_ids
+        type: string
+      - name: created_at
+        type: time.Time
+      - name: pod_group_id
+        type: int
+      - name: pod_service_id
+        type: int
+      - name: pod_group_lcuuid
+        type: string
+      - name: pod_service_lcuuid
+        type: string
+      - name: pod_replica_set_id
+        type: int
+      - name: pod_replica_set_lcuuid
+        type: string
+      - name: pod_node_id
+        type: int
+      - name: pod_node_lcuuid
+        type: string
+      - name: vpc_id
+        type: int
+      - name: vpc_lcuuid
+        type: string
+      - name: az_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string
+      - name: pod_namespace_id
+        type: int
+      - name: pod_cluster_id
+        type: int

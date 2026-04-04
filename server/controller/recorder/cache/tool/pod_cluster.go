@@ -12,9 +12,9 @@ type PodCluster struct {
 	lcuuid   string
 	id       int
 	name     string
-	regionID int
-	azID     int
-	vpcID    int
+	regionId int
+	azId     int
+	vpcId    int
 }
 
 func (t *PodCluster) IsValid() bool {
@@ -25,7 +25,7 @@ func (t *PodCluster) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *PodCluster) ID() int {
+func (t *PodCluster) Id() int {
 	return t.id
 }
 
@@ -33,25 +33,25 @@ func (t *PodCluster) Name() string {
 	return t.name
 }
 
-func (t *PodCluster) RegionID() int {
-	return t.regionID
+func (t *PodCluster) RegionId() int {
+	return t.regionId
 }
 
-func (t *PodCluster) AZID() int {
-	return t.azID
+func (t *PodCluster) AzId() int {
+	return t.azId
 }
 
-func (t *PodCluster) VPCID() int {
-	return t.vpcID
+func (t *PodCluster) VpcId() int {
+	return t.vpcId
 }
 
 func (t *PodCluster) reset(dbItem *metadbmodel.PodCluster, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.vpcID = dbItem.VPCID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.vpcId = dbItem.VPCID
 }
 
 func NewPodClusterCollection(t *Tool) *PodClusterCollection {

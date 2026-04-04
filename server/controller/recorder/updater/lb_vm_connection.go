@@ -31,25 +31,25 @@ import (
 type LBVMConnectionMessageFactory struct{}
 
 func (f *LBVMConnectionMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedLBVMConnections{}
+	return &message.AddedLbVmConnections{}
 }
 
 func (f *LBVMConnectionMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedLBVMConnection{}
+	return &message.UpdatedLbVmConnection{}
 }
 
 func (f *LBVMConnectionMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedLBVMConnections{}
+	return &message.DeletedLbVmConnections{}
 }
 
 func (f *LBVMConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedLBVMConnectionFields{}
+	return &message.UpdatedLbVmConnectionFields{}
 }
 
 type LBVMConnection struct {
 	UpdaterBase[
 		cloudmodel.LBVMConnection,
-		*diffbase.LBVMConnection,
+		*diffbase.LbVmConnection,
 		*metadbmodel.LBVMConnection,
 		metadbmodel.LBVMConnection,
 	]
@@ -61,7 +61,7 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 			ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
 			wholeCache,
 			db.NewLBVMConnection().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.LBVMConnections,
+			wholeCache.DiffBases().LBVMConnection().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 }
 
 func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnection) (*metadbmodel.LBVMConnection, bool) {
-	vmID, exists := c.cache.ToolDataSet.GetVMIDByLcuuid(cloudItem.VMLcuuid)
+	vmItem := c.cache.Tool().Vm().GetByLcuuid(cloudItem.VMLcuuid)
+	vmID, exists := vmItem.Id(), vmItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VM_EN, cloudItem.VMLcuuid,
@@ -83,7 +84,8 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 		), c.metadata.LogPrefixes)
 		return nil, false
 	}
-	lbID, exists := c.cache.ToolDataSet.GetLBIDByLcuuid(cloudItem.LBLcuuid)
+	lbItem := c.cache.Tool().Lb().GetByLcuuid(cloudItem.LBLcuuid)
+	lbID, exists := lbItem.Id(), lbItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_LB_EN, cloudItem.LBLcuuid,
@@ -102,6 +104,6 @@ func (c *LBVMConnection) generateDBItemToAdd(cloudItem *cloudmodel.LBVMConnectio
 }
 
 // 保留接口
-func (c *LBVMConnection) generateUpdateInfo(diffBase *diffbase.LBVMConnection, cloudItem *cloudmodel.LBVMConnection) (types.UpdatedFields, map[string]interface{}, bool) {
+func (c *LBVMConnection) generateUpdateInfo(diffBase *diffbase.LbVmConnection, cloudItem *cloudmodel.LBVMConnection) (types.UpdatedFields, map[string]interface{}, bool) {
 	return nil, nil, false
 }

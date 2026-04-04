@@ -7,59 +7,59 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// VTap defines cache data structure.
-type VTap struct {
+// Vtap defines cache data structure.
+type Vtap struct {
 	id             int
 	lcuuid         string
 	name           string
 	aType          int
-	launchServerID int
+	launchServerId int
 }
 
-func (t *VTap) IsValid() bool {
+func (t *Vtap) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *VTap) ID() int {
+func (t *Vtap) Id() int {
 	return t.id
 }
 
-func (t *VTap) Lcuuid() string {
+func (t *Vtap) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *VTap) Name() string {
+func (t *Vtap) Name() string {
 	return t.name
 }
 
-func (t *VTap) Type() int {
+func (t *Vtap) AType() int {
 	return t.aType
 }
 
-func (t *VTap) LaunchServerID() int {
-	return t.launchServerID
+func (t *Vtap) LaunchServerId() int {
+	return t.launchServerId
 }
 
-func (t *VTap) reset(dbItem *metadbmodel.VTap, tool *Tool) {
+func (t *Vtap) reset(dbItem *metadbmodel.VTap, tool *Tool) {
 	t.id = dbItem.ID
 	t.lcuuid = dbItem.Lcuuid
 	t.name = dbItem.Name
 	t.aType = dbItem.Type
-	t.launchServerID = dbItem.LaunchServerID
+	t.launchServerId = dbItem.LaunchServerID
 }
 
-func NewVTapCollection(t *Tool) *VTapCollection {
-	c := new(VTapCollection)
-	c.collection = newCollectionBuilder[*VTap]().
+func NewVtapCollection(t *Tool) *VtapCollection {
+	c := new(VtapCollection)
+	c.collection = newCollectionBuilder[*Vtap]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_VTAP_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.VTap { return new(metadbmodel.VTap) }).
-		withCacheItemFactory(func() *VTap { return new(VTap) }).
+		withCacheItemFactory(func() *Vtap { return new(Vtap) }).
 		build()
 	return c
 }
 
-// VTapCollection defines a collection that maps individual fields to the VTap cache data structure.
-type VTapCollection struct {
-	collection[*VTap, *metadbmodel.VTap]
+// VtapCollection defines a collection that maps individual fields to the Vtap cache data structure.
+type VtapCollection struct {
+	collection[*Vtap, *metadbmodel.VTap]
 }

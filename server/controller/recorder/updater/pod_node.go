@@ -61,7 +61,7 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNod
 			ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN,
 			wholeCache,
 			db.NewPodNode().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.PodNodes,
+			wholeCache.DiffBases().PodNode().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNod
 }
 
 func (n *PodNode) generateDBItemToAdd(cloudItem *cloudmodel.PodNode) (*metadbmodel.PodNode, bool) {
-	vpcID, exists := n.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := n.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -83,7 +84,8 @@ func (n *PodNode) generateDBItemToAdd(cloudItem *cloudmodel.PodNode) (*metadbmod
 		), n.metadata.LogPrefixes)
 		return nil, false
 	}
-	podClusterID, exists := n.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
+	podClusterItem := n.cache.Tool().PodCluster().GetByLcuuid(cloudItem.PodClusterLcuuid)
+	podClusterID, exists := podClusterItem.Id(), podClusterItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,
@@ -122,9 +124,9 @@ func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *clou
 		mapInfo["hostname"] = cloudItem.Hostname
 		structInfo.Hostname.Set(diffBase.Hostname, cloudItem.Hostname)
 	}
-	if diffBase.IP != cloudItem.IP {
+	if diffBase.Ip != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP
-		structInfo.IP.Set(diffBase.IP, cloudItem.IP)
+		structInfo.Ip.Set(diffBase.Ip, cloudItem.IP)
 	}
 	if diffBase.State != cloudItem.State {
 		mapInfo["state"] = cloudItem.State
@@ -134,13 +136,13 @@ func (n *PodNode) generateUpdateInfo(diffBase *diffbase.PodNode, cloudItem *clou
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	if diffBase.AzLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AzLcuuid, cloudItem.AZLcuuid)
 	}
-	if diffBase.VCPUNum != cloudItem.VCPUNum {
+	if diffBase.VcpuNum != cloudItem.VCPUNum {
 		mapInfo["vcpu_num"] = cloudItem.VCPUNum
-		structInfo.VCPUNum.Set(diffBase.VCPUNum, cloudItem.VCPUNum)
+		structInfo.VcpuNum.Set(diffBase.VcpuNum, cloudItem.VCPUNum)
 	}
 	if diffBase.MemTotal != cloudItem.MemTotal {
 		mapInfo["mem_total"] = cloudItem.MemTotal

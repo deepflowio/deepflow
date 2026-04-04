@@ -7,104 +7,104 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// VInterface defines cache data structure.
-type VInterface struct {
+// Vinterface defines cache data structure.
+type Vinterface struct {
 	lcuuid     string
 	id         int
 	name       string
 	ifType     int
 	index      int
 	mac        string
-	regionID   int
-	networkID  int
-	vpcID      int
+	regionId   int
+	networkId  int
+	vpcId      int
 	deviceType int
-	deviceID   int
-	deviceName string
+	deviceId   int
+	VinterfaceExt
 }
 
-func (t *VInterface) IsValid() bool {
+func (t *Vinterface) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *VInterface) Lcuuid() string {
+func (t *Vinterface) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *VInterface) ID() int {
+func (t *Vinterface) Id() int {
 	return t.id
 }
 
-func (t *VInterface) Name() string {
+func (t *Vinterface) Name() string {
 	return t.name
 }
 
-func (t *VInterface) Type() int {
+func (t *Vinterface) IfType() int {
 	return t.ifType
 }
 
-func (t *VInterface) Index() int {
+func (t *Vinterface) Index() int {
 	return t.index
 }
 
-func (t *VInterface) Mac() string {
+func (t *Vinterface) Mac() string {
 	return t.mac
 }
 
-func (t *VInterface) RegionID() int {
-	return t.regionID
+func (t *Vinterface) RegionId() int {
+	return t.regionId
 }
 
-func (t *VInterface) NetworkID() int {
-	return t.networkID
+func (t *Vinterface) NetworkId() int {
+	return t.networkId
 }
 
-func (t *VInterface) VPCID() int {
-	return t.vpcID
+func (t *Vinterface) VpcId() int {
+	return t.vpcId
 }
 
-func (t *VInterface) DeviceType() int {
+func (t *Vinterface) DeviceType() int {
 	return t.deviceType
 }
 
-func (t *VInterface) DeviceID() int {
-	return t.deviceID
+func (t *Vinterface) DeviceId() int {
+	return t.deviceId
 }
 
-func (t *VInterface) DeviceName() string {
+func (t *Vinterface) DeviceName() string {
 	return t.deviceName
 }
 
-func (t *VInterface) reset(dbItem *metadbmodel.VInterface, tool *Tool) {
+func (t *Vinterface) reset(dbItem *metadbmodel.VInterface, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
 	t.ifType = dbItem.Type
 	t.index = dbItem.Index
 	t.mac = dbItem.Mac
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.networkID = dbItem.NetworkID
-	t.vpcID = dbItem.VPCID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.networkId = dbItem.NetworkID
+	t.vpcId = dbItem.VPCID
 	t.deviceType = dbItem.DeviceType
-	t.deviceID = dbItem.DeviceID
-	t.resetCustom(dbItem, tool)
+	t.deviceId = dbItem.DeviceID
+	t.resetExt(dbItem, tool)
 }
 
-func NewVInterfaceCollection(t *Tool) *VInterfaceCollection {
-	c := new(VInterfaceCollection)
+func NewVinterfaceCollection(t *Tool) *VinterfaceCollection {
+	c := new(VinterfaceCollection)
 	c.resetExt()
-	c.collection = newCollectionBuilder[*VInterface]().
+	c.collection = newCollectionBuilder[*Vinterface]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.VInterface { return new(metadbmodel.VInterface) }).
-		withCacheItemFactory(func() *VInterface { return new(VInterface) }).
+		withCacheItemFactory(func() *Vinterface { return new(Vinterface) }).
 		withExtender(c).
 		build()
 	return c
 }
 
-// VInterfaceCollection defines a collection that maps individual fields to the VInterface cache data structure.
-type VInterfaceCollection struct {
-	collection[*VInterface, *metadbmodel.VInterface]
-	VInterfaceCollectionExt
+// VinterfaceCollection defines a collection that maps individual fields to the Vinterface cache data structure.
+type VinterfaceCollection struct {
+	collection[*Vinterface, *metadbmodel.VInterface]
+	VinterfaceCollectionExt
 }

@@ -1,30 +1,90 @@
 name: host
-public_name: Host
+orm_name: Host
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: ip
+      orm_name: IP
+      type: string
+    - name: hostname
+      orm_name: Hostname
+      type: string
+    - name: htype
+      orm_name: HType
+      type: int
+    - name: vcpu_num
+      orm_name: VCPUNum
+      type: int
+    - name: mem_total
+      orm_name: MemTotal
+      type: int
+    - name: extra_info
+      orm_name: ExtraInfo
+      type: string
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: regionID
-    public_name: Region
+  - name: region_id
+    orm_name: Region
     type: int
-    ref: Region
-  - name: azID
-    public_name: AZ
+    ref:
+      resource: region
+      lookup_by: lcuuid
+      target: id
+  - name: az_id
+    orm_name: AZ
     type: int
-    ref: AZ
+    ref:
+      resource: az
+      lookup_by: lcuuid
+      target: id
   - name: ip
-    public_name: IP
+    orm_name: IP
     type: string
-  key_fields:
-  - name: ip
-    public_name: IP
-    type: string
+    for_index: true
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: ip
+        type: string
+      - name: uid
+        type: string
+      - name: htype
+        type: int
+      - name: vcpu_num
+        type: int
+      - name: mem_total
+        type: int
+      - name: extra_info
+        type: string
+      - name: hostname
+        type: string
+      - name: az_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string

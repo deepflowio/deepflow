@@ -17,6 +17,8 @@
 package tool
 
 import (
+	"slices"
+
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
@@ -52,13 +54,16 @@ func (c *ProcessCollection) IsProcessGIDSoftDeleted(gid uint32) bool {
 
 // GenerateIdentifierByDBProcess generates a ProcessIdentifier from database Process model
 func (c *ProcessCollection) GenerateIdentifierByDBProcess(p *metadbmodel.Process) ProcessIdentifier {
-	return c.GenerateIdentifier(p.Name, p.PodGroupID, p.VTapID, p.CommandLine)
+	return c.GenerateIdentifier(p.Name, p.ProcessName, p.PodGroupID, p.VTapID, p.CommandLine)
 }
 
 // GenerateIdentifier creates a ProcessIdentifier based on the process attributes
-func (c *ProcessCollection) GenerateIdentifier(name string, podGroupID int, vtapID uint32, commandLine string) ProcessIdentifier {
+func (c *ProcessCollection) GenerateIdentifier(name, processName string, podGroupID int, vtapID uint32, commandLine string) ProcessIdentifier {
 	var identifier ProcessIdentifier
 	if podGroupID == 0 {
+		if slices.Contains([]string{"java", "python", "python3", "node"}, processName) {
+			commandLine = extractExecFileFromCmd(commandLine)
+		}
 		identifier = ProcessIdentifier{
 			Name:        name,
 			VTapID:      vtapID,

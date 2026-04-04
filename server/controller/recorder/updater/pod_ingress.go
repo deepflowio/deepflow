@@ -61,7 +61,7 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN,
 			wholeCache,
 			db.NewPodIngress().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.PodIngresses,
+			wholeCache.DiffBases().PodIngress().GetAll(),
 			cloudData,
 		),
 	}
@@ -76,7 +76,8 @@ func NewPodIngress(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngress) *
 
 // Implement DataGenerator interface
 func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*metadbmodel.PodIngress, bool) {
-	podNamespaceID, exists := i.cache.ToolDataSet.GetPodNamespaceIDByLcuuid(cloudItem.PodNamespaceLcuuid)
+	podNamespaceItem := i.cache.Tool().PodNamespace().GetByLcuuid(cloudItem.PodNamespaceLcuuid)
+	podNamespaceID, exists := podNamespaceItem.Id(), podNamespaceItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, cloudItem.PodNamespaceLcuuid,
@@ -84,7 +85,8 @@ func (i *PodIngress) generateDBItemToAdd(cloudItem *cloudmodel.PodIngress) (*met
 		), i.metadata.LogPrefixes)
 		return nil, false
 	}
-	podClusterID, exists := i.cache.ToolDataSet.GetPodClusterIDByLcuuid(cloudItem.PodClusterLcuuid)
+	podClusterItem := i.cache.Tool().PodCluster().GetByLcuuid(cloudItem.PodClusterLcuuid)
+	podClusterID, exists := podClusterItem.Id(), podClusterItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_CLUSTER_EN, cloudItem.PodClusterLcuuid,

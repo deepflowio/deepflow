@@ -1,0 +1,29 @@
+name: routing_table
+orm_name: RoutingTable
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: destination
+      orm_name: Destination
+      type: string
+    - name: nexthop
+      orm_name: Nexthop
+      type: string
+    - name: nexthop_type
+      orm_name: NexthopType
+      type: string
+
+cache_tool:
+  enabled: false
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: destination
+        type: string
+      - name: nexthop_type
+        type: string
+      - name: nexthop
+        type: string

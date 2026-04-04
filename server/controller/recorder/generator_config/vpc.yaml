@@ -1,12 +1,54 @@
 name: vpc
-public_name: VPC
+orm_name: VPC
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: label
+      orm_name: Label
+      type: string
+    - name: tunnel_id
+      orm_name: TunnelID
+      type: int
+    - name: cidr
+      orm_name: CIDR
+      type: string
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: owner
+      orm_name: Owner
+      type: string
+
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: label
+        type: string
+      - name: owner
+        type: string
+      - name: cidr
+        type: string
+      - name: tunnel_id
+        type: int
+      - name: region_lcuuid
+        type: string
+      - name: uid
+        type: string

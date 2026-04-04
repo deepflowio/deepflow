@@ -13,13 +13,13 @@ type Pod struct {
 	id             int
 	domainLcuuid   string
 	name           string
-	regionID       int
-	azID           int
-	vpcID          int
-	podClusterID   int
-	podNamespaceID int
-	podGroupID     int
-	podNodeID      int
+	regionId       int
+	azId           int
+	vpcId          int
+	podClusterId   int
+	podNamespaceId int
+	podGroupId     int
+	podNodeId      int
 }
 
 func (t *Pod) IsValid() bool {
@@ -30,7 +30,7 @@ func (t *Pod) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *Pod) ID() int {
+func (t *Pod) Id() int {
 	return t.id
 }
 
@@ -42,32 +42,32 @@ func (t *Pod) Name() string {
 	return t.name
 }
 
-func (t *Pod) RegionID() int {
-	return t.regionID
+func (t *Pod) RegionId() int {
+	return t.regionId
 }
 
-func (t *Pod) AZID() int {
-	return t.azID
+func (t *Pod) AzId() int {
+	return t.azId
 }
 
-func (t *Pod) VPCID() int {
-	return t.vpcID
+func (t *Pod) VpcId() int {
+	return t.vpcId
 }
 
-func (t *Pod) PodClusterID() int {
-	return t.podClusterID
+func (t *Pod) PodClusterId() int {
+	return t.podClusterId
 }
 
-func (t *Pod) PodNamespaceID() int {
-	return t.podNamespaceID
+func (t *Pod) PodNamespaceId() int {
+	return t.podNamespaceId
 }
 
-func (t *Pod) PodGroupID() int {
-	return t.podGroupID
+func (t *Pod) PodGroupId() int {
+	return t.podGroupId
 }
 
-func (t *Pod) PodNodeID() int {
-	return t.podNodeID
+func (t *Pod) PodNodeId() int {
+	return t.podNodeId
 }
 
 func (t *Pod) reset(dbItem *metadbmodel.Pod, tool *Tool) {
@@ -75,13 +75,13 @@ func (t *Pod) reset(dbItem *metadbmodel.Pod, tool *Tool) {
 	t.id = dbItem.ID
 	t.domainLcuuid = dbItem.Domain
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.vpcID = dbItem.VPCID
-	t.podClusterID = dbItem.PodClusterID
-	t.podNamespaceID = dbItem.PodNamespaceID
-	t.podGroupID = dbItem.PodGroupID
-	t.podNodeID = dbItem.PodNodeID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.vpcId = dbItem.VPCID
+	t.podClusterId = dbItem.PodClusterID
+	t.podNamespaceId = dbItem.PodNamespaceID
+	t.podGroupId = dbItem.PodGroupID
+	t.podNodeId = dbItem.PodNodeID
 }
 
 func NewPodCollection(t *Tool) *PodCollection {

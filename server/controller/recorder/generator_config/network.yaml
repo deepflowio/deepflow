@@ -1,18 +1,77 @@
 name: network
-public_name: Network
+orm_name: Network
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: label
+      orm_name: Label
+      type: string
+    - name: tunnel_id
+      orm_name: TunnelID
+      type: int
+    - name: net_type
+      orm_name: NetType
+      type: int
+    - name: segmentation_id
+      orm_name: SegmentationID
+      type: int
+    - name: vpc_lcuuid
+      orm_name: VPCID
+      type: string
+      ref:
+        resource: vpc
+        lookup_by: id
+        target: lcuuid
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: vpcID
-    public_name: VPCID
+  - name: vpc_id
+    orm_name: VPCID
     type: int
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: label
+        type: string
+      - name: tunnel_id
+        type: int
+      - name: segmentation_id
+        type: int
+      - name: net_type
+        type: int
+      - name: vpc_id
+        type: int
+      - name: vpc_lcuuid
+        type: string
+      - name: az_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string
