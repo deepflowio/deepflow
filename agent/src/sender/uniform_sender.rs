@@ -604,14 +604,19 @@ impl<T: Sendable> UniformSender<T> {
                 conn.reconnect_interval = 0;
             } else {
                 if self.counter.dropped.load(Ordering::Relaxed) == 0 {
-                    self.exception_handler.set(Exception::AnalyzerSocketError);
                     if conn.dest_ip.is_empty() || conn.dest_ip == "0.0.0.0" {
-                        warn!("'analyzer_ip' is not assigned, please check whether the Agent is successfully registered");
+                        let error_msg = "'analyzer_ip' is not assigned, please check whether the Agent is successfully registered".into();
+                        warn!("{}", error_msg);
+                        self.exception_handler
+                            .set(Exception::AnalyzerSocketError, Some(error_msg));
                     } else {
-                        error!(
+                        let error_msg = format!(
                             "{} sender tcp connection to {}:{} failed",
-                            self.name, conn.dest_ip, conn.dest_port,
+                            self.name, conn.dest_ip, conn.dest_port
                         );
+                        error!("{}", error_msg);
+                        self.exception_handler
+                            .set(Exception::AnalyzerSocketError, Some(error_msg));
                     }
                 }
                 self.counter.dropped.fetch_add(1, Ordering::Relaxed);
@@ -644,11 +649,13 @@ impl<T: Sendable> UniformSender<T> {
                 }
                 Err(e) => {
                     if self.counter.dropped.load(Ordering::Relaxed) == 0 {
-                        self.exception_handler.set(Exception::AnalyzerSocketError);
-                        error!(
+                        let error_msg = format!(
                             "{} sender tcp stream write data to {}:{} failed: {}",
                             self.name, conn.dest_ip, conn.dest_port, e
                         );
+                        error!("{}", error_msg);
+                        self.exception_handler
+                            .set(Exception::AnalyzerSocketError, Some(error_msg));
                     }
                     self.counter.dropped.fetch_add(1, Ordering::Relaxed);
                     conn.tcp_stream.take();
@@ -703,7 +710,7 @@ impl<T: Sendable> UniformSender<T> {
         if overflow || self.input.total_overwritten_count() > self.overwritten_count {
             self.overwritten_count = self.input.total_overwritten_count();
             self.exception_handler
-                .set(Exception::DataBpsThresholdExceeded);
+                .set(Exception::DataBpsThresholdExceeded, None);
             self.log_when_traffic_overflow(config);
         }
         overflow

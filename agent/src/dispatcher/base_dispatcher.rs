@@ -302,7 +302,7 @@ impl BaseDispatcher {
         }
         while !leaky_bucket.acquire(1) {
             counter.get_token_failed.fetch_add(1, Ordering::Relaxed);
-            exception_handler.set(Exception::RxPpsThresholdExceeded);
+            exception_handler.set(Exception::RxPpsThresholdExceeded, None);
             thread::sleep(Duration::from_millis(1));
         }
 

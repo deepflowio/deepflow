@@ -834,8 +834,9 @@ impl Trident {
                     cgroups_controller = Some(cg_controller);
                 }
                 Err(e) => {
-                    warn!("initialize cgroups controller failed: {}, resource utilization will be checked regularly to prevent resource usage from exceeding the limit.", e);
-                    exception_handler.set(Exception::CgroupsConfigError);
+                    let error_msg = format!("initialize cgroups controller failed: {}, resource utilization will be checked regularly to prevent resource usage from exceeding the limit.", e);
+                    warn!("{}", error_msg);
+                    exception_handler.set(Exception::CgroupsConfigError, Some(error_msg));
                 }
             }
         }
