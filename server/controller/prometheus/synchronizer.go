@@ -54,38 +54,35 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 	var err error
 	nonLabelNames := mapset.NewSet[string]()
 	metricNameToAPPLabelNames := make(map[string][]*trident.LabelResponse, 0)
-	s.cache.MetricAndAPPLabelLayout.Get().Range(func(k, v interface{}) bool {
-		key := k.(cache.LayoutKey)
+	for key, index := range s.cache.MetricAndAPPLabelLayout.GetLayoutKeyToIndex() {
 		labelNameID, ok := s.cache.LabelName.GetIDByName(key.LabelName)
 		if !ok {
 			nonLabelNames.Add(key.LabelName)
-			return true
+			continue
 		}
+		labelName := key.LabelName
 		metricNameToAPPLabelNames[key.MetricName] = append(
 			metricNameToAPPLabelNames[key.MetricName],
 			&trident.LabelResponse{
-				Name:                &key.LabelName,
+				Name:                &labelName,
 				NameId:              proto.Uint32(uint32(labelNameID)),
-				AppLabelColumnIndex: proto.Uint32(uint32(v.(uint8))),
+				AppLabelColumnIndex: proto.Uint32(uint32(index)),
 			})
-		return true
-	})
+	}
 
 	mLabels := make([]*trident.MetricLabelResponse, 0)
-	s.cache.MetricName.Get().Range(func(k, v interface{}) bool {
-		metricName := k.(string)
-		metricID := v.(int)
+	for metricName, metricID := range s.cache.MetricName.GetNameToID() {
+		mn := metricName
 		mLabels = append(
 			mLabels,
 			&trident.MetricLabelResponse{
 				OrgId:      proto.Uint32(uint32(s.org.GetID())),
-				MetricName: &metricName,
+				MetricName: &mn,
 				MetricId:   proto.Uint32(uint32((metricID))),
-				LabelIds:   metricNameToAPPLabelNames[metricName],
+				LabelIds:   metricNameToAPPLabelNames[mn],
 			})
 		s.counter.SendMetricCount++
-		return true
-	})
+	}
 	if nonLabelNames.Cardinality() > 0 {
 		log.Warningf("label name id not found, names: %v", nonLabelNames.ToSlice(), s.org.LogPrefix)
 	}
@@ -96,8 +93,7 @@ func (s *Synchronizer) assembleLabelFully() ([]*trident.LabelResponse, error) {
 	ls := make([]*trident.LabelResponse, 0)
 	nonLabelNames := mapset.NewSet[string]()
 	nonLabelValues := mapset.NewSet[string]()
-	for iter := range s.cache.Label.GetKeyToID().IterBuffered() {
-		k := iter.Key
+	for k, _ := range s.cache.Label.GetKeyToID() {
 		ni, ok := s.cache.LabelName.GetIDByName(k.Name)
 		if !ok {
 			nonLabelNames.Add(k.Name)
@@ -108,9 +104,11 @@ func (s *Synchronizer) assembleLabelFully() ([]*trident.LabelResponse, error) {
 			nonLabelValues.Add(k.Value)
 			continue
 		}
+		name := k.Name
+		value := k.Value
 		ls = append(ls, &trident.LabelResponse{
-			Name:    &k.Name,
-			Value:   &k.Value,
+			Name:    &name,
+			Value:   &value,
 			NameId:  proto.Uint32(uint32(ni)),
 			ValueId: proto.Uint32(uint32(vi)),
 		})

@@ -17,7 +17,7 @@
 package cache
 
 import (
-	"github.com/cornelk/hashmap"
+	"sync"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
@@ -27,46 +27,61 @@ import (
 type labelValue struct {
 	org *common.ORG
 
-	valueToID *hashmap.Map[string, int]
+	mu        sync.RWMutex
+	valueToID map[string]int
 }
 
 func newLabelValue(org *common.ORG) *labelValue {
 	return &labelValue{
 		org:       org,
-		valueToID: hashmap.New[string, int](),
+		valueToID: make(map[string]int),
 	}
 }
 
 func (lv *labelValue) GetIDByValue(v string) (int, bool) {
-	if id, ok := lv.valueToID.Get(v); ok {
-		return id, true
-	}
-	return 0, false
+	lv.mu.RLock()
+	defer lv.mu.RUnlock()
+	id, ok := lv.valueToID[v]
+	return id, ok
 }
 
-func (lv *labelValue) GetValueToID() *hashmap.Map[string, int] {
-	return lv.valueToID
+// GetValueToID returns a snapshot copy of the valueToID map.
+func (lv *labelValue) GetValueToID() map[string]int {
+	lv.mu.RLock()
+	defer lv.mu.RUnlock()
+	result := make(map[string]int, len(lv.valueToID))
+	for k, v := range lv.valueToID {
+		result[k] = v
+	}
+	return result
 }
 
 func (lv *labelValue) Add(batch []*controller.PrometheusLabelValue) {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
 	for _, item := range batch {
-		lv.valueToID.Set(item.GetValue(), int(item.GetId()))
+		lv.valueToID[item.GetValue()] = int(item.GetId())
 	}
 }
 
+// refresh rebuilds the entire cache from DB (snapshot-and-swap).
 func (lv *labelValue) refresh(args ...interface{}) error {
 	labelValues, err := lv.load()
 	if err != nil {
 		return err
 	}
+	newV2I := make(map[string]int, len(labelValues))
 	for _, item := range labelValues {
-		lv.valueToID.Set(item.Value, item.ID)
+		newV2I[item.Value] = item.ID
 	}
+	lv.mu.Lock()
+	lv.valueToID = newV2I
+	lv.mu.Unlock()
 	return nil
 }
 
 func (lv *labelValue) load() ([]*metadbmodel.PrometheusLabelValue, error) {
 	var labelValues []*metadbmodel.PrometheusLabelValue
-	err := lv.org.DB.Find(&labelValues).Error
+	err := lv.org.DB.Select("id", "value").Find(&labelValues).Error
 	return labelValues, err
 }

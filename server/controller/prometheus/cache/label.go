@@ -17,7 +17,7 @@
 package cache
 
 import (
-	cmap "github.com/orcaman/concurrent-map/v2"
+	"sync"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
@@ -43,48 +43,65 @@ func NewLabelKey(name, value string) LabelKey {
 type label struct {
 	org *common.ORG
 
-	keyToID cmap.ConcurrentMap[LabelKey, int]
+	mu      sync.RWMutex
+	keyToID map[LabelKey]int
 }
 
 func newLabel(org *common.ORG) *label {
 	return &label{
 		org:     org,
-		keyToID: cmap.NewStringer[LabelKey, int](),
+		keyToID: make(map[LabelKey]int),
 	}
 }
 
-func (l *label) GetKeyToID() cmap.ConcurrentMap[LabelKey, int] {
-	return l.keyToID
+// GetKeyToID returns a snapshot copy of the keyToID map.
+func (l *label) GetKeyToID() map[LabelKey]int {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	result := make(map[LabelKey]int, len(l.keyToID))
+	for k, v := range l.keyToID {
+		result[k] = v
+	}
+	return result
 }
 
 func (l *label) GetIDByKey(key LabelKey) (int, bool) {
-	if item, ok := l.keyToID.Get(key); ok {
-		return item, true
-	}
-	return 0, false
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	id, ok := l.keyToID[key]
+	return id, ok
 }
 
 func (l *label) Add(batch []*controller.PrometheusLabel) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	for _, item := range batch {
 		k := NewLabelKey(item.GetName(), item.GetValue())
-		l.keyToID.Set(k, int(item.GetId()))
+		l.keyToID[k] = int(item.GetId())
 	}
 }
 
+// refresh rebuilds the entire cache from DB (snapshot-and-swap).
+// This is the most critical optimization: the old ConcurrentMap append-only
+// approach caused millions of String()+FNV hash+lock operations per refresh.
+// Now we build a plain map without any locking during construction, then swap.
 func (l *label) refresh(args ...interface{}) error {
 	ls, err := l.load()
 	if err != nil {
 		return err
 	}
+	newMap := make(map[LabelKey]int, len(ls))
 	for _, item := range ls {
-		k := NewLabelKey(item.Name, item.Value)
-		l.keyToID.Set(k, item.ID)
+		newMap[NewLabelKey(item.Name, item.Value)] = item.ID
 	}
+	l.mu.Lock()
+	l.keyToID = newMap
+	l.mu.Unlock()
 	return nil
 }
 
 func (l *label) load() ([]*metadbmodel.PrometheusLabel, error) {
 	var labels []*metadbmodel.PrometheusLabel
-	err := l.org.DB.Find(&labels).Error
+	err := l.org.DB.Select("id", "name", "value").Find(&labels).Error
 	return labels, err
 }
