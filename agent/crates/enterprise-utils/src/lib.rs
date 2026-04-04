@@ -311,6 +311,13 @@ pub mod l7 {
                 }
             }
 
+            pub fn find_bind_values<'a>(
+                _: &'a [u8],
+                _: usize,
+            ) -> Option<impl Iterator<Item = ()> + 'a> {
+                Some(std::iter::empty())
+            }
+
             #[derive(Serialize, Clone, Copy, Debug, Default, PartialEq)]
             pub enum TnsPacketType {
                 #[default]
