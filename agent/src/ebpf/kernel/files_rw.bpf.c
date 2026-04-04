@@ -334,7 +334,14 @@ static __inline int trace_io_event_common(void *ctx,
 		return -1;
 	}
 
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+	int __ai_agent = is_ai_agent_process(pid_tgid);
+#endif
+
 	if (tracer_ctx->io_event_collect_mode == 0) {
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+		if (!__ai_agent)
+#endif
 		return -1;
 	}
 
@@ -346,6 +353,9 @@ static __inline int trace_io_event_common(void *ctx,
 	}
 
 	if (trace_id == 0 && tracer_ctx->io_event_collect_mode == 1) {
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+		if (!__ai_agent)
+#endif
 		return -1;
 	}
 
@@ -371,6 +381,9 @@ static __inline int trace_io_event_common(void *ctx,
 	}
 
 	if (latency < tracer_ctx->io_event_minimal_duration) {
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+		if (!__ai_agent)
+#endif
 		return -1;
 	}
 
@@ -382,6 +395,12 @@ static __inline int trace_io_event_common(void *ctx,
 	buffer->bytes_count = data_args->bytes_count;
 	buffer->latency = latency;
 	buffer->operation = direction;
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+	buffer->access_permission =
+	    ai_agent_get_access_permission(pid_tgid, data_args->fd, offset);
+#else
+	buffer->access_permission = 0;
+#endif
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)

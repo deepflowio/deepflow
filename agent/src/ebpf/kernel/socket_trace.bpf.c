@@ -39,6 +39,25 @@
 
 #define __user
 
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+#ifndef AI_AGENT_PROC_FORK
+#define AI_AGENT_PROC_FORK  1
+#define AI_AGENT_PROC_EXEC  2
+#define AI_AGENT_PROC_EXIT  3
+#endif
+
+static __inline int is_ai_agent_process(__u64 pid_tgid);
+static __inline int ai_agent_submit_event(void *ctx, __u8 source,
+					  void *event, __u32 event_sz,
+					  __u64 pid_tgid);
+static __inline int ai_agent_emit_proc_event(void *ctx, __u8 event_type,
+					     __u32 pid, __u32 parent_pid,
+					     __u64 pid_tgid);
+static __inline void ai_agent_cleanup_proc_pid(__u32 tgid);
+static __inline int ai_agent_on_fork(void *ctx, __u32 parent_tgid,
+				     __u32 child_tgid);
+#endif
+
 /* *INDENT-OFF* */
 /***********************************************************
  * map definitions
@@ -1364,6 +1383,14 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	 * so they are saved here.
 	 */
 	int data_max_sz = tracer_ctx->data_limit_max;
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+	if (is_ai_agent_process(((__u64)tgid) << 32)) {
+		__u32 ai_limit = tracer_ctx->ai_agent_data_limit_max;
+		data_max_sz = ai_limit == 0 ?
+			      AI_AGENT_DATA_LIMIT_MAX_UNLIMITED : ai_limit;
+		sk_info->is_ai_agent = 1;
+	}
+#endif
 
 	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 	if (trace_stats == NULL)
@@ -1523,8 +1550,17 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 #endif
 	__u32 send_reasm_bytes = 0;
 	if (is_socket_info_valid(socket_info_ptr)) {
+		if (!socket_info_ptr->allow_reassembly &&
+		    is_proto_reasm_enabled(conn_info->protocol)) {
+			socket_info_ptr->allow_reassembly = true;
+			socket_info_ptr->finish_reasm = false;
+			socket_info_ptr->reasm_bytes = 0;
+		}
 		sk_info->uid = socket_info_ptr->uid;
 		sk_info->allow_reassembly = socket_info_ptr->allow_reassembly;
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+		socket_info_ptr->is_ai_agent = sk_info->is_ai_agent;
+#endif
 
 		/*
 		 * The kernel syscall interface determines that it is the TLS
@@ -1592,6 +1628,10 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		 * Below, confirm the actual size of the data to be transmitted after
 		 * enabling data reassembly. The data transmission size is limited by
 		 * the maximum transmission configuration value.
+		 *
+		 * socket_info_ptr->reasm_bytes records the cumulative bytes accepted
+		 * into the current reassembly budget, not the raw unbounded syscall
+		 * length seen from user space.
 		 */
 		if (sk_info->allow_reassembly
 		    && socket_info_ptr->reasm_bytes < data_max_sz) {
@@ -1644,6 +1684,11 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	v->cap_timestamp = bpf_ktime_get_ns();
 	v->direction = conn_info->direction;
 	v->syscall_len = syscall_len;
+	__u32 reasm_bytes = sk_info->reasm_bytes;
+	if (is_socket_info_valid(socket_info_ptr)) {
+		reasm_bytes = socket_info_ptr->reasm_bytes;
+	}
+	v->reasm_bytes = reasm_bytes;
 	v->msg_type = MSG_COMMON;
 
 	// Reassembly modification type
@@ -2870,6 +2915,13 @@ static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 	if (tracer_ctx == NULL)
 		return;
 	int data_max_sz = tracer_ctx->data_limit_max;
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+	if (is_ai_agent_process(pid_tgid)) {
+		__u32 ai_limit = tracer_ctx->ai_agent_data_limit_max;
+		data_max_sz = ai_limit == 0 ?
+			      AI_AGENT_DATA_LIMIT_MAX_UNLIMITED : ai_limit;
+	}
+#endif
 	struct __socket_data_buffer *v_buff =
 	    bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)

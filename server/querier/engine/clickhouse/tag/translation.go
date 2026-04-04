@@ -851,6 +851,27 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			),
 		}
 	}
+	// gprocess.biz_type
+	for _, suffix := range []string{"", "_0", "_1"} {
+		bizTypeSuffix := "gprocess.biz_type" + suffix
+		processIDSuffix := "gprocess_id" + suffix
+		tagResourceMap[bizTypeSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet('flow_tag.gprocess_map', 'biz_type', (toUInt64("+processIDSuffix+")))",
+				processIDSuffix+"!=0",
+				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.gprocess_map WHERE biz_type GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE tag_name='biz_type' AND (name_en %[1]s %[2]s OR name_zh %[1]s %[2]s)))",
+				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.gprocess_map WHERE biz_type GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE tag_name='biz_type' AND (%[1]s(name_en,%[2]s) OR %[1]s(name_zh,%[2]s))))",
+				processIDSuffix,
+			),
+			"enum": NewTag(
+				"dictGetOrDefault('flow_tag.int_enum_map', '%s', ('%s',toUInt64(dictGet('flow_tag.gprocess_map', 'biz_type', (toUInt64("+processIDSuffix+"))))), dictGet('flow_tag.gprocess_map', 'biz_type', (toUInt64("+processIDSuffix+"))))",
+				"",
+				"toUInt64(dictGet('flow_tag.gprocess_map', 'biz_type', (toUInt64("+processIDSuffix+")))) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
+				"toUInt64(dictGet('flow_tag.gprocess_map', 'biz_type', (toUInt64("+processIDSuffix+")))) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
+				"",
+			),
+		}
+	}
 
 	// 单个外部字段-ext_metrics
 	tagResourceMap["tag."] = map[string]*Tag{
