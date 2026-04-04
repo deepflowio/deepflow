@@ -774,3 +774,22 @@ TP_SCHED_PROG(process_exec) (struct sched_comm_exec_ctx *ctx)
 {
 	return __process_exec((void *)ctx);
 }
+
+// uretprobe: fires when _dl_open() returns after dynamically loading a library.
+// Attached from user-space via program__attach_uprobe() to ld-linux's _dl_open.
+URETPROG(dl_open_uretprobe) (struct pt_regs *ctx)
+{
+	struct member_fields_offset *offset = retrieve_ready_kern_offset();
+	if (offset == NULL)
+		return 0;
+
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+
+	struct library_load_event_t data = {};
+	data.meta.event_type = EVENT_TYPE_LIB_LOAD;
+	data.pid = pid;
+	bpf_perf_event_output(ctx, &NAME(socket_data),
+			      BPF_F_CURRENT_CPU, &data, sizeof(data));
+	return 0;
+}

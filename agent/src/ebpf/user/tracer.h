@@ -724,6 +724,7 @@ int exec_set_feature_pids(int feature, const int *pids, int num);
 int set_feature_pids(int feature, const int *pids, int num);
 int init_match_pids_hash(void);
 bool is_pid_match(int feature, int pid);
+int add_feature_pid(int feature, int pid);
 struct probe *create_probe(struct bpf_tracer *tracer,
 			   const char *func_name, bool isret,
 			   enum probe_type type, void *private,
