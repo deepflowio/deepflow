@@ -21,7 +21,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc, RwLock,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use arc_swap::access::Access;
@@ -36,6 +36,7 @@ use nix::{
 
 use super::CaptureNetworkTypeHandler;
 use crate::common::decapsulate::TunnelTypeBitmap;
+use crate::liveness::DebugInfo;
 #[cfg(target_os = "linux")]
 use crate::platform::{GenericPoller, Poller};
 use crate::{
@@ -547,6 +548,8 @@ impl MirrorModeDispatcher {
         info!("Start mirror dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
+        let mut last_liveness = Instant::now();
+        base.liveness_handle.start(DebugInfo::new("running"));
 
         let mut flow_map = FlowMap::new(
             base.id as u32,
@@ -570,6 +573,10 @@ impl MirrorModeDispatcher {
         }
 
         while !base.terminated.load(Ordering::Relaxed) {
+            if last_liveness.elapsed() >= Duration::from_secs(1) {
+                base.liveness_handle.heartbeat(DebugInfo::new("running"));
+                last_liveness = Instant::now();
+            }
             let config = Config {
                 flow: &base.flow_map_config.load(),
                 log_parser: &base.log_parser_config.load(),
@@ -732,6 +739,7 @@ impl MirrorModeDispatcher {
             base.check_and_update_bpf(&mut self.base.engine);
         }
 
+        base.liveness_handle.stop(DebugInfo::new("stopped"));
         self.pipelines.clear();
         self.base.terminate_handler();
         self.last_timestamp_array.clear();

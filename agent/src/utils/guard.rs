@@ -50,6 +50,7 @@ use crate::common::{
 };
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
+use crate::liveness::{DebugInfo, LivenessHandle};
 use crate::rpc::get_timestamp;
 use crate::trident::AgentState;
 use crate::utils::environment::get_disk_usage;
@@ -265,6 +266,7 @@ pub struct Guard {
     system: Arc<Mutex<System>>,
     pid: Pid,
     cgroups_disabled: bool,
+    liveness: LivenessHandle,
 }
 
 impl Guard {
@@ -276,6 +278,7 @@ impl Guard {
         cgroup_mount_path: String,
         is_cgroup_v2: bool,
         cgroups_disabled: bool,
+        liveness: LivenessHandle,
     ) -> Result<Self, &'static str> {
         let Ok(pid) = get_current_pid() else {
             return Err("get the process' pid failed: {}, deepflow-agent restart...");
@@ -294,6 +297,7 @@ impl Guard {
             system: Arc::new(Mutex::new(System::new())),
             pid,
             cgroups_disabled,
+            liveness,
         })
     }
 
@@ -543,16 +547,19 @@ impl Guard {
 
         self.running_watchdog.store(true, Relaxed);
         self.start_watchdog(feed.clone());
+        let liveness = self.liveness.clone();
 
         let thread = thread::Builder::new().name("guard".to_owned()).spawn(move || {
             let mut system_load = SystemLoadGuard::new(system.clone(), exception_handler.clone());
             #[cfg(target_os = "linux")]
             let mut last_over_max_sockets_limit = None;
             let feed = feed.clone();
+            liveness.start(DebugInfo::new("running"));
 
             feed.add(FeedTitle::Init);
 
             loop {
+                liveness.heartbeat(DebugInfo::new("running"));
                 let config = config.load();
                 let capture_mode = config.capture_mode;
                 let cpu_limit = config.max_millicpus;
@@ -782,6 +789,7 @@ impl Guard {
                     break;
                 }
             }
+            liveness.stop(DebugInfo::new("stopped"));
             info!("guard exited");
         }).unwrap();
 

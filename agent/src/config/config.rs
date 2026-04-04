@@ -135,6 +135,8 @@ pub struct Config {
     pub pid_file: String,
     pub team_id: String,
     pub cgroups_disabled: bool,
+    pub liveness_probe_enabled: bool,
+    pub liveness_probe_port: u16,
 }
 
 impl Config {
@@ -297,6 +299,8 @@ impl Default for Config {
             pid_file: Default::default(),
             team_id: "".into(),
             cgroups_disabled: false,
+            liveness_probe_enabled: false,
+            liveness_probe_port: 39090,
         }
     }
 }
@@ -3975,6 +3979,8 @@ mod tests {
             .expect("failed loading config file");
         assert_eq!(c.controller_ips.len(), 1);
         assert_eq!(&c.controller_ips[0], "127.0.0.1");
+        assert!(!c.liveness_probe_enabled);
+        assert_eq!(c.liveness_probe_port, 39090);
     }
 
     #[test]

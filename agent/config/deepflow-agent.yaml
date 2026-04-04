@@ -39,6 +39,11 @@ controller-ips:
 ## kubernetes api watcher
 #async-worker-thread-number: 16
 
+## Enable HTTP liveness probe endpoint
+#liveness-probe-enabled: false
+## HTTP liveness probe listen port
+#liveness-probe-port: 39090
+
 ## Type of agent identifier, choose from [ip-and-mac, ip], defaults to "ip-and-mac"
 #agent-unique-identifier: ip-and-mac
 

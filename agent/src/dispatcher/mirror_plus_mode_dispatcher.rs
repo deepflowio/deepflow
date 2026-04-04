@@ -22,7 +22,7 @@ use std::{
         Arc, RwLock,
     },
     thread::{self, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use arc_swap::access::Access;
@@ -48,6 +48,7 @@ use crate::{
         PacketCounter,
     },
     flow_generator::{flow_map::Config, FlowMap},
+    liveness::{DebugInfo, LivenessHandle},
     rpc::get_timestamp,
     utils::stats::{self, Countable, QueueStats},
 };
@@ -217,6 +218,7 @@ pub(super) struct MirrorPlusModeDispatcher {
     pub(super) agent_type: Arc<RwLock<AgentType>>,
     pub(super) mac: u32,
     pub(super) flow_generator_thread_handler: Option<JoinHandle<()>>,
+    pub(super) flow_generator_liveness: LivenessHandle,
     pub(super) queue_debugger: Arc<QueueDebugger>,
     pub(super) inner_queue_size: usize,
     pub(super) stats_collector: Arc<stats::Collector>,
@@ -289,6 +291,7 @@ impl MirrorPlusModeDispatcher {
         let mac = self.mac;
         let agent_type = self.agent_type.clone();
         let local_vm_mac_set = self.local_vm_mac_set.clone();
+        let liveness = self.flow_generator_liveness.clone();
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let cpu_set = base.options.lock().unwrap().cpu_set;
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -299,6 +302,7 @@ impl MirrorPlusModeDispatcher {
                 .name("dispatcher-packet-to-flow-generator".to_owned())
                 .spawn(move || {
                     let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
+                    let mut last_liveness = Instant::now();
                     let mut flow_map = FlowMap::new(
                         id as u32,
                         Some(flow_output_queue),
@@ -319,8 +323,13 @@ impl MirrorPlusModeDispatcher {
                             warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
                         }
                     }
+                    liveness.start(DebugInfo::new("running"));
 
                     while !terminated.load(Ordering::Relaxed) {
+                        if last_liveness.elapsed() >= Duration::from_secs(1) {
+                            liveness.heartbeat(DebugInfo::new("running"));
+                            last_liveness = Instant::now();
+                        }
                         let config = Config {
                             flow: &flow_map_config.load(),
                             log_parser: &log_parser_config.load(),
@@ -459,6 +468,7 @@ impl MirrorPlusModeDispatcher {
                             }
                         }
                     }
+                    liveness.stop(DebugInfo::new("stopped"));
                     pipelines.clear();
                     last_timestamp_array.clear();
                 })
@@ -475,6 +485,8 @@ impl MirrorPlusModeDispatcher {
         let mut batch = Vec::with_capacity(HANDLER_BATCH_SIZE);
         let id = base.id;
         let mut allocator = Allocator::new(self.raw_packet_block_size);
+        let mut last_liveness = Instant::now();
+        base.liveness_handle.start(DebugInfo::new("running"));
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let cpu_set = base.options.lock().unwrap().cpu_set;
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -482,6 +494,10 @@ impl MirrorPlusModeDispatcher {
             warn!("CPU Affinity({:?}) bind error: {:?}.", &cpu_set, e);
         }
         while !base.terminated.load(Ordering::Relaxed) {
+            if last_liveness.elapsed() >= Duration::from_secs(1) {
+                base.liveness_handle.heartbeat(DebugInfo::new("running"));
+                last_liveness = Instant::now();
+            }
             if base.reset_whitelist.swap(false, Ordering::Relaxed) {
                 base.tap_interface_whitelist.reset();
             }
@@ -542,6 +558,7 @@ impl MirrorPlusModeDispatcher {
         if let Some(handler) = self.flow_generator_thread_handler.take() {
             let _ = handler.join();
         }
+        base.liveness_handle.stop(DebugInfo::new("stopped"));
         self.base.terminate_handler();
         info!("Stopped dispatcher {}", self.base.is.log_id);
     }
