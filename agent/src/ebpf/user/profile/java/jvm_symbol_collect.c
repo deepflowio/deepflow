@@ -871,20 +871,14 @@ static int thread_pool_add_task(symbol_collect_thread_pool_t * pool,
 		pool->thread_index = pool->thread_count;
 
 		if ((ret =
-		     pthread_create(&thread, NULL, &worker_thread, pool)) < 0) {
+		     create_monitored_pthread("java-sym-wk", &thread,
+					      worker_thread, pool,
+					      true)) != ETR_OK) {
 			ebpf_warning(JAVA_LOG_TAG
 				     "Create worker thread failed with '%s(%d)'\n",
 				     strerror(errno), errno);
 			pthread_mutex_unlock(&pool->lock);
 			return -2;
-		}
-
-		if (pthread_detach(thread) != 0) {
-			ebpf_warning(JAVA_LOG_TAG
-				     "Failed to detach thread with '%s(%d)'\n",
-				     strerror(errno), errno);
-			pthread_mutex_unlock(&pool->lock);
-			return -1;
 		}
 
 		task_thread_t *new_threads = realloc(pool->threads,

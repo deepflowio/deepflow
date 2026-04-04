@@ -342,7 +342,16 @@ void format_port_ranges(uint16_t *ports, size_t size, char *ret_str, int str_sz)
  * @return 32-bit hash value computed over the input data.
  */
 uint32_t murmurhash(const void *key, size_t len, uint32_t seed);
-#if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
+#if !defined(JAVA_AGENT_ATTACH_TOOL)
+typedef void (*work_thread_func_t)(void *);
+typedef void *(*pthread_thread_func_t)(void *);
+
+int create_monitored_work_thread(const char *name, pthread_t *t,
+				 work_thread_func_t fn, void *arg,
+				 bool detached);
+int create_monitored_pthread(const char *name, pthread_t *t,
+			     pthread_thread_func_t fn, void *arg,
+			     bool detached);
 int create_work_thread(const char *name, pthread_t *t, void *fn, void *arg);
-#endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */
+#endif /* !defined(JAVA_AGENT_ATTACH_TOOL) */
 #endif /* DF_COMMON_H */

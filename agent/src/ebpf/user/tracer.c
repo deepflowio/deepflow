@@ -294,30 +294,15 @@ int enable_tracer_reader_work(const char *prefix_name, int idx,
 {
 	int ret;
 	char name[TASK_COMM_LEN];
+
 	snprintf(name, sizeof(name), "%s-%d", prefix_name, idx);
-	ret = pthread_create(&tracer->perf_workers[idx], NULL, fn,
-			     (void *)(uint64_t) idx);
-	if (ret) {
+	ret = create_monitored_pthread(name, &tracer->perf_workers[idx],
+				       (pthread_thread_func_t)fn,
+				       (void *)(uint64_t)idx, true);
+	if (ret != ETR_OK) {
 		ebpf_warning("tracer reader(%s), pthread_create "
 			     "is error:%s\n", name, strerror(errno));
 		return ETR_INVAL;
-	}
-
-	/* set thread name */
-	pthread_setname_np(tracer->perf_workers[idx], name);
-
-	/*
-	 * Separating threads is to automatically release
-	 * resources after pthread_exit(), without being
-	 * blocked or stuck.
-	 */
-	ret = pthread_detach(tracer->perf_workers[idx]);
-	if (ret != 0) {
-		ebpf_warning("Error detaching thread, error:%s\n",
-			     strerror(errno));
-		return ETR_INVAL;
-	} else {
-		ebpf_info("thread %s, detached successful.", name);
 	}
 
 	return ETR_OK;
@@ -1729,12 +1714,18 @@ static void period_process_main(__unused void *arg)
 	pthread_t threads[sys_cpus_count];
 	int i;
 	for (i = 0; i < sys_cpus_count; i++) {
-		if (cpu_online[i])
-			if (pthread_create
-			    (&threads[i], NULL, kick_kern_push_data,
-			     (void *)(uintptr_t) i) != 0) {
-				ebpf_warning("pthread_create failed");
-			}
+		int ret;
+		char name[NAME_LEN];
+
+		if (!cpu_online[i])
+			continue;
+
+		snprintf(name, sizeof(name), "kick-kern.%d", i);
+		ret = create_monitored_pthread(name, &threads[i],
+					       kick_kern_push_data,
+					       (void *)(uintptr_t)i, true);
+		if (ret != ETR_OK)
+			ebpf_warning("pthread_create failed");
 	}
 
 	// Only this unique identifier can be adapted to the kernel
@@ -2279,8 +2270,9 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	if ((err = sockopt_register(&match_pids_sockopts)) != ETR_OK)
 		return err;
 
-	err = pthread_create(&ctrl_pthread, NULL, (void *)&ctrl_main, NULL);
-	if (err) {
+	err = create_monitored_work_thread("ctrl-main", &ctrl_pthread,
+					 ctrl_main, NULL, true);
+	if (err != ETR_OK) {
 		ebpf_info("<%s> ctrl_pthread, pthread_create is error:%s\n",
 			  __func__, strerror(errno));
 		return ETR_INVAL;
@@ -2315,10 +2307,9 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 				     SYS_TIME_UPDATE_PERIOD))
 		return ETR_INVAL;
 
-	err =
-	    pthread_create(&cpus_kick_pthread, NULL,
-			   (void *)&period_process_main, NULL);
-	if (err) {
+	err = create_monitored_work_thread("period-process", &cpus_kick_pthread,
+					 period_process_main, NULL, true);
+	if (err != ETR_OK) {
 		ebpf_info
 		    ("<%s> cpus_kick_pthread, pthread_create is error:%s\n",
 		     __func__, strerror(errno));

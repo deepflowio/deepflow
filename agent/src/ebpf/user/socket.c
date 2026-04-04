@@ -2362,11 +2362,12 @@ static int dispatch_workers_setup(struct bpf_tracer *tracer,
 
 		pthread_mutex_init(&tracer->queues[i].mutex, NULL);
 		pthread_cond_init(&tracer->queues[i].cond, NULL);
-		ret =
-		    pthread_create(&tracer->dispatch_workers[i], NULL,
-				   (void *)&process_data,
-				   (void *)&tracer->queues[i]);
-		if (ret) {
+		ret = create_monitored_work_thread(name,
+						    &tracer->dispatch_workers[i],
+						    process_data,
+						    (void *)&tracer->queues[i],
+						    true);
+		if (ret != ETR_OK) {
 			ebpf_info
 			    ("<%s> process_data, pthread_create is error:%s\n",
 			     __func__, strerror(errno));
@@ -2729,10 +2730,10 @@ retry_load:
 
 	if ((ret = sockopt_register(&datadump_sockopts)) != ETR_OK)
 		return ret;
-	ret =
-	    pthread_create(&proc_events_pthread, NULL,
-			   (void *)&process_events_handle_main, (void *)tracer);
-	if (ret) {
+	ret = create_monitored_work_thread("proc-events", &proc_events_pthread,
+					 process_events_handle_main, (void *)tracer,
+					 true);
+	if (ret != ETR_OK) {
 		ebpf_warning
 		    ("proc_events_pthread, pthread_create is error:%s\n",
 		     strerror(errno));

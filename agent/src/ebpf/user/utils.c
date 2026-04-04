@@ -1639,37 +1639,105 @@ u32 djb2_32bit(const char *str)
 	return hash;		// 32-bit output
 }
 
-#if !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL)
-int create_work_thread(const char *name, pthread_t * t, void *fn, void *arg)
+#if !defined(JAVA_AGENT_ATTACH_TOOL)
+#include "crash_monitor.h"
+
+enum monitored_thread_kind {
+	MONITORED_THREAD_WORK = 0,
+	MONITORED_THREAD_PTHREAD = 1,
+};
+
+struct monitored_thread_args {
+	enum monitored_thread_kind kind;
+	work_thread_func_t work_fn;
+	pthread_thread_func_t pthread_fn;
+	void *arg;
+};
+
+static void *monitored_thread_main(void *arg)
+{
+	struct monitored_thread_args *thread_args = arg;
+	void *ret = NULL;
+
+	if (thread_args == NULL)
+		return NULL;
+
+	(void)crash_monitor_prepare_thread();
+	if (thread_args->kind == MONITORED_THREAD_WORK) {
+		if (thread_args->work_fn != NULL)
+			thread_args->work_fn(thread_args->arg);
+	} else if (thread_args->pthread_fn != NULL) {
+		ret = thread_args->pthread_fn(thread_args->arg);
+	}
+
+	free(thread_args);
+	return ret;
+}
+
+static int create_monitored_thread_common(const char *name, pthread_t *t,
+					  work_thread_func_t work_fn,
+					  pthread_thread_func_t pthread_fn,
+					  void *arg, bool detached)
 {
 	int ret;
-	ret = pthread_create(t, NULL, fn, arg);
+	struct monitored_thread_args *thread_args;
+
+	thread_args = calloc(1, sizeof(*thread_args));
+	if (thread_args == NULL) {
+		ebpf_warning("worker name %s alloc failed:%s\n",
+			     name, strerror(errno));
+		return ETR_NOMEM;
+	}
+
+	thread_args->kind = (pthread_fn != NULL) ?
+		MONITORED_THREAD_PTHREAD : MONITORED_THREAD_WORK;
+	thread_args->work_fn = work_fn;
+	thread_args->pthread_fn = pthread_fn;
+	thread_args->arg = arg;
+
+	ret = pthread_create(t, NULL, monitored_thread_main, thread_args);
 	if (ret) {
 		ebpf_warning("worker name %s is error:%s\n",
 			     name, strerror(errno));
+		free(thread_args);
 		return ETR_INVAL;
 	}
 
-	/* set thread name */
 	pthread_setname_np(*t, name);
+	if (!detached)
+		return ETR_OK;
 
-	/*
-	 * Separating threads is to automatically release
-	 * resources after pthread_exit(), without being
-	 * blocked or stuck.
-	 */
 	ret = pthread_detach(*t);
 	if (ret != 0) {
 		ebpf_warning("Error detaching thread, error:%s\n",
 			     strerror(errno));
 		return ETR_INVAL;
-	} else {
-		ebpf_info("thread %s, detached successful.", name);
 	}
 
+	ebpf_info("thread %s, detached successful.", name);
 	return ETR_OK;
 }
-#endif /* !defined(AARCH64_MUSL) && !defined(JAVA_AGENT_ATTACH_TOOL) */
+
+int create_monitored_work_thread(const char *name, pthread_t *t,
+				 work_thread_func_t fn, void *arg,
+				 bool detached)
+{
+	return create_monitored_thread_common(name, t, fn, NULL, arg, detached);
+}
+
+int create_monitored_pthread(const char *name, pthread_t *t,
+			     pthread_thread_func_t fn, void *arg,
+			     bool detached)
+{
+	return create_monitored_thread_common(name, t, NULL, fn, arg, detached);
+}
+
+int create_work_thread(const char *name, pthread_t * t, void *fn, void *arg)
+{
+	return create_monitored_work_thread(name, t,
+				    (work_thread_func_t)fn, arg, true);
+}
+#endif /* !defined(JAVA_AGENT_ATTACH_TOOL) */
 
 static inline int compare(const void *a, const void *b)
 {
