@@ -85,6 +85,8 @@ OBJS := user/elf.o \
 	user/log.o \
 	user/probe.o \
 	user/tracer.o \
+	user/crash_monitor.o \
+	user/crash_symbolize.o \
 	user/table.o \
 	user/socket.o \
 	user/ctrl.o \
@@ -240,7 +242,7 @@ build: $(ELFFILES) $(JAVA_TOOL) $(LIBTRACE)
 
 tools: $(LIBTRACE)
 	$(call msg,TOOLS,deepflow-ebpfctl)
-	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -lelf -lz -lpthread
+	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -ldwarf -lelf -lz -lpthread
 
 $(JAVA_TOOL): $(JAVA_AGENT_SO) user/log.c user/utils.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a
 	$(call msg,TOOLS,$@)

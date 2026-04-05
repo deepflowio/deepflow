@@ -2898,6 +2898,7 @@ impl AgentComponents {
                 config_handler.flow(),
                 config_handler.collector(),
                 policy_getter,
+                config_handler.static_config.log_file.as_str(),
                 dpdk_ebpf_senders,
                 log_sender,
                 l7_stats_sender,

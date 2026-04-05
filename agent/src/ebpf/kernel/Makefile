@@ -69,7 +69,6 @@ EBPF_CLAGS ?= -I. -Ivmlinux -Iinclude -I../../../crates/trace-utils/src \
 		-fno-unwind-tables \
 		-fno-stack-protector \
 		-fno-asynchronous-unwind-tables -g -O2 $(FINAL_TARGET)
-	$(Q)$(LLVM_OBJDUMP) --source --debug-vars --line-numbers --symbol-description $@ > ${@:.elf=.objdump} 
 	$(Q)$(LLVM_STRIP) -g $@ # strip useless DWARF info
 
 clean:

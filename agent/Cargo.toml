@@ -192,6 +192,8 @@ harness = false
 
 [profile.release]
 panic = 'abort'
+debug = 2
+split-debuginfo = "off"
 
 [profile.dev]
 panic = 'abort'

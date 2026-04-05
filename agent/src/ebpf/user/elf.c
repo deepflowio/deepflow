@@ -512,7 +512,7 @@ int elf_info_collect(struct elf_info *elf_info, const void *buf, size_t buf_sz)
 {
 	int ret = ETR_OK;
 
-	// TODO: Create elf by elf file path. 
+	// TODO: Create elf by elf file path.
 	// (Note: You need to copy the instruction data from the binary file to buffer.)
 	//int fd = open("*.elf", O_RDONLY | O_CLOEXEC);
 	//elf_info->elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
@@ -538,4 +538,212 @@ int elf_info_collect(struct elf_info *elf_info, const void *buf, size_t buf_sz)
 	}
 
 	return ret;
+}
+
+static int elf_symbol_type_supported(unsigned int st_type)
+{
+	if (st_type == STT_FUNC || st_type == STT_NOTYPE)
+		return 1;
+#ifdef STT_GNU_IFUNC
+	if (st_type == STT_GNU_IFUNC)
+		return 1;
+#endif
+	return 0;
+}
+
+int elf_read_build_id(const char *path, uint8_t *build_id, size_t build_id_cap,
+		      uint32_t *build_id_size)
+{
+	Elf *elf = NULL;
+	Elf_Scn *scn = NULL;
+	int fd = -1;
+	int ret = ETR_NOTEXIST;
+
+	if (build_id_size != NULL)
+		*build_id_size = 0;
+	if (path == NULL || build_id == NULL || build_id_cap == 0 ||
+	    build_id_size == NULL)
+		return ETR_INVAL;
+	if (openelf(path, &elf, &fd) != 0)
+		return ETR_INVAL;
+
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
+		GElf_Shdr shdr;
+		Elf_Data *data = NULL;
+
+		if (!gelf_getshdr(scn, &shdr) || shdr.sh_type != SHT_NOTE)
+			continue;
+		while ((data = elf_getdata(scn, data)) != NULL) {
+			size_t offset = 0;
+			GElf_Nhdr nhdr;
+			size_t name_offset = 0;
+			size_t desc_offset = 0;
+
+			while ((offset = gelf_getnote(data, offset, &nhdr, &name_offset,
+						      &desc_offset)) != 0) {
+				const char *name;
+				size_t copy_size;
+
+				if (nhdr.n_type != NT_GNU_BUILD_ID)
+					continue;
+				if (data->d_buf == NULL ||
+				    name_offset + nhdr.n_namesz > data->d_size ||
+				    desc_offset + nhdr.n_descsz > data->d_size)
+					continue;
+				name = (const char *)data->d_buf + name_offset;
+				if (nhdr.n_namesz < 3 || memcmp(name, "GNU", 3) != 0)
+					continue;
+
+				copy_size = build_id_cap < nhdr.n_descsz ? build_id_cap :
+				    nhdr.n_descsz;
+				memset(build_id, 0, build_id_cap);
+				memcpy(build_id,
+				       (const uint8_t *)data->d_buf + desc_offset,
+				       copy_size);
+				*build_id_size = (uint32_t)copy_size;
+				ret = ETR_OK;
+				goto out;
+			}
+		}
+	}
+
+out:
+	if (elf != NULL)
+		elf_end(elf);
+	if (fd >= 0)
+		close(fd);
+	return ret;
+}
+
+int elf_file_offset_to_vaddr(Elf *elf, uint64_t file_offset, uint64_t *vaddr)
+{
+	size_t phnum;
+	size_t i;
+
+	if (elf == NULL || vaddr == NULL)
+		return ETR_INVAL;
+	if (elf_getphdrnum(elf, &phnum) != 0)
+		return ETR_INVAL;
+
+	for (i = 0; i < phnum; i++) {
+		GElf_Phdr phdr;
+
+		if (gelf_getphdr(elf, (int)i, &phdr) == NULL)
+			continue;
+		if (phdr.p_type != PT_LOAD)
+			continue;
+		if (file_offset < phdr.p_offset ||
+		    file_offset >= phdr.p_offset + phdr.p_filesz)
+			continue;
+
+		*vaddr = phdr.p_vaddr + (file_offset - phdr.p_offset);
+		return ETR_OK;
+	}
+
+	return ETR_NOTEXIST;
+}
+
+int elf_symbolize_pc(Elf *elf, uint64_t vaddr, const char **symbol_name,
+		     uint64_t *symbol_addr, uint64_t *symbol_size)
+{
+	Elf_Scn *scn = NULL;
+	const char *best_name = NULL;
+	uint64_t best_addr = 0;
+	uint64_t best_size = 0;
+	int best_contains = 0;
+	int best_is_func = 0;
+
+	if (symbol_name != NULL)
+		*symbol_name = NULL;
+	if (symbol_addr != NULL)
+		*symbol_addr = 0;
+	if (symbol_size != NULL)
+		*symbol_size = 0;
+	if (elf == NULL)
+		return ETR_INVAL;
+
+	while ((scn = elf_nextscn(elf, scn)) != NULL) {
+		GElf_Shdr shdr;
+		Elf_Data *data = NULL;
+
+		if (!gelf_getshdr(scn, &shdr))
+			continue;
+		if ((shdr.sh_type != SHT_SYMTAB && shdr.sh_type != SHT_DYNSYM) ||
+		    shdr.sh_entsize == 0)
+			continue;
+
+		while ((data = elf_getdata(scn, data)) != NULL) {
+			size_t sym_count;
+			size_t i;
+
+			if (data->d_size % shdr.sh_entsize != 0)
+				continue;
+			sym_count = data->d_size / shdr.sh_entsize;
+			for (i = 0; i < sym_count; i++) {
+				GElf_Sym sym;
+				const char *name;
+				unsigned int st_type;
+				int contains = 0;
+				int is_func;
+
+				if (!gelf_getsym(data, (int)i, &sym))
+					continue;
+				st_type = GELF_ST_TYPE(sym.st_info);
+				if (!elf_symbol_type_supported(st_type))
+					continue;
+				if (sym.st_value == 0)
+					continue;
+				name = elf_strptr(elf, shdr.sh_link, sym.st_name);
+				if (name == NULL || name[0] == '\0')
+					continue;
+
+				if (sym.st_size != 0) {
+					if (vaddr >= sym.st_value &&
+					    vaddr < sym.st_value + sym.st_size)
+						contains = 1;
+				} else if (sym.st_value > vaddr) {
+					continue;
+				}
+				is_func = (st_type == STT_FUNC);
+
+				if (contains) {
+					if (!best_contains ||
+					    (is_func && !best_is_func) ||
+					    sym.st_value > best_addr ||
+					    (sym.st_value == best_addr &&
+					     sym.st_size != 0 &&
+					     (best_size == 0 ||
+					      sym.st_size < best_size))) {
+						best_name = name;
+						best_addr = sym.st_value;
+						best_size = sym.st_size;
+						best_contains = 1;
+						best_is_func = is_func;
+					}
+					continue;
+				}
+
+				if (best_contains)
+					continue;
+				if (best_name == NULL ||
+				    (is_func && !best_is_func) ||
+				    sym.st_value > best_addr) {
+					best_name = name;
+					best_addr = sym.st_value;
+					best_size = sym.st_size;
+					best_is_func = is_func;
+				}
+			}
+		}
+	}
+
+	if (best_name == NULL)
+		return ETR_NOTEXIST;
+	if (symbol_name != NULL)
+		*symbol_name = best_name;
+	if (symbol_addr != NULL)
+		*symbol_addr = best_addr;
+	if (symbol_size != NULL)
+		*symbol_size = best_size;
+	return ETR_OK;
 }

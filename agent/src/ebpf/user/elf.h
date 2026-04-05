@@ -16,6 +16,9 @@
 
 #ifndef DF_TRACE_ELF_H
 #define DF_TRACE_ELF_H
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <gelf.h>
 #define EM_BPF           247
 #define ELF_ST_TYPE(x) (((uint32_t) x) & 0xf)
@@ -63,4 +66,9 @@ int elf_info_collect(struct elf_info *elf_info, const void *buf, size_t buf_sz);
 int find_sym_by_idx(Elf * e, Elf_Scn * syms_scn, int sym_idx, GElf_Sym * sym);
 int find_prog_func_sym(Elf * e, Elf_Scn * syms_scn, size_t prog_shndx,
 		       GElf_Sym * sym);
+int elf_read_build_id(const char *path, uint8_t *build_id, size_t build_id_cap,
+		      uint32_t *build_id_size);
+int elf_file_offset_to_vaddr(Elf *elf, uint64_t file_offset, uint64_t *vaddr);
+int elf_symbolize_pc(Elf *elf, uint64_t vaddr, const char **symbol_name,
+		     uint64_t *symbol_addr, uint64_t *symbol_size);
 #endif /*DF_TRACE_ELF_H */

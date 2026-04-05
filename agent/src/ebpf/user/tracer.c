@@ -43,6 +43,7 @@
 #include "mem.h"
 #include "socket.h"
 #include "unwind_tracer.h"
+#include "crash_monitor.h"
 #include "extended/extended.h"
 #include "profile/perf_profiler.h"
 
@@ -2183,6 +2184,19 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 			return ETR_INVAL;
 		}
 	}
+	/*
+	 * Stage 2 runs before enabling the new crash monitor instance so the agent
+	 * can recover and report snapshots left by a previous fatal exit. This is
+	 * deliberately done during normal startup rather than from the fatal signal
+	 * handler because snapshot consumption may read files, validate multiple
+	 * records, emit formatted logs, and clear consumed state.
+	 */
+	if (crash_monitor_consume_pending_snapshots() != ETR_OK)
+		ebpf_warning("Consume pending crash snapshots failed for %s\n",
+			     CRASH_SNAPSHOT_FILE);
+	if (crash_monitor_init() != ETR_OK)
+		ebpf_warning("Initialize crash monitor failed for %s\n",
+			     CRASH_SNAPSHOT_FILE);
 
 	int err;
 	if (max_locked_memory_set_unlimited() != 0)

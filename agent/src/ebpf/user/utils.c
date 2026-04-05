@@ -1642,6 +1642,21 @@ u32 djb2_32bit(const char *str)
 #if !defined(JAVA_AGENT_ATTACH_TOOL)
 #include "crash_monitor.h"
 
+/*
+ * Crash-aware thread trampoline
+ * -----------------------------
+ *
+ * sigaltstack() is a per-thread attribute, so enabling crash capture once in
+ * the main thread is not enough. Every covered C/eBPF worker must prepare its
+ * own alternate signal stack before running normal logic. These helper wrappers
+ * centralize that requirement: the real worker entry runs only after
+ * crash_monitor_prepare_thread() has completed for the new thread.
+ *
+ * This design keeps crash-monitor setup out of each individual worker function
+ * and makes thread coverage easier to audit from a small number of creation
+ * call-sites.
+ */
+
 enum monitored_thread_kind {
 	MONITORED_THREAD_WORK = 0,
 	MONITORED_THREAD_PTHREAD = 1,

@@ -48,6 +48,41 @@ extern int jattach(int pid, int argc, char **argv, int print_output);
 static int create_symbol_collect_task(pid_t pid, options_t * opts,
 				      bool is_same_mntns);
 
+/*
+ * The standalone deepflow-jattach tool is built with JAVA_AGENT_ATTACH_TOOL and
+ * does not link crash_monitor.c, so it cannot use the monitored thread helpers
+ * that prepare per-thread altstacks for crash capture. Keep the regular agent
+ * build on create_monitored_pthread(), but let the attach tool fall back to a
+ * plain pthread worker so the Java symbol collection thread pool still builds.
+ */
+static int create_symbol_worker_thread(const char *name, pthread_t *thread,
+			       void *(*fn)(void *), void *arg,
+			       bool detached)
+{
+#ifdef JAVA_AGENT_ATTACH_TOOL
+	int ret;
+
+	ret = pthread_create(thread, NULL, fn, arg);
+	if (ret != 0) {
+		errno = ret;
+		return ETR_INVAL;
+	}
+
+	if (!detached)
+		return ETR_OK;
+
+	ret = pthread_detach(*thread);
+	if (ret != 0) {
+		errno = ret;
+		return ETR_INVAL;
+	}
+
+	return ETR_OK;
+#else
+	return create_monitored_pthread(name, thread, fn, arg, detached);
+#endif
+}
+
 bool test_dl_open(const char *so_lib_file_path)
 {
 	if (access(so_lib_file_path, F_OK)) {
@@ -871,7 +906,7 @@ static int thread_pool_add_task(symbol_collect_thread_pool_t * pool,
 		pool->thread_index = pool->thread_count;
 
 		if ((ret =
-		     create_monitored_pthread("java-sym-wk", &thread,
+		     create_symbol_worker_thread("java-sym-wk", &thread,
 					      worker_thread, pool,
 					      true)) != ETR_OK) {
 			ebpf_warning(JAVA_LOG_TAG

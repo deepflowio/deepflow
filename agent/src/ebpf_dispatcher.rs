@@ -523,6 +523,7 @@ pub struct EbpfCollector {
     counter: Arc<EbpfCounter>,
     stats_collector: Arc<stats::Collector>,
     need_reload_config: Arc<AtomicBool>,
+    log_file: String,
 
     exception_handler: ExceptionHandler,
     process_listener: Arc<ProcessListener>,
@@ -741,6 +742,7 @@ impl EbpfCollector {
         proc_event_sender: DebugSender<BoxedProcEvents>,
         ebpf_profile_sender: DebugSender<Profile>,
         policy_getter: PolicyGetter,
+        log_file: &str,
         time_diff: Arc<AtomicI64>,
         stats_collector: &stats::Collector,
         process_listener: &ProcessListener,
@@ -749,7 +751,7 @@ impl EbpfCollector {
         #[allow(static_mut_refs)]
         unsafe {
             let dpdk_sender_count = dpdk_senders.len();
-            let handle = Self::ebpf_core_init(process_listener, config, stats_collector);
+            let handle = Self::ebpf_core_init(process_listener, config, log_file, stats_collector);
             // initialize communication between core and ebpf collector
             SWITCH = false;
             SENDER = Some(sender);
@@ -772,6 +774,7 @@ impl EbpfCollector {
     unsafe fn ebpf_core_init(
         process_listener: &ProcessListener,
         config: &EbpfConfig,
+        log_file: &str,
         stats_collector: &stats::Collector,
     ) -> Result<ConfigHandle> {
         // ebpf core modules init
@@ -912,7 +915,7 @@ impl EbpfCollector {
             }
         }
 
-        if ebpf::bpf_tracer_init(null_mut(), true) != 0 {
+        if ebpf::bpf_tracer_init(CString::new(log_file.as_bytes()).unwrap().as_ptr(), true) != 0 {
             info!("ebpf bpf_tracer_init error.");
             return Err(Error::EbpfInitError);
         }
@@ -1260,6 +1263,7 @@ impl EbpfCollector {
         flow_map_config: FlowAccess,
         collector_config: CollectorAccess,
         policy_getter: PolicyGetter,
+        log_file: &str,
         dpdk_senders: Vec<DebugSender<Box<packet::Packet<'static>>>>,
         output: DebugSender<AppProto>,
         l7_stats_output: DebugSender<BatchedBox<L7Stats>>,
@@ -1294,6 +1298,7 @@ impl EbpfCollector {
             proc_event_output,
             ebpf_profile_sender,
             policy_getter,
+            log_file,
             time_diff.clone(),
             &stats_collector,
             process_listener,
@@ -1322,6 +1327,7 @@ impl EbpfCollector {
                 get_token_failed: AtomicU64::new(0),
             }),
             need_reload_config: Default::default(),
+            log_file: log_file.to_owned(),
             stats_collector,
             exception_handler,
             process_listener: process_listener.clone(),
@@ -1375,9 +1381,12 @@ impl EbpfCollector {
                             as *mut memory_profile::MemoryContext,
                     ));
                 }
-                if let Ok(handle) =
-                    Self::ebpf_core_init(&self.process_listener, config, &self.stats_collector)
-                {
+                if let Ok(handle) = Self::ebpf_core_init(
+                    &self.process_listener,
+                    config,
+                    self.log_file.as_str(),
+                    &self.stats_collector,
+                ) {
                     self.config_handle = handle;
                 } else {
                     warn!("ebpf start_continuous_profiler error.");
