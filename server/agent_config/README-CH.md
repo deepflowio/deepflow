@@ -8391,6 +8391,7 @@ processors:
         MongoDB: 1-65535
         MySQL: 1-65535
         NATS: 1-65535
+        NetSign: 1-65535
         OpenWire: 1-65535
         Oracle: 1521
         PING: 1-65535
@@ -8463,6 +8464,7 @@ processors:
         MongoDB: []
         MySQL: []
         NATS: []
+        NetSign: []
         OpenWire: []
         Oracle: []
         PING: []

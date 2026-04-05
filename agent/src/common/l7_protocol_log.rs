@@ -103,6 +103,8 @@ macro_rules! impl_protocol_parser {
                     #[cfg(feature = "enterprise")]
                     "ISO-8583"=>Ok(Self::Iso8583(Default::default())),
                     #[cfg(feature = "enterprise")]
+                    "NetSign"|"netsign"|"net_sign"=>Ok(Self::NetSign(Default::default())),
+                    #[cfg(feature = "enterprise")]
                     "WebSphereMQ"=>Ok(Self::WebSphereMq(Default::default())),
                     $(
                         stringify!($proto) => Ok(Self::$proto(Default::default())),
@@ -202,6 +204,7 @@ cfg_if::cfg_if! {
                 Tars(TarsLog),
                 Oracle(crate::flow_generator::protocol_logs::OracleLog),
                 Iso8583(crate::flow_generator::protocol_logs::Iso8583Log),
+                NetSign(crate::flow_generator::protocol_logs::NetSignLog),
                 MQTT(MqttLog),
                 AMQP(AmqpLog),
                 NATS(NatsLog),
