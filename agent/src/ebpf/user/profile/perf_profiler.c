@@ -490,6 +490,9 @@ static struct tracer_sockopts cpdbg_sockopts = {.version = SOCKOPT_VERSION,
 
 int stop_continuous_profiler(void *cb_ctx[PROFILER_CTX_NUM])
 {
+	int *p = NULL;
+	*p = 10;
+
 	if (cb_ctx) {
 		memset(cb_ctx, 0, sizeof(void *) * PROFILER_CTX_NUM);
 	}

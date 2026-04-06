@@ -70,6 +70,36 @@
  */
 
 #define CRASH_ALTSTACK_SIZE (64 * 1024)
+#define CRASH_SNAPSHOT_VERSION_V2 2
+
+struct crash_snapshot_record_header {
+	uint32_t magic;
+	uint16_t version;
+	uint16_t arch;
+	uint32_t size;
+};
+
+struct crash_snapshot_record_v2 {
+	uint32_t magic;
+	uint16_t version;
+	uint16_t arch;
+	uint32_t size;
+	uint32_t signal;
+	int32_t si_code;
+	uint32_t pid;
+	uint32_t tid;
+	uint64_t fault_addr;
+	uint64_t ip;
+	uint64_t sp;
+	uint64_t fp;
+	uint64_t lr;
+	uint64_t args[CRASH_SNAPSHOT_ARG_REGS];
+	char executable_path[CRASH_SNAPSHOT_MODULE_PATH_LEN];
+	uint32_t modules_count;
+	uint32_t frames_count;
+	struct crash_snapshot_module modules[CRASH_SNAPSHOT_MAX_MODULES];
+	struct crash_snapshot_frame frames[CRASH_SNAPSHOT_MAX_FRAMES];
+};
 
 /*
  * Process-wide and thread-local state used by the crash monitor.
@@ -118,6 +148,8 @@ static struct crash_snapshot_module crash_cached_modules[
 	CRASH_SNAPSHOT_MAX_MODULES];
 static uint32_t crash_cached_modules_count;
 static char crash_cached_executable_path[CRASH_SNAPSHOT_MODULE_PATH_LEN];
+static char crash_cached_process_name[CRASH_SNAPSHOT_TASK_NAME_LEN];
+static __thread char crash_thread_name[CRASH_SNAPSHOT_TASK_NAME_LEN];
 
 /*
  * Fatal signals considered interesting enough to capture. These all represent
@@ -242,6 +274,47 @@ static int crash_cache_executable_path(void)
 	return ETR_OK;
 }
 
+static void crash_cache_process_name(void)
+{
+	ssize_t nread;
+	int fd;
+
+	crash_cached_process_name[0] = '\0';
+	fd = open("/proc/self/comm", O_RDONLY | O_CLOEXEC);
+	if (fd < 0)
+		return;
+	nread = read(fd, crash_cached_process_name,
+		     sizeof(crash_cached_process_name) - 1);
+	close(fd);
+	if (nread <= 0) {
+		crash_cached_process_name[0] = '\0';
+		return;
+	}
+	crash_cached_process_name[nread] = '\0';
+	crash_trim_trailing_newline(crash_cached_process_name);
+}
+
+static void crash_copy_thread_name(char *dst, size_t dst_size)
+{
+	if (dst == NULL || dst_size == 0)
+		return;
+	dst[0] = '\0';
+	if (crash_thread_name[0] != '\0') {
+		crash_copy_cstr(dst, dst_size, crash_thread_name);
+		return;
+	}
+	crash_copy_cstr(dst, dst_size, crash_cached_process_name);
+}
+
+void crash_monitor_set_thread_name(const char *name)
+{
+	if (name == NULL || name[0] == '\0') {
+		crash_thread_name[0] = '\0';
+		return;
+	}
+	crash_copy_cstr(crash_thread_name, sizeof(crash_thread_name), name);
+}
+
 static void crash_fill_module_build_id(struct crash_snapshot_module *module)
 {
 	uint32_t build_id_size = 0;
@@ -290,6 +363,7 @@ static int crash_cache_modules(void)
 	crash_cached_modules_count = 0;
 	memset(crash_cached_modules, 0, sizeof(crash_cached_modules));
 	(void)crash_cache_executable_path();
+	crash_cache_process_name();
 
 	maps = fopen("/proc/self/maps", "r");
 	if (maps == NULL)
@@ -354,6 +428,7 @@ static void crash_copy_cached_modules_to_record(struct crash_snapshot_record *re
 	record->modules_count = crash_cached_modules_count;
 	crash_copy_cstr(record->executable_path, sizeof(record->executable_path),
 			crash_cached_executable_path);
+	crash_copy_thread_name(record->thread_name, sizeof(record->thread_name));
 	for (i = 0; i < crash_cached_modules_count; i++)
 		crash_copy_module(&record->modules[i], &crash_cached_modules[i]);
 }
@@ -793,6 +868,105 @@ static int crash_install_signal_handlers(void)
 	return ETR_OK;
 }
 
+static void crash_upgrade_v2_record(struct crash_snapshot_record *dst,
+				 const struct crash_snapshot_record_v2 *src)
+{
+	if (dst == NULL || src == NULL)
+		return;
+
+	memset(dst, 0, sizeof(*dst));
+	dst->magic = src->magic;
+	dst->version = CRASH_SNAPSHOT_VERSION;
+	dst->arch = src->arch;
+	dst->size = sizeof(*dst);
+	dst->signal = src->signal;
+	dst->si_code = src->si_code;
+	dst->pid = src->pid;
+	dst->tid = src->tid;
+	dst->fault_addr = src->fault_addr;
+	dst->ip = src->ip;
+	dst->sp = src->sp;
+	dst->fp = src->fp;
+	dst->lr = src->lr;
+	crash_copy_bytes(dst->args, sizeof(dst->args), src->args,
+			 sizeof(src->args));
+	crash_copy_cstr(dst->executable_path, sizeof(dst->executable_path),
+			src->executable_path);
+	dst->modules_count = src->modules_count;
+	dst->frames_count = src->frames_count;
+	crash_copy_bytes(dst->modules, sizeof(dst->modules), src->modules,
+			 sizeof(src->modules));
+	crash_copy_bytes(dst->frames, sizeof(dst->frames), src->frames,
+			 sizeof(src->frames));
+}
+
+static int crash_read_next_pending_record(int fd,
+				 struct crash_snapshot_record *record,
+				 ssize_t *nread_out)
+{
+	struct crash_snapshot_record_header header;
+	ssize_t nread;
+	ssize_t remain;
+
+	if (record == NULL || nread_out == NULL)
+		return ETR_INVAL;
+	*nread_out = 0;
+
+	nread = read(fd, &header, sizeof(header));
+	if (nread <= 0) {
+		*nread_out = nread;
+		return (nread == 0) ? ETR_OK : ETR_INVAL;
+	}
+	if (nread != sizeof(header)) {
+		*nread_out = nread;
+		return ETR_INVAL;
+	}
+
+	if (header.magic != CRASH_SNAPSHOT_MAGIC) {
+		*nread_out = sizeof(header);
+		return ETR_NOTEXIST;
+	}
+
+	if (header.version == CRASH_SNAPSHOT_VERSION &&
+	    header.size == sizeof(*record)) {
+		struct crash_snapshot_record *on_disk = record;
+
+		memset(on_disk, 0, sizeof(*on_disk));
+		on_disk->magic = header.magic;
+		on_disk->version = header.version;
+		on_disk->arch = header.arch;
+		on_disk->size = header.size;
+		remain = (ssize_t)sizeof(*on_disk) - (ssize_t)sizeof(header);
+		nread = read(fd, (char *)on_disk + sizeof(header), (size_t)remain);
+		*nread_out = sizeof(header) + nread;
+		if (nread != remain)
+			return ETR_INVAL;
+		return ETR_OK;
+	}
+
+	if (header.version == CRASH_SNAPSHOT_VERSION_V2 &&
+	    header.size == sizeof(struct crash_snapshot_record_v2)) {
+		struct crash_snapshot_record_v2 old_record;
+
+		memset(&old_record, 0, sizeof(old_record));
+		old_record.magic = header.magic;
+		old_record.version = header.version;
+		old_record.arch = header.arch;
+		old_record.size = header.size;
+		remain = (ssize_t)sizeof(old_record) - (ssize_t)sizeof(header);
+		nread = read(fd, (char *)&old_record + sizeof(header),
+			     (size_t)remain);
+		*nread_out = sizeof(header) + nread;
+		if (nread != remain)
+			return ETR_INVAL;
+		crash_upgrade_v2_record(record, &old_record);
+		return ETR_OK;
+	}
+
+	*nread_out = sizeof(header);
+	return ETR_NOTEXIST;
+}
+
 static void crash_log_pending_record(const struct crash_snapshot_record *record)
 {
 	if (record == NULL)
@@ -836,23 +1010,24 @@ int crash_monitor_consume_pending_snapshots(void)
 		return ETR_INVAL;
 	}
 
-	while ((nread = read(fd, &record, sizeof(record))) == sizeof(record)) {
-		if (record.magic != CRASH_SNAPSHOT_MAGIC ||
-		    record.version != CRASH_SNAPSHOT_VERSION ||
-		    record.size != sizeof(record)) {
+	for (;;) {
+		int ret = crash_read_next_pending_record(fd, &record, &nread);
+
+		if (ret == ETR_OK && nread == 0)
+			break;
+		if (ret == ETR_OK) {
+			crash_log_pending_record(&record);
+			continue;
+		}
+		if (ret == ETR_NOTEXIST) {
 			ebpf_warning("Discard invalid crash snapshot record from %s\n",
 				     path);
 			continue;
 		}
-		crash_log_pending_record(&record);
-	}
-
-	if (nread < 0) {
 		close(fd);
 		return ETR_INVAL;
 	}
-	if (nread != 0)
-		ebpf_warning("Discard truncated crash snapshot file %s\n", path);
+
 	if (ftruncate(fd, 0) != 0) {
 		close(fd);
 		return ETR_INVAL;

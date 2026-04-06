@@ -49,12 +49,13 @@ extern "C" {
  * the whole structure without building variable-length text buffers.
  */
 #define CRASH_SNAPSHOT_MAGIC 0x44464352U
-#define CRASH_SNAPSHOT_VERSION 2
+#define CRASH_SNAPSHOT_VERSION 3
 #define CRASH_SNAPSHOT_MAX_FRAMES 32
 #define CRASH_SNAPSHOT_ARG_REGS 8
 #define CRASH_SNAPSHOT_MAX_MODULES 32
 #define CRASH_SNAPSHOT_MODULE_PATH_LEN 256
 #define CRASH_SNAPSHOT_BUILD_ID_SIZE 20
+#define CRASH_SNAPSHOT_TASK_NAME_LEN 16
 #define CRASH_SNAPSHOT_INVALID_MODULE 0xffffffffU
 #define CRASH_SNAPSHOT_FILE "/var/log/deepflow-agent/deepflow-agent.crash"
 
@@ -132,6 +133,15 @@ struct crash_snapshot_frame {
  *   language arguments. Stack-passed, floating-point, optimized-out, or older
  *   frame arguments are outside the guarantees of this snapshot format.
  *
+ * executable_path:
+ *   Best-effort path of the crashing executable image.
+ *
+ * thread_name:
+ *   Best-effort kernel task name (comm) of the crashing thread. The name is
+ *   cached in normal context and then copied into the snapshot by the fatal
+ *   handler so Stage 2 can report which thread actually faulted without doing
+ *   any crash-time /proc lookup.
+ *
  * modules[] / frames[]:
  *   Bounded arrays reserved so the signal handler never has to allocate memory
  *   while collecting stack state. modules_count and frames_count indicate how
@@ -153,6 +163,7 @@ struct crash_snapshot_record {
 	uint64_t lr;
 	uint64_t args[CRASH_SNAPSHOT_ARG_REGS];
 	char executable_path[CRASH_SNAPSHOT_MODULE_PATH_LEN];
+	char thread_name[CRASH_SNAPSHOT_TASK_NAME_LEN];
 	uint32_t modules_count;
 	uint32_t frames_count;
 	struct crash_snapshot_module modules[CRASH_SNAPSHOT_MAX_MODULES];
@@ -181,6 +192,16 @@ int crash_monitor_init(void);
  * valid stack.
  */
 int crash_monitor_prepare_thread(void);
+
+/*
+ * Optional normal-context helper for thread wrappers.
+ *
+ * Callers that already know the worker's intended name can seed it here before
+ * crash_monitor_prepare_thread() runs. This avoids depending on any crash-time
+ * /proc reads and helps preserve the logical worker name even if the creating
+ * thread races with pthread_setname_np().
+ */
+void crash_monitor_set_thread_name(const char *name);
 
 /*
  * Stage-2 consumer entry point.

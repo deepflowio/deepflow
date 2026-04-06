@@ -1667,6 +1667,7 @@ struct monitored_thread_args {
 	work_thread_func_t work_fn;
 	pthread_thread_func_t pthread_fn;
 	void *arg;
+	char name[CRASH_SNAPSHOT_TASK_NAME_LEN];
 };
 
 static void *monitored_thread_main(void *arg)
@@ -1677,6 +1678,7 @@ static void *monitored_thread_main(void *arg)
 	if (thread_args == NULL)
 		return NULL;
 
+	crash_monitor_set_thread_name(thread_args->name);
 	(void)crash_monitor_prepare_thread();
 	if (thread_args->kind == MONITORED_THREAD_WORK) {
 		if (thread_args->work_fn != NULL)
@@ -1709,6 +1711,8 @@ static int create_monitored_thread_common(const char *name, pthread_t *t,
 	thread_args->work_fn = work_fn;
 	thread_args->pthread_fn = pthread_fn;
 	thread_args->arg = arg;
+	if (name != NULL)
+		snprintf(thread_args->name, sizeof(thread_args->name), "%s", name);
 
 	ret = pthread_create(t, NULL, monitored_thread_main, thread_args);
 	if (ret) {
