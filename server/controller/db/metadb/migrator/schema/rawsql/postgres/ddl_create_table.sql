@@ -218,7 +218,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     boot_time               INTEGER DEFAULT 0,
     exceptions              BIGINT DEFAULT 0 CHECK (exceptions >= 0),
-    exception_description   VARCHAR(256) DEFAULT '',
+    exception_description   TEXT,
     vtap_lcuuid             VARCHAR(64) DEFAULT NULL,
     vtap_group_lcuuid       VARCHAR(64) DEFAULT NULL,
     cpu_num                 INTEGER DEFAULT 0,
