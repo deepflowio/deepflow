@@ -66,7 +66,7 @@ char linux_release[128];	// Record the contents of 'uname -r'
  * Used to manage or inspect per-CPU kick threads.
  */
 kick_thread_info_t kick_threads[MAX_CPU_NR];
-static uint32_t kick_kern_sched_priority = KICK_KERN_SCHED_PRIORITY;
+static int32_t kick_kern_nice = KICK_KERN_NICE;
 volatile uint32_t *tracers_lock;
 extern volatile uint64_t sys_boot_time_ns;	// System boot time in nanoseconds
 volatile uint64_t prev_sys_boot_time_ns;	// The last updated system boot time, in nanoseconds
@@ -1648,13 +1648,13 @@ static int boot_time_update(void)
  * The following method triggers a timeout check on all CPUs
  * to push data residing in the eBPF buffer.
  */
-int set_kick_kern_sched_priority(uint32_t priority)
+int set_kick_kern_nice(int32_t nice)
 {
-	if (priority == 0)
+	if (nice < -20 || nice > 19)
 		return ETR_INVAL;
 
-	kick_kern_sched_priority = priority;
-	ebpf_info("Set kick thread SCHED_FIFO priority to %u.\n", priority);
+	kick_kern_nice = nice;
+	ebpf_info("Set kick thread nice value to %d.\n", nice);
 	return 0;
 }
 
@@ -1722,25 +1722,24 @@ retry_bind:
 	}
 
 	/*
-	 * Use a low SCHED_FIFO priority from startup configuration for the per-CPU
-	 * kick thread.
+	 * Keep the kick thread on the default SCHED_OTHER/CFS policy and adjust
+	 * only its Linux nice value.
 	 *
-	 * This thread wakes up periodically and issues a lightweight syscall to
-	 * trigger kernel-side timeout checks that flush batched eBPF data. Under
-	 * CPU contention, the default CFS scheduler may delay the dispatch of this
-	 * thread after the timer expires, which increases the actual kick interval.
-	 * Switching to SCHED_FIFO with a low priority helps reduce this wakeup
-	 * latency while limiting interference with other workloads.
+	 * A smaller nice value gives the thread more scheduling preference under
+	 * CPU contention, while a larger value gives it less. Negative values may
+	 * require CAP_SYS_NICE or a sufficient RLIMIT_NICE.
 	 */
-	struct sched_param sched_param = {
-		.sched_priority = kick_kern_sched_priority,
-	};
-	if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &sched_param) != 0) {
-		ebpf_warning("Kick thread %d failed to set SCHED_FIFO priority %d: %s(%d)\n",
-			     tid, sched_param.sched_priority, strerror(errno), errno);
+	if (setpriority(PRIO_PROCESS, tid, kick_kern_nice) != 0) {
+		if (kick_kern_nice < 0 && (errno == EACCES || errno == EPERM)) {
+			ebpf_warning("Kick thread %d failed to set nice value %d and will continue with default CFS priority; CAP_SYS_NICE or RLIMIT_NICE may be required: %s(%d)\n",
+				     tid, kick_kern_nice, strerror(errno), errno);
+		} else {
+			ebpf_warning("Kick thread %d failed to set nice value %d and will continue with default CFS priority: %s(%d)\n",
+				     tid, kick_kern_nice, strerror(errno), errno);
+		}
 	} else {
-		ebpf_info("Kick thread %d set SCHED_FIFO priority %d.\n",
-			  tid, sched_param.sched_priority);
+		ebpf_info("Kick thread %d set nice value %d.\n", tid,
+			  kick_kern_nice);
 	}
 
 	struct epoll_event events[1];
