@@ -1149,7 +1149,7 @@ pub struct EbpfProfile {
 pub struct EbpfTunning {
     pub collector_queue_size: usize,
     pub userspace_worker_threads: i32,
-    pub kick_kern_sched_priority: u32,
+    pub kick_kern_nice: i32,
     pub perf_pages_count: u32,
     pub kernel_ring_size: u32,
     pub max_socket_entries: u32,
@@ -1162,7 +1162,7 @@ impl Default for EbpfTunning {
         Self {
             collector_queue_size: 65535,
             userspace_worker_threads: 1,
-            kick_kern_sched_priority: 1,
+            kick_kern_nice: 0,
             perf_pages_count: 128,
             kernel_ring_size: 65536,
             max_socket_entries: 131072,
@@ -1174,10 +1174,10 @@ impl Default for EbpfTunning {
 
 impl EbpfTunning {
     pub(crate) fn validate(&self) -> Result<(), String> {
-        if !(1..=99).contains(&self.kick_kern_sched_priority) {
+        if !(-20..=19).contains(&self.kick_kern_nice) {
             return Err(format!(
-                "kick_kern_sched_priority {} not in [1, 99]",
-                self.kick_kern_sched_priority
+                "kick_kern_nice {} not in [-20, 19]",
+                self.kick_kern_nice
             ));
         }
 

@@ -999,15 +999,13 @@ impl EbpfCollector {
 
         if let Err(e) = config.ebpf.tunning.validate() {
             warn!(
-                "skip setting kick thread SCHED_FIFO priority to {}: {}",
-                config.ebpf.tunning.kick_kern_sched_priority, e
+                "skip setting kick thread nice value to {}: {}",
+                config.ebpf.tunning.kick_kern_nice, e
             );
-        } else if ebpf::set_kick_kern_sched_priority(config.ebpf.tunning.kick_kern_sched_priority)
-            != 0
-        {
+        } else if ebpf::set_kick_kern_nice(config.ebpf.tunning.kick_kern_nice) != 0 {
             warn!(
-                "failed to set kick thread SCHED_FIFO priority to {}",
-                config.ebpf.tunning.kick_kern_sched_priority
+                "failed to set kick thread nice value to {}",
+                config.ebpf.tunning.kick_kern_nice
             );
         }
 
