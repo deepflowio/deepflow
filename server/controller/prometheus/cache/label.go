@@ -142,6 +142,6 @@ func (l *label) processLoadedData(data []*metadbmodel.PrometheusLabel) {
 
 func (l *label) load() ([]*metadbmodel.PrometheusLabel, error) {
 	var labels []*metadbmodel.PrometheusLabel
-	err := l.org.DB.Find(&labels).Error
+	err := l.org.DB.Select("id", "name", "value").Find(&labels).Error
 	return labels, err
 }

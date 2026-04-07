@@ -99,7 +99,7 @@ func (ln *labelName) encode(strs []string) ([]*controller.PrometheusLabelName, e
 
 func (ln *labelName) load() (ids mapset.Set[int], err error) {
 	var items []*metadbmodel.PrometheusLabelName
-	err = ln.org.DB.Find(&items).Error
+	err = ln.org.DB.Select("id", "name").Find(&items).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", ln.resourceType, err, ln.org.LogPrefix)
 		return nil, err
@@ -114,7 +114,7 @@ func (ln *labelName) load() (ids mapset.Set[int], err error) {
 
 func (ln *labelName) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*metadbmodel.PrometheusLabelName
-	err = ln.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
+	err = ln.org.DB.Unscoped().Select("id").Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", ln.resourceType, err, ln.org.LogPrefix)
 		return

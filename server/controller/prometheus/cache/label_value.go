@@ -127,6 +127,6 @@ func (lv *labelValue) processLoadedData(data []*metadbmodel.PrometheusLabelValue
 
 func (lv *labelValue) load() ([]*metadbmodel.PrometheusLabelValue, error) {
 	var labelValues []*metadbmodel.PrometheusLabelValue
-	err := lv.org.DB.Find(&labelValues).Error
+	err := lv.org.DB.Select("id", "value").Find(&labelValues).Error
 	return labelValues, err
 }

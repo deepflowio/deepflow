@@ -105,7 +105,7 @@ func (ia *indexAllocator) encode(strs []string) ([]*controller.PrometheusMetricA
 
 func (ia *indexAllocator) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*metadbmodel.PrometheusMetricAPPLabelLayout
-	err = ia.org.DB.Where("metric_name = ? AND app_label_column_index IN (?)", ia.metricName, ids).Find(&dbItems).Error
+	err = ia.org.DB.Select("app_label_column_index").Where("metric_name = ? AND app_label_column_index IN (?)", ia.metricName, ids).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", ia.resourceType, err, ia.org.LogPrefix)
 		return
@@ -139,7 +139,7 @@ func newLabelLayout(org *common.ORG, cfg prometheuscfg.Config) *labelLayout {
 
 func (ll *labelLayout) refresh(args ...interface{}) error {
 	var items []*metadbmodel.PrometheusMetricAPPLabelLayout
-	err := ll.org.DB.Find(&items).Error
+	err := ll.org.DB.Select("metric_name", "app_label_name", "app_label_column_index").Find(&items).Error
 	if err != nil {
 		return err
 	}
