@@ -132,7 +132,7 @@ func (ln *target) encode(ts []*controller.PrometheusTargetRequest) ([]*controlle
 
 func (ln *target) load() (ids mapset.Set[int], err error) {
 	var items []*metadbmodel.PrometheusTarget
-	err = ln.org.DB.Unscoped().Where(&metadbmodel.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&items).Error
+	err = ln.org.DB.Unscoped().Select("id", "instance", "job", "epc_id", "pod_cluster_id").Where(&metadbmodel.PrometheusTarget{CreateMethod: common.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&items).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", ln.resourceType, err, ln.org.LogPrefix)
 		return nil, err
@@ -148,7 +148,7 @@ func (ln *target) load() (ids mapset.Set[int], err error) {
 
 func (ln *target) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*metadbmodel.PrometheusTarget
-	err = ln.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
+	err = ln.org.DB.Unscoped().Select("id").Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", ln.resourceType, err, ln.org.LogPrefix)
 		return

@@ -68,7 +68,7 @@ func (ml *metricLabelName) store(item *metadbmodel.PrometheusMetricLabelName) {
 
 func (ml *metricLabelName) refresh(args ...interface{}) error {
 	var items []*metadbmodel.PrometheusMetricLabelName
-	err := ml.org.DB.Find(&items).Error
+	err := ml.org.DB.Select("metric_name", "label_name_id").Find(&items).Error
 	if err != nil {
 		return err
 	}

@@ -99,7 +99,7 @@ func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName,
 
 func (mn *metricName) load() (ids mapset.Set[int], err error) {
 	var items []*metadbmodel.PrometheusMetricName
-	err = mn.org.DB.Find(&items).Error
+	err = mn.org.DB.Select("id", "name").Find(&items).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", mn.resourceType, err, mn.org.LogPrefix)
 		return nil, err
@@ -114,7 +114,7 @@ func (mn *metricName) load() (ids mapset.Set[int], err error) {
 
 func (mn *metricName) check(ids []int) (inUseIDs []int, err error) {
 	var dbItems []*metadbmodel.PrometheusMetricName
-	err = mn.org.DB.Unscoped().Where("id IN ?", ids).Find(&dbItems).Error
+	err = mn.org.DB.Unscoped().Select("id").Where("id IN ?", ids).Find(&dbItems).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", mn.resourceType, err, mn.org.LogPrefix)
 		return

@@ -42,7 +42,7 @@ func newLabelValue(org *common.ORG) *labelValue {
 
 func (lv *labelValue) refresh(args ...interface{}) error {
 	var items []*metadbmodel.PrometheusLabelValue
-	err := lv.org.DB.Unscoped().Find(&items).Error
+	err := lv.org.DB.Unscoped().Select("id", "value").Find(&items).Error
 	if err != nil {
 		log.Errorf("db query %s failed: %v", lv.resourceType, err, lv.org.LogPrefix)
 		return err

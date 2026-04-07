@@ -63,7 +63,7 @@ func (l *label) getID(key cache.LabelKey) (int, bool) {
 
 func (l *label) refresh(args ...interface{}) error {
 	var items []*metadbmodel.PrometheusLabel
-	err := l.org.DB.Find(&items).Error
+	err := l.org.DB.Select("id", "name", "value").Find(&items).Error
 	if err != nil {
 		return err
 	}
