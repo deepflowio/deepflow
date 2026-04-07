@@ -5593,7 +5593,7 @@ inputs:
 
 参与用户态数据处理的工作线程数量。实际最大值为主机 CPU 逻辑核心数。
 
-#### Kick 线程 FIFO 优先级 {#inputs.ebpf.tunning.kick_kern_sched_priority}
+#### Kick 线程 Nice 值 {#inputs.ebpf.tunning.kick_kern_nice}
 
 **标签**:
 
@@ -5601,36 +5601,37 @@ inputs:
 
 **FQCN**:
 
-`inputs.ebpf.tunning.kick_kern_sched_priority`
+`inputs.ebpf.tunning.kick_kern_nice`
 
 **默认值**:
 ```yaml
 inputs:
   ebpf:
     tunning:
-      kick_kern_sched_priority: 1
+      kick_kern_nice: 0
 ```
 
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Range | [1, 99] |
+| Range | [-20, 19] |
 
 **详细描述**:
 
-控制每个 CPU 上 kick 线程的 SCHED_FIFO 优先级。
+控制每个 CPU 上 kick 线程使用的 Linux nice 值。
 
 这些线程会在周期性定时器到期后唤醒，并通过轻量级 syscall
 触发内核侧超时检查，将批量 eBPF 数据从缓冲区中推送出来。
 
 当“指标中心”中 `deepflow_tenant -> deepflow_agent_ebpf_collector`
 下的 `metrics.period_push_max_delay` 达到 199ms 时，需要关注这个
-配置项。这说明周期性 push 延迟已经触发超限标记，此时可以适当提高
-该配置项的取值。
+配置项。这说明周期性 push 延迟已经触发超限标记，此时可以适当降低
+该配置项的取值，以提高 kick 线程的调度倾向。
 
-更高的取值可以在 CPU 竞争时降低调度延迟，但也会增加对其他负载
-造成干扰的风险。
+更小的 nice 值意味着更高的调度倾向，更大的 nice 值意味着更低的
+调度倾向。取值范围为 -20 到 19。负值可能需要 CAP_SYS_NICE 或
+足够的 RLIMIT_NICE。该配置仍然可能对其他负载产生影响。
 
 #### Perf Page 数量 {#inputs.ebpf.tunning.perf_pages_count}
 
