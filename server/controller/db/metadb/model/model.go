@@ -190,7 +190,7 @@ type VTap struct {
 	CreatedAt            time.Time `gorm:"column:created_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	BootTime             int       `gorm:"column:boot_time;type:int;default:0" json:"BOOT_TIME"`
 	Exceptions           int64     `gorm:"column:exceptions;type:bigint unsigned;default:0" json:"EXCEPTIONS"`
-	ExceptionDescription string    `gorm:"column:exception_description;type:varchar(256);default:''" json:"EXCEPTION_DESCRIPTION"`
+	ExceptionDescription string    `gorm:"column:exception_description;type:text" json:"EXCEPTION_DESCRIPTION"`
 	VTapLcuuid           string    `gorm:"column:vtap_lcuuid;type:char(64);default:null" json:"VTAP_LCUUID"`
 	VtapGroupLcuuid      string    `gorm:"column:vtap_group_lcuuid;type:char(64);default:null" json:"VTAP_GROUP_LCUUID"`
 	CPUNum               int       `gorm:"column:cpu_num;type:int;default:0" json:"CPU_NUM"` // logical number of cpu
@@ -207,8 +207,8 @@ type VTap struct {
 	DisableFeatures      string    `gorm:"column:disable_features;type:char(64)" json:"DISABLE_FEATURES"`           // separated by ,
 	FollowGroupFeatures  string    `gorm:"column:follow_group_features;type:char(64)" json:"FOLLOW_GROUP_FEATURES"` // separated by ,
 	TapMode              int       `gorm:"column:tap_mode;type:int;default:null" json:"TAP_MODE"`
-	ExpectedRevision     string    `gorm:"column:expected_revision;type:text;default null" json:"EXPECTED_REVISION"`
-	UpgradePackage       string    `gorm:"column:upgrade_package;type:text;default null" json:"UPGRADE_PACKAGE"`
+	ExpectedRevision     string    `gorm:"column:expected_revision;type:text;default:null" json:"EXPECTED_REVISION"`
+	UpgradePackage       string    `gorm:"column:upgrade_package;type:text;default:null" json:"UPGRADE_PACKAGE"`
 	TeamID               int       `gorm:"column:team_id;type:int;default:0" json:"TEAM_ID"`
 	Lcuuid               string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 }
