@@ -74,6 +74,6 @@ func (mn *metricName) refresh(args ...interface{}) error {
 
 func (mn *metricName) load() ([]*metadbmodel.PrometheusMetricName, error) {
 	var metricNames []*metadbmodel.PrometheusMetricName
-	err := mn.org.DB.Find(&metricNames).Error
+	err := mn.org.DB.Select("id", "name").Find(&metricNames).Error
 	return metricNames, err
 }

@@ -83,6 +83,6 @@ func (mll *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
 
 func (mml *metricAndAPPLabelLayout) load() ([]*metadbmodel.PrometheusMetricAPPLabelLayout, error) {
 	var metricAPPLabelLayouts []*metadbmodel.PrometheusMetricAPPLabelLayout
-	err := mml.org.DB.Find(&metricAPPLabelLayouts).Error
+	err := mml.org.DB.Select("metric_name", "app_label_name", "app_label_column_index").Find(&metricAPPLabelLayouts).Error
 	return metricAPPLabelLayouts, err
 }
