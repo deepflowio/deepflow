@@ -33,7 +33,7 @@ BEGIN
         DEALLOCATE PREPARE stmt;
     END IF;
 END;
-CALL AddColumnIfNotExists('vtap', 'exception_description', "VARCHAR(256) DEFAULT ''", 'exceptions');
+CALL AddColumnIfNotExists('vtap', 'exception_description', 'TEXT', 'exceptions');
 
 -- Cleanup
 DROP PROCEDURE IF EXISTS ColumnExists;
