@@ -75,6 +75,6 @@ func (ln *labelName) refresh(args ...interface{}) error {
 
 func (ln *labelName) load() ([]*metadbmodel.PrometheusLabelName, error) {
 	var labelNames []*metadbmodel.PrometheusLabelName
-	err := ln.org.DB.Find(&labelNames).Error
+	err := ln.org.DB.Select("id", "name").Find(&labelNames).Error
 	return labelNames, err
 }
