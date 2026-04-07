@@ -47,7 +47,7 @@ func newMetricTarget(org *common.ORG, te *target) *metricTarget {
 
 func (mt *metricTarget) refresh(args ...interface{}) error {
 	var items []*metadbmodel.PrometheusMetricTarget
-	err := mt.org.DB.Find(&items).Error
+	err := mt.org.DB.Select("metric_name", "target_id").Find(&items).Error
 	if err != nil {
 		return err
 	}
