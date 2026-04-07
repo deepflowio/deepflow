@@ -1,26 +1,41 @@
 # Crash Monitor 设计说明
 
-## 1. 背景与目标
+## 1. 背景、目标与非目标
 
-DeepFlow Agent 的 eBPF 用户态运行时包含大量直接与内核、ELF、符号表、profiling 逻辑交互的 C 代码路径。这些路径一旦触发 `SIGSEGV`、`SIGBUS`、`SIGABRT`、`SIGILL`、`SIGFPE` 等 fatal signal，进程通常会立即终止；如果没有额外保护，留给排障的往往只有一条粗粒度的系统崩溃信息。
+DeepFlow Agent 的 eBPF 用户态运行时包含大量直接与内核、ELF、符号表、profiling、线程管理和 native 内存交互的 C 代码路径。这些路径一旦触发 `SIGSEGV`、`SIGABRT`、`SIGBUS`、`SIGILL`、`SIGFPE` 等 fatal signal，进程通常会立即终止；如果没有额外保护，留给排障的往往只有一条粗粒度的系统崩溃信息，无法回答下面这些最关键的问题：
 
-crash monitor 的目标不是“吞掉崩溃”或“让损坏后的进程继续运行”，而是：
+- 到底是哪条线程崩了；
+- 崩溃时顶层寄存器分别是多少；
+- 调用栈里每一帧属于哪个模块；
+- 当前磁盘上的 ELF / debuginfo 能否还原出 `symbol` 与 `file:line`；
+- older frames 的参数是否还能从 crash-time 留下的寄存器、frame pointer、栈窗口和 DWARF 表达式中做 best-effort 恢复。
+
+当前 crash monitor 的目标不是“吞掉崩溃”或“让损坏后的进程继续运行”，而是：
 
 1. **保留原始崩溃语义**：进程最终仍按原始 fatal signal 退出。
-2. **在最危险的时刻只做最小保全**：fatal signal handler 只抓取有界、固定大小的原始机器状态。
-3. **把复杂分析延后到正常上下文**：ELF、DWARF、build-id、文件行号恢复等工作全部放到下次正常启动时执行。
-4. **覆盖 C/eBPF 工作线程**：不仅是初始化线程，所有接入 monitored helper 的线程都要准备自己的 altstack。
-5. **适应容器持久化**：崩溃快照固定落盘到 `/var/log/deepflow-agent/deepflow-agent.crash`，便于挂载、收集与离线分析。
+2. **Stage-1 只做最小证据保全**：fatal signal handler 只抓取有界、固定大小、可安全持久化的原始机器状态。
+3. **把复杂分析延后到 Stage-2**：ELF、DWARF、build-id、symbol、`file:line`、per-frame 参数恢复全部放到下一次正常启动时处理。
+4. **覆盖 C/eBPF 工作线程**：不仅主线程要准备 altstack，通过 monitored helper 创建的 worker thread 也要统一接入。
+5. **对容器部署友好**：崩溃快照固定落盘到 `/var/log/deepflow-agent/deepflow-agent.crash`，便于挂载、收集与离线分析。
+6. **在 v4 ABI 上支持更强的恢复能力**：恢复日志里显示完整通用寄存器块，并在条件允许时输出每帧参数信息。
+
+同时它有明确的**非目标**：
+
+- 不尝试在崩溃后继续执行当前进程；
+- 不在 fatal signal handler 中做符号化、DWARF 遍历、`/proc` 扫描或复杂日志格式化；
+- 不承诺一定恢复出所有帧的源码级参数；
+- 不承诺恢复浮点 / SIMD / vector 参数；
+- 不承诺在极端内存损坏场景下 100% 落盘成功。
 
 相关源码入口：
 
-- 快照 ABI：`agent/src/ebpf/user/crash_monitor.h`
-- Stage-1/Stage-2 主实现：`agent/src/ebpf/user/crash_monitor.c`
-- Stage-2 符号化器：`agent/src/ebpf/user/crash_symbolize.c`
-- ELF helper：`agent/src/ebpf/user/elf.c`
-- 启动接线：`agent/src/ebpf/user/tracer.c`
-- 构建接线：`agent/src/ebpf/Makefile`
-
+- 快照 ABI：`agent/src/ebpf/user/crash_monitor.h:52-296`
+- Stage-1 / Stage-2 主实现：`agent/src/ebpf/user/crash_monitor.c:340-1275`
+- Stage-2 符号化与参数恢复：`agent/src/ebpf/user/crash_symbolize.c:1810-3145`
+- ELF helper：`agent/src/ebpf/user/elf.c:32-646`
+- 启动接线：`agent/src/ebpf/user/tracer.c:2196-2199`
+- 线程接线：`agent/src/ebpf/user/utils.c:1673-1682`
+- 构建接线：`agent/src/ebpf/Makefile:88-89`、`agent/src/ebpf/Makefile:135`
 ---
 
 ## 2. 核心设计原则
@@ -30,16 +45,18 @@ crash monitor 的目标不是“吞掉崩溃”或“让损坏后的进程继续
 整个机制严格分为两个阶段：
 
 - **Stage-1：fatal signal context**
-  - 目标：保住原始现场。
-  - 只做寄存器抓取、有限栈回溯、模块元数据复制、二进制快照写盘。
+  - 运行在 `SIGSEGV/SIGABRT/SIGBUS/...` handler 中；
+  - 目标是保住原始现场；
+  - 只做寄存器抓取、有限栈回溯、模块元数据复制、固定大小二进制快照写盘；
   - 不做 ELF/DWARF 解析，不做 `/proc` 扫描，不做复杂日志格式化。
 
 - **Stage-2：normal process context**
-  - 目标：消费旧快照并输出可读崩溃报告。
-  - 允许打开 ELF、读取 debuginfo、遍历 DWARF、打印函数名与 `file:line`。
-  - 允许使用常规日志、文件读写和库调用。
+  - 运行在下一次正常启动时；
+  - 目标是消费旧快照并输出可读崩溃报告；
+  - 允许打开 ELF、读取 split debuginfo、遍历 DWARF、打印 `symbol` 与 `file:line`、做 best-effort 参数恢复；
+  - 允许使用常规日志、文件读写、libelf、libdwarf 和其他正常上下文设施。
 
-这两个阶段之间通过固定大小的 `struct crash_snapshot_record` 作为 ABI 契约连接。
+这两个阶段通过固定大小的 `struct crash_snapshot_record` 作为 ABI 契约连接。
 
 ### 2.2 不在 handler 中做不安全工作
 
@@ -48,9 +65,9 @@ fatal signal handler 运行在最不可信的时刻。此时：
 - 当前线程的普通栈可能已经损坏；
 - 堆状态可能不一致；
 - 进程中的锁可能处于未知状态；
-- libc / runtime 的内部状态也可能不再可靠。
+- libc / runtime 的内部状态也可能已经不可靠。
 
-因此 handler 中明确避免：
+因此 Stage-1 明确避免：
 
 - `malloc/free`
 - 锁和复杂同步原语
@@ -58,7 +75,13 @@ fatal signal handler 运行在最不可信的时刻。此时：
 - `/proc/self/maps` 扫描
 - ELF / DWARF 解析
 - 常规日志路径
-- 任何需要假设“进程状态仍然一致”的复杂操作
+- 任何依赖“进程状态仍然一致”的复杂操作
+
+Stage-1 的理想动作序列只有：
+
+1. 基于 `ucontext_t` 和预缓存元数据构造固定大小 record；
+2. 调用 `write()` 追加写盘；
+3. 恢复默认信号行为并重新抛出原始 signal。
 
 ### 2.3 best-effort，而不是 all-or-nothing
 
@@ -66,8 +89,9 @@ fatal signal handler 运行在最不可信的时刻。此时：
 
 - 某一帧无法识别模块，不影响其他帧；
 - 某个模块找不到 debuginfo，不影响其余模块；
-- 某一帧没有 DWARF 行号，也仍然可以输出 symbol 或 raw PC；
-- 即使所有帧都无法完整符号化，崩溃摘要和原始地址仍然会被输出。
+- 某一帧没有 `file:line`，也仍然可以输出 symbol 或 raw PC；
+- 某个参数 location 可解析但 value 无法读取时，也仍然可以输出 location；
+- older frames 即使拿不到真实值，也不会阻断整个 crash report 的输出。
 
 ### 2.4 保留原始崩溃语义
 
@@ -79,59 +103,9 @@ crash monitor 是**诊断工具**，不是恢复工具。handler 在写完快照
 
 ---
 
-## 3. 总体架构
+## 3. 整体架构与启动时序
 
-### 3.1 Stage-1 的前置准备（正常上下文）
-
-虽然 Stage-1 的核心执行点在 fatal signal handler 中，但为了满足 signal-safety 约束，很多准备工作必须在进程**尚未崩溃**时完成：
-
-1. 打开固定快照文件；
-2. 安装 fatal signal handler；
-3. 为当前线程准备 altstack；
-4. 读取 `/proc/self/maps`，预缓存可执行 file-backed mappings；
-5. 记录 `/proc/self/exe` 对应的主程序路径；
-6. 缓存 `/proc/self/comm` 对应的进程/task 名称，作为主线程或旧快照的兜底名字；
-7. 为每个缓存模块预读取 GNU build-id（若存在）；
-8. 对通过 monitored helper 创建的 worker thread，在进入真正工作函数前先把预期线程名写入 crash monitor 的线程本地缓存，再执行 `crash_monitor_prepare_thread()`。
-
-这些预处理让 handler 在崩溃当下只需要做“复制固定数据 + 写盘”，而不需要临时发现模块布局，也不需要在 signal context 里再去读取 `/proc/thread-self/comm` 之类的名字信息。
-
-### 3.2 Stage-1 的崩溃捕获（fatal signal context）
-
-fatal signal 到来后，handler 在 altstack 上执行，主要完成：
-
-1. 从 `siginfo_t` 读取 `si_code`、`si_addr` 等故障信息；
-2. 从 `ucontext_t` 提取寄存器：`ip/sp/fp/lr/args[]`；
-3. 基于 frame pointer 做有界回溯；
-4. 将预缓存的 `modules[]`、`modules_count`、`executable_path`、`thread_name` 复制到 record；
-5. 为每个 frame 填充：
-   - `absolute_pc`
-   - `module_index`
-   - `rel_pc`
-6. 通过 `write()` 追加写入固定大小的 `struct crash_snapshot_record`；
-7. 重新抛出原始 signal。
-
-### 3.3 Stage-2 的恢复与符号化（正常上下文）
-
-下次进程正常启动时，启动流程会先消费旧快照，再初始化新的 crash monitor。Stage-2 的职责是：
-
-1. 打开 `.crash` 文件；
-2. 逐条读取并校验 record；
-3. 输出 crash summary；
-4. 对每一帧做模块恢复、ELF 符号解析、DWARF `file:line` 解析；
-5. 以 best-effort 方式打印最丰富的可读崩溃报告；
-6. `ftruncate()` 清空已经消费的快照文件。
-
-这里需要特别区分两类产物：
-
-- **原始快照**：保存在 `/var/log/deepflow-agent/deepflow-agent.crash`；
-- **Stage-2 解析后的最终可读报告**：不会回写到 `.crash`，而是通过现有 eBPF/Agent 日志链路输出到常规运行日志。
-
-也就是说，`.crash` 文件只负责保存结构化原始证据；真正给运维和开发者阅读的“最终报告”会出现在 agent 正常日志里，而不是单独再生成一个新的 crash report 文件。
-
----
-
-## 4. 启动时序
+### 3.1 启动时序
 
 启动路径中必须保持如下顺序：
 
@@ -141,19 +115,38 @@ fatal signal 到来后，handler 在 altstack 上执行，主要完成：
 也就是：
 
 - **先消费上一次崩溃留下的旧快照**；
-- **再安装本次运行新的 handler 和快照文件**。
+- **再安装本次运行新的 handler、altstack 和快照文件**。
 
 这样设计的原因是：
 
 - Stage-2 需要在完全正常的上下文里运行；
-- 它会打开文件、校验多条记录、调用 symbolizer、打印格式化日志、清空文件；
-- 这些都不应该放进 fatal signal handler。
+- 它会打开文件、校验记录、遍历 ELF/DWARF、打印格式化日志、清空快照文件；
+- 这些动作都不应该放进 fatal signal handler。
 
-因此 Stage-2 不是“崩溃当下的一部分”，而是“下一次启动时的恢复流程”。
+### 3.2 启动接线
+
+当前启动接线位于 `agent/src/ebpf/user/tracer.c:2196-2199`，在正常初始化期间先调用：
+
+- `crash_monitor_consume_pending_snapshots()`（`agent/src/ebpf/user/tracer.c:2196`）
+- `crash_monitor_init()`（`agent/src/ebpf/user/tracer.c:2199`）
+
+这意味着 `.crash` 文件中的旧记录会在新一轮 agent 正常启动时被恢复成可读日志，而不是在崩溃当下直接做复杂处理。
+
+### 3.3 线程接线
+
+`sigaltstack()` 是**线程级属性**，不是进程级属性。只给主线程安装 altstack 并不能自动覆盖其他工作线程。
+
+当前线程接线位于 `agent/src/ebpf/user/utils.c:1673-1682` 的 monitored thread wrapper：
+
+1. 线程真正进入工作函数前，先把预期线程名传给 `crash_monitor_set_thread_name()`（`agent/src/ebpf/user/utils.c:1681`，实现定义见 `agent/src/ebpf/user/crash_monitor.c:340`）；
+2. 然后调用 `crash_monitor_prepare_thread()` 安装该线程自己的 altstack（`agent/src/ebpf/user/utils.c:1682`，实现定义见 `agent/src/ebpf/user/crash_monitor.c:1260`）；
+3. 最后才进入真正的 worker routine。
+
+这样可以把 crash monitor 的线程准备逻辑集中到统一入口，避免每个 worker 自己手写一遍。
 
 ---
 
-## 5. 快照文件与持久化策略
+## 4. 快照文件与持久化策略
 
 快照文件固定为：
 
@@ -161,29 +154,29 @@ fatal signal 到来后，handler 在 altstack 上执行，主要完成：
 #define CRASH_SNAPSHOT_FILE "/var/log/deepflow-agent/deepflow-agent.crash"
 ```
 
-这样做的价值：
+这样做有几个价值：
 
-1. **与运行日志配置解耦**：crash snapshot 不依赖普通 `log_file` 配置。
-2. **适合容器持久化**：`/var/log/deepflow-agent/` 很适合被挂载到宿主机或 sidecar。
+1. **与运行日志配置解耦**：crash snapshot 不依赖普通 `log_file` 配置；
+2. **适合容器持久化**：`/var/log/deepflow-agent/` 很适合被挂载到宿主机或 sidecar；
 3. **便于运维收集**：路径稳定，外部系统更容易采集和归档。
 
 需要注意：
 
-- `.crash` 是**二进制快照文件**，不是普通文本日志；
+- `.crash` 是**结构化二进制快照文件**，不是普通文本日志；
 - 默认语义是“启动时消费并清空”；
-- 如果需要保留原始快照做离线分析，应在消费前复制一份。
+- 如果需要长期保留原始样本做离线分析，应在 agent 下次启动前复制一份。
 
 ---
 
-## 6. 快照 ABI 设计
+## 5. Snapshot ABI 设计
 
-快照 ABI 由 `agent/src/ebpf/user/crash_monitor.h` 定义，核心结构有三个：
+快照 ABI 由 `agent/src/ebpf/user/crash_monitor.h:52-296` 定义。当前版本为：
 
-- `struct crash_snapshot_module`
-- `struct crash_snapshot_frame`
-- `struct crash_snapshot_record`
+```c
+#define CRASH_SNAPSHOT_VERSION 4
+```
 
-### 6.1 为什么必须固定大小
+### 5.1 为什么必须固定大小
 
 固定大小 ABI 的好处是：
 
@@ -194,66 +187,175 @@ fatal signal 到来后，handler 在 altstack 上执行，主要完成：
 - `magic/version/size` 可以做强校验；
 - 后续演进时可以受控地维护兼容性。
 
-### 6.2 `crash_snapshot_module`
+### 5.2 版本演进
+
+当前 reader 兼容三代 on-disk 记录：
+
+- **v2**：基础崩溃元数据、模块数组、帧数组，但没有线程名、full regs、stack window、frame hints；
+- **v3**：在 v2 基础上增加 `thread_name`；
+- **v4**：增加完整通用寄存器块、栈窗口、`frame_fp`、`frame_flags` 等字段，用于增强 Stage-2 的日志和参数恢复能力。
+
+兼容策略是：
+
+- 读取侧识别 v2 / v3 / v4；
+- 对旧记录在内存中升级为当前 `struct crash_snapshot_record`；
+- 新增字段统一 zero-fill；
+- 对旧帧补出保守的 `frame_flags`；
+- 旧记录不会伪装成“有完整寄存器 / 栈窗口”的新记录，而是通过 `capture_flags` 诚实地降级。
+
+### 5.3 `struct crash_snapshot_module`
 
 每个模块条目保存一个 executable mapping 的关键信息：
 
 - `start` / `end`：崩溃进程中的运行时虚拟地址范围；
-- `file_offset`：该映射起点对应的文件偏移；
+- `file_offset`：映射起点对应的文件偏移；
 - `build_id` / `build_id_size`：GNU build-id；
 - `path`：模块路径。
 
-这些字段的用途是让 Stage-2 在原进程已经死亡的情况下，仍能把 raw PC 重新绑定回“崩溃时的真实模块布局”。
+用途是让 Stage-2 在原进程已经死亡的情况下，仍能把 raw PC 重新绑定回“崩溃时真实观察到的模块布局”。
 
-### 6.3 `crash_snapshot_frame`
+### 5.4 `struct crash_snapshot_frame`
 
-每一帧保存：
+每一帧现在保存：
 
 - `absolute_pc`：崩溃时的真实运行时地址；
+- `rel_pc`：相对 `module.start` 的偏移；
+- `frame_fp`：该帧相关的 best-effort frame pointer hint；
 - `module_index`：指向 `modules[]` 的索引；
-- `rel_pc`：`absolute_pc - module.start`；
-- `reserved`：保留字段。
+- `frame_flags`：描述该帧来源和性质。
 
-这里同时保留 `absolute_pc` 和 `(module_index, rel_pc)` 的原因是：
+#### `frame_flags` 含义
 
-- `absolute_pc` 是最原始、最可信的 fallback 值；
-- `(module_index, rel_pc)` 是**跨 ASLR 更稳定**的符号化输入；
-- 即使 Stage-2 无法完全解析，也仍可输出 raw PC。
+- `CRASH_SNAPSHOT_FRAME_TOP`
+  - 顶层崩溃帧；
+- `CRASH_SNAPSHOT_FRAME_FP_WALK`
+  - 来自 Stage-1 的 frame-pointer walk；
+- `CRASH_SNAPSHOT_FRAME_LR_HINT`
+  - AArch64 上额外记录的 link register caller hint；
+- `CRASH_SNAPSHOT_FRAME_TRUNCATED`
+  - 说明 frame walk 命中固定帧数上限，后续栈帧被截断。
 
-### 6.4 `crash_snapshot_record`
+其中 `frame_fp` 的引入很重要：它给 Stage-2 提供了一个与该帧相关的原始 frame pointer 线索，使 `DW_AT_frame_base`、`DW_OP_fbreg`、简单 `CFA+offset` 场景在 older frames 上也有一定恢复基础。
+
+### 5.5 `struct crash_snapshot_record`
 
 顶层 record 保存：
 
-- `magic/version/size`：格式校验；
+- `magic/version/arch/size`：格式识别与校验；
 - `signal/si_code/pid/tid/fault_addr`：崩溃摘要；
-- `ip/sp/fp/lr`：顶层寄存器快照；
-- `args[]`：top frame 的 ABI 参数寄存器；
-- `executable_path`：主程序路径；
-- `thread_name`：崩溃线程名；如果是旧版本快照则该字段可能为空；
-- `modules_count` + `modules[]`：模块元数据；
-- `frames_count` + `frames[]`：栈帧数组。
+- `ip/sp/fp/lr`：顶层控制寄存器快照；
+- `args[]`：top frame 的原始 ABI 参数寄存器；
+- `executable_path`：可执行文件路径；
+- `thread_name`：崩溃线程名；
+- `modules_count` + `modules[]`：模块缓存；
+- `frames_count` + `frames[]`：栈帧数组；
+- `capture_flags`：记录扩展数据是否真的存在；
+- `stack_window_start/stack_window_size/stack_window[]`：栈窗口；
+- `registers`：完整通用寄存器块。
 
-当前 snapshot ABI 已提升到 **v3**。v3 相比早期版本新增了 `thread_name` 字段，用于把崩溃线程（或至少主进程/task）的名字持久化到快照中，供下次启动时的 Stage-2 summary 直接打印。为了避免旧容器里残留的历史 `.crash` 文件因为结构体大小变化而完全无法消费，当前读取侧会兼容旧版 record，并在内存中升级成当前结构后再走统一的 Stage-2 符号化流程。
+#### `capture_flags` 含义
 
-### 6.5 `args[]` 的能力边界
+- `CRASH_SNAPSHOT_FLAG_FULL_REGS`
+  - 说明记录中包含完整 top-frame 通用寄存器块；
+- `CRASH_SNAPSHOT_FLAG_STACK_WINDOW`
+  - 说明记录中包含有效的栈窗口副本。
 
-`args[]` 只是 **top frame 的原始 ABI argument registers**，不代表：
+### 5.6 完整寄存器块的边界
 
-- 能恢复所有源码级函数参数；
-- 能恢复 older frames 的参数；
-- 能恢复 stack-passed arguments；
-- 能恢复浮点/SIMD 参数；
-- 能在优化后二次映射出源码级参数名。
+v4 当前只扩展到**通用寄存器**，不包括 SIMD / FP / vector 寄存器。
 
-因此它的定位是“尽力保留顶层寄存器参数现场”，而不是完整参数还原系统。
+- x86_64：`rax/rbx/rcx/rdx/rsi/rdi/rbp/rsp/r8-r15/rip/eflags`
+- aarch64：`x0-x30/sp/pc/pstate`
+
+这已经足够支撑：
+
+- 更完整的 recovered register logging；
+- top-frame 的寄存器值检查；
+- 受限的 DWARF location expression 求值。
+
+但它**不代表**可以恢复：
+
+- SSE/AVX 参数；
+- 浮点寄存器参数；
+- 任意 older frame 的完整寄存器文件。
+
+### 5.7 `args[]` 的定位
+
+`args[]` 仍然保留，但它的定位非常明确：
+
+- 只是 **top frame 的原始 ABI argument registers**；
+- 它是低层原始证据，不等同于源码级参数列表；
+- 不保证能恢复 stack-passed、floating-point、optimized-out 或 older-frame 参数。
+
+也就是说，v4 并不是用 full regs 替代 `args[]`，而是：
+
+- `args[]` 继续保留为简洁的 ABI subset；
+- `registers` 负责提供更完整的 top-frame 通用寄存器视图；
+- `frames[] + frame_fp + stack_window + DWARF` 负责做 per-frame best-effort 参数恢复。
 
 ---
 
-## 7. Stage-1 细节
+## 6. Stage-1：正常上下文预处理
 
-### 7.1 fatal signal 覆盖范围
+虽然 Stage-1 的核心执行点在 fatal signal handler 中，但为了满足 signal-safety 约束，许多准备工作必须在进程**尚未崩溃**时完成。
 
-当前监控的 fatal signals 包括：
+### 6.1 打开固定快照文件
+
+`crash_monitor_init()`（`agent/src/ebpf/user/crash_monitor.c:1275`）在正常上下文中打开 `.crash` 文件，并把 fd 长期保留。这样 handler 崩溃当下只需重用该 fd 调用 `write()`。
+
+### 6.2 预缓存模块布局
+
+`crash_cache_modules()`（`agent/src/ebpf/user/crash_monitor.c:376`）会在正常上下文中读取 `/proc/self/maps`，筛选出：
+
+- file-backed
+- 可执行
+- 有绝对路径
+
+的映射，并缓存：
+
+- 地址范围；
+- 文件偏移；
+- 模块路径；
+- build-id。
+
+这样做的目的：
+
+- handler 不需要再扫描 `/proc/self/maps`；
+- Stage-2 不依赖已经不存在的旧进程地址空间；
+- 记录里直接携带“崩溃时观察到的真实模块布局”。
+
+### 6.3 缓存 executable path 与线程/进程名称
+
+正常上下文中还会缓存：
+
+- 主程序路径；
+- 进程名；
+- monitored thread 提前写入的线程逻辑名。
+
+这样 handler 在崩溃时只需做 bounded copy，而不需要去读 `/proc/thread-self/comm` 之类的信息。
+
+### 6.4 为每个线程准备 altstack
+
+`crash_monitor_prepare_thread()`（`agent/src/ebpf/user/crash_monitor.c:1260`）最终调用 altstack 安装逻辑，为当前线程分配并注册独立 signal stack。
+
+这是非常关键的设计点：如果崩溃由普通栈损坏、栈溢出、frame-pointer 链错误等问题引起，那么继续在原普通栈上运行 handler 很可能再次 fault。altstack 能显著提高“至少把快照写出来”的概率。
+
+### 6.5 预缓存线程普通栈边界
+
+altstack 之外，代码还会在正常上下文中记录当前线程的**普通栈边界**。这点非常重要，因为：
+
+- `ucontext_t::uc_stack` 描述的是信号 altstack 状态；
+- 但 Stage-1 做 frame-pointer walk 时，需要约束的是被打断线程的**正常工作栈**。
+
+因此后续回溯与 stack window 复制都基于预缓存的普通栈边界进行保守检查。
+
+---
+
+## 7. Stage-1：fatal signal 捕获流程
+
+### 7.1 覆盖的 fatal signals
+
+当前覆盖：
 
 - `SIGSEGV`
 - `SIGABRT`
@@ -261,331 +363,709 @@ fatal signal 到来后，handler 在 altstack 上执行，主要完成：
 - `SIGILL`
 - `SIGFPE`
 
-handler 安装使用的关键标志：
+安装 handler 时使用的关键标志：
 
-- `SA_SIGINFO`：让 handler 能拿到 `siginfo_t` 与 `ucontext_t`；
-- `SA_ONSTACK`：让 handler 在 altstack 上运行；
-- `SA_RESETHAND`：触发一次后恢复默认信号行为，便于 rethrow。
+- `SA_SIGINFO`：让 handler 拿到 `siginfo_t` 与 `ucontext_t`；
+- `SA_ONSTACK`：强制 handler 在 altstack 上运行；
+- `SA_RESETHAND`：第一次触发后恢复默认行为，便于重新抛出原始 signal。
 
-### 7.2 为什么必须使用 altstack
+### 7.2 构造 record 头部
 
-如果线程因为栈损坏、栈溢出、错误栈指针等原因崩溃，再继续在原普通栈上运行 handler，极有可能再次 fault。
+fatal signal 到来后，handler 会在栈上构造一个固定大小的 `struct crash_snapshot_record`，填入：
 
-因此当前实现会：
-
-- 为当前线程安装独立的 signal altstack；
-- 在 worker thread 入口统一调用 `crash_monitor_prepare_thread()`；
-- 确保崩溃线程即使普通栈不可用，也仍有机会完成最关键的快照写盘。
-
-需要强调的是：
-
-- `sigaltstack()` 是**线程级属性**，不是进程级属性；
-- 主线程装了 altstack，不代表其他线程也装了；
-- 所有被纳入覆盖范围的 C/eBPF 线程都必须单独准备。
-
-### 7.3 为什么要预缓存线程真实栈边界
-
-在回溯 frame pointer 链时，约束条件必须基于**被打断线程的普通栈边界**，而不是 `ucontext_t::uc_stack` 中描述的 signal altstack。
-
-因此当前实现会在正常上下文中预缓存线程真实栈边界，供 handler 在回溯时做保守边界检查，例如：
-
-- frame pointer 必须单调前进；
-- 必须满足自然对齐；
-- 必须落在线程普通栈边界内；
-- 达到最大帧数立即停止。
-
-### 7.4 模块缓存如何工作
-
-为了让 Stage-2 在旧进程退出后仍能恢复模块信息，当前实现会在正常上下文中读取 `/proc/self/maps`，缓存一组**可执行、file-backed** 映射，并为每个模块记录：
-
-- 地址范围；
-- 文件偏移；
-- 模块路径；
-- build-id。
-
-随后在 handler 中直接把这些固定大小的缓存复制到 record。这样：
-
-- handler 不需要扫描 `/proc`；
-- Stage-2 不需要依赖已经不存在的旧进程地址空间；
-- 记录中天然携带“崩溃时真实观察到的模块布局”。
-
-### 7.5 寄存器与栈帧采集
-
-当前实现支持从 `ucontext_t` 中直接提取崩溃瞬间的寄存器现场。
-
-### x86_64
-
-- `RIP -> ip`
-- `RSP -> sp`
-- `RBP -> fp`
-- 参数寄存器：`RDI/RSI/RDX/RCX/R8/R9`
-
-### aarch64
-
-- `pc`
-- `sp`
-- `x29 -> fp`
-- `x30 -> lr`
-- 参数寄存器：`x0-x7`
-
-栈回溯采用 frame-pointer walk，而不是 `backtrace()`。这样做的优点是：
-
-- 依赖更少；
-- 对崩溃上下文更可控；
-- 更容易做严格边界检查。
-
-### 7.6 frame 注释：`absolute_pc`、`module_index`、`rel_pc`
-
-handler 在得到 `absolute_pc` 后，还会为每一帧补充：
-
-- `module_index`：该地址属于哪个缓存模块；
-- `rel_pc`：相对于 `module.start` 的偏移。
-
-这一步是 Stage-2 稳定符号化的关键，因为：
-
-- 单靠 `absolute_pc`，下次启动后的新进程无法直接复原旧进程的 ASLR 布局；
-- 有了 `module_index + rel_pc`，Stage-2 可以对照 `modules[]` 恢复 file-relative PC；
-- 即使模块解析失败，`absolute_pc` 仍是 fallback。
-
-### 7.7 写盘与 rethrow
-
-handler 最终通过打开好的 `crash_snapshot_fd` 调用 `write()` 追加写入一条 record，然后立即重新抛出原始 signal。
-
-这保证：
-
-- 崩溃现场被尽快保留下来；
-- 进程仍按原始故障语义退出；
-- crash monitor 不会掩盖真实异常。
-
----
-
-## 8. Stage-2 符号化流程
-
-当前 Stage-2 已不再只是“打印原始地址”，而是具备完整的 best-effort 符号化链路。
-
-### 8.1 入口与消费流程
-
-启动时 Stage-2 会：
-
-1. 打开 `.crash` 文件；
-2. 循环读取 record header，并根据 `version/size` 判断当前条目属于新格式还是旧格式；
-3. 校验 `magic/version/size`；
-4. 对旧版本 record 做内存内升级，然后统一调用 `crash_symbolize_record()`；
-5. 读取结束后 `ftruncate(fd, 0)` 清空文件。
-
-如果出现：
-
-- 非法 record：直接丢弃并 warning；
-- 截断尾部：打印 truncated warning；
-- 文件不存在：视为无待消费快照，直接返回成功。
-
-### 8.2 crash summary
-
-在真正逐帧符号化之前，Stage-2 先打印 crash summary。当前 summary 除了基础崩溃元数据之外，还额外强调“这是哪个 task 崩的”和“当前磁盘上的可执行文件是否还是同一个镜像”。因此 summary 现在包含：
-
-- `task`：优先来自 snapshot 的 `thread_name`；如果消费的是旧版快照，则回退到 `executable_path` 的 basename；
+- `magic`
+- `version`
+- `size`
 - `signal`
 - `si_code`
 - `pid`
 - `tid`
-- `executable`
-- `executable_md5`：Stage-2 对 `executable_path` 指向的当前文件做 best-effort MD5 计算，便于快速判断本次解析所面对的磁盘镜像是否与崩溃时记录的可执行路径一致；
-- `ip`
 - `fault_addr`
-- `frames`
-- `args[]`：紧跟在 summary 后打印 top frame 的原始 ABI 参数寄存器值。在 x86_64 上对应 `rdi/rsi/rdx/rcx/r8/r9`，在 aarch64 上对应 `x0-x7`。
 
-这样即使后续所有帧都无法完整恢复，至少仍能得到一条可读的崩溃摘要；而 `task + executable_md5` 又进一步降低了“只知道哪个 pid/tid 崩了，但不知道到底是哪条线程、当前镜像是否已被替换”的排障成本。
+然后把预缓存的模块、可执行路径和线程名复制进 record。
 
-### 8.3 单帧符号化的恢复顺序
+### 7.3 从 `ucontext_t` 采集寄存器
 
-对每一帧，`crash_symbolize_frame()` 的逻辑大致为：
+#### x86_64
 
-1. 根据 `frame.module_index` 找到对应模块；
+从 `ucontext_t` 提取：
+
+- `RIP -> ip`
+- `RSP -> sp`
+- `RBP -> fp`
+- `RDI/RSI/RDX/RCX/R8/R9 -> args[]`
+
+并进一步写入完整寄存器块：
+
+- `rax/rbx/rcx/rdx/rsi/rdi/rbp/rsp/r8-r15/rip/eflags`
+
+同时设置 `CRASH_SNAPSHOT_FLAG_FULL_REGS`。
+
+#### aarch64
+
+从 `ucontext_t` 提取：
+
+- `pc -> ip`
+- `sp -> sp`
+- `x29 -> fp`
+- `x30 -> lr`
+- `x0-x7 -> args[]`
+
+并进一步写入完整寄存器块：
+
+- `x0-x30/sp/pc/pstate`
+
+同时设置 `CRASH_SNAPSHOT_FLAG_FULL_REGS`。
+
+### 7.4 栈窗口采集
+
+v4 在 Stage-1 里还会抓取一个固定大小的栈窗口：
+
+- 上限由 `CRASH_SNAPSHOT_STACK_WINDOW_SIZE` 控制，当前为 `2048` 字节；
+- 起点优先取有效的 `sp`；
+- 如果 `fp` 也有效且比 `sp` 更低，则起点下探到 `fp`；
+- 复制范围被严格限制在已缓存的线程普通栈边界之内；
+- 最终设置：
+  - `stack_window_start`
+  - `stack_window_size`
+  - `CRASH_SNAPSHOT_FLAG_STACK_WINDOW`
+
+这不是为了“保存整个线程栈”，而是为了给 Stage-2 留下一小段**可验证、可界定、可安全读取**的 crash-time 栈证据，使某些 stack-backed 参数有机会恢复出值。
+
+### 7.5 帧采集与 `frame_fp` / `frame_flags`
+
+Stage-1 的栈回溯采用 **frame-pointer walk**，而不是 `backtrace()` 或完整 unwind VM。其目标不是最强回溯，而是在 signal context 下以最小逻辑获取可用 backtrace 候选。
+
+当前策略：
+
+1. 先把顶层崩溃帧作为 `CRASH_SNAPSHOT_FRAME_TOP` 记录进去；
+2. AArch64 上再把 `lr` 作为 `CRASH_SNAPSHOT_FRAME_LR_HINT` 额外记录一帧 caller hint；
+3. 然后沿 frame pointer 做有界回溯；
+4. 每一帧记录：
+   - `absolute_pc`
+   - `frame_fp`
+   - `frame_flags`
+5. 命中最大帧数后，对最后一帧打上 `CRASH_SNAPSHOT_FRAME_TRUNCATED`。
+
+### 7.6 为什么要记录 `frame_fp`
+
+older frames 不再有完整寄存器快照；对它们来说，能可靠留下来的上下文非常有限。`frame_fp` 的价值在于：
+
+- 给 Stage-2 一个与该帧对应的原始 frame pointer hint；
+- 使 `DW_AT_frame_base` 缺失时，仍可退回 frame pointer 作为简化 frame base；
+- 使简单的 `DW_OP_fbreg` / `CFA+offset` 参数恢复成为可能。
+
+### 7.7 模块注释：`module_index + rel_pc`
+
+在所有帧采集完成后，Stage-1 会再次遍历 `frames[]`，把每帧的 `absolute_pc` 映射到预缓存的 `modules[]`：
+
+- `module_index`
+- `rel_pc`
+
+这一步非常关键，因为：
+
+- 单靠 `absolute_pc`，Stage-2 无法在新进程中直接复原旧进程的 ASLR 布局；
+- 有了 `module_index + rel_pc`，Stage-2 才能稳定地重建 file-relative / ELF-relative PC；
+- 即使后续某步失败，`absolute_pc` 仍可作为 fallback 输出。
+
+### 7.8 写盘与重新抛出 signal
+
+最终 handler 使用 `write()` 把整个固定大小 record 追加到 `.crash` 文件，然后：
+
+1. 恢复该 signal 的默认行为；
+2. 重新向自身发送同一个 signal；
+3. 保持原始崩溃退出语义。
+
+---
+
+## 8. Stage-2：消费旧快照
+
+### 8.1 读取流程
+
+启动时 `crash_monitor_consume_pending_snapshots()`（`agent/src/ebpf/user/crash_monitor.c:1212`）会：
+
+1. 以读写方式打开 `.crash` 文件；
+2. 循环读取每条 record header；
+3. 根据 `magic/version/size` 判断是 v2 / v3 / v4 哪种记录；
+4. 对旧记录做内存内升级；
+5. 调用 `crash_symbolize_record()`（`agent/src/ebpf/user/crash_symbolize.c:3145`）输出可读报告；
+6. 全部完成后 `ftruncate(fd, 0)` 清空文件。
+
+### 8.2 兼容读取与升级
+
+- 对 **v4**：直接读入当前结构；
+- 对 **v2**：升级时补零线程名、full regs、stack window，并为帧合成保守的 `frame_flags`；
+- 对 **v3**：保留线程名，其余新字段补零，并同样合成保守帧标记。
+
+因此旧快照仍可继续消费，但能力会自动降级为：
+
+- 只有 partial register view；
+- 没有 stack window-backed 参数值恢复；
+- older frames 的参数更多只能显示 `<unavailable>` 或根本没有 value。
+
+### 8.3 非法记录与截断文件的处理
+
+这里需要区分几种情况：
+
+- **magic 不匹配 / 版本尺寸不认识**
+  - 视为非法 record；
+  - 打 warning；
+  - 跳过继续读下一条。
+
+- **读取某条合法格式记录时发生短读 / I/O 错误**
+  - 当前消费流程会返回失败；
+  - 不会把它当成“正常可跳过”的记录继续向后消费。
+
+这意味着：文档里的“截断尾部只 warning 然后继续”并不准确；当前实现对真正的短读/损坏是更保守的处理。
+
+### 8.4 清空策略
+
+只有整个消费流程正常跑完后，才会对 `.crash` 文件执行 `ftruncate(fd, 0)`。如果消费过程中返回错误，则不会伪装成“已经完整消费成功”。
+
+---
+
+## 9. Stage-2：符号化恢复链路
+
+### 9.1 总体顺序
+
+对每一帧，Stage-2 大致按以下顺序恢复信息：
+
+1. 根据 `frame.module_index` 找到模块；
 2. 计算 `file_offset_pc = module.file_offset + frame.rel_pc`；
-3. 打开原始模块 ELF；
-4. 使用 PT_LOAD 信息把 file offset 映射回 ELF virtual address；
-5. 优先查找 external debuginfo；
-6. 若存在 external debuginfo，则优先用其做 symbol 和 line 解析；
-7. 若 external debuginfo 不足，则回退到模块本体的 ELF / DWARF；
-8. 收集 symbol、`file:line` 等信息；
-9. 输出该帧最丰富的表示；
-10. 如果任何一步失败，则退回 raw fallback。
+3. 打开模块 ELF；
+4. 用 `elf_file_offset_to_vaddr()`（`agent/src/ebpf/user/elf.c:618`）把 file-relative PC 转回 ELF virtual address；
+5. 优先寻找 external debuginfo；
+6. 用 debuginfo 或模块本体做 symbol / `file:line` / params 恢复；
+7. 输出该帧最丰富的日志；
+8. 如果某步失败，则退回较低层级表示。
 
-### 8.4 external debuginfo 的查找顺序
+### 9.2 为什么要先转回 ELF vaddr
 
-Stage-2 优先使用 build-id 精确匹配 debuginfo，查找顺序为：
+DWARF location list、line table、subprogram range 等大多工作在 ELF / DWARF 的地址空间，而不是进程运行时的 ASLR 地址空间。
+
+因此 Stage-2 必须先把：
+
+- `module.file_offset`
+- `frame.rel_pc`
+
+转换成稳定的 `elf_vaddr`，后续的：
+
+- `elf_symbolize_pc()`（`agent/src/ebpf/user/elf.c:646`）
+- `dwarf_lowpc()` / `dwarf_highpc_b()`
+- location list range match
+
+才能对齐到同一地址空间。
+
+### 9.3 external debuginfo 查找顺序
+
+优先顺序是：
 
 1. `/usr/lib/debug/.build-id/xx/yyyy....debug`
 2. `/usr/lib/debug<module>.debug`
 
+其中第一优先级会先基于 snapshot 里持久化的 build-id 构造路径，再验证 candidate debug image 的 build-id 是否匹配；第二优先级则是常见的 path-based fallback。
+
+这样可以避免仅凭 pathname 误匹配到错误版本的 debuginfo。
+
+### 9.4 ELF symbol 与 DWARF line 的分工
+
+- **ELF symbol**
+  - 成本较低；
+  - 即使没有完整 DWARF，很多时候也能拿到函数名；
+  - 适合做第一层命名恢复。
+
+- **DWARF line**
+  - 用于恢复源码路径与行号；
+  - 在可用时比单纯 symbol 更强；
+  - 也可能补上更准确的 subprogram 名称。
+
+Stage-2 会尽量同时收集 symbol 和 `file:line`，并根据恢复结果做分层降级输出。
+
+### 9.5 `DW_TAG_subprogram` 覆盖匹配不只看 `low_pc/high_pc`
+
+这是 older-frame 参数恢复能否真正落到正确函数上的关键点。
+
+很多编译器、LTO、函数克隆、冷/热路径拆分或较新的 DWARF 生成器，并不会把函数范围编码成单一的：
+
+- `DW_AT_low_pc + DW_AT_high_pc`
+
+而是会使用：
+
+- `DW_AT_ranges + .debug_ranges`（经典 range list）
+- `DW_AT_ranges + .debug_rnglists`（DWARF5 rnglists）
+
+如果 Stage-2 只检查 `low_pc/high_pc`，就会出现一种很迷惑的现象：
+
+- ELF symbol 还能命中；
+- 某些 line table 也许还能命中；
+- 但 formal parameter 恢复找不到正确的 `DW_TAG_subprogram`；
+- 最终 older frames 看起来像“没有 params”或一直 `<unavailable>`。
+
+当前实现的覆盖匹配策略是：
+
+1. **优先检查 `low_pc/high_pc`**；
+2. 如果该 DIE 没有可用的 `low/high` 覆盖，再检查 `DW_AT_ranges`；
+3. **只有当该 DIE 完全没有显式 PC coverage 信息时**，才退回到名字匹配。
+
+这个约束非常重要：
+
+- 如果一个 DIE 明明声明了自己的地址覆盖范围，但目标 PC 不在其中，Stage-2 不会再因为名字相似就把它错认成目标函数；
+- 只有“这个 DIE 根本没给可比对的 PC coverage”时，名字回退才是合理的保底策略。
+
+### 9.6 对 `DW_AT_ranges` 的两类支持
+
+#### 9.6.1 经典 `.debug_ranges`
+
+对经典 range list，当前实现会：
+
+- 通过 `dwarf_get_ranges_b()` 读取条目；
+- 处理：
+  - `DW_RANGES_ADDRESS_SELECTION`
+  - `DW_RANGES_ENTRY`
+  - `DW_RANGES_END`
+- 优先使用 subprogram 自己的 `low_pc` 作为 base；
+- 若 subprogram 没有 `low_pc`，则退回使用当前 CU 的 `low_pc` 作为 `cu_base`；
+- 最终把 range 条目转换到和 `elf_vaddr` 同一语义的地址空间里比较。
+
+这里的 `cu_base` 很关键：经典 range list 的很多条目是“相对 base 的 offset pair”，如果没有一个可靠 base，older-frame 子程序匹配就容易全部落空。
+
+#### 9.6.2 DWARF5 `.debug_rnglists`
+
+对 DWARF5 rnglists，当前实现会：
+
+- 通过 `dwarf_rnglists_get_rle_head()` 拿到 rnglist head；
+- 用 `dwarf_get_rnglists_entry_fields_a()` 遍历条目；
+- 对可比较的 range entry 使用 libdwarf 已经 cook 好的地址（`cooked1/cooked2`）；
+- 若 `debug_addr_unavailable` 置位，则跳过该条目；
+- 处理 `DW_RLE_offset_pair`、`DW_RLE_startx_endx`、`DW_RLE_startx_length`、`DW_RLE_start_end`、`DW_RLE_start_length` 等常见形式。
+
+这样可以覆盖一批新工具链默认生成的 `DW_AT_ranges` 形式，而不再局限于老式 `low_pc/high_pc`。
+
+### 9.7 名字回退匹配不是简单字符串比较
+
+当且仅当某个 `DW_TAG_subprogram` 没有可比对的 PC coverage 时，Stage-2 才会退回到名字匹配。这个回退过程本身也做了几层增强：
+
+- 参数名/函数名会递归跟随：
+  - `DW_AT_name`
+  - `DW_AT_linkage_name`
+  - `DW_AT_MIPS_linkage_name`
+  - `DW_AT_abstract_origin`
+  - `DW_AT_specification`
+- 名字比较前会做归一化，去掉常见编译器后缀，例如：
+  - `.isra`
+  - `.constprop`
+  - `.part`
+  - `.cold`
+  - `.clone`
+  - `.llvm.`
+- 还会剥离 ELF 符号常见的版本后缀，如 `@GLIBC_...` / `@@GLIBC_...`。
+
+因此，名字回退的目标不是“宽松乱猜”，而是在没有 PC coverage 信息时，尽量把 DWARF DIE 与 ELF symbol 对齐到同一个逻辑函数名。
+
+### 9.8 同一套 range-aware 匹配同时服务 `params` 与 `file:line`
+
+当前 range-aware 子程序匹配并不只用于 formal parameter 恢复，也用于补强 Stage-2 对 subprogram 名称的判断。
+
+也就是说，`DW_AT_ranges` / rnglists 的支持会同时改善：
+
+- `Recovered crash frame[N] params:`
+- 某些 frame 的 subprogram 识别
+- 与 line table 相配合时的函数名质量
+
+这也是为什么 older-frame 参数恢复的问题，最终不能只盯着 `DW_AT_location`，还必须先把“目标 subprogram 是否找对”这一步补齐。
+
+---
+
+## 10. Stage-2：完整寄存器与 top-frame args 日志
+
+### 10.1 crash summary
+
+每条恢复出的 crash report 都会先打印 summary，包含：
+
+- `task`
+- `signal`
+- `code`
+- `pid`
+- `tid`
+- `executable`
+- `executable_md5`
+- `ip`
+- `fault_addr`
+- `frames`
+
 其中：
 
-- 如果 snapshot 中带有 build-id，会优先验证 candidate debuginfo 的 build-id 是否匹配；
-- 这样可以避免只靠 pathname 造成的误匹配；
-- 当 build-id 无法提供时，再回退到 path-based 位置。
+- `task` 优先来自 snapshot 的 `thread_name`；
+- `executable_md5` 是 Stage-2 对当前磁盘上 `executable_path` 指向文件做的 best-effort 摘要，用于帮助判断“当前恢复环境里的镜像是不是同一个文件”。
 
-### 8.5 ELF symbol 与 DWARF line 的角色分工
+### 10.2 full register logging 与 partial register logging
 
-Stage-2 同时使用两类信息源：
+summary 之后紧接着是寄存器输出：
 
-### ELF symbol
+- **v4 且 `FULL_REGS` 置位**
+  - 输出完整 top-frame 通用寄存器块；
+- **升级后的 v2/v3 旧记录**
+  - 输出 `Recovered crash registers (partial): ...`；
+  - 只打印旧 ABI 真正持久化过的字段，避免给人“完整寄存器都在”的错觉。
 
-用途：
+这点非常重要：**Stage-2 不会伪造旧 snapshot 从未保存过的寄存器。**
 
-- 恢复函数名；
-- 即使缺少完整 DWARF，也常常还能给出 symbol；
-- 代价较低，适合作为第一层命名恢复。
+### 10.3 `Recovered crash args:` 的定位
 
-### DWARF line table
+在寄存器块之后，Stage-2 还会输出一条：
 
-用途：
+- x86_64：`rdi/rsi/rdx/rcx/r8/r9`
+- aarch64：`x0-x7`
 
-- 恢复源码路径与行号；
-- 在可用时提供比单纯 symbol 更强的定位能力；
-- 也可以从 DIE/subprogram 中补充更好的函数名。
+这条日志只是 top-frame ABI 参数寄存器视图，方便快速查看崩溃入口的低层调用约定现场。它不是参数恢复系统的最终结果，也不覆盖 older frames。
 
-Stage-2 的实际行为是：
+---
 
-- 尽可能同时获取 symbol 和 `file:line`；
-- 若只有 symbol，则输出 `symbol+offset`；
-- 若只有 `file:line`，也会输出；
-- 二者都缺失时退回 raw frame 日志。
+## 11. Stage-2：per-frame 参数恢复
 
-### 8.6 日志降级策略
+这是 v4 相比早期设计最重要的增强点之一。
 
-当前每帧日志的输出层级大致为：
+### 11.1 为什么需要 v4 才能把这件事做得更有价值
+
+Stage-2 发生在“下次启动”，旧进程已经不存在，因此它**不能**再访问：
+
+- 旧线程 live registers；
+- 旧线程完整栈；
+- `/proc/<oldpid>/mem`；
+- 旧地址空间中的任意内存。
+
+因此 older frames 参数恢复只能依赖 Stage-1 已经保存下来的原始证据。v4 新增的关键证据包括：
+
+- top-frame 完整通用寄存器块；
+- `frame_fp`；
+- 栈窗口；
+- `frame_flags`；
+- 稳定的 `module_index + rel_pc` / `elf_vaddr` 映射。
+
+### 11.2 当前参数恢复的整体策略
+
+对每一帧，Stage-2 会：
+
+1. 找到包含该 `elf_vaddr` 的 `DW_TAG_subprogram`；
+2. 枚举其 `DW_TAG_formal_parameter`；
+3. 尝试读取参数名；
+4. 尝试求值 `DW_AT_location`；
+5. 按 best-effort 原则输出 value、location 或 `<unavailable>`。
+
+### 11.3 参数名如何恢复
+
+参数名优先来自 `DW_AT_name`。如果当前 DIE 没有直接名字，会继续跟随：
+
+- `DW_AT_abstract_origin`
+- `DW_AT_specification`
+
+去补齐名字。若仍不可得，则退回为：
+
+- `arg0`
+- `arg1`
+- ...
+
+### 11.4 为什么 location list 匹配要用 `dwarf_pc`
+
+当前实现不会直接用 `frame.absolute_pc` 去匹配 location list，而是优先使用已经重建好的 `elf_vaddr`。原因是：
+
+- `absolute_pc` 是进程运行时地址，受 ASLR 影响；
+- DWARF range / location list 工作在 ELF / DWARF 地址空间；
+- 只有使用 `elf_vaddr`，location list 才能与 line table、subprogram range 保持一致。
+
+这保证了参数恢复链路与符号化链路使用同一套地址语义。
+
+### 11.5 当前支持的 DWARF location expression 子集
+
+当前实现支持一组**受限但高价值**的 DWARF op：
+
+- `DW_OP_regN`
+- `DW_OP_bregN`
+- `DW_OP_fbreg`
+- `DW_OP_call_frame_cfa`
+- `DW_OP_plus_uconst`
+- `DW_OP_consts`
+- `DW_OP_constu`
+- `DW_OP_stack_value`
+
+这意味着它适合处理：
+
+- 参数直接在寄存器中的情况；
+- 参数在“寄存器 + 偏移”地址中的情况；
+- 参数在 frame base / CFA 附近栈槽里的情况；
+- 简单常量表达式。
+
+### 11.6 当前**不支持**或不会完整处理的表达式
+
+第一版不会承诺处理完整 DWARF VM，尤其包括：
+
+- `DW_OP_piece` / `DW_OP_bit_piece`
+- `DW_OP_entry_value`
+- TLS 相关复杂表达式
+- implicit pointer / complex call ops
+- 浮点 / vector 参数位置
+- 任何依赖旧进程未保存寄存器或未保存内存区域的复杂表达式
+
+这些场景会自动降级为 location-only 或 `<unavailable>`，而不会伪造数值。
+
+### 11.7 `frame_base` 与 `DW_AT_location` 的语义区别
+
+这里有一个非常关键但容易误解的点：
+
+- `DW_AT_frame_base`
+  - 当前实现按“地址语义”求值；
+  - **不会**把它当成“应该立刻解引用的内存地址”；
+  - 这是后续 `DW_OP_fbreg` 的基底。
+
+- `DW_AT_location`
+  - 当前实现按“参数位置表达式”求值；
+  - 如果最终结果是地址，并且该地址落在已捕获的 `stack_window` 内，则会尝试把该地址对应的 8 字节内容读出来作为 value；
+  - 如果地址不在 `stack_window` 内，则保留 location，但不伪造 value。
+
+简单说：
+
+- frame base / CFA 负责描述“去哪找”；
+- stack window 负责在“证据真的存在”时提供“读出来的值”。
+
+### 11.8 simple CFA 的来源
+
+当前实现没有引入完整 CFI unwind 解释器，而是使用一个保守的简化策略：
+
+- 当 `frame_fp` 可用时，x86_64 / aarch64 都把 `CFA` 近似为 `frame_fp + 16`。
+
+这和标准 ABI 下常见的“保存的 FP + 返回地址”布局一致，足以覆盖一部分简单 stack-slot 参数恢复场景，但它不是一个通用 unwind VM。
+
+### 11.9 older frames 为什么仍然只能是 best-effort
+
+只有 top frame 才有完整通用寄存器块。older frames 没有完整 caller-saved/callee-saved 寄存器快照，因此它们的参数恢复主要依赖：
+
+- `frame_fp`
+- simple CFA
+- `stack_window`
+- DWARF location expression
+
+这意味着：
+
+- 对 `fbreg` / `cfa+offset` 这类参数，older frames 可能恢复出值；
+- 对“纯寄存器参数”且该寄存器没有 crash-time 证据的 older frame，通常只能得到 location 或 `<unavailable>`；
+- 这是设计上的能力边界，不是 Stage-2 的 bug。
+
+### 11.10 top-frame ABI fallback
+
+如果某个 formal parameter 的 DWARF 恢复失败，但它属于 top frame，Stage-2 还会尝试退回到 `args[]`：
+
+- x86_64：`rdi/rsi/rdx/rcx/r8/r9`
+- aarch64：`x0-x7`
+
+这提供了一个非常实用的兜底：即使 debuginfo 不完整，top frame 的前若干整数/指针参数仍可能给出原始值。
+
+### 11.11 参数日志的输出形态
+
+参数不会塞进原有 frame line，而是单独打印一行：
+
+```text
+Recovered crash frame[2] params: fd=0x3 @rdi buf=<unavailable> @rbp-0x20 len=0x400 @rbp+0x10
+```
+
+目前可能出现的几种形式：
+
+- `name=0x1234 @rdi`
+  - 有值，也知道它来自哪个寄存器或位置；
+- `name=0x1234 @rbp+0x10`
+  - 有值，并且值是从栈槽恢复出来的；
+- `name=<unavailable> @x29-0x18`
+  - location 可知，但 value 无法从现有证据读取；
+- `name=<unavailable>`
+  - 名字能枚举出来，但没有足够证据恢复位置和值。
+
+### 11.12 如何解读 older-frame 参数日志
+
+older-frame 参数日志最容易被误解的地方，是“为什么已经出现 `params:` 了，但很多值还是 `<unavailable>`”。这里需要把几类结果区分开看：
+
+#### 11.12.1 `params:` 一行出现，本身就说明子程序匹配已经成功了
+
+如果日志里出现：
+
+```text
+Recovered crash frame[1] params: req=<unavailable> rem=<unavailable>
+```
+
+这至少说明以下步骤已经成功：
+
+1. 该 frame 已成功映射到模块；
+2. 已成功重建 `elf_vaddr`；
+3. 已找到与该地址匹配的 `DW_TAG_subprogram`；
+4. 已枚举出其 `DW_TAG_formal_parameter`；
+5. 已恢复出参数名或参数序号。
+
+因此，`<unavailable>` 并不等同于“older-frame 恢复没工作”。很多时候它恰恰说明：
+
+- older-frame 的 **函数匹配已经对了**；
+- 只是当前保存下来的 crash-time 证据不足以把值也恢复出来。
+
+#### 11.12.2 `params:` 完全没有，通常要优先排查三类问题
+
+如果一帧连 `Recovered crash frame[N] params:` 都没有，通常优先看：
+
+1. **该二进制/库是否真的有 DWARF debuginfo**；
+2. **目标地址是否被 line/subprogram/ranges 覆盖**；
+3. **该帧是否只是有 symbol，但没有 formal parameter 信息**。
+
+当前实现里，“完全没有 params 行”和“有 params 行但值不可用”是两个不同层级的问题，排查方向也不同。
+
+#### 11.12.3 older frames 的 `<unavailable>` 很多时候是设计边界，不是 bug
+
+older frames 没有完整寄存器文件，因此像下面这些参数更容易拿不到值：
+
+- 纯寄存器参数，但对应寄存器没有 crash-time 证据；
+- 参数位置落在 stack window 之外；
+- 参数表达式依赖未实现的 DWARF op；
+- 参数已经被优化掉；
+- 参数原本就在浮点 / vector 寄存器里。
+
+这些场景里，当前实现更倾向于：
+
+- 输出 location；
+- 或输出 `<unavailable>`；
+- 而不是猜一个看似合理但未经证据支持的数值。
+
+### 11.13 一次真实验证里能说明什么、不能说明什么
+
+在一次实际的 `socket_tracer` 崩溃恢复验证中，可以看到类似：
+
+```text
+Recovered crash frame[1] params: req=<unavailable> rem=<unavailable>
+Recovered crash frame[2] params: useconds=<unavailable>
+Recovered crash frame[5] params: arg=<unavailable>
+Recovered crash frame[6] params: arg0=<unavailable> arg1=<unavailable> arg2=<unavailable> arg3=<unavailable>
+```
+
+这类输出说明：
+
+- older-frame 的 parameter enumeration 已经在工作；
+- `DW_AT_ranges` / rnglists 匹配已经让 older frames 能正确落到对应 subprogram；
+- 但 value recovery 仍严格受限于 crash-time 证据、DWARF 位置表达式复杂度以及 stack window 覆盖范围。
+
+换句话说，这类日志更接近“恢复链路已经打通，但证据不足以恢复值”，而不是“Stage-2 完全没命中 older frame”。
+
+---
+
+## 12. Stage-2：日志格式与降级策略
+
+### 12.1 报告边界
+
+每条恢复出的 crash report 都会用固定分隔线括起来，便于在普通 agent 日志中快速定位整段恢复报告。
+
+### 12.2 日志大致顺序
+
+1. 分隔线
+2. `Recovered crash snapshot: ...`
+3. `Recovered crash registers: ...` 或 `Recovered crash registers (partial): ...`
+4. `Recovered crash args: ...`
+5. 每一帧的 `Recovered crash frame[N]: ...`
+6. 如有参数，再打印 `Recovered crash frame[N] params: ...`
+7. 分隔线
+
+### 12.3 单帧日志的降级层级
+
+当前每帧日志大致按以下优先级降级：
 
 1. `module + rel_pc + symbol + file:line + build_id`
 2. `module + rel_pc + symbol + file:line`
-3. `module + rel_pc + file:line (+ build_id)`
-4. `module + rel_pc + symbol (+ build_id)`
-5. `raw pc + module + rel_pc (+ build_id)`
-6. `raw pc`
+3. `module + rel_pc + file:line + build_id`
+4. `module + rel_pc + file:line`
+5. `module + rel_pc + symbol + build_id`
+6. `module + rel_pc + symbol`
+7. `raw pc + module + rel_pc + build_id`
+8. `raw pc + module + rel_pc`
+9. `raw pc`
 
-这正是 Stage-2 best-effort 设计的体现：
+参数日志本身也遵循 best-effort：
 
-- 局部失败只降低该帧信息丰富度；
-- 不会导致整条快照消费失败；
-- 其他帧仍继续输出。
+- 有值就打印值；
+- 只有位置就打印位置；
+- 都没有就打印 `<unavailable>`；
+- 某一帧参数失败，不影响其他帧与整条记录。
 
-### 8.7 当前输出示意
-
-当前 Stage-2 在输出一条恢复出的 crash report 时，会先打印一条明显的分隔线，再输出 summary 与逐帧日志，最后再打印一条相同的分隔线，便于在普通 agent 日志中快速定位整段 crash report。
-
-可能出现的日志形态包括：
+### 12.4 当前日志示意
 
 ```text
 =========================================================
 Recovered crash snapshot: task=deepflow-agent signal=11 code=1 pid=123 tid=456 executable=/usr/bin/deepflow-agent executable_md5=0123456789abcdef0123456789abcdef ip=0x7f... fault_addr=0x0 frames=6
+Recovered crash registers: rip=0x7f... rsp=0x7ffd... rbp=0x7ffd... eflags=0x10246
+Recovered crash registers: rax=0x0 rbx=0x7f... rcx=0x2a rdx=0x0 rsi=0x7f... rdi=0x1
+Recovered crash registers: r8=0x7f... r9=0x0 r10=0x... r11=0x... r12=0x... r13=0x... r14=0x... r15=0x...
 Recovered crash args: rdi=0x1 rsi=0x7f1234567000 rdx=0x0 rcx=0x2a r8=0x7f1234500000 r9=0x0
 Recovered crash frame[0]: pc=0x7f... module=/usr/bin/deepflow-agent rel=0x1234 symbol=foo+0x18 file=/root/project/foo.c:87 build_id=abcd...
-Recovered crash frame[3]: pc=0x7f... module=/lib64/libc.so.6 rel=0x2a1f0
+Recovered crash frame[0] params: req=0x7f1234567000 @rsi timeout=0x2a @rcx
+Recovered crash frame[2]: pc=0x7f... module=/lib64/libc.so.6 rel=0x2a1f0 symbol=malloc+0x30
+Recovered crash frame[2] params: bytes=<unavailable> @rbp+0x10
 =========================================================
 ```
 
-这里要注意三点：
+需要注意三点：
 
-1. `task` 字段优先来自崩溃线程的缓存名字；如果消费的是旧版快照或名字不可得，则会回退到可执行文件名。
-2. `executable_md5` 是**Stage-2 在恢复时**对当前 `executable_path` 指向文件做的 best-effort 摘要，而不是 Stage-1 在崩溃当下持久化进 snapshot 的字段。因此它更适合作为“当前恢复环境中的镜像指纹”来辅助对比，而不是把它理解为崩溃瞬间的额外 on-disk ABI 数据。
-3. `args[]` 打印的是崩溃线程 top frame 的**原始寄存器参数值**，不是经过调试信息反推后的源码级函数参数列表。也就是说，它不能覆盖 stack-passed 参数、浮点参数、被优化掉的参数，older frames 的参数也不在这个输出保证范围内。
-
----
-
-## 9. ELF / DWARF helper 能力
-
-为了支撑 Stage-2，当前在 `agent/src/ebpf/user/elf.c` 中已经补充了通用 helper：
-
-- `elf_read_build_id()`：从 ELF note 中提取 GNU build-id；
-- `elf_file_offset_to_vaddr()`：把 file offset 映射回 ELF 虚拟地址空间；
-- `elf_symbolize_pc()`：从 `SHT_SYMTAB` / `SHT_DYNSYM` 中为 PC 选择最匹配的 symbol。
-
-这些 helper 的作用是把 Stage-2 的符号化逻辑从 `crash_monitor.c` 中拆分出来，使职责更清晰：
-
-- `crash_monitor.c`：负责 snapshot 捕获与消费；
-- `crash_symbolize.c`：负责 Stage-2 高层符号化流程；
-- `elf.c`：负责通用 ELF/build-id/symbol 基础能力。
+1. `executable_md5` 是 Stage-2 针对**当前磁盘文件**做的摘要，不是崩溃当下持久化进 snapshot 的字段；
+2. `Recovered crash args:` 是 top-frame 原始 ABI 参数寄存器视图，不等同于 formal parameters 恢复结果；
+3. `Recovered crash frame[N] params:` 是当前 per-frame 参数恢复的最终用户可见输出，它是建立在 DWARF + capture evidence 上的 best-effort 结果。
 
 ---
 
-## 10. 构建接线
+## 13. 当前限制与权衡
 
-当前构建系统已经完成了 crash symbolizer 的接线：
+### 13.1 模块缓存是有界的
 
-1. `agent/src/ebpf/Makefile` 的 `OBJS` 中包含：
-   - `user/crash_monitor.o`
-   - `user/crash_symbolize.o`
+`modules[]` 受 `CRASH_SNAPSHOT_MAX_MODULES` 限制。超过上限时只能保留前 N 个模块，未入缓存的帧可能退回 raw PC。
 
-2. `deepflow-ebpfctl` 显式链接了：
-   - `-ldwarf`
-   - `-lelf`
-   - `-lz`
-   - `-lpthread`
+### 13.2 `dlopen/dlclose` 可能让缓存陈旧
 
-3. 现有构建参数继续保留：
-   - `-fno-omit-frame-pointer`
+模块缓存是在正常上下文中预构建的。如果之后进程又发生大量 `dlopen/dlclose` 动态变化，那么：
 
-其中 `-fno-omit-frame-pointer` 很重要，因为当前 Stage-1 栈回溯显著依赖 frame pointer。如果编译时省略它，回溯深度和可靠性都会受影响。
-
----
-
-## 11. 线程覆盖策略
-
-当前线程覆盖依赖 monitored helper：
-
-- 在线程真正进入工作函数前，先把调用方传入的线程名写入 crash monitor 的线程本地缓存；
-- 然后统一调用 `crash_monitor_prepare_thread()`；
-- 再进入原始 worker routine。
-
-这样设计的好处：
-
-- 不需要每个线程入口重复手写 altstack 初始化；
-- 接入和审计更统一；
-- 新增 C/eBPF worker 时，只要继续复用现有 monitored helper，即可自动纳入 crash monitor 保护范围；
-- 崩溃时不需要在 signal handler 里再去访问 `/proc/thread-self/comm`，线程名已经在正常上下文里准备好了。
-
-需要注意的是：如果未来新增线程绕过了 monitored helper，那么它即使进程里安装了 fatal handler，也仍可能因为没有 altstack 而抓不到可靠快照；同时它的线程名也不会自动进入 crash monitor 的线程本地缓存。
-
----
-
-## 12. 当前限制与权衡
-
-### 12.1 模块缓存是有界的
-
-`modules[]` 受 `CRASH_SNAPSHOT_MAX_MODULES` 上限限制。当前设计选择固定上限，是为了保持 ABI 固定大小和 handler 的实现简单性。
-
-影响是：
-
-- 极端情况下，模块数量超过上限时只能保留前 N 个；
-- 未进入缓存的模块对应 frame 可能只能退回 raw PC。
-
-### 12.2 `dlopen/dlclose` 动态变化可能导致缓存陈旧
-
-模块缓存是在正常上下文里预构建的。如果进程在之后又发生了大量 `dlopen/dlclose` 变化，那么：
-
-- 某些 frame 可能无法精确匹配到 record 中缓存的模块；
+- 某些 frame 可能无法精确匹配到缓存模块；
 - Stage-2 会对这些帧退回 raw fallback；
-- 这是当前设计接受的 trade-off。
+- 这是固定大小 ABI 与 signal-safety 的 trade-off。
 
-### 12.3 依赖 frame pointer
+### 13.3 当前回溯依赖 frame pointer
 
-当前回溯主要依赖 frame-pointer walk，因此：
+当前 Stage-1 主要依赖 frame-pointer walk，因此：
 
 - 对 `-fomit-frame-pointer` 不友好；
-- 对高度优化、无标准 frame 链的代码路径，回溯深度可能受限；
-- 顶层寄存器信息仍然可信，但 older frames 的完整性不是绝对保证。
+- 对高度优化、无标准 frame 链的路径，回溯深度可能受限；
+- older frames 的参数恢复也会随之受影响。
 
-### 12.4 不保证一定能拿到 `file:line`
+### 13.4 older frames 没有完整寄存器文件
+
+只有 top frame 保存了完整通用寄存器。older frames 的参数恢复更多依赖：
+
+- `frame_fp`
+- simple CFA
+- 栈窗口
+- DWARF location
+
+因此 older frames 的“纯寄存器参数”无法像 top frame 那样普遍恢复。
+
+### 13.5 栈窗口是有界的
+
+当前栈窗口固定为 2048 字节，只覆盖 `sp/fp` 附近的一小段正常栈证据。超出窗口的地址不会被读取，因此：
+
+- 某些 stack-backed 参数只能得到 location，拿不到 value；
+- 这是一种有意识的安全与复杂度控制。
+
+### 13.6 不是完整 DWARF VM
+
+当前并未实现完整的 DWARF expression / unwind 解释器。复杂表达式、piecewise 参数、entry value、TLS 等场景会降级处理。
+
+### 13.7 不保证一定拿到 `file:line`
 
 即使 symbolization 已实现，以下情况仍会导致只有 symbol 或 raw 地址：
 
 - 二进制被 strip；
 - 系统未安装 debuginfo；
 - DWARF sections 不完整；
-- 目标地址无法映射到任何行表项；
+- 行表无法覆盖目标地址；
 - candidate debuginfo 与 build-id 不匹配。
 
-### 12.5 crash monitor 不是容错机制
+### 13.8 不保证所有崩溃都能捕获
 
 它不能保证：
 
@@ -600,21 +1080,21 @@ Recovered crash frame[3]: pc=0x7f... module=/lib64/libc.so.6 rel=0x2a1f0
 
 ---
 
-## 13. 运维与使用注意事项
+## 14. 运维与使用注意事项
 
-### 13.1 `.crash` 是结构化二进制文件
+### 14.1 `.crash` 是二进制快照文件
 
 不能把 `.crash` 当普通文本日志直接阅读。它保存的是 `struct crash_snapshot_record` 序列，供 Stage-2 消费。
 
-### 13.2 默认会在消费后清空
+### 14.2 默认会在消费后清空
 
-Stage-2 消费完成后会调用 `ftruncate()` 清空快照文件。因此如果需要长期保留原始崩溃样本，应在 agent 启动前先复制。
+Stage-2 消费完成后会 `ftruncate()` 清空快照文件。因此如果需要保留原始崩溃样本，应在 agent 启动前先复制。
 
-### 13.3 容器里要保证路径可写
+### 14.3 容器里要保证路径可写
 
-如果容器环境无法写入 `/var/log/deepflow-agent/`，则即使 handler 触发，快照也无法可靠落盘。
+如果容器环境无法写入 `/var/log/deepflow-agent/`，则即使 handler 触发，也无法可靠落盘。
 
-### 13.4 debuginfo 越完整，报告越可读
+### 14.4 debuginfo 越完整，报告越可读
 
 如果部署环境同时提供：
 
@@ -622,39 +1102,326 @@ Stage-2 消费完成后会调用 `ftruncate()` 清空快照文件。因此如果
 - 共享库 ELF
 - 对应 build-id 匹配的 debuginfo
 
-那么 Stage-2 能输出最丰富的结果：module、symbol、offset、源码路径、行号、build-id。
+那么 Stage-2 才能输出最丰富的结果：
+
+- 完整模块路径
+- build-id
+- symbol
+- `file:line`
+- per-frame 参数位置与部分参数值
+
+### 14.5 尽量保留 frame pointer
+
+当前构建链路保留了 `-fno-omit-frame-pointer`（`agent/src/ebpf/Makefile:135`）。如果未来某些相关组件关闭 frame pointer，回溯质量与 per-frame 参数恢复质量都会下降。
+
+### 14.6 Rust sample / release 构建时的 debuginfo 要求
+
+对 Rust sample 来说，是否能恢复出应用自身帧的 `file:line` 与 formal parameters，往往首先取决于 release 产物里是否真的保留了 DWARF。
+
+一个很常见、也很容易误判的现象是：
+
+- `file` 命令显示二进制 **not stripped**；
+- `ELF symbol` 仍然能给出函数名；
+- 但 Stage-2 对应用自身帧仍然没有 `file:line`，也没有 `params:`。
+
+这里的关键点是：
+
+- **not stripped ≠ 有 DWARF debuginfo**
+- 一个二进制即使保留了 `.symtab` / `.strtab`，也依然可能完全没有：
+  - `.debug_info`
+  - `.debug_abbrev`
+  - `.debug_line`
+  - `.debug_str`
+  - `.debug_ranges` / `.debug_rnglists`
+
+在这种情况下，Stage-2 仍可能拿到：
+
+- `symbol`
+- `module`
+- `rel_pc`
+
+但无法拿到：
+
+- `file:line`
+- `DW_TAG_formal_parameter`
+- `DW_AT_location`
+- per-frame `params:`
+
+#### 推荐的 Rust release 配置
+
+当前 sample 推荐使用：
+
+```toml
+[profile.release]
+panic = 'abort'
+debug = 2
+split-debuginfo = "off"
+```
+
+其含义分别是：
+
+- `panic = 'abort'`
+  - 更接近 crash monitor 要观测的“原生崩溃/终止”语义；
+- `debug = 2`
+  - 在 release 中保留完整 DWARF；
+- `split-debuginfo = "off"`
+  - 让 DWARF 直接保留在主二进制里，便于当前 Stage-2 直接从目标 ELF 读取。
+
+当前 sample 已按这组方式配置：
+
+- `agent/src/ebpf/samples/rust/socket-tracer/Cargo.toml:21-24`
+- `agent/src/ebpf/samples/rust/profiler/Cargo.toml:21-24`
+
+#### 如何确认 release 产物里真的有 debuginfo
+
+不要只看 `file` 命令。更可靠的是直接检查 section：
+
+```bash
+readelf -S samples/rust/socket-tracer/target/release/socket_tracer | grep debug_
+readelf -S samples/rust/profiler/target/release/profiler | grep debug_
+```
+
+如果能看到至少部分：
+
+- `.debug_info`
+- `.debug_abbrev`
+- `.debug_line`
+- `.debug_str`
+
+那么 Stage-2 对应用自身帧的恢复能力才算真正具备基础。
+
+如果只能看到：
+
+- `.symtab`
+- `.strtab`
+
+但完全没有 `.debug_*`，那么通常会出现：
+
+- 应用帧有 `symbol`；
+- 但没有 `file:line`；
+- 也没有 `Recovered crash frame[N] params:`。
+
+### 14.7 如何排查“有 symbol，但应用自身帧没 params”
+
+推荐按下面顺序看：
+
+1. **先看是否有 `.debug_*` section**
+   - 没有的话，先解决构建配置；
+2. **再看系统库是否有 debuginfo**
+   - 如果 libc 帧能出 `file:line` / `params`，而应用帧不行，往往说明 crash monitor 主链路是通的，问题主要在应用自身 debuginfo；
+3. **再看是不是 older-frame 证据不足**
+   - 若应用帧已经出现 `params:`，但大量 `<unavailable>`，则通常不是 debuginfo 缺失，而是 older-frame 恢复的正常边界。
+
+这个排查顺序很重要，因为它能把三类问题明确分开：
+
+- **没有 DWARF**
+- **DWARF 子程序匹配失败**
+- **DWARF 已命中，但值证据不足**
+
+### 14.8 一次典型现象应该如何解释
+
+如果你看到这样的组合：
+
+- libc 帧有 `file:line`，也有 `params:`；
+- 应用自身帧只有 `symbol`，没有 `file:line`，也没有 `params:`；
+- 二进制 `file` 显示为 `not stripped`；
+- 但 `readelf -S` 看不到任何 `.debug_*`；
+
+那么最合理的解释通常是：
+
+- crash monitor 的 Stage-2 主逻辑已经正常工作；
+- older-frame range-aware 匹配也已经在系统库帧上生效；
+- 应用自身帧缺参数的主要原因是 **release 产物没把 DWARF 带进来**。
+
+这类现象本身不应被解读为“older-frame 参数恢复又坏了”。
+
+### 14.9 基于这次 `profiler` 实际日志的完整案例分析
+
+这次 `samples/rust/profiler/target/release/profiler` 的恢复日志，比前面的 `socket_tracer` 样例更能说明：当 release 产物真的带上 DWARF 之后，当前 Stage-2 已经可以同时覆盖：
+
+- 应用自身的 C 帧；
+- 应用自身的 Rust 帧；
+- libc 的 older frames；
+- 同一条日志里 top-frame 与 older-frame 的不同恢复层级。
+
+可以先抓住下面几个最关键的实际现象：
+
+```text
+Recovered crash frame[0]: ... symbol=setup_bpf_tracer+0x3a file=/work/agent/src/ebpf/user/tracer.c:226 ...
+Recovered crash frame[0] params: name=0x577e25dc66b2 @r12 load_name=0x7ffd0560c0f0 @rsi bpf_bin_buffer=0x0 @rdx buffer_sz=0x1 @rcx tps=0x577e5dc65f80 @r8 workers_nr=0x1 @r9 ...
+Recovered crash frame[1]: ... symbol=running_socket_tracer+0x198 file=/work/agent/src/ebpf/user/socket.c:2568 ...
+Recovered crash frame[1] params: handle=<unavailable> @r12 thread_nr=0x1 @rbp+0x10-0xa8d8 perf_pages_cnt=0x40 @rbp+0x10-0xa8e0 queue_size=0x10000 @rbp+0x10-0xa8f4 ...
+Recovered crash frame[2]: ... symbol=_ZN8profiler4main17h... file=/work/agent/src/ebpf/samples/rust/profiler/src/main.rs:178 ...
+```
+
+#### 14.9.1 这首先说明 release debuginfo 已经真的生效
+
+当前 `profiler` sample 的 release 配置位于 `agent/src/ebpf/samples/rust/profiler/Cargo.toml:21-24`。在这次实际日志里，应用自身模块已经不再只是“有 symbol 但没有源码信息”，而是明确出现了：
+
+- 应用自身帧的 `file:line`；
+- Rust 源文件路径；
+- older-frame 的参数行；
+- libc 与应用模块混合存在时的连续恢复结果。
+
+这和之前 `socket_tracer` 那种“系统库帧能出 `file:line/params`，但应用自身帧只有 symbol”的现象形成了很清晰的对照。也就是说，这次日志本身已经证明：**release debuginfo 缺失的问题在 `profiler` 这个样例上已经被排除。**
+
+#### 14.9.2 `frame[0]` 说明 top-frame 恢复不是简单复读 `args[]`
+
+顶帧符号是 `setup_bpf_tracer`，其函数签名可在 `agent/src/ebpf/user/tracer.c:330-340` 查看。对应日志里恢复出的参数名包括：
+
+- `name`
+- `load_name`
+- `bpf_bin_buffer`
+- `buffer_sz`
+- `tps`
+- `workers_nr`
+- `free_cb`
+- `create_cb`
+- `handle`
+- `profiler_callback_ctx`
+- `sample_freq`
+
+这和源码签名是能对上的，但更关键的是：**值的位置并不只是 SysV ABI 入口寄存器。**
+
+例如日志里：
+
+- `name=... @r12`
+- `load_name=... @rsi`
+- `bpf_bin_buffer=... @rdx`
+- `workers_nr=0x1 @r9`
+
+这里最值得注意的是 `name` 出现在 `@r12`，而不是机械地标成 `@rdi`。这说明当前实现不是把 `args[]` 生硬套上参数名，而是已经在 `crash_recover_parameter_value()`（`agent/src/ebpf/user/crash_symbolize.c:1810`）里按 DWARF location 做了“**崩溃点当前 live location**”恢复。因此：
+
+- `Recovered crash args:` 仍然是 top-frame 的原始 ABI 视图；
+- `Recovered crash frame[0] params:` 则是更接近源码语义的 DWARF 驱动视图。
+
+这两行日志一起看，才能正确理解 top-frame 参数恢复的价值。
+
+#### 14.9.3 `frame[1]` 是 older-frame 参数值恢复已经落地的直接证据
+
+`frame[1]` 对应 `running_socket_tracer`，其函数签名可在 `agent/src/ebpf/user/socket.c:2508-2514` 查看。更重要的是，这一帧恢复出的几个值和 Rust 调用点 `agent/src/ebpf/samples/rust/profiler/src/main.rs:178-185` 是能直接对上的：
+
+- `thread_nr=0x1`
+- `perf_pages_cnt=0x40`
+- `queue_size=0x10000`
+- `max_trace_entries=0x20000`
+
+这几个值并不是 top frame 的 ABI 参数，而是**older frame 自己的参数值**。而且它们的 location 形态是：
+
+- `@rbp+0x10-0xa8d8`
+- `@rbp+0x10-0xa8e0`
+- `@rbp+0x10-0xa8f4`
+- `@rbp+0x10-0xa8dc`
+
+这正是本次改动最关键的验证点之一：它表明当前 older-frame 恢复已经不只是“能枚举参数名”，而是确实能够把：
+
+- `frame_fp`
+- stack window
+- DWARF location expression
+- older-frame subprogram range 匹配
+
+组合起来，恢复出一部分 **真实的非顶帧参数值**。
+
+#### 14.9.4 为什么 `frame[1]` 里仍然有些参数是 `<unavailable>`
+
+同一帧里也有：
+
+- `handle=<unavailable> @r12`
+- `max_socket_entries=<unavailable> @rbx`
+- `socket_map_max_reclaim=<unavailable> @rbp+0x10`
+
+这类结果不应理解为“older-frame 恢复失败”，而应理解为：
+
+1. 子程序已经匹配成功；
+2. 参数名已经枚举成功；
+3. location 至少部分已经恢复成功；
+4. 但在当前 crash-time 证据下，值本身无法被可靠取回。
+
+也就是说，`<unavailable>` 在这个上下文里表达的是“**诚实降级**”，不是“**根本没命中**”。这正符合当前设计里 best-effort 的边界。
+
+#### 14.9.5 `frame[2]` 没有 `params:`，不代表这一帧恢复失败
+
+`frame[2]` 落在 `agent/src/ebpf/samples/rust/profiler/src/main.rs:178`，而 `main()` 本身定义在 `agent/src/ebpf/samples/rust/profiler/src/main.rs:157`。这条日志至少说明两件事：
+
+- Rust release 二进制里的 `file:line` 已经可以恢复出来；
+- line table 已经把 PC 准确落到了 `running_socket_tracer(...)` 的调用点附近。
+
+同时，`frame[2]` 没有出现 `params:` 并不奇怪，因为 Rust 这里的 `main()` 本身并没有源码级 formal parameters 需要恢复。这个例子很重要，因为它说明：
+
+- “没有 `params:`” 并不总是异常；
+- 它有时只是因为该函数本来就没有可枚举的参数，或者该帧对应的是 callsite 语义更强的一段代码位置。
+
+#### 14.9.6 运行时 / 启动帧的混合结果也符合预期
+
+后续日志里还能看到：
+
+- `frame[3]` 的 `f=<unavailable> @rdi`
+- `frame[7]` 的 `main/argc/argv`
+- `frame[8]` 的 `main/argc/argv/init/fini/rtld_fini/stack_end`
+
+它们共同说明：
+
+- 不是只有顶帧和应用帧能出参数；
+- libc startup older frames 也已经可以输出参数名与部分位置；
+- 某些运行时包装层、closure、启动桩会天然更容易出现 `<unavailable>`，因为它们经常伴随更重的优化、寄存器重用或更难的 DWARF 表达式。
+
+因此，这类“有的帧能恢复值，有的帧只能恢复位置，有的帧只有 `file:line`”的混合结果，恰恰是当前实现真实而健康的表现，而不是异常现象。
+
+#### 14.9.7 这次实际日志能得出的最终结论
+
+基于这次 `profiler` 实际日志，可以比较明确地得出下面几条结论：
+
+1. `v4` snapshot 的 full-register 持久化已经正常工作；
+2. release 带 debuginfo 的 Rust sample 已经能恢复出应用自身帧的 `file:line`；
+3. older-frame 参数恢复已经不只是“枚举名字”，而是能恢复出一部分真实值；
+4. `frame_fp + stack_window + DWARF` 这条设计路线已经被实际日志验证；
+5. 剩余的 `<unavailable>` 主要反映的是证据边界，而不是主链路损坏。
+
+如果要用一句话概括这次案例，最准确的表述应当是：
+
+> **当前实现已经能在真实日志中同时证明“应用帧可符号化”和“older-frame 参数可部分恢复”；剩下没有恢复出的部分，更多是 best-effort 的天然边界，而不是实现根本不可用。**
 
 ---
 
-## 14. 当前能力总结
+## 15. 当前能力总结
 
 当前 crash monitor 已具备以下能力：
 
 - fatal signal handler 安装；
 - 每线程 altstack 准备；
-- 顶层寄存器抓取；
+- 顶层崩溃元数据抓取；
+- top-frame ABI 参数寄存器抓取；
+- v4 完整 top-frame 通用寄存器块持久化；
+- 普通栈边界缓存；
+- bounded stack window 持久化；
 - frame-pointer 有界回溯；
-- 固定大小 crash snapshot ABI；
-- v2/v3 快照兼容消费；
-- 固定路径二进制快照写盘；
+- AArch64 LR hint 记录；
+- `frame_fp` / `frame_flags` 持久化；
 - `/proc/self/maps` 模块缓存；
-- `modules[] / executable_path / thread_name / module_index / rel_pc` 写入；
+- `module_index + rel_pc` 注释；
+- 固定路径二进制快照写盘；
+- v2 / v3 / v4 快照兼容消费；
 - 启动期旧快照消费；
-- Stage-2 crash summary 中的 task 名、可执行文件路径与 MD5 输出；
-- Stage-2 恢复日志前后分隔线输出；
+- crash summary 中的 task 名、可执行文件路径与 MD5 输出；
+- Stage-2 完整寄存器 / partial 寄存器日志；
+- Stage-2 top-frame args 日志；
 - Stage-2 ELF symbol 解析；
 - Stage-2 DWARF `file:line` 解析；
 - build-id aware external debuginfo 查找；
+- per-frame formal parameter 枚举；
+- 受限 DWARF location expression 求值；
+- stack-window-backed 参数值恢复；
+- per-frame `params:` 日志输出；
 - best-effort 多层级日志降级输出。
 
 换句话说，当前实现已经不是“只能打印原始地址的快照消费者”，而是一个完整的：
 
 - **Stage-1 原始崩溃现场采集器**
-- **Stage-2 best-effort 崩溃符号化器**
+- **Stage-2 best-effort 崩溃符号化器与参数恢复器**
 
 ---
 
-## 15. 总结
+## 16. 总结
 
 整个设计的核心思想可以概括为一句话：
 
@@ -662,15 +1429,17 @@ Stage-2 消费完成后会调用 `ftruncate()` 清空快照文件。因此如果
 
 围绕这一原则，当前实现已经形成完整闭环：
 
-1. 运行前预缓存模块与线程上下文；
-2. 崩溃时以 async-signal-safe 风格保存固定大小快照；
-3. 下次启动时恢复旧快照；
-4. 基于模块、build-id、ELF、DWARF 做 best-effort 符号化；
-5. 输出可读崩溃摘要与逐帧报告；
-6. 清空已消费快照，继续本次运行。
+1. 运行前预缓存模块、线程名和线程普通栈边界；
+2. 为主线程与 monitored worker thread 准备 altstack；
+3. 崩溃时以 async-signal-safe 风格保存固定大小 v4 快照；
+4. 快照中持久化模块、帧、full regs、stack window 等原始证据；
+5. 下次启动时兼容消费 v2/v3/v4 记录；
+6. 基于 build-id、ELF、DWARF 做 best-effort 符号化；
+7. 输出 crash summary、完整寄存器、top-frame args、逐帧日志和 per-frame 参数；
+8. 清空已消费快照，继续本次运行。
 
 这保证了：
 
 - 原始崩溃语义不被破坏；
 - signal handler 保持足够克制；
-- Stage-2 可以不断增强，而不需要把复杂逻辑塞回 fatal path。
+- Stage-2 可以不断增强，而无需把复杂逻辑塞回 fatal path。

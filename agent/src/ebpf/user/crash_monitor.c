@@ -71,12 +71,20 @@
 
 #define CRASH_ALTSTACK_SIZE (64 * 1024)
 #define CRASH_SNAPSHOT_VERSION_V2 2
+#define CRASH_SNAPSHOT_VERSION_V3 3
 
 struct crash_snapshot_record_header {
 	uint32_t magic;
 	uint16_t version;
 	uint16_t arch;
 	uint32_t size;
+};
+
+struct crash_snapshot_frame_v3 {
+	uint64_t absolute_pc;
+	uint64_t rel_pc;
+	uint32_t module_index;
+	uint32_t reserved;
 };
 
 struct crash_snapshot_record_v2 {
@@ -98,7 +106,30 @@ struct crash_snapshot_record_v2 {
 	uint32_t modules_count;
 	uint32_t frames_count;
 	struct crash_snapshot_module modules[CRASH_SNAPSHOT_MAX_MODULES];
-	struct crash_snapshot_frame frames[CRASH_SNAPSHOT_MAX_FRAMES];
+	struct crash_snapshot_frame_v3 frames[CRASH_SNAPSHOT_MAX_FRAMES];
+};
+
+struct crash_snapshot_record_v3 {
+	uint32_t magic;
+	uint16_t version;
+	uint16_t arch;
+	uint32_t size;
+	uint32_t signal;
+	int32_t si_code;
+	uint32_t pid;
+	uint32_t tid;
+	uint64_t fault_addr;
+	uint64_t ip;
+	uint64_t sp;
+	uint64_t fp;
+	uint64_t lr;
+	uint64_t args[CRASH_SNAPSHOT_ARG_REGS];
+	char executable_path[CRASH_SNAPSHOT_MODULE_PATH_LEN];
+	char thread_name[CRASH_SNAPSHOT_TASK_NAME_LEN];
+	uint32_t modules_count;
+	uint32_t frames_count;
+	struct crash_snapshot_module modules[CRASH_SNAPSHOT_MAX_MODULES];
+	struct crash_snapshot_frame_v3 frames[CRASH_SNAPSHOT_MAX_FRAMES];
 };
 
 /*
@@ -505,25 +536,115 @@ static int crash_open_snapshot_file(void)
  */
 static void crash_fill_frame(struct crash_snapshot_record *record,
 			     struct crash_snapshot_frame *frame,
-			     uint64_t absolute_pc)
+			     uint64_t absolute_pc, uint64_t frame_fp,
+			     uint32_t frame_flags)
 {
 	frame->absolute_pc = absolute_pc;
 	frame->rel_pc = 0;
+	frame->frame_fp = frame_fp;
 	frame->module_index = CRASH_SNAPSHOT_INVALID_MODULE;
-	frame->reserved = 0;
+	frame->frame_flags = frame_flags;
 	if (record != NULL)
 		crash_fill_frame_module(record, frame);
 }
 
 static int crash_append_frame(struct crash_snapshot_record *record,
-			      uint64_t absolute_pc)
+			      uint64_t absolute_pc, uint64_t frame_fp,
+			      uint32_t frame_flags)
 {
 	if (absolute_pc == 0 || record->frames_count >= CRASH_SNAPSHOT_MAX_FRAMES)
 		return 0;
 
-	crash_fill_frame(record, &record->frames[record->frames_count], absolute_pc);
+	crash_fill_frame(record, &record->frames[record->frames_count], absolute_pc,
+			 frame_fp, frame_flags);
 	record->frames_count++;
 	return 1;
+}
+
+static void crash_capture_stack_window(struct crash_snapshot_record *record,
+				       uintptr_t stack_floor,
+				       uintptr_t stack_ceil)
+{
+	uintptr_t start = 0;
+	size_t copy_size;
+
+	if (record == NULL)
+		return;
+	if (record->sp >= stack_floor && record->sp < stack_ceil)
+		start = (uintptr_t)record->sp;
+	if (record->fp >= stack_floor && record->fp < stack_ceil &&
+	    (start == 0 || record->fp < start))
+		start = (uintptr_t)record->fp;
+	if (start == 0 || start >= stack_ceil)
+		return;
+
+	copy_size = (size_t)(stack_ceil - start);
+	if (copy_size > CRASH_SNAPSHOT_STACK_WINDOW_SIZE)
+		copy_size = CRASH_SNAPSHOT_STACK_WINDOW_SIZE;
+	if (copy_size == 0)
+		return;
+
+	crash_copy_bytes(record->stack_window, sizeof(record->stack_window),
+			 (const void *)start, copy_size);
+	record->stack_window_start = (uint64_t)start;
+	record->stack_window_size = (uint32_t)copy_size;
+	record->capture_flags |= CRASH_SNAPSHOT_FLAG_STACK_WINDOW;
+}
+
+static void crash_capture_registers_from_ucontext(struct crash_snapshot_record *record,
+					  ucontext_t *ctx)
+{
+	if (record == NULL || ctx == NULL)
+		return;
+
+#if defined(__x86_64__)
+	record->registers.x86_64.rax =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_RAX];
+	record->registers.x86_64.rbx =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_RBX];
+	record->registers.x86_64.rcx =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_RCX];
+	record->registers.x86_64.rdx =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_RDX];
+	record->registers.x86_64.rsi =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_RSI];
+	record->registers.x86_64.rdi =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_RDI];
+	record->registers.x86_64.rbp =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_RBP];
+	record->registers.x86_64.rsp =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_RSP];
+	record->registers.x86_64.r8 =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_R8];
+	record->registers.x86_64.r9 =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_R9];
+	record->registers.x86_64.r10 =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_R10];
+	record->registers.x86_64.r11 =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_R11];
+	record->registers.x86_64.r12 =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_R12];
+	record->registers.x86_64.r13 =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_R13];
+	record->registers.x86_64.r14 =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_R14];
+	record->registers.x86_64.r15 =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_R15];
+	record->registers.x86_64.rip =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_RIP];
+	record->registers.x86_64.eflags =
+		(uint64_t)ctx->uc_mcontext.gregs[REG_EFL];
+	record->capture_flags |= CRASH_SNAPSHOT_FLAG_FULL_REGS;
+#elif defined(__aarch64__)
+	for (size_t i = 0; i < 31; i++)
+		record->registers.aarch64.x[i] = (uint64_t)ctx->uc_mcontext.regs[i];
+	record->registers.aarch64.sp = (uint64_t)ctx->uc_mcontext.sp;
+	record->registers.aarch64.pc = (uint64_t)ctx->uc_mcontext.pc;
+	record->registers.aarch64.pstate = (uint64_t)ctx->uc_mcontext.pstate;
+	record->capture_flags |= CRASH_SNAPSHOT_FLAG_FULL_REGS;
+#else
+	(void)ctx;
+#endif
 }
 
 static void crash_cache_thread_stack_bounds(void)
@@ -654,6 +775,7 @@ static uint32_t crash_collect_frames(struct crash_snapshot_frame *frames,
 		uintptr_t *frame;
 		uintptr_t next_fp;
 		uintptr_t return_addr;
+		uint64_t frame_hint = 0;
 
 		if ((current_fp & (sizeof(uintptr_t) - 1)) != 0)
 			break;
@@ -668,13 +790,18 @@ static uint32_t crash_collect_frames(struct crash_snapshot_frame *frames,
 		return_addr = frame[1];
 		if (return_addr == 0)
 			break;
-		crash_fill_frame(NULL, &frames[count++], (uint64_t)return_addr);
-		if (!crash_is_frame_pointer_valid(current_fp, next_fp, stack_floor,
+		if (crash_is_frame_pointer_valid(current_fp, next_fp, stack_floor,
 						 stack_ceil))
+			frame_hint = (uint64_t)next_fp;
+		crash_fill_frame(NULL, &frames[count++], (uint64_t)return_addr,
+				 frame_hint, CRASH_SNAPSHOT_FRAME_FP_WALK);
+		if (frame_hint == 0)
 			break;
 		current_fp = next_fp;
 	}
 
+	if (count == max_frames && current_fp != 0)
+		frames[count - 1].frame_flags |= CRASH_SNAPSHOT_FRAME_TRUNCATED;
 	return count;
 }
 
@@ -687,6 +814,8 @@ static uint32_t crash_collect_frames(struct crash_snapshot_frame *frames,
  *   - architecture id,
  *   - top-frame control registers (IP/SP/FP/LR),
  *   - a best-effort set of ABI argument registers,
+ *   - the full general-purpose register block for v4 snapshots,
+ *   - a bounded stack window anchored in the crashing thread's normal stack,
  *   - and a bounded stack trace candidate built from the frame pointer.
  *
  * The argument capture is intentionally limited to the crashing frame's raw ABI
@@ -722,7 +851,10 @@ static void crash_fill_record_from_ucontext(struct crash_snapshot_record *record
 	record->args[3] = (uint64_t)ctx->uc_mcontext.gregs[REG_RCX];
 	record->args[4] = (uint64_t)ctx->uc_mcontext.gregs[REG_R8];
 	record->args[5] = (uint64_t)ctx->uc_mcontext.gregs[REG_R9];
-	(void)crash_append_frame(record, record->ip);
+	crash_capture_registers_from_ucontext(record, ctx);
+	crash_capture_stack_window(record, stack_floor, stack_ceil);
+	(void)crash_append_frame(record, record->ip, record->fp,
+				 CRASH_SNAPSHOT_FRAME_TOP);
 	record->frames_count +=
 		crash_collect_frames(record->frames + record->frames_count,
 				     CRASH_SNAPSHOT_MAX_FRAMES -
@@ -743,13 +875,17 @@ static void crash_fill_record_from_ucontext(struct crash_snapshot_record *record
 	record->args[5] = (uint64_t)ctx->uc_mcontext.regs[5];
 	record->args[6] = (uint64_t)ctx->uc_mcontext.regs[6];
 	record->args[7] = (uint64_t)ctx->uc_mcontext.regs[7];
-	(void)crash_append_frame(record, record->ip);
+	crash_capture_registers_from_ucontext(record, ctx);
+	crash_capture_stack_window(record, stack_floor, stack_ceil);
+	(void)crash_append_frame(record, record->ip, record->fp,
+				 CRASH_SNAPSHOT_FRAME_TOP);
 	/*
 	 * On AArch64 the link register often contains a useful caller hint even when
 	 * the full frame walk is short. Record it as an extra top-level clue before
 	 * continuing along the frame-pointer chain.
 	 */
-	(void)crash_append_frame(record, record->lr);
+	(void)crash_append_frame(record, record->lr, record->fp,
+				 CRASH_SNAPSHOT_FRAME_LR_HINT);
 	record->frames_count +=
 		crash_collect_frames(record->frames + record->frames_count,
 				     CRASH_SNAPSHOT_MAX_FRAMES -
@@ -871,6 +1007,9 @@ static int crash_install_signal_handlers(void)
 static void crash_upgrade_v2_record(struct crash_snapshot_record *dst,
 				 const struct crash_snapshot_record_v2 *src)
 {
+	uint32_t frames;
+	uint32_t i;
+
 	if (dst == NULL || src == NULL)
 		return;
 
@@ -896,8 +1035,63 @@ static void crash_upgrade_v2_record(struct crash_snapshot_record *dst,
 	dst->frames_count = src->frames_count;
 	crash_copy_bytes(dst->modules, sizeof(dst->modules), src->modules,
 			 sizeof(src->modules));
-	crash_copy_bytes(dst->frames, sizeof(dst->frames), src->frames,
-			 sizeof(src->frames));
+	frames = dst->frames_count;
+	if (frames > CRASH_SNAPSHOT_MAX_FRAMES)
+		frames = CRASH_SNAPSHOT_MAX_FRAMES;
+	for (i = 0; i < frames; i++) {
+		dst->frames[i].absolute_pc = src->frames[i].absolute_pc;
+		dst->frames[i].rel_pc = src->frames[i].rel_pc;
+		dst->frames[i].frame_fp = 0;
+		dst->frames[i].module_index = src->frames[i].module_index;
+		dst->frames[i].frame_flags =
+			i == 0 ? CRASH_SNAPSHOT_FRAME_TOP : CRASH_SNAPSHOT_FRAME_FP_WALK;
+	}
+}
+
+static void crash_upgrade_v3_record(struct crash_snapshot_record *dst,
+				 const struct crash_snapshot_record_v3 *src)
+{
+	uint32_t frames;
+	uint32_t i;
+
+	if (dst == NULL || src == NULL)
+		return;
+
+	memset(dst, 0, sizeof(*dst));
+	dst->magic = src->magic;
+	dst->version = CRASH_SNAPSHOT_VERSION;
+	dst->arch = src->arch;
+	dst->size = sizeof(*dst);
+	dst->signal = src->signal;
+	dst->si_code = src->si_code;
+	dst->pid = src->pid;
+	dst->tid = src->tid;
+	dst->fault_addr = src->fault_addr;
+	dst->ip = src->ip;
+	dst->sp = src->sp;
+	dst->fp = src->fp;
+	dst->lr = src->lr;
+	crash_copy_bytes(dst->args, sizeof(dst->args), src->args,
+			 sizeof(src->args));
+	crash_copy_cstr(dst->executable_path, sizeof(dst->executable_path),
+			src->executable_path);
+	crash_copy_cstr(dst->thread_name, sizeof(dst->thread_name),
+			src->thread_name);
+	dst->modules_count = src->modules_count;
+	dst->frames_count = src->frames_count;
+	crash_copy_bytes(dst->modules, sizeof(dst->modules), src->modules,
+			 sizeof(src->modules));
+	frames = dst->frames_count;
+	if (frames > CRASH_SNAPSHOT_MAX_FRAMES)
+		frames = CRASH_SNAPSHOT_MAX_FRAMES;
+	for (i = 0; i < frames; i++) {
+		dst->frames[i].absolute_pc = src->frames[i].absolute_pc;
+		dst->frames[i].rel_pc = src->frames[i].rel_pc;
+		dst->frames[i].frame_fp = 0;
+		dst->frames[i].module_index = src->frames[i].module_index;
+		dst->frames[i].frame_flags =
+			i == 0 ? CRASH_SNAPSHOT_FRAME_TOP : CRASH_SNAPSHOT_FRAME_FP_WALK;
+	}
 }
 
 static int crash_read_next_pending_record(int fd,
@@ -960,6 +1154,25 @@ static int crash_read_next_pending_record(int fd,
 		if (nread != remain)
 			return ETR_INVAL;
 		crash_upgrade_v2_record(record, &old_record);
+		return ETR_OK;
+	}
+
+	if (header.version == CRASH_SNAPSHOT_VERSION_V3 &&
+	    header.size == sizeof(struct crash_snapshot_record_v3)) {
+		struct crash_snapshot_record_v3 old_record;
+
+		memset(&old_record, 0, sizeof(old_record));
+		old_record.magic = header.magic;
+		old_record.version = header.version;
+		old_record.arch = header.arch;
+		old_record.size = header.size;
+		remain = (ssize_t)sizeof(old_record) - (ssize_t)sizeof(header);
+		nread = read(fd, (char *)&old_record + sizeof(header),
+			     (size_t)remain);
+		*nread_out = sizeof(header) + nread;
+		if (nread != remain)
+			return ETR_INVAL;
+		crash_upgrade_v3_record(record, &old_record);
 		return ETR_OK;
 	}
 

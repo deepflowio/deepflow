@@ -17,3 +17,8 @@ lazy_static = "1.4.0"
 log = "0.4"
 env_logger = "0.9"
 trace-utils = { path = "../../../../../crates/trace-utils" }
+
+[profile.release]
+panic = 'abort'
+debug = 2
+split-debuginfo = "off"

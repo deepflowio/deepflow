@@ -22,6 +22,7 @@
 #include <libdwarf-0/libdwarf.h>
 #include <limits.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -32,6 +33,12 @@
 #include "utils.h"
 
 #define CRASH_SYMBOL_NAME_LEN 256
+#define CRASH_PARAM_TEXT_LEN 1024
+#define CRASH_PARAM_NAME_LEN 128
+#define CRASH_PARAM_LOCATION_LEN 128
+#define CRASH_DWARF_EXPR_LEN_MAX 128
+#define CRASH_DWARF_EXPR_STACK_MAX 8
+#define CRASH_DWARF_REF_DEPTH_MAX 8
 #define CRASH_REPORT_SEPARATOR "========================================================="
 
 /*
@@ -72,12 +79,54 @@ struct crash_symbolized_frame {
 	uint64_t symbol_addr;
 	uint64_t symbol_size;
 	char file_path[CRASH_SNAPSHOT_MODULE_PATH_LEN];
+	char params_text[CRASH_PARAM_TEXT_LEN];
 	uint64_t line;
 	bool has_module;
 	bool has_elf_vaddr;
 	bool has_symbol;
 	bool has_line;
+	bool has_params;
 };
+
+struct crash_param_eval_context {
+	const struct crash_snapshot_record *record;
+	const struct crash_snapshot_frame *frame;
+	uint64_t pc;
+	uint64_t frame_pc;
+	uint64_t frame_base;
+	uint64_t call_frame_cfa;
+	char frame_base_location[CRASH_PARAM_LOCATION_LEN];
+	char call_frame_cfa_location[CRASH_PARAM_LOCATION_LEN];
+	bool has_frame_base;
+	bool has_call_frame_cfa;
+};
+
+struct crash_expr_stack_item {
+	uint64_t value;
+	char location[CRASH_PARAM_LOCATION_LEN];
+	bool has_value;
+	bool is_address;
+	bool has_location;
+};
+
+struct crash_expr_value {
+	uint64_t value;
+	char location[CRASH_PARAM_LOCATION_LEN];
+	uint8_t byte_size;
+	bool has_value;
+	bool is_address;
+	bool has_location;
+};
+
+struct crash_param_value {
+	uint64_t value;
+	char location[CRASH_PARAM_LOCATION_LEN];
+	uint8_t byte_size;
+	bool has_value;
+	bool has_location;
+};
+
+static int crash_record_has_full_regs(const struct crash_snapshot_record *record);
 
 /*
  * Convert the in-record binary build-id bytes into a printable lowercase hex
@@ -126,6 +175,96 @@ static void crash_copy_cstr(char *dst, size_t dst_size, const char *src)
 	for (i = 0; i + 1 < dst_size && src[i] != '\0'; i++)
 		dst[i] = src[i];
 	dst[i] = '\0';
+}
+
+/*
+ * Older frames often have to match a DWARF subprogram against an ELF-derived
+ * symbol name because some debug images omit low/high PC on declaration DIEs or
+ * express ranges in ways this best-effort path does not fully evaluate.
+ *
+ * Normalize common compiler/linker suffixes before comparing names so forms
+ * like foo.isra.0, foo.constprop.3, foo.cold, or versioned symbols still match
+ * the underlying subprogram name.
+ */
+static char *crash_find_symbol_name_cut(char *name)
+{
+	static const char *const suffixes[] = {
+		".isra",
+		".constprop",
+		".part",
+		".cold",
+		".clone",
+		".llvm.",
+	};
+	char *cut = NULL;
+	char *candidate;
+	size_t i;
+
+	if (name == NULL || name[0] == '\0')
+		return NULL;
+
+	candidate = strstr(name, "@@");
+	if (candidate != NULL)
+		cut = candidate;
+	candidate = strchr(name, '@');
+	if (candidate != NULL && (cut == NULL || candidate < cut))
+		cut = candidate;
+	for (i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); i++) {
+		candidate = strstr(name, suffixes[i]);
+		if (candidate != NULL && (cut == NULL || candidate < cut))
+			cut = candidate;
+	}
+	return cut;
+}
+
+static void crash_normalize_symbol_name(const char *src, char *dst,
+				       size_t dst_size)
+{
+	char *cut;
+
+	if (dst == NULL || dst_size == 0)
+		return;
+	dst[0] = '\0';
+	if (src == NULL || src[0] == '\0')
+		return;
+
+	crash_copy_cstr(dst, dst_size, src);
+	cut = crash_find_symbol_name_cut(dst);
+	if (cut != NULL)
+		*cut = '\0';
+}
+
+static int crash_symbol_names_match(const char *lhs, const char *rhs)
+{
+	char lhs_name[CRASH_SYMBOL_NAME_LEN];
+	char rhs_name[CRASH_SYMBOL_NAME_LEN];
+
+	crash_normalize_symbol_name(lhs, lhs_name, sizeof(lhs_name));
+	crash_normalize_symbol_name(rhs, rhs_name, sizeof(rhs_name));
+	if (lhs_name[0] == '\0' || rhs_name[0] == '\0')
+		return 0;
+	return strcmp(lhs_name, rhs_name) == 0;
+}
+
+static size_t crash_appendf(char *dst, size_t dst_size, size_t offset,
+			    const char *fmt, ...)
+{
+	va_list ap;
+	int written;
+
+	if (dst == NULL || dst_size == 0)
+		return offset;
+	if (offset >= dst_size)
+		return dst_size - 1;
+
+	va_start(ap, fmt);
+	written = vsnprintf(dst + offset, dst_size - offset, fmt, ap);
+	va_end(ap);
+	if (written < 0)
+		return offset;
+	if ((size_t)written >= dst_size - offset)
+		return dst_size - 1;
+	return offset + (size_t)written;
 }
 
 struct crash_md5_context {
@@ -520,10 +659,28 @@ static int crash_find_debug_image(const struct crash_snapshot_module *module,
 }
 
 /*
+ * Non-top frames captured by the Stage-1 frame-pointer walk or LR hint hold a
+ * saved return address rather than the exact call instruction. Most symbol/DWARF
+ * consumers want a PC that still falls inside the caller's instruction range, so
+ * normalize those frames to the previous byte before looking up symbols,
+ * line-table rows, or location lists.
+ */
+static uint64_t crash_lookup_pc_for_frame(const struct crash_snapshot_frame *frame,
+					  uint64_t pc)
+{
+	if (frame == NULL || pc == 0)
+		return pc;
+	if ((frame->frame_flags & CRASH_SNAPSHOT_FRAME_TOP) != 0)
+		return pc;
+	return pc - 1;
+}
+
+/*
  * Convert the ASLR-stable file-relative PC captured in the snapshot back into
  * the ELF virtual address space expected by ELF/DWARF symbol lookup helpers.
  */
 static int crash_symbolize_prepare_vaddr(Elf * elf,
+					 const struct crash_snapshot_frame *frame,
 					 struct crash_symbolized_frame *result)
 {
 	if (result == NULL)
@@ -531,6 +688,7 @@ static int crash_symbolize_prepare_vaddr(Elf * elf,
 	if (elf_file_offset_to_vaddr(elf, result->file_offset_pc,
 				     &result->elf_vaddr) != ETR_OK)
 		return ETR_NOTEXIST;
+	result->elf_vaddr = crash_lookup_pc_for_frame(frame, result->elf_vaddr);
 	result->has_elf_vaddr = true;
 	return ETR_OK;
 }
@@ -566,12 +724,1787 @@ static int crash_line_match_better(uint64_t candidate_addr, uint64_t best_addr)
 	return best_addr == 0 || candidate_addr >= best_addr;
 }
 
+static int crash_top_frame_abi_value(const struct crash_snapshot_record *record,
+				     const struct crash_snapshot_frame *frame,
+				     uint32_t param_index, uint64_t *value,
+				     const char **location_name)
+{
+	static const char *const x86_64_regs[] = {
+		"rdi", "rsi", "rdx", "rcx", "r8", "r9",
+	};
+	static const char *const aarch64_regs[] = {
+		"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7",
+	};
+
+	if (value != NULL)
+		*value = 0;
+	if (location_name != NULL)
+		*location_name = NULL;
+	if (record == NULL || frame == NULL ||
+	    (frame->frame_flags & CRASH_SNAPSHOT_FRAME_TOP) == 0)
+		return ETR_NOTEXIST;
+
+	switch (record->arch) {
+	case CRASH_SNAPSHOT_ARCH_X86_64:
+		if (param_index >= sizeof(x86_64_regs) / sizeof(x86_64_regs[0]))
+			return ETR_NOTEXIST;
+		if (value != NULL)
+			*value = record->args[param_index];
+		if (location_name != NULL)
+			*location_name = x86_64_regs[param_index];
+		return ETR_OK;
+	case CRASH_SNAPSHOT_ARCH_AARCH64:
+		if (param_index >= sizeof(aarch64_regs) / sizeof(aarch64_regs[0]))
+			return ETR_NOTEXIST;
+		if (value != NULL)
+			*value = record->args[param_index];
+		if (location_name != NULL)
+			*location_name = aarch64_regs[param_index];
+		return ETR_OK;
+	default:
+		return ETR_NOTEXIST;
+	}
+}
+
+static void crash_append_param_unavailable(struct crash_symbolized_frame *result,
+					   const char *name)
+{
+	size_t offset;
+
+	if (result == NULL || name == NULL || name[0] == '\0')
+		return;
+	offset = strlen(result->params_text);
+	if (offset != 0)
+		offset = crash_appendf(result->params_text,
+				      sizeof(result->params_text), offset,
+				      " ");
+	offset = crash_appendf(result->params_text, sizeof(result->params_text),
+			      offset, "%s=<unavailable>", name);
+	result->has_params = offset != 0;
+}
+
+static void crash_append_param_value(struct crash_symbolized_frame *result,
+				      const char *name, uint64_t value,
+				      const char *location_name)
+{
+	size_t offset;
+
+	if (result == NULL || name == NULL || name[0] == '\0')
+		return;
+	offset = strlen(result->params_text);
+	if (offset != 0)
+		offset = crash_appendf(result->params_text,
+				      sizeof(result->params_text), offset,
+				      " ");
+	if (location_name != NULL && location_name[0] != '\0')
+		offset = crash_appendf(result->params_text,
+				      sizeof(result->params_text), offset,
+				      "%s=0x%llx @%s", name,
+				      (unsigned long long)value,
+				      location_name);
+	else
+		offset = crash_appendf(result->params_text,
+				      sizeof(result->params_text), offset,
+				      "%s=0x%llx", name,
+				      (unsigned long long)value);
+	result->has_params = offset != 0;
+}
+
+static void crash_append_param_location(struct crash_symbolized_frame *result,
+				 const char *name,
+				 const char *location_name)
+{
+	size_t offset;
+
+	if (result == NULL || name == NULL || name[0] == '\0' ||
+	    location_name == NULL || location_name[0] == '\0')
+		return;
+	offset = strlen(result->params_text);
+	if (offset != 0)
+		offset = crash_appendf(result->params_text,
+				      sizeof(result->params_text), offset,
+				      " ");
+	offset = crash_appendf(result->params_text, sizeof(result->params_text),
+			      offset, "%s=<unavailable> @%s", name,
+			      location_name);
+	result->has_params = offset != 0;
+}
+
+static void crash_format_location_offset(char *buf, size_t buf_size,
+				 const char *base, int64_t offset)
+{
+	if (buf == NULL || buf_size == 0)
+		return;
+	buf[0] = '\0';
+	if (base == NULL || base[0] == '\0')
+		return;
+	if (offset == 0) {
+		crash_copy_cstr(buf, buf_size, base);
+		return;
+	}
+	if (offset > 0)
+		(void)snprintf(buf, buf_size, "%s+0x%llx", base,
+			       (unsigned long long)offset);
+	else
+		(void)snprintf(buf, buf_size, "%s-0x%llx", base,
+			       (unsigned long long)(uint64_t)(-offset));
+}
+
+static uint64_t crash_frame_pointer_value(const struct crash_snapshot_record *record,
+					 const struct crash_snapshot_frame *frame)
+{
+	if (frame != NULL && frame->frame_fp != 0)
+		return frame->frame_fp;
+	if (record != NULL && frame != NULL &&
+	    (frame->frame_flags & CRASH_SNAPSHOT_FRAME_TOP) != 0)
+		return record->fp;
+	return 0;
+}
+
+static const char *crash_frame_pointer_name(const struct crash_snapshot_record *record)
+{
+	if (record == NULL)
+		return "fp";
+	switch (record->arch) {
+	case CRASH_SNAPSHOT_ARCH_X86_64:
+		return "rbp";
+	case CRASH_SNAPSHOT_ARCH_AARCH64:
+		return "x29";
+	default:
+		return "fp";
+	}
+}
+
+static int crash_snapshot_read_word(const struct crash_snapshot_record *record,
+				    uint64_t addr, uint8_t size,
+				    uint64_t *value)
+{
+	uint64_t start;
+	uint64_t end;
+	uint64_t offset;
+	uint64_t loaded = 0;
+
+	if (value != NULL)
+		*value = 0;
+	if (record == NULL || value == NULL || size == 0 || size > sizeof(loaded) ||
+	    (record->capture_flags & CRASH_SNAPSHOT_FLAG_STACK_WINDOW) == 0)
+		return ETR_NOTEXIST;
+	start = record->stack_window_start;
+	end = start + record->stack_window_size;
+	if (end < start || addr < start || addr + size > end)
+		return ETR_NOTEXIST;
+	offset = addr - start;
+	memcpy(&loaded, record->stack_window + offset, size);
+	*value = loaded;
+	return ETR_OK;
+}
+
+static const char *crash_dwarf_reg_name(const struct crash_snapshot_record *record,
+				Dwarf_Unsigned regno)
+{
+	static const char *const aarch64_names[] = {
+		"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7",
+		"x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15",
+		"x16", "x17", "x18", "x19", "x20", "x21", "x22", "x23",
+		"x24", "x25", "x26", "x27", "x28", "x29", "x30",
+	};
+
+	if (record == NULL)
+		return NULL;
+	switch (record->arch) {
+	case CRASH_SNAPSHOT_ARCH_X86_64:
+		switch (regno) {
+		case 0:
+			return "rax";
+		case 1:
+			return "rdx";
+		case 2:
+			return "rcx";
+		case 3:
+			return "rbx";
+		case 4:
+			return "rsi";
+		case 5:
+			return "rdi";
+		case 6:
+			return "rbp";
+		case 7:
+			return "rsp";
+		case 8:
+			return "r8";
+		case 9:
+			return "r9";
+		case 10:
+			return "r10";
+		case 11:
+			return "r11";
+		case 12:
+			return "r12";
+		case 13:
+			return "r13";
+		case 14:
+			return "r14";
+		case 15:
+			return "r15";
+		case 16:
+			return "rip";
+		default:
+			return NULL;
+		}
+	case CRASH_SNAPSHOT_ARCH_AARCH64:
+		if (regno <= 30)
+			return aarch64_names[regno];
+		if (regno == 31)
+			return "sp";
+		return NULL;
+	default:
+		return NULL;
+	}
+}
+
+static int crash_register_value_by_dwarf_reg(const struct crash_param_eval_context *ctx,
+				     Dwarf_Unsigned regno,
+				     uint64_t *value,
+				     const char **location_name)
+{
+	const struct crash_snapshot_record *record;
+	const struct crash_snapshot_frame *frame;
+	uint64_t frame_fp;
+	int top_frame;
+
+	if (value != NULL)
+		*value = 0;
+	if (location_name != NULL)
+		*location_name = NULL;
+	if (ctx == NULL || ctx->record == NULL || ctx->frame == NULL)
+		return ETR_INVAL;
+
+	record = ctx->record;
+	frame = ctx->frame;
+	frame_fp = crash_frame_pointer_value(record, frame);
+	top_frame = (frame->frame_flags & CRASH_SNAPSHOT_FRAME_TOP) != 0;
+	if (location_name != NULL)
+		*location_name = crash_dwarf_reg_name(record, regno);
+
+	switch (record->arch) {
+	case CRASH_SNAPSHOT_ARCH_X86_64:
+		if (crash_record_has_full_regs(record) && top_frame) {
+			switch (regno) {
+			case 0:
+				*value = record->registers.x86_64.rax;
+				return ETR_OK;
+			case 1:
+				*value = record->registers.x86_64.rdx;
+				return ETR_OK;
+			case 2:
+				*value = record->registers.x86_64.rcx;
+				return ETR_OK;
+			case 3:
+				*value = record->registers.x86_64.rbx;
+				return ETR_OK;
+			case 4:
+				*value = record->registers.x86_64.rsi;
+				return ETR_OK;
+			case 5:
+				*value = record->registers.x86_64.rdi;
+				return ETR_OK;
+			case 6:
+				*value = record->registers.x86_64.rbp;
+				return ETR_OK;
+			case 7:
+				*value = record->registers.x86_64.rsp;
+				return ETR_OK;
+			case 8:
+				*value = record->registers.x86_64.r8;
+				return ETR_OK;
+			case 9:
+				*value = record->registers.x86_64.r9;
+				return ETR_OK;
+			case 10:
+				*value = record->registers.x86_64.r10;
+				return ETR_OK;
+			case 11:
+				*value = record->registers.x86_64.r11;
+				return ETR_OK;
+			case 12:
+				*value = record->registers.x86_64.r12;
+				return ETR_OK;
+			case 13:
+				*value = record->registers.x86_64.r13;
+				return ETR_OK;
+			case 14:
+				*value = record->registers.x86_64.r14;
+				return ETR_OK;
+			case 15:
+				*value = record->registers.x86_64.r15;
+				return ETR_OK;
+			case 16:
+				*value = record->registers.x86_64.rip;
+				return ETR_OK;
+			default:
+				break;
+			}
+		}
+		if (top_frame) {
+			switch (regno) {
+			case 1:
+				*value = record->args[2];
+				return ETR_OK;
+			case 2:
+				*value = record->args[3];
+				return ETR_OK;
+			case 4:
+				*value = record->args[1];
+				return ETR_OK;
+			case 5:
+				*value = record->args[0];
+				return ETR_OK;
+			case 6:
+				if (frame_fp != 0) {
+					*value = frame_fp;
+					return ETR_OK;
+				}
+				break;
+			case 7:
+				*value = record->sp;
+				return ETR_OK;
+			case 8:
+				*value = record->args[4];
+				return ETR_OK;
+			case 9:
+				*value = record->args[5];
+				return ETR_OK;
+			case 16:
+				*value = record->ip;
+				return ETR_OK;
+			default:
+				break;
+			}
+		}
+		if (regno == 6 && frame_fp != 0) {
+			*value = frame_fp;
+			return ETR_OK;
+		}
+		return ETR_NOTEXIST;
+	case CRASH_SNAPSHOT_ARCH_AARCH64:
+		if (crash_record_has_full_regs(record) && top_frame) {
+			if (regno <= 30) {
+				*value = record->registers.aarch64.x[regno];
+				return ETR_OK;
+			}
+			if (regno == 31) {
+				*value = record->registers.aarch64.sp;
+				return ETR_OK;
+			}
+		}
+		if (top_frame) {
+			if (regno < CRASH_SNAPSHOT_ARG_REGS) {
+				*value = record->args[regno];
+				return ETR_OK;
+			}
+			if (regno == 29 && frame_fp != 0) {
+				*value = frame_fp;
+				return ETR_OK;
+			}
+			if (regno == 30) {
+				*value = record->lr;
+				return ETR_OK;
+			}
+			if (regno == 31) {
+				*value = record->sp;
+				return ETR_OK;
+			}
+		}
+		if (regno == 29 && frame_fp != 0) {
+			*value = frame_fp;
+			return ETR_OK;
+		}
+		return ETR_NOTEXIST;
+	default:
+		return ETR_NOTEXIST;
+	}
+}
+
+static int64_t crash_dwarf_signed_operand(Dwarf_Small opcode,
+					  Dwarf_Unsigned operand)
+{
+	if (opcode >= DW_OP_breg0 && opcode <= DW_OP_breg31)
+		return (int64_t)(Dwarf_Signed)operand;
+	switch (opcode) {
+	case DW_OP_consts:
+	case DW_OP_fbreg:
+		return (int64_t)(Dwarf_Signed)operand;
+	default:
+		return (int64_t)operand;
+	}
+}
+
+static int crash_follow_reference_die(Dwarf_Debug dbg, Dwarf_Die die,
+				      Dwarf_Half attrnum,
+				      Dwarf_Die *target_die,
+				      Dwarf_Bool *target_is_info,
+				      Dwarf_Error *errp)
+{
+	Dwarf_Attribute attr = 0;
+	Dwarf_Off offset = 0;
+	Dwarf_Bool is_info = 1;
+	int rc;
+
+	if (target_die != NULL)
+		*target_die = 0;
+	if (target_is_info != NULL)
+		*target_is_info = 1;
+	if (dbg == NULL || die == 0 || target_die == NULL)
+		return ETR_INVAL;
+
+	rc = dwarf_attr(die, attrnum, &attr, errp);
+	if (rc != DW_DLV_OK)
+		return ETR_NOTEXIST;
+	rc = dwarf_global_formref_b(attr, &offset, &is_info, errp);
+	dwarf_dealloc(dbg, attr, DW_DLA_ATTR);
+	if (rc != DW_DLV_OK)
+		return ETR_NOTEXIST;
+	rc = dwarf_offdie_b(dbg, offset, is_info, target_die, errp);
+	if (rc != DW_DLV_OK) {
+		if (target_die != NULL)
+			*target_die = 0;
+		return ETR_NOTEXIST;
+	}
+	if (target_is_info != NULL)
+		*target_is_info = is_info;
+	return ETR_OK;
+}
+
+static int crash_resolve_die_byte_size_recursive(Dwarf_Debug dbg, Dwarf_Die die,
+					 Dwarf_Bool is_info,
+					 uint8_t *size,
+					 int depth,
+					 Dwarf_Error *errp)
+{
+	Dwarf_Attribute attr = 0;
+	Dwarf_Unsigned byte_size = 0;
+	Dwarf_Die target = 0;
+	Dwarf_Bool target_is_info = 1;
+	int rc;
+
+	if (size != NULL)
+		*size = 0;
+	if (dbg == NULL || die == 0 || size == NULL ||
+	    depth >= CRASH_DWARF_REF_DEPTH_MAX)
+		return ETR_INVAL;
+
+	rc = dwarf_attr(die, DW_AT_byte_size, &attr, errp);
+	if (rc == DW_DLV_OK) {
+		rc = dwarf_formudata(attr, &byte_size, errp);
+		dwarf_dealloc(dbg, attr, DW_DLA_ATTR);
+		if (rc == DW_DLV_OK && byte_size != 0) {
+			*size = byte_size > UINT8_MAX ? UINT8_MAX : (uint8_t)byte_size;
+			return ETR_OK;
+		}
+	}
+	if (crash_follow_reference_die(dbg, die, DW_AT_type, &target,
+				       &target_is_info, errp) == ETR_OK) {
+		rc = crash_resolve_die_byte_size_recursive(dbg, target,
+						       target_is_info,
+						       size,
+						       depth + 1,
+						       errp);
+		dwarf_dealloc(dbg, target, DW_DLA_DIE);
+		if (rc == ETR_OK)
+			return ETR_OK;
+	}
+	(void)is_info;
+	return ETR_NOTEXIST;
+}
+
+static uint8_t crash_resolve_parameter_byte_size(Dwarf_Debug dbg,
+					 Dwarf_Die param_die,
+					 Dwarf_Bool param_is_info,
+					 Dwarf_Error *errp)
+{
+	uint8_t size = (uint8_t)sizeof(uint64_t);
+	uint8_t resolved = 0;
+
+	if (dbg == NULL || param_die == 0)
+		return size;
+	if (crash_resolve_die_byte_size_recursive(dbg, param_die, param_is_info,
+						 &resolved, 0,
+						 errp) == ETR_OK &&
+	    resolved != 0)
+		return resolved;
+	return size;
+}
+
+static int crash_copy_die_name_recursive(Dwarf_Debug dbg, Dwarf_Die die,
+					 Dwarf_Bool is_info,
+					 char *buf, size_t buf_size,
+					 int depth,
+					 Dwarf_Error *errp)
+{
+	Dwarf_Die target = 0;
+	Dwarf_Bool target_is_info = 1;
+	char *name = NULL;
+	int rc;
+
+	if (buf != NULL && buf_size != 0)
+		buf[0] = '\0';
+	if (dbg == NULL || die == 0 || buf == NULL || buf_size == 0 ||
+	    depth >= CRASH_DWARF_REF_DEPTH_MAX)
+		return ETR_NOTEXIST;
+
+	rc = dwarf_die_text(die, DW_AT_name, &name, errp);
+	if (rc == DW_DLV_OK && name != NULL && name[0] != '\0') {
+		crash_copy_cstr(buf, buf_size, name);
+		return ETR_OK;
+	}
+	rc = dwarf_die_text(die, DW_AT_linkage_name, &name, errp);
+	if (rc == DW_DLV_OK && name != NULL && name[0] != '\0') {
+		crash_copy_cstr(buf, buf_size, name);
+		return ETR_OK;
+	}
+	rc = dwarf_die_text(die, DW_AT_MIPS_linkage_name, &name, errp);
+	if (rc == DW_DLV_OK && name != NULL && name[0] != '\0') {
+		crash_copy_cstr(buf, buf_size, name);
+		return ETR_OK;
+	}
+
+	if (crash_follow_reference_die(dbg, die, DW_AT_abstract_origin, &target,
+				       &target_is_info, errp) == ETR_OK) {
+		rc = crash_copy_die_name_recursive(dbg, target, target_is_info, buf,
+						  buf_size, depth + 1,
+						  errp);
+		dwarf_dealloc(dbg, target, DW_DLA_DIE);
+		if (rc == ETR_OK)
+			return ETR_OK;
+	}
+	if (crash_follow_reference_die(dbg, die, DW_AT_specification, &target,
+				       &target_is_info, errp) == ETR_OK) {
+		rc = crash_copy_die_name_recursive(dbg, target, target_is_info, buf,
+						  buf_size, depth + 1,
+						  errp);
+		dwarf_dealloc(dbg, target, DW_DLA_DIE);
+		if (rc == ETR_OK)
+			return ETR_OK;
+	}
+	(void)is_info;
+	return ETR_NOTEXIST;
+}
+
+static void crash_expr_stack_reset(struct crash_expr_stack_item *stack,
+				   size_t stack_cap)
+{
+	size_t i;
+
+	if (stack == NULL)
+		return;
+	for (i = 0; i < stack_cap; i++) {
+		stack[i].value = 0;
+		stack[i].location[0] = '\0';
+		stack[i].has_value = false;
+		stack[i].is_address = false;
+		stack[i].has_location = false;
+	}
+}
+
+static int crash_expr_stack_push(struct crash_expr_stack_item *stack,
+				 size_t stack_cap,
+				 size_t *stack_size,
+				 const struct crash_expr_stack_item *item)
+{
+	if (stack == NULL || stack_size == NULL || item == NULL ||
+	    *stack_size >= stack_cap)
+		return ETR_INVAL;
+	stack[*stack_size] = *item;
+	(*stack_size)++;
+	return ETR_OK;
+}
+
+static int crash_expr_stack_pop(struct crash_expr_stack_item *stack,
+				 size_t *stack_size,
+				 struct crash_expr_stack_item *item)
+{
+	if (stack == NULL || stack_size == NULL || item == NULL || *stack_size == 0)
+		return ETR_NOTEXIST;
+	*item = stack[*stack_size - 1];
+	(*stack_size)--;
+	return ETR_OK;
+}
+
+static void crash_expr_value_reset(struct crash_expr_value *value)
+{
+	if (value == NULL)
+		return;
+	value->value = 0;
+	value->location[0] = '\0';
+	value->byte_size = 0;
+	value->has_value = false;
+	value->is_address = false;
+	value->has_location = false;
+}
+
+static int crash_init_param_eval_context(struct crash_param_eval_context *ctx,
+					 const struct crash_snapshot_record *record,
+					 const struct crash_snapshot_frame *frame,
+					 uint64_t dwarf_pc)
+{
+	if (ctx == NULL || record == NULL || frame == NULL)
+		return ETR_INVAL;
+	memset(ctx, 0, sizeof(*ctx));
+	ctx->record = record;
+	ctx->frame = frame;
+	ctx->frame_pc = crash_lookup_pc_for_frame(frame, frame->absolute_pc);
+	ctx->pc = dwarf_pc != 0 ? dwarf_pc : ctx->frame_pc;
+	return ETR_OK;
+}
+
+static int crash_compute_simple_cfa(struct crash_param_eval_context *ctx)
+{
+	uint64_t frame_fp;
+	uint64_t cfa;
+
+	if (ctx == NULL || ctx->record == NULL || ctx->frame == NULL)
+		return ETR_INVAL;
+	if (ctx->has_call_frame_cfa)
+		return ETR_OK;
+	frame_fp = crash_frame_pointer_value(ctx->record, ctx->frame);
+	if (frame_fp == 0)
+		return ETR_NOTEXIST;
+
+	switch (ctx->record->arch) {
+	case CRASH_SNAPSHOT_ARCH_X86_64:
+		cfa = frame_fp + sizeof(uint64_t) * 2;
+		break;
+	case CRASH_SNAPSHOT_ARCH_AARCH64:
+		cfa = frame_fp + sizeof(uint64_t) * 2;
+		break;
+	default:
+		return ETR_NOTEXIST;
+	}
+	ctx->call_frame_cfa = cfa;
+	crash_format_location_offset(ctx->call_frame_cfa_location,
+				     sizeof(ctx->call_frame_cfa_location),
+				     crash_frame_pointer_name(ctx->record),
+				     (int64_t)(cfa - frame_fp));
+	ctx->has_call_frame_cfa = true;
+	return ETR_OK;
+}
+
+static int crash_load_stack_address(const struct crash_param_eval_context *ctx,
+				   uint64_t addr,
+				   struct crash_expr_value *out)
+{
+	uint64_t loaded = 0;
+	uint8_t load_size;
+
+	if (ctx == NULL || out == NULL)
+		return ETR_INVAL;
+	load_size = out->byte_size != 0 ? out->byte_size : (uint8_t)sizeof(uint64_t);
+	if (load_size > sizeof(uint64_t))
+		return ETR_NOTEXIST;
+	if (crash_snapshot_read_word(ctx->record, addr, load_size, &loaded) != ETR_OK)
+		return ETR_NOTEXIST;
+	out->value = loaded;
+	out->byte_size = load_size;
+	out->has_value = true;
+	out->is_address = false;
+	if (!out->has_location || out->location[0] == '\0') {
+		out->has_location = true;
+		crash_format_location_offset(out->location, sizeof(out->location),
+					     "mem", (int64_t)addr);
+	}
+	return ETR_OK;
+}
+
+static int crash_eval_locdesc(const struct crash_param_eval_context *ctx,
+			      Dwarf_Locdesc_c locdesc,
+			      Dwarf_Unsigned op_count,
+			      bool load_memory,
+			      struct crash_expr_value *out,
+			      Dwarf_Error *errp)
+{
+	struct crash_expr_stack_item stack[CRASH_DWARF_EXPR_STACK_MAX];
+	size_t stack_size = 0;
+	Dwarf_Unsigned op_index;
+	struct crash_expr_stack_item lhs = { 0 };
+	uint8_t requested_size = 0;
+
+	if (out != NULL) {
+		requested_size = out->byte_size;
+		crash_expr_value_reset(out);
+		out->byte_size = requested_size;
+	}
+	if (ctx == NULL || out == NULL)
+		return ETR_INVAL;
+
+	crash_expr_stack_reset(stack, CRASH_DWARF_EXPR_STACK_MAX);
+	for (op_index = 0; op_index < op_count; op_index++) {
+		Dwarf_Small opcode = 0;
+		Dwarf_Unsigned operand1 = 0;
+		Dwarf_Unsigned operand2 = 0;
+		Dwarf_Unsigned operand3 = 0;
+		Dwarf_Unsigned branch_offset = 0;
+		struct crash_expr_stack_item item;
+		const char *reg_name = NULL;
+		uint64_t reg_value = 0;
+		int64_t signed_operand;
+
+		if (dwarf_get_location_op_value_c(locdesc, op_index, &opcode,
+						 &operand1, &operand2,
+						 &operand3,
+						 &branch_offset,
+						 errp) != DW_DLV_OK)
+			return ETR_NOTEXIST;
+		(void)operand2;
+		(void)operand3;
+		(void)branch_offset;
+		memset(&item, 0, sizeof(item));
+		signed_operand = crash_dwarf_signed_operand(opcode, operand1);
+
+		switch (opcode) {
+		case DW_OP_reg0 ... DW_OP_reg31:
+			if (crash_register_value_by_dwarf_reg(ctx,
+						     (Dwarf_Unsigned)(opcode -
+								      DW_OP_reg0),
+						     &reg_value,
+						     &reg_name) == ETR_OK) {
+				item.value = reg_value;
+				item.has_value = true;
+			}
+			if (reg_name != NULL && reg_name[0] != '\0') {
+				crash_copy_cstr(item.location,
+						sizeof(item.location), reg_name);
+				item.has_location = true;
+			}
+			item.is_address = false;
+			if (crash_expr_stack_push(stack,
+						 CRASH_DWARF_EXPR_STACK_MAX,
+						 &stack_size,
+						 &item) != ETR_OK)
+				return ETR_NOTEXIST;
+			break;
+		case DW_OP_breg0 ... DW_OP_breg31:
+			if (crash_register_value_by_dwarf_reg(ctx,
+						     (Dwarf_Unsigned)(opcode -
+								      DW_OP_breg0),
+						     &reg_value,
+						     &reg_name) != ETR_OK)
+				return ETR_NOTEXIST;
+			item.value = reg_value + (uint64_t)signed_operand;
+			item.has_value = true;
+			item.is_address = true;
+			item.has_location = true;
+			crash_format_location_offset(item.location,
+						sizeof(item.location),
+						reg_name,
+						signed_operand);
+			if (crash_expr_stack_push(stack,
+						 CRASH_DWARF_EXPR_STACK_MAX,
+						 &stack_size,
+						 &item) != ETR_OK)
+				return ETR_NOTEXIST;
+			break;
+		case DW_OP_fbreg:
+			if (!ctx->has_frame_base)
+				return ETR_NOTEXIST;
+			item.value = ctx->frame_base + (uint64_t)signed_operand;
+			item.has_value = true;
+			item.is_address = true;
+			item.has_location = true;
+			crash_format_location_offset(item.location,
+						sizeof(item.location),
+						ctx->frame_base_location,
+						signed_operand);
+			if (crash_expr_stack_push(stack,
+						 CRASH_DWARF_EXPR_STACK_MAX,
+						 &stack_size,
+						 &item) != ETR_OK)
+				return ETR_NOTEXIST;
+			break;
+		case DW_OP_call_frame_cfa:
+			if (!ctx->has_call_frame_cfa)
+				return ETR_NOTEXIST;
+			item.value = ctx->call_frame_cfa;
+			item.has_value = true;
+			item.is_address = true;
+			item.has_location = true;
+			crash_copy_cstr(item.location, sizeof(item.location),
+					ctx->call_frame_cfa_location);
+			if (crash_expr_stack_push(stack,
+						 CRASH_DWARF_EXPR_STACK_MAX,
+						 &stack_size,
+						 &item) != ETR_OK)
+				return ETR_NOTEXIST;
+			break;
+		case DW_OP_plus_uconst:
+			if (crash_expr_stack_pop(stack, &stack_size, &lhs) != ETR_OK ||
+			    !lhs.has_value)
+				return ETR_NOTEXIST;
+			lhs.value += operand1;
+			if (lhs.has_location) {
+				char base_location[CRASH_PARAM_LOCATION_LEN];
+
+				crash_copy_cstr(base_location, sizeof(base_location),
+						lhs.location);
+				crash_format_location_offset(lhs.location,
+						    sizeof(lhs.location),
+						    base_location,
+						    (int64_t)operand1);
+			}
+			if (crash_expr_stack_push(stack,
+						 CRASH_DWARF_EXPR_STACK_MAX,
+						 &stack_size,
+						 &lhs) != ETR_OK)
+				return ETR_NOTEXIST;
+			break;
+		case DW_OP_consts:
+		case DW_OP_constu:
+			item.value = (uint64_t)signed_operand;
+			item.has_value = true;
+			item.is_address = false;
+			if (crash_expr_stack_push(stack,
+						 CRASH_DWARF_EXPR_STACK_MAX,
+						 &stack_size,
+						 &item) != ETR_OK)
+				return ETR_NOTEXIST;
+			break;
+		case DW_OP_stack_value:
+			if (crash_expr_stack_pop(stack, &stack_size, &lhs) != ETR_OK)
+				return ETR_NOTEXIST;
+			lhs.is_address = false;
+			if (crash_expr_stack_push(stack,
+						 CRASH_DWARF_EXPR_STACK_MAX,
+						 &stack_size,
+						 &lhs) != ETR_OK)
+				return ETR_NOTEXIST;
+			break;
+		default:
+			return ETR_NOTEXIST;
+		}
+	}
+
+	if (crash_expr_stack_pop(stack, &stack_size, &lhs) != ETR_OK ||
+	    stack_size != 0)
+		return ETR_NOTEXIST;
+	out->is_address = lhs.is_address;
+	out->has_location = lhs.has_location;
+	if (lhs.has_location)
+		crash_copy_cstr(out->location, sizeof(out->location), lhs.location);
+	if (!lhs.has_value)
+		return out->has_location ? ETR_OK : ETR_NOTEXIST;
+	out->value = lhs.value;
+	out->has_value = true;
+	if (out->is_address) {
+		if (!load_memory)
+			return ETR_OK;
+		if (crash_load_stack_address(ctx, out->value, out) == ETR_OK)
+			return ETR_OK;
+		out->has_value = false;
+		out->is_address = false;
+		return out->has_location ? ETR_OK : ETR_NOTEXIST;
+	}
+	return ETR_OK;
+}
+
+static int crash_eval_location_attribute(const struct crash_param_eval_context *ctx,
+					 Dwarf_Attribute attr,
+					 bool load_memory,
+					 struct crash_expr_value *out,
+					 Dwarf_Error *errp)
+{
+	Dwarf_Loc_Head_c loc_head = 0;
+	Dwarf_Unsigned loc_count = 0;
+	unsigned int loc_kind = DW_LKIND_unknown;
+	int rc;
+	Dwarf_Unsigned entry_index;
+	int ret = ETR_NOTEXIST;
+	uint8_t requested_size = 0;
+
+	if (out != NULL) {
+		requested_size = out->byte_size;
+		crash_expr_value_reset(out);
+		out->byte_size = requested_size;
+	}
+	if (ctx == NULL || attr == 0 || out == NULL)
+		return ETR_INVAL;
+
+	rc = dwarf_get_loclist_c(attr, &loc_head, &loc_count, errp);
+	if (rc != DW_DLV_OK || loc_head == 0 || loc_count == 0)
+		return ETR_NOTEXIST;
+	(void)dwarf_get_loclist_head_kind(loc_head, &loc_kind, errp);
+
+	for (entry_index = 0; entry_index < loc_count; entry_index++) {
+		Dwarf_Small lle_value = 0;
+		Dwarf_Unsigned raw_low = 0;
+		Dwarf_Unsigned raw_high = 0;
+		Dwarf_Bool debug_addr_unavailable = 0;
+		Dwarf_Addr lowpc = 0;
+		Dwarf_Addr highpc = 0;
+		Dwarf_Unsigned op_count = 0;
+		Dwarf_Locdesc_c locdesc = 0;
+		Dwarf_Small source = 0;
+		Dwarf_Unsigned expr_offset = 0;
+		Dwarf_Unsigned locdesc_offset = 0;
+		int range_matches = 1;
+		struct crash_expr_value value;
+
+		crash_expr_value_reset(&value);
+		value.byte_size = requested_size;
+		rc = dwarf_get_locdesc_entry_d(loc_head, entry_index, &lle_value,
+					      &raw_low, &raw_high,
+					      &debug_addr_unavailable,
+					      &lowpc, &highpc,
+					      &op_count, &locdesc,
+					      &source, &expr_offset,
+					      &locdesc_offset, errp);
+		if (rc != DW_DLV_OK)
+			continue;
+		(void)lle_value;
+		(void)raw_low;
+		(void)raw_high;
+		(void)source;
+		(void)expr_offset;
+		(void)locdesc_offset;
+		if (loc_kind != DW_LKIND_expression && !debug_addr_unavailable &&
+		    highpc > lowpc)
+			range_matches = ctx->pc >= lowpc && ctx->pc < highpc;
+		if (!range_matches)
+			continue;
+		if (crash_eval_locdesc(ctx, locdesc, op_count, load_memory, &value,
+				      errp) == ETR_OK) {
+			*out = value;
+			ret = ETR_OK;
+			break;
+		}
+	}
+
+	dwarf_dealloc_loc_head_c(loc_head);
+	return ret;
+}
+
+static int crash_eval_die_location_recursive(Dwarf_Debug dbg, Dwarf_Die die,
+					     Dwarf_Bool is_info,
+					     Dwarf_Half attrnum,
+					     struct crash_param_eval_context *ctx,
+					     bool load_memory,
+					     struct crash_expr_value *out,
+					     int depth,
+					     Dwarf_Error *errp)
+{
+	Dwarf_Attribute attr = 0;
+	Dwarf_Die target = 0;
+	Dwarf_Bool target_is_info = 1;
+	int rc;
+	uint8_t requested_size = 0;
+
+	if (out != NULL) {
+		requested_size = out->byte_size;
+		crash_expr_value_reset(out);
+		out->byte_size = requested_size;
+	}
+	if (dbg == NULL || die == 0 || ctx == NULL || out == NULL ||
+	    depth >= CRASH_DWARF_REF_DEPTH_MAX)
+		return ETR_INVAL;
+
+	rc = dwarf_attr(die, attrnum, &attr, errp);
+	if (rc == DW_DLV_OK) {
+		rc = crash_eval_location_attribute(ctx, attr, load_memory, out,
+						  errp);
+		dwarf_dealloc(dbg, attr, DW_DLA_ATTR);
+		if (rc == ETR_OK)
+			return ETR_OK;
+	}
+	if (crash_follow_reference_die(dbg, die, DW_AT_abstract_origin, &target,
+				       &target_is_info, errp) == ETR_OK) {
+		rc = crash_eval_die_location_recursive(dbg, target, target_is_info,
+						      attrnum, ctx,
+						      load_memory, out,
+						      depth + 1,
+						      errp);
+		dwarf_dealloc(dbg, target, DW_DLA_DIE);
+		if (rc == ETR_OK)
+			return ETR_OK;
+	}
+	if (crash_follow_reference_die(dbg, die, DW_AT_specification, &target,
+				       &target_is_info, errp) == ETR_OK) {
+		rc = crash_eval_die_location_recursive(dbg, target, target_is_info,
+						      attrnum, ctx,
+						      load_memory, out,
+						      depth + 1,
+						      errp);
+		dwarf_dealloc(dbg, target, DW_DLA_DIE);
+		if (rc == ETR_OK)
+			return ETR_OK;
+	}
+	(void)is_info;
+	return ETR_NOTEXIST;
+}
+
+static int crash_prepare_frame_base(Dwarf_Debug dbg, Dwarf_Die die,
+				    Dwarf_Bool is_info,
+				    struct crash_param_eval_context *ctx,
+				    Dwarf_Error *errp)
+{
+	struct crash_expr_value value;
+	uint64_t frame_fp;
+	int rc;
+
+	if (ctx == NULL || ctx->record == NULL || ctx->frame == NULL)
+		return ETR_INVAL;
+	if (ctx->has_frame_base)
+		return ETR_OK;
+
+	crash_expr_value_reset(&value);
+	rc = crash_eval_die_location_recursive(dbg, die, is_info,
+					      DW_AT_frame_base, ctx,
+					      false, &value, 0, errp);
+	if (rc == ETR_OK && value.has_value) {
+		ctx->frame_base = value.value;
+		ctx->has_frame_base = true;
+		if (value.has_location)
+			crash_copy_cstr(ctx->frame_base_location,
+						sizeof(ctx->frame_base_location),
+						value.location);
+		else
+			crash_copy_cstr(ctx->frame_base_location,
+						sizeof(ctx->frame_base_location),
+						"frame-base");
+		return ETR_OK;
+	}
+
+	frame_fp = crash_frame_pointer_value(ctx->record, ctx->frame);
+	if (frame_fp == 0)
+		return ETR_NOTEXIST;
+	ctx->frame_base = frame_fp;
+	ctx->has_frame_base = true;
+	crash_copy_cstr(ctx->frame_base_location,
+			sizeof(ctx->frame_base_location),
+			crash_frame_pointer_name(ctx->record));
+	return ETR_OK;
+}
+
+static int crash_param_from_expr_value(const struct crash_expr_value *expr,
+				      struct crash_param_value *param)
+{
+	if (param != NULL) {
+		param->value = 0;
+		param->location[0] = '\0';
+		param->byte_size = 0;
+		param->has_value = false;
+		param->has_location = false;
+	}
+	if (expr == NULL || param == NULL)
+		return ETR_INVAL;
+	if (expr->has_value) {
+		param->value = expr->value;
+		param->byte_size = expr->byte_size;
+		param->has_value = true;
+	}
+	if (expr->has_location && expr->location[0] != '\0') {
+		crash_copy_cstr(param->location, sizeof(param->location),
+				expr->location);
+		param->has_location = true;
+	}
+	return param->has_value || param->has_location ? ETR_OK : ETR_NOTEXIST;
+}
+
+static int crash_recover_parameter_value(Dwarf_Debug dbg, Dwarf_Die subprogram_die,
+					 Dwarf_Bool subprogram_is_info,
+					 Dwarf_Die param_die,
+					 Dwarf_Bool param_is_info,
+					 struct crash_param_eval_context *ctx,
+					 struct crash_param_value *param,
+					 Dwarf_Error *errp)
+{
+	struct crash_expr_value expr;
+	int rc;
+
+	if (param != NULL) {
+		param->value = 0;
+		param->location[0] = '\0';
+		param->byte_size = 0;
+		param->has_value = false;
+		param->has_location = false;
+	}
+	if (dbg == NULL || param_die == 0 || ctx == NULL || param == NULL)
+		return ETR_INVAL;
+
+	(void)crash_compute_simple_cfa(ctx);
+	if (subprogram_die != 0)
+		(void)crash_prepare_frame_base(dbg, subprogram_die, subprogram_is_info,
+					      ctx, errp);
+	crash_expr_value_reset(&expr);
+	expr.byte_size = crash_resolve_parameter_byte_size(dbg, param_die,
+						 param_is_info, errp);
+	rc = crash_eval_die_location_recursive(dbg, param_die, param_is_info,
+					      DW_AT_location, ctx,
+					      true, &expr, 0, errp);
+	if (rc != ETR_OK)
+		return ETR_NOTEXIST;
+	return crash_param_from_expr_value(&expr, param);
+}
+
+
+static uint32_t crash_collect_direct_formal_parameters(Dwarf_Debug dbg,
+					   Dwarf_Die subprogram_die,
+					   Dwarf_Bool subprogram_is_info,
+					   Dwarf_Die params_die,
+					   Dwarf_Bool params_is_info,
+					   const struct crash_snapshot_record *record,
+					   const struct crash_snapshot_frame *frame,
+					   struct crash_param_eval_context *eval_ctx,
+					   int have_eval_ctx,
+					   uint32_t *param_index,
+					   struct crash_symbolized_frame *result,
+					   Dwarf_Error *errp)
+{
+	Dwarf_Die child = 0;
+	int rc;
+	uint32_t collected = 0;
+
+	if (dbg == NULL || subprogram_die == 0 || params_die == 0 || record == NULL ||
+	    frame == NULL || param_index == NULL || result == NULL)
+		return 0;
+
+	rc = dwarf_child(params_die, &child, errp);
+	if (rc != DW_DLV_OK)
+		return 0;
+
+	for (;;) {
+		Dwarf_Die sibling = 0;
+		Dwarf_Half tag = 0;
+		char fallback_name[CRASH_PARAM_NAME_LEN];
+		char param_name_buf[CRASH_PARAM_NAME_LEN];
+		const char *param_name = NULL;
+		struct crash_param_value recovered;
+		uint64_t abi_value = 0;
+		const char *abi_location_name = NULL;
+
+		memset(&recovered, 0, sizeof(recovered));
+		if (dwarf_tag(child, &tag, errp) == DW_DLV_OK &&
+		    tag == DW_TAG_formal_parameter) {
+			if (crash_copy_die_name_recursive(dbg, child, params_is_info,
+							 param_name_buf,
+							 sizeof(param_name_buf), 0,
+							 errp) == ETR_OK &&
+			    param_name_buf[0] != '\0') {
+				param_name = param_name_buf;
+			} else {
+				(void)snprintf(fallback_name, sizeof(fallback_name), "arg%u",
+					       *param_index);
+				param_name = fallback_name;
+			}
+			if (have_eval_ctx &&
+			    crash_recover_parameter_value(dbg, subprogram_die,
+						   subprogram_is_info, child,
+						   params_is_info, eval_ctx,
+						   &recovered,
+						   errp) == ETR_OK) {
+				if (recovered.has_value) {
+					crash_append_param_value(result, param_name,
+							 recovered.value,
+							 recovered.has_location ?
+							 recovered.location : NULL);
+				} else if (recovered.has_location) {
+					crash_append_param_location(result, param_name,
+							    recovered.location);
+				} else {
+					crash_append_param_unavailable(result, param_name);
+				}
+			} else if (crash_top_frame_abi_value(record, frame, *param_index,
+						    &abi_value,
+						    &abi_location_name) == ETR_OK) {
+				crash_append_param_value(result, param_name, abi_value,
+						      abi_location_name);
+			} else {
+				crash_append_param_unavailable(result, param_name);
+			}
+			(*param_index)++;
+			collected++;
+		}
+		rc = dwarf_siblingof_b(dbg, child, params_is_info, &sibling, errp);
+		dwarf_dealloc(dbg, child, DW_DLA_DIE);
+		if (rc != DW_DLV_OK)
+			break;
+		child = sibling;
+	}
+	return collected;
+}
+
+static uint32_t crash_collect_formal_parameters_recursive(Dwarf_Debug dbg,
+					      Dwarf_Die subprogram_die,
+					      Dwarf_Bool subprogram_is_info,
+					      Dwarf_Die params_die,
+					      Dwarf_Bool params_is_info,
+					      const struct crash_snapshot_record *record,
+					      const struct crash_snapshot_frame *frame,
+					      struct crash_param_eval_context *eval_ctx,
+					      int have_eval_ctx,
+					      uint32_t *param_index,
+					      struct crash_symbolized_frame *result,
+					      int depth,
+					      Dwarf_Error *errp)
+{
+	Dwarf_Die target = 0;
+	Dwarf_Bool target_is_info = 1;
+	uint32_t collected;
+
+	if (dbg == NULL || subprogram_die == 0 || params_die == 0 || record == NULL ||
+	    frame == NULL || param_index == NULL || result == NULL ||
+	    depth >= CRASH_DWARF_REF_DEPTH_MAX)
+		return 0;
+
+	collected = crash_collect_direct_formal_parameters(dbg, subprogram_die,
+							     subprogram_is_info,
+							     params_die,
+							     params_is_info,
+							     record, frame,
+							     eval_ctx,
+							     have_eval_ctx,
+							     param_index,
+							     result, errp);
+	if (collected != 0)
+		return collected;
+
+	if (crash_follow_reference_die(dbg, params_die, DW_AT_abstract_origin,
+				       &target, &target_is_info,
+				       errp) == ETR_OK) {
+		collected = crash_collect_formal_parameters_recursive(dbg,
+							     subprogram_die,
+							     subprogram_is_info,
+							     target,
+							     target_is_info,
+							     record,
+							     frame,
+							     eval_ctx,
+							     have_eval_ctx,
+							     param_index,
+							     result,
+							     depth + 1,
+							     errp);
+		dwarf_dealloc(dbg, target, DW_DLA_DIE);
+		if (collected != 0)
+			return collected;
+	}
+	if (crash_follow_reference_die(dbg, params_die, DW_AT_specification,
+				       &target, &target_is_info,
+				       errp) == ETR_OK) {
+		collected = crash_collect_formal_parameters_recursive(dbg,
+							     subprogram_die,
+							     subprogram_is_info,
+							     target,
+							     target_is_info,
+							     record,
+							     frame,
+							     eval_ctx,
+							     have_eval_ctx,
+							     param_index,
+							     result,
+							     depth + 1,
+							     errp);
+		dwarf_dealloc(dbg, target, DW_DLA_DIE);
+		if (collected != 0)
+			return collected;
+	}
+	return 0;
+}
+
+static void crash_collect_formal_parameters(Dwarf_Debug dbg, Dwarf_Die die,
+					   Dwarf_Bool is_info,
+					   const struct crash_snapshot_record *record,
+					   const struct crash_snapshot_frame *frame,
+					   uint64_t dwarf_pc,
+					   struct crash_symbolized_frame *result,
+					   Dwarf_Error *errp)
+{
+	struct crash_param_eval_context eval_ctx;
+	int have_eval_ctx = 0;
+	uint32_t param_index = 0;
+
+	if (dbg == NULL || die == 0 || record == NULL || frame == NULL ||
+	    result == NULL)
+		return;
+
+	if (crash_init_param_eval_context(&eval_ctx, record, frame, dwarf_pc) == ETR_OK)
+		have_eval_ctx = 1;
+
+	(void)crash_collect_formal_parameters_recursive(dbg, die, is_info, die,
+						     is_info, record, frame,
+						     &eval_ctx, have_eval_ctx,
+						     &param_index, result, 0,
+						     errp);
+}
+
+static int crash_die_pc_matches_range(uint64_t dwarf_pc, uint64_t start,
+				       uint64_t end,
+				       uint64_t *matched_start,
+				       uint64_t *matched_end)
+{
+	if (start >= end)
+		return 0;
+	if (dwarf_pc < start || dwarf_pc >= end)
+		return 0;
+	if (matched_start != NULL)
+		*matched_start = start;
+	if (matched_end != NULL)
+		*matched_end = end;
+	return 1;
+}
+
+static int crash_read_die_low_pc(Dwarf_Die die, uint64_t *low_pc,
+				 Dwarf_Error *errp)
+{
+	Dwarf_Addr addr = 0;
+
+	if (low_pc != NULL)
+		*low_pc = 0;
+	if (die == 0 || low_pc == NULL)
+		return ETR_INVAL;
+	if (dwarf_lowpc(die, &addr, errp) != DW_DLV_OK)
+		return ETR_NOTEXIST;
+	*low_pc = (uint64_t)addr;
+	return ETR_OK;
+}
+
+static int crash_get_attr_form_class(Dwarf_Die die, Dwarf_Attribute attr,
+				     Dwarf_Half attrnum,
+				     Dwarf_Half *form_out,
+				     enum Dwarf_Form_Class *class_out,
+				     Dwarf_Error *errp)
+{
+	Dwarf_Half version = 0;
+	Dwarf_Half offset_size = 0;
+	Dwarf_Half form = 0;
+	int rc;
+
+	if (form_out != NULL)
+		*form_out = 0;
+	if (class_out != NULL)
+		*class_out = DW_FORM_CLASS_UNKNOWN;
+	if (die == 0 || attr == 0)
+		return ETR_INVAL;
+
+	rc = dwarf_whatform(attr, &form, errp);
+	if (rc != DW_DLV_OK)
+		return ETR_NOTEXIST;
+	rc = dwarf_get_version_of_die(die, &version, &offset_size);
+	if (rc != DW_DLV_OK)
+		return ETR_NOTEXIST;
+	if (form_out != NULL)
+		*form_out = form;
+	if (class_out != NULL)
+		*class_out = dwarf_get_form_class(version, attrnum, offset_size,
+						 form);
+	return ETR_OK;
+}
+
+static int crash_die_low_high_pc_contains_pc(Dwarf_Die die, uint64_t dwarf_pc,
+					     int *had_coverage,
+					     uint64_t *matched_start,
+					     uint64_t *matched_end,
+					     Dwarf_Error *errp)
+{
+	Dwarf_Addr low_pc = 0;
+	Dwarf_Addr high_pc = 0;
+	Dwarf_Half highpc_form = 0;
+	enum Dwarf_Form_Class highpc_class = DW_FORM_CLASS_UNKNOWN;
+	int rc;
+
+	if (had_coverage != NULL)
+		*had_coverage = 0;
+	if (die == 0)
+		return 0;
+
+	rc = dwarf_lowpc(die, &low_pc, errp);
+	if (rc != DW_DLV_OK)
+		return 0;
+	rc = dwarf_highpc_b(die, &high_pc, &highpc_form, &highpc_class, errp);
+	if (rc != DW_DLV_OK)
+		return 0;
+	if (had_coverage != NULL)
+		*had_coverage = 1;
+	if (highpc_class == DW_FORM_CLASS_CONSTANT)
+		high_pc += low_pc;
+	return crash_die_pc_matches_range(dwarf_pc, (uint64_t)low_pc,
+					  (uint64_t)high_pc,
+					  matched_start, matched_end);
+}
+
+static int crash_die_ranges_contains_pc_classic(Dwarf_Debug dbg, Dwarf_Die die,
+					Dwarf_Attribute ranges_attr,
+					uint64_t dwarf_pc,
+					uint64_t cu_base,
+					int have_cu_base,
+					uint64_t *matched_start,
+					uint64_t *matched_end,
+					Dwarf_Error *errp)
+{
+	Dwarf_Ranges *ranges = 0;
+	Dwarf_Signed rangecount = 0;
+	Dwarf_Unsigned range_offset = 0;
+	Dwarf_Unsigned bytecount = 0;
+	Dwarf_Off realoffset = 0;
+	Dwarf_Addr low_pc = 0;
+	uint64_t base = 0;
+	int have_base = have_cu_base;
+	int rc;
+	Dwarf_Signed i;
+	int found = 0;
+
+	if (dbg == NULL || die == 0 || ranges_attr == 0)
+		return 0;
+	if (dwarf_lowpc(die, &low_pc, errp) == DW_DLV_OK) {
+		base = (uint64_t)low_pc;
+		have_base = 1;
+	} else if (have_cu_base) {
+		base = cu_base;
+	}
+	if (dwarf_formudata(ranges_attr, &range_offset, errp) != DW_DLV_OK)
+		return 0;
+	rc = dwarf_get_ranges_b(dbg, (Dwarf_Off)range_offset, die, &realoffset,
+				&ranges, &rangecount, &bytecount, errp);
+	if (rc != DW_DLV_OK)
+		return 0;
+	(void)realoffset;
+	(void)bytecount;
+
+	for (i = 0; i < rangecount; i++) {
+		switch (ranges[i].dwr_type) {
+		case DW_RANGES_ADDRESS_SELECTION:
+			base = (uint64_t)ranges[i].dwr_addr2;
+			have_base = 1;
+			break;
+		case DW_RANGES_ENTRY:
+			if (have_base) {
+				uint64_t start = base + (uint64_t)ranges[i].dwr_addr1;
+				uint64_t end = base + (uint64_t)ranges[i].dwr_addr2;
+
+				if (start >= base && end >= base &&
+				    crash_die_pc_matches_range(dwarf_pc, start, end,
+							     matched_start,
+							     matched_end)) {
+					found = 1;
+					goto out;
+				}
+			}
+			break;
+		case DW_RANGES_END:
+			goto out;
+		default:
+			break;
+		}
+	}
+
+out:
+	if (ranges != 0)
+		dwarf_dealloc_ranges(dbg, ranges, rangecount);
+	return found;
+}
+
+static int crash_die_ranges_contains_pc_rnglists(Dwarf_Attribute ranges_attr,
+					 Dwarf_Half ranges_form,
+					 uint64_t dwarf_pc,
+					 uint64_t *matched_start,
+					 uint64_t *matched_end,
+					 Dwarf_Error *errp)
+{
+	Dwarf_Rnglists_Head head = 0;
+	Dwarf_Unsigned range_value = 0;
+	Dwarf_Unsigned entry_count = 0;
+	Dwarf_Unsigned global_offset = 0;
+	Dwarf_Unsigned i;
+	int found = 0;
+
+	if (ranges_attr == 0)
+		return 0;
+	if (dwarf_formudata(ranges_attr, &range_value, errp) != DW_DLV_OK)
+		return 0;
+	if (dwarf_rnglists_get_rle_head(ranges_attr, ranges_form, range_value,
+					&head, &entry_count,
+					&global_offset, errp) != DW_DLV_OK)
+		return 0;
+	(void)global_offset;
+
+	for (i = 0; i < entry_count; i++) {
+		unsigned int entrylen = 0;
+		unsigned int rle_value = 0;
+		Dwarf_Unsigned raw1 = 0;
+		Dwarf_Unsigned raw2 = 0;
+		Dwarf_Unsigned cooked1 = 0;
+		Dwarf_Unsigned cooked2 = 0;
+		Dwarf_Bool debug_addr_unavailable = 0;
+
+		if (dwarf_get_rnglists_entry_fields_a(head, i, &entrylen,
+						     &rle_value, &raw1,
+						     &raw2,
+						     &debug_addr_unavailable,
+						     &cooked1, &cooked2,
+						     errp) != DW_DLV_OK)
+			continue;
+		(void)entrylen;
+		(void)raw1;
+		(void)raw2;
+		if (debug_addr_unavailable)
+			continue;
+		switch (rle_value) {
+		case DW_RLE_offset_pair:
+		case DW_RLE_startx_endx:
+		case DW_RLE_startx_length:
+		case DW_RLE_start_end:
+		case DW_RLE_start_length:
+			if (crash_die_pc_matches_range(dwarf_pc, (uint64_t)cooked1,
+						      (uint64_t)cooked2,
+						      matched_start,
+						      matched_end)) {
+				found = 1;
+				goto out;
+			}
+			break;
+		case DW_RLE_end_of_list:
+			goto out;
+		default:
+			break;
+		}
+	}
+
+out:
+	if (head != 0)
+		dwarf_dealloc_rnglists_head(head);
+	return found;
+}
+
+static int crash_die_contains_pc(Dwarf_Debug dbg, Dwarf_Die die,
+				 uint64_t dwarf_pc,
+				 uint64_t cu_base,
+				 int have_cu_base,
+				 int *had_coverage,
+				 uint64_t *matched_start,
+				 uint64_t *matched_end,
+				 Dwarf_Error *errp)
+{
+	Dwarf_Attribute ranges_attr = 0;
+	Dwarf_Half ranges_form = 0;
+	enum Dwarf_Form_Class ranges_class = DW_FORM_CLASS_UNKNOWN;
+	int had_pc_coverage = 0;
+	int found = 0;
+
+	if (had_coverage != NULL)
+		*had_coverage = 0;
+	if (matched_start != NULL)
+		*matched_start = 0;
+	if (matched_end != NULL)
+		*matched_end = 0;
+	if (dbg == NULL || die == 0)
+		return 0;
+	if (crash_die_low_high_pc_contains_pc(die, dwarf_pc, &had_pc_coverage,
+					       matched_start,
+					       matched_end, errp)) {
+		if (had_coverage != NULL)
+			*had_coverage = 1;
+		return 1;
+	}
+	if (had_pc_coverage) {
+		if (had_coverage != NULL)
+			*had_coverage = 1;
+		return 0;
+	}
+	if (dwarf_attr(die, DW_AT_ranges, &ranges_attr, errp) != DW_DLV_OK)
+		return 0;
+	if (had_coverage != NULL)
+		*had_coverage = 1;
+	if (crash_get_attr_form_class(die, ranges_attr, DW_AT_ranges,
+				     &ranges_form, &ranges_class,
+				     errp) != ETR_OK)
+		goto out;
+	switch (ranges_class) {
+	case DW_FORM_CLASS_RANGELISTPTR:
+		found = crash_die_ranges_contains_pc_classic(dbg, die, ranges_attr,
+						     dwarf_pc, cu_base,
+						     have_cu_base,
+						     matched_start,
+						     matched_end,
+						     errp);
+		break;
+	case DW_FORM_CLASS_RNGLIST:
+	case DW_FORM_CLASS_RNGLISTSPTR:
+		found = crash_die_ranges_contains_pc_rnglists(ranges_attr,
+						      ranges_form,
+						      dwarf_pc,
+						      matched_start,
+						      matched_end,
+						      errp);
+		break;
+	default:
+		break;
+	}
+
+out:
+	dwarf_dealloc(dbg, ranges_attr, DW_DLA_ATTR);
+	return found;
+}
+
+static int crash_subprogram_name_matches_symbol(Dwarf_Debug dbg, Dwarf_Die die,
+					 Dwarf_Bool is_info,
+					 const struct crash_symbolized_frame *result,
+					 Dwarf_Error *errp)
+{
+	char die_name[CRASH_SYMBOL_NAME_LEN];
+
+	if (dbg == NULL || die == 0 || result == NULL || !result->has_symbol ||
+	    result->symbol_name[0] == '\0')
+		return 0;
+	if (crash_copy_die_name_recursive(dbg, die, is_info, die_name,
+					 sizeof(die_name), 0,
+					 errp) != ETR_OK ||
+	    die_name[0] == '\0')
+		return 0;
+	return crash_symbol_names_match(die_name, result->symbol_name);
+}
+
+static int crash_subprogram_matches_frame(Dwarf_Debug dbg, Dwarf_Die die,
+					  Dwarf_Bool is_info,
+					  uint64_t dwarf_pc,
+					  uint64_t cu_base,
+					  int have_cu_base,
+					  const struct crash_symbolized_frame *result,
+					  Dwarf_Error *errp)
+{
+	int had_coverage = 0;
+
+	if (dbg == NULL || die == 0 || result == NULL)
+		return 0;
+	if (crash_die_contains_pc(dbg, die, dwarf_pc, cu_base, have_cu_base,
+				      &had_coverage, NULL, NULL, errp))
+		return 1;
+	if (had_coverage)
+		return 0;
+	return crash_subprogram_name_matches_symbol(dbg, die, is_info, result,
+					     errp);
+}
+
+static int crash_symbolize_params_in_die(Dwarf_Debug dbg, Dwarf_Die die,
+					 Dwarf_Bool is_info,
+					 const struct crash_snapshot_record *record,
+					 const struct crash_snapshot_frame *frame,
+					 uint64_t dwarf_pc,
+					 uint64_t cu_base,
+					 int have_cu_base,
+					 struct crash_symbolized_frame *result,
+					 Dwarf_Error *errp)
+{
+	Dwarf_Half tag = 0;
+	int rc;
+	Dwarf_Die child = 0;
+
+	if (dbg == NULL || die == 0 || result == NULL)
+		return 0;
+
+	rc = dwarf_tag(die, &tag, errp);
+	if (rc != DW_DLV_OK)
+		return 0;
+	if (tag == DW_TAG_subprogram &&
+	    crash_subprogram_matches_frame(dbg, die, is_info, dwarf_pc, cu_base,
+					     have_cu_base, result,
+					     errp)) {
+		size_t params_len_before = strlen(result->params_text);
+
+		crash_collect_formal_parameters(dbg, die, is_info, record, frame,
+					       dwarf_pc, result, errp);
+		if (strlen(result->params_text) != params_len_before)
+			return 1;
+	}
+
+	rc = dwarf_child(die, &child, errp);
+	if (rc == DW_DLV_OK) {
+		for (;;) {
+			Dwarf_Die sibling = 0;
+			int found;
+
+			found = crash_symbolize_params_in_die(dbg, child, is_info,
+						      record, frame,
+						      dwarf_pc,
+						      cu_base,
+						      have_cu_base,
+						      result, errp);
+			if (found) {
+				dwarf_dealloc(dbg, child, DW_DLA_DIE);
+				return 1;
+			}
+			rc = dwarf_siblingof_b(dbg, child, is_info, &sibling, errp);
+			dwarf_dealloc(dbg, child, DW_DLA_DIE);
+			if (rc != DW_DLV_OK)
+				break;
+			child = sibling;
+		}
+	}
+	return 0;
+}
+
+static int crash_symbolize_dwarf_params(const char *path,
+					const struct crash_snapshot_record *record,
+					const struct crash_snapshot_frame *frame,
+					struct crash_symbolized_frame *result)
+{
+	Dwarf_Debug dbg = 0;
+	Dwarf_Error err = 0;
+	Dwarf_Bool is_info = 1;
+	int fd = -1;
+	int rc;
+	int found = 0;
+
+	if (path == NULL || path[0] == '\0' || record == NULL || frame == NULL ||
+	    result == NULL || !result->has_elf_vaddr)
+		return ETR_INVAL;
+
+	fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return ETR_NOTEXIST;
+
+	rc = dwarf_init_b(fd, DW_GROUPNUMBER_ANY, NULL, NULL, &dbg, &err);
+	if (rc != DW_DLV_OK) {
+		close(fd);
+		return ETR_NOTEXIST;
+	}
+
+	for (;;) {
+		Dwarf_Die cu_die = 0;
+		Dwarf_Die no_die = 0;
+		uint64_t cu_base = 0;
+		int have_cu_base = 0;
+
+		rc = dwarf_next_cu_header_d(dbg, is_info, NULL, NULL, NULL,
+					    NULL, NULL, NULL, NULL, NULL, NULL,
+					    NULL, &err);
+		if (rc != DW_DLV_OK)
+			break;
+		rc = dwarf_siblingof_b(dbg, no_die, is_info, &cu_die, &err);
+		if (rc != DW_DLV_OK)
+			continue;
+		if (crash_read_die_low_pc(cu_die, &cu_base, &err) == ETR_OK)
+			have_cu_base = 1;
+		found = crash_symbolize_params_in_die(dbg, cu_die, is_info, record,
+						     frame, result->elf_vaddr,
+						     cu_base, have_cu_base,
+						     result, &err);
+		dwarf_dealloc(dbg, cu_die, DW_DLA_DIE);
+		if (found)
+			break;
+	}
+
+	if (err != 0)
+		dwarf_dealloc_error(dbg, err);
+	(void)dwarf_finish(dbg);
+	close(fd);
+	return found && result->has_params ? ETR_OK : ETR_NOTEXIST;
+}
+
 /*
  * Walk a DIE subtree looking for a subprogram range that contains the target
  * address. When found, DWARF can provide a better function name than stripped
  * or incomplete ELF symbols.
  */
 static void crash_symbolize_line_in_die(Dwarf_Debug dbg, Dwarf_Die die,
+					uint64_t cu_base,
+					int have_cu_base,
 					struct crash_symbolized_frame *result,
 					Dwarf_Error * errp)
 {
@@ -586,35 +2519,22 @@ static void crash_symbolize_line_in_die(Dwarf_Debug dbg, Dwarf_Die die,
 	if (rc != DW_DLV_OK)
 		return;
 	if (tag == DW_TAG_subprogram) {
-		Dwarf_Addr low_pc = 0;
-		Dwarf_Addr high_pc = 0;
-		Dwarf_Half highpc_form = 0;
-		enum Dwarf_Form_Class highpc_class = DW_FORM_CLASS_UNKNOWN;
+		uint64_t matched_start = 0;
+		uint64_t matched_end = 0;
+		int had_coverage = 0;
 
-		rc = dwarf_lowpc(die, &low_pc, errp);
-		if (rc == DW_DLV_OK) {
-			rc = dwarf_highpc_b(die, &high_pc, &highpc_form,
-					    &highpc_class, errp);
-			if (rc == DW_DLV_OK) {
-				if (highpc_class == DW_FORM_CLASS_CONSTANT)
-					high_pc += low_pc;
-				if (result->elf_vaddr >= low_pc &&
-				    result->elf_vaddr < high_pc) {
-					char *name = NULL;
+		if (crash_die_contains_pc(dbg, die, result->elf_vaddr, cu_base,
+					 have_cu_base, &had_coverage,
+					 &matched_start, &matched_end,
+					 errp)) {
+			char *name = NULL;
 
-					if (!result->has_symbol &&
-					    dwarf_diename(die, &name,
-							  errp) == DW_DLV_OK) {
-						crash_set_symbol_name(result,
-								      name,
-								      low_pc,
-								      high_pc -
-								      low_pc);
-						if (name != NULL)
-							dwarf_dealloc(dbg, name,
-								      DW_DLA_STRING);
-					}
-				}
+			if (!result->has_symbol &&
+			    dwarf_diename(die, &name, errp) == DW_DLV_OK) {
+				crash_set_symbol_name(result, name, matched_start,
+						      matched_end - matched_start);
+				if (name != NULL)
+					dwarf_dealloc(dbg, name, DW_DLA_STRING);
 			}
 		}
 	}
@@ -626,7 +2546,8 @@ static void crash_symbolize_line_in_die(Dwarf_Debug dbg, Dwarf_Die die,
 		for (;;) {
 			Dwarf_Die sibling = 0;
 
-			crash_symbolize_line_in_die(dbg, current, result, errp);
+			crash_symbolize_line_in_die(dbg, current, cu_base, have_cu_base,
+						  result, errp);
 			rc = dwarf_siblingof_b(dbg, current, true, &sibling,
 					       errp);
 			dwarf_dealloc(dbg, current, DW_DLA_DIE);
@@ -684,6 +2605,8 @@ static int crash_symbolize_dwarf_lines(const char *path,
 		Dwarf_Bool has_stmt_list = 0;
 		Dwarf_Unsigned line_version = 0;
 		Dwarf_Small table_count = 0;
+		uint64_t cu_base = 0;
+		int have_cu_base = 0;
 
 		rc = dwarf_next_cu_header_d(dbg, is_info, NULL, NULL, NULL,
 					    NULL, NULL, NULL, NULL, NULL, NULL,
@@ -694,7 +2617,10 @@ static int crash_symbolize_dwarf_lines(const char *path,
 		if (rc != DW_DLV_OK)
 			continue;
 
-		crash_symbolize_line_in_die(dbg, cu_die, result, &err);
+		if (crash_read_die_low_pc(cu_die, &cu_base, &err) == ETR_OK)
+			have_cu_base = 1;
+		crash_symbolize_line_in_die(dbg, cu_die, cu_base, have_cu_base,
+					      result, &err);
 		rc = dwarf_hasattr(cu_die, DW_AT_stmt_list, &has_stmt_list,
 				   &err);
 		if (rc != DW_DLV_OK || !has_stmt_list) {
@@ -801,7 +2727,7 @@ static int crash_symbolize_frame(const struct crash_snapshot_record *record,
 	if (openelf(result->module->path, &elf, &fd) != 0)
 		return ETR_NOTEXIST;
 
-	ret = crash_symbolize_prepare_vaddr(elf, result);
+	ret = crash_symbolize_prepare_vaddr(elf, frame, result);
 	if (ret != ETR_OK)
 		goto out;
 
@@ -810,11 +2736,16 @@ static int crash_symbolize_frame(const struct crash_snapshot_record *record,
 	    openelf(debug_path, &debug_elf, &debug_fd) == 0) {
 		(void)crash_symbolize_elf_symbols(debug_elf, result);
 		(void)crash_symbolize_dwarf_lines(debug_path, result);
+		(void)crash_symbolize_dwarf_params(debug_path, record, frame,
+					      result);
 	}
 	if (!result->has_symbol)
 		(void)crash_symbolize_elf_symbols(elf, result);
 	if (!result->has_line)
 		(void)crash_symbolize_dwarf_lines(result->module->path, result);
+	if (!result->has_params)
+		(void)crash_symbolize_dwarf_params(result->module->path, record,
+					      frame, result);
 	ret = ETR_OK;
 
 out:
@@ -836,8 +2767,9 @@ out:
  * task crashed and whether the recovered executable still matches the image on
  * disk. The task name comes from Stage 1 when available, while the MD5 is a
  * best-effort Stage-2 calculation against the recorded executable path. The
- * raw top-frame ABI argument registers are logged separately right after the
- * summary so the main headline remains grep-friendly.
+ * recovered register block and the raw top-frame ABI argument registers are
+ * logged immediately after the summary so the main headline remains
+ * grep-friendly.
  */
 static void crash_log_summary(const struct crash_snapshot_record *record,
 			      uint32_t frames)
@@ -864,6 +2796,147 @@ static void crash_log_summary(const struct crash_snapshot_record *record,
 	     record->tid, executable_path, md5_text,
 	     (unsigned long long)record->ip,
 	     (unsigned long long)record->fault_addr, frames);
+}
+
+static int crash_record_has_full_regs(const struct crash_snapshot_record *record)
+{
+	return record != NULL &&
+	    (record->capture_flags & CRASH_SNAPSHOT_FLAG_FULL_REGS) != 0;
+}
+
+/*
+ * Emit the recovered top-frame general-purpose register block.
+ *
+ * v4 snapshots persist a richer register set than older records. When Stage 2
+ * is consuming an upgraded v2/v3 record, keep the log honest by marking it as
+ * partial and only printing the fields that older formats actually captured.
+ */
+static void crash_log_registers(const struct crash_snapshot_record *record)
+{
+	if (record == NULL)
+		return;
+
+	switch (record->arch) {
+	case CRASH_SNAPSHOT_ARCH_X86_64:
+		if (crash_record_has_full_regs(record)) {
+			ebpf_info
+			    ("Recovered crash registers: rip=0x%llx rsp=0x%llx rbp=0x%llx eflags=0x%llx\n",
+			     (unsigned long long)record->registers.x86_64.rip,
+			     (unsigned long long)record->registers.x86_64.rsp,
+			     (unsigned long long)record->registers.x86_64.rbp,
+			     (unsigned long long)record->registers.x86_64.eflags);
+			ebpf_info
+			    ("Recovered crash registers: rax=0x%llx rbx=0x%llx rcx=0x%llx rdx=0x%llx rsi=0x%llx rdi=0x%llx\n",
+			     (unsigned long long)record->registers.x86_64.rax,
+			     (unsigned long long)record->registers.x86_64.rbx,
+			     (unsigned long long)record->registers.x86_64.rcx,
+			     (unsigned long long)record->registers.x86_64.rdx,
+			     (unsigned long long)record->registers.x86_64.rsi,
+			     (unsigned long long)record->registers.x86_64.rdi);
+			ebpf_info
+			    ("Recovered crash registers: r8=0x%llx r9=0x%llx r10=0x%llx r11=0x%llx r12=0x%llx r13=0x%llx r14=0x%llx r15=0x%llx\n",
+			     (unsigned long long)record->registers.x86_64.r8,
+			     (unsigned long long)record->registers.x86_64.r9,
+			     (unsigned long long)record->registers.x86_64.r10,
+			     (unsigned long long)record->registers.x86_64.r11,
+			     (unsigned long long)record->registers.x86_64.r12,
+			     (unsigned long long)record->registers.x86_64.r13,
+			     (unsigned long long)record->registers.x86_64.r14,
+			     (unsigned long long)record->registers.x86_64.r15);
+			return;
+		}
+		ebpf_info
+		    ("Recovered crash registers (partial): rip=0x%llx rsp=0x%llx rbp=0x%llx rdi=0x%llx rsi=0x%llx rdx=0x%llx rcx=0x%llx r8=0x%llx r9=0x%llx\n",
+		     (unsigned long long)record->ip,
+		     (unsigned long long)record->sp,
+		     (unsigned long long)record->fp,
+		     (unsigned long long)record->args[0],
+		     (unsigned long long)record->args[1],
+		     (unsigned long long)record->args[2],
+		     (unsigned long long)record->args[3],
+		     (unsigned long long)record->args[4],
+		     (unsigned long long)record->args[5]);
+		return;
+	case CRASH_SNAPSHOT_ARCH_AARCH64:
+		if (crash_record_has_full_regs(record)) {
+			ebpf_info
+			    ("Recovered crash registers: pc=0x%llx sp=0x%llx x29=0x%llx x30=0x%llx pstate=0x%llx\n",
+			     (unsigned long long)record->registers.aarch64.pc,
+			     (unsigned long long)record->registers.aarch64.sp,
+			     (unsigned long long)record->registers.aarch64.x[29],
+			     (unsigned long long)record->registers.aarch64.x[30],
+			     (unsigned long long)record->registers.aarch64.pstate);
+			ebpf_info
+			    ("Recovered crash registers: x0=0x%llx x1=0x%llx x2=0x%llx x3=0x%llx x4=0x%llx x5=0x%llx x6=0x%llx x7=0x%llx\n",
+			     (unsigned long long)record->registers.aarch64.x[0],
+			     (unsigned long long)record->registers.aarch64.x[1],
+			     (unsigned long long)record->registers.aarch64.x[2],
+			     (unsigned long long)record->registers.aarch64.x[3],
+			     (unsigned long long)record->registers.aarch64.x[4],
+			     (unsigned long long)record->registers.aarch64.x[5],
+			     (unsigned long long)record->registers.aarch64.x[6],
+			     (unsigned long long)record->registers.aarch64.x[7]);
+			ebpf_info
+			    ("Recovered crash registers: x8=0x%llx x9=0x%llx x10=0x%llx x11=0x%llx x12=0x%llx x13=0x%llx x14=0x%llx x15=0x%llx\n",
+			     (unsigned long long)record->registers.aarch64.x[8],
+			     (unsigned long long)record->registers.aarch64.x[9],
+			     (unsigned long long)record->registers.aarch64.x[10],
+			     (unsigned long long)record->registers.aarch64.x[11],
+			     (unsigned long long)record->registers.aarch64.x[12],
+			     (unsigned long long)record->registers.aarch64.x[13],
+			     (unsigned long long)record->registers.aarch64.x[14],
+			     (unsigned long long)record->registers.aarch64.x[15]);
+			ebpf_info
+			    ("Recovered crash registers: x16=0x%llx x17=0x%llx x18=0x%llx x19=0x%llx x20=0x%llx x21=0x%llx x22=0x%llx x23=0x%llx\n",
+			     (unsigned long long)record->registers.aarch64.x[16],
+			     (unsigned long long)record->registers.aarch64.x[17],
+			     (unsigned long long)record->registers.aarch64.x[18],
+			     (unsigned long long)record->registers.aarch64.x[19],
+			     (unsigned long long)record->registers.aarch64.x[20],
+			     (unsigned long long)record->registers.aarch64.x[21],
+			     (unsigned long long)record->registers.aarch64.x[22],
+			     (unsigned long long)record->registers.aarch64.x[23]);
+			ebpf_info
+			    ("Recovered crash registers: x24=0x%llx x25=0x%llx x26=0x%llx x27=0x%llx x28=0x%llx\n",
+			     (unsigned long long)record->registers.aarch64.x[24],
+			     (unsigned long long)record->registers.aarch64.x[25],
+			     (unsigned long long)record->registers.aarch64.x[26],
+			     (unsigned long long)record->registers.aarch64.x[27],
+			     (unsigned long long)record->registers.aarch64.x[28]);
+			return;
+		}
+		ebpf_info
+		    ("Recovered crash registers (partial): pc=0x%llx sp=0x%llx x29=0x%llx x30=0x%llx x0=0x%llx x1=0x%llx x2=0x%llx x3=0x%llx x4=0x%llx x5=0x%llx x6=0x%llx x7=0x%llx\n",
+		     (unsigned long long)record->ip,
+		     (unsigned long long)record->sp,
+		     (unsigned long long)record->fp,
+		     (unsigned long long)record->lr,
+		     (unsigned long long)record->args[0],
+		     (unsigned long long)record->args[1],
+		     (unsigned long long)record->args[2],
+		     (unsigned long long)record->args[3],
+		     (unsigned long long)record->args[4],
+		     (unsigned long long)record->args[5],
+		     (unsigned long long)record->args[6],
+		     (unsigned long long)record->args[7]);
+		return;
+	default:
+		if (crash_record_has_full_regs(record))
+			ebpf_info
+			    ("Recovered crash registers: ip=0x%llx sp=0x%llx fp=0x%llx lr=0x%llx\n",
+			     (unsigned long long)record->ip,
+			     (unsigned long long)record->sp,
+			     (unsigned long long)record->fp,
+			     (unsigned long long)record->lr);
+		else
+			ebpf_info
+			    ("Recovered crash registers (partial): ip=0x%llx sp=0x%llx fp=0x%llx lr=0x%llx\n",
+			     (unsigned long long)record->ip,
+			     (unsigned long long)record->sp,
+			     (unsigned long long)record->fp,
+			     (unsigned long long)record->lr);
+		return;
+	}
 }
 
 /*
@@ -919,6 +2992,16 @@ static void crash_log_args(const struct crash_snapshot_record *record)
 	}
 }
 
+static void crash_log_frame_params(uint32_t index,
+				  const struct crash_symbolized_frame *symbolized)
+{
+	if (symbolized == NULL || !symbolized->has_params ||
+	    symbolized->params_text[0] == '\0')
+		return;
+	ebpf_info("Recovered crash frame[%u] params: %s\n", index,
+		  symbolized->params_text);
+}
+
 /*
  * Fallback logging for frames that could not be fully symbolized. The goal is
  * to preserve at least the raw PC, plus module/rel_pc/build-id when Stage 1
@@ -944,6 +3027,7 @@ static void crash_log_raw_frame(uint32_t index,
 		    ("Recovered crash frame[%u]: pc=0x%llx module=%s rel=0x%llx build_id=%s\n",
 		     index, (unsigned long long)frame->absolute_pc, module_path,
 		     (unsigned long long)frame->rel_pc, build_id);
+		crash_log_frame_params(index, symbolized);
 		return;
 	}
 	if (symbolized != NULL && symbolized->has_module) {
@@ -951,10 +3035,12 @@ static void crash_log_raw_frame(uint32_t index,
 		    ("Recovered crash frame[%u]: pc=0x%llx module=%s rel=0x%llx\n",
 		     index, (unsigned long long)frame->absolute_pc, module_path,
 		     (unsigned long long)frame->rel_pc);
+		crash_log_frame_params(index, symbolized);
 		return;
 	}
 	ebpf_warning("Recovered crash frame[%u]: pc=0x%llx\n", index,
 		     (unsigned long long)frame->absolute_pc);
+	crash_log_frame_params(index, symbolized);
 }
 
 /*
@@ -997,6 +3083,7 @@ static void crash_log_symbolized_frame(uint32_t index,
 			     symbol_name, (unsigned long long)symbol_offset,
 			     symbolized->file_path,
 			     (unsigned long long)symbolized->line, build_id);
+			crash_log_frame_params(index, symbolized);
 			return;
 		}
 		ebpf_info
@@ -1005,6 +3092,7 @@ static void crash_log_symbolized_frame(uint32_t index,
 		     (unsigned long long)frame->rel_pc, symbol_name,
 		     (unsigned long long)symbol_offset, symbolized->file_path,
 		     (unsigned long long)symbolized->line);
+		crash_log_frame_params(index, symbolized);
 		return;
 	}
 	if (symbolized->has_line) {
@@ -1015,6 +3103,7 @@ static void crash_log_symbolized_frame(uint32_t index,
 			     module_path, (unsigned long long)frame->rel_pc,
 			     symbolized->file_path,
 			     (unsigned long long)symbolized->line, build_id);
+			crash_log_frame_params(index, symbolized);
 			return;
 		}
 		ebpf_info
@@ -1022,6 +3111,7 @@ static void crash_log_symbolized_frame(uint32_t index,
 		     index, (unsigned long long)frame->absolute_pc, module_path,
 		     (unsigned long long)frame->rel_pc, symbolized->file_path,
 		     (unsigned long long)symbolized->line);
+		crash_log_frame_params(index, symbolized);
 		return;
 	}
 	if (build_id[0] != '\0') {
@@ -1030,6 +3120,7 @@ static void crash_log_symbolized_frame(uint32_t index,
 		     index, (unsigned long long)frame->absolute_pc, module_path,
 		     (unsigned long long)frame->rel_pc, symbol_name,
 		     (unsigned long long)symbol_offset, build_id);
+		crash_log_frame_params(index, symbolized);
 		return;
 	}
 	ebpf_info
@@ -1037,6 +3128,7 @@ static void crash_log_symbolized_frame(uint32_t index,
 	     index, (unsigned long long)frame->absolute_pc, module_path,
 	     (unsigned long long)frame->rel_pc, symbol_name,
 	     (unsigned long long)symbol_offset);
+	crash_log_frame_params(index, symbolized);
 }
 
 /*
@@ -1063,6 +3155,7 @@ int crash_symbolize_record(const struct crash_snapshot_record *record)
 		frames = CRASH_SNAPSHOT_MAX_FRAMES;
 	ebpf_info("%s\n", CRASH_REPORT_SEPARATOR);
 	crash_log_summary(record, frames);
+	crash_log_registers(record);
 	crash_log_args(record);
 	for (i = 0; i < frames; i++) {
 		struct crash_symbolized_frame symbolized;

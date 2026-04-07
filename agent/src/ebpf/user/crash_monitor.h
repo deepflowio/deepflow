@@ -40,8 +40,8 @@ extern "C" {
  *   Stage 2 (normal context)
  *     - Read the binary snapshot file later, when it is safe to allocate
  *       memory, take locks, parse ELF/DWARF, or emit rich logs.
- *     - Resolve modules, symbols, and file:line information from the raw
- *       addresses captured in Stage 1.
+ *     - Resolve modules, symbols, file:line information, and best-effort
+ *       source-level argument locations from the raw data captured in Stage 1.
  *
  * The data structures below form the on-disk contract between those two
  * stages. They are versioned and fixed-size on purpose so that the signal
@@ -49,13 +49,14 @@ extern "C" {
  * the whole structure without building variable-length text buffers.
  */
 #define CRASH_SNAPSHOT_MAGIC 0x44464352U
-#define CRASH_SNAPSHOT_VERSION 3
+#define CRASH_SNAPSHOT_VERSION 4
 #define CRASH_SNAPSHOT_MAX_FRAMES 32
 #define CRASH_SNAPSHOT_ARG_REGS 8
 #define CRASH_SNAPSHOT_MAX_MODULES 32
 #define CRASH_SNAPSHOT_MODULE_PATH_LEN 256
 #define CRASH_SNAPSHOT_BUILD_ID_SIZE 20
 #define CRASH_SNAPSHOT_TASK_NAME_LEN 16
+#define CRASH_SNAPSHOT_STACK_WINDOW_SIZE 2048
 #define CRASH_SNAPSHOT_INVALID_MODULE 0xffffffffU
 #define CRASH_SNAPSHOT_FILE "/var/log/deepflow-agent/deepflow-agent.crash"
 
@@ -63,6 +64,18 @@ enum crash_snapshot_arch {
 	CRASH_SNAPSHOT_ARCH_UNKNOWN = 0,
 	CRASH_SNAPSHOT_ARCH_X86_64 = 1,
 	CRASH_SNAPSHOT_ARCH_AARCH64 = 2,
+};
+
+enum crash_snapshot_record_flags {
+	CRASH_SNAPSHOT_FLAG_FULL_REGS = 1U << 0,
+	CRASH_SNAPSHOT_FLAG_STACK_WINDOW = 1U << 1,
+};
+
+enum crash_snapshot_frame_flags {
+	CRASH_SNAPSHOT_FRAME_TOP = 1U << 0,
+	CRASH_SNAPSHOT_FRAME_FP_WALK = 1U << 1,
+	CRASH_SNAPSHOT_FRAME_LR_HINT = 1U << 2,
+	CRASH_SNAPSHOT_FRAME_TRUNCATED = 1U << 3,
 };
 
 /*
@@ -106,12 +119,55 @@ struct crash_snapshot_module {
  *   module_index points into the modules[] array. Consumers should be prepared
  *   for module_index == CRASH_SNAPSHOT_INVALID_MODULE when module lookup was
  *   unavailable or intentionally skipped in signal context.
+ *
+ * frame_fp:
+ *   Best-effort raw frame pointer observed for this frame during the manual
+ *   frame-pointer walk. Stage 2 may reuse it as a hint when evaluating simple
+ *   DWARF frame-base or stack-slot expressions.
+ *
+ * frame_flags:
+ *   Marks how the frame entered the snapshot: top frame, frame-pointer walk,
+ *   AArch64 LR hint, or whether the walk hit the fixed frame budget.
  */
 struct crash_snapshot_frame {
 	uint64_t absolute_pc;
 	uint64_t rel_pc;
+	uint64_t frame_fp;
 	uint32_t module_index;
-	uint32_t reserved;
+	uint32_t frame_flags;
+};
+
+struct crash_snapshot_regs_x86_64 {
+	uint64_t rax;
+	uint64_t rbx;
+	uint64_t rcx;
+	uint64_t rdx;
+	uint64_t rsi;
+	uint64_t rdi;
+	uint64_t rbp;
+	uint64_t rsp;
+	uint64_t r8;
+	uint64_t r9;
+	uint64_t r10;
+	uint64_t r11;
+	uint64_t r12;
+	uint64_t r13;
+	uint64_t r14;
+	uint64_t r15;
+	uint64_t rip;
+	uint64_t eflags;
+};
+
+struct crash_snapshot_regs_aarch64 {
+	uint64_t x[31];
+	uint64_t sp;
+	uint64_t pc;
+	uint64_t pstate;
+};
+
+union crash_snapshot_registers {
+	struct crash_snapshot_regs_x86_64 x86_64;
+	struct crash_snapshot_regs_aarch64 aarch64;
 };
 
 /*
@@ -131,7 +187,7 @@ struct crash_snapshot_frame {
  *   Best-effort ABI argument registers for the crashing frame only. These are
  *   raw integer/pointer register values, not reconstructed high-level source
  *   language arguments. Stack-passed, floating-point, optimized-out, or older
- *   frame arguments are outside the guarantees of this snapshot format.
+ *   frame arguments are outside the guarantees of this subset.
  *
  * executable_path:
  *   Best-effort path of the crashing executable image.
@@ -146,6 +202,17 @@ struct crash_snapshot_frame {
  *   Bounded arrays reserved so the signal handler never has to allocate memory
  *   while collecting stack state. modules_count and frames_count indicate how
  *   many entries were actually populated.
+ *
+ * capture_flags + registers:
+ *   v4 extends the snapshot with a full top-frame general-purpose register
+ *   block. Stage 2 uses it both for richer logging and for best-effort DWARF
+ *   parameter recovery. Older snapshots leave this block zeroed and clear the
+ *   FULL_REGS flag.
+ *
+ * stack_window_*:
+ *   A bounded copy of the crashing thread's normal stack near the recorded SP.
+ *   Stage 2 may use this evidence to recover stack-backed parameters when
+ *   simple DWARF location expressions point into the captured window.
  */
 struct crash_snapshot_record {
 	uint32_t magic;
@@ -168,6 +235,11 @@ struct crash_snapshot_record {
 	uint32_t frames_count;
 	struct crash_snapshot_module modules[CRASH_SNAPSHOT_MAX_MODULES];
 	struct crash_snapshot_frame frames[CRASH_SNAPSHOT_MAX_FRAMES];
+	uint32_t capture_flags;
+	uint32_t stack_window_size;
+	uint64_t stack_window_start;
+	union crash_snapshot_registers registers;
+	uint8_t stack_window[CRASH_SNAPSHOT_STACK_WINDOW_SIZE];
 };
 
 /*
@@ -207,16 +279,17 @@ void crash_monitor_set_thread_name(const char *name);
  * Stage-2 consumer entry point.
  *
  * The implementation is expected to parse any pending binary crash snapshots in
- * normal context, resolve module/symbol/file:line information, and emit the
- * final human-readable crash report. Because this runs outside signal context,
- * it may safely use allocators, locks, /proc parsing, ELF/DWARF libraries, and
- * richer logging facilities.
+ * normal context, resolve module/symbol/file:line information, attempt
+ * best-effort per-frame parameter recovery, and emit the final human-readable
+ * crash report. Because this runs outside signal context, it may safely use
+ * allocators, locks, /proc parsing, ELF/DWARF libraries, and richer logging
+ * facilities.
  *
  * This split is intentional. The fatal signal handler should capture evidence
  * with the smallest possible async-signal-safe surface area and then rethrow
  * the original signal. Reading old snapshot files, validating multiple records,
- * formatting logs, truncating consumed state, and future symbolization work all
- * belong to normal process context, not to the crashing thread's handler.
+ * formatting logs, truncating consumed state, and symbolization work all belong
+ * to normal process context, not to the crashing thread's handler.
  *
  * The snapshot file location is fixed at CRASH_SNAPSHOT_FILE.
  */

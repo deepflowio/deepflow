@@ -19,4 +19,6 @@ env_logger = "0.9"
 trace-utils = { path = "../../../../../crates/trace-utils" }
 
 [profile.release]
-debug = true
+panic = 'abort'
+debug = 2
+split-debuginfo = "off"
