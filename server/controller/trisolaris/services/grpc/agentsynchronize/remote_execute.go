@@ -353,12 +353,15 @@ func (e *RemoteExecute) logRequest(ctx *remoteExecContext, req *api.RemoteExecRe
 	if req.RequestId != nil && *req.RequestId == reqeustIDOfResponseToHeartbeat {
 		return
 	}
-	if req.GetCommandData() != nil {
-		log.Infof("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d, exec_type: %s, batch_len: %d, MD5: %s, total_len: %d", ctx.key, req.GetRequestId(), req.GetExecType(), req.GetBatchLen(), req.GetCommandData().GetMd5(), req.GetCommandData().GetTotalLen())
-	} else {
-		log.Infof("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d, exec_type: %s, batch_len: %d", ctx.key, req.GetRequestId(), req.GetExecType(), req.GetBatchLen())
-	}
 
-	b, _ := json.Marshal(req)
-	log.Debugf("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d: %s", ctx.key, req.GetRequestId(), string(b))
+	if req.GetExecType() == api.ExecutionType_DRY_REPLAY_PCAP {
+		if req.GetCommandData() != nil {
+			log.Infof("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d, exec_type: %s, batch_len: %d, MD5: %s, total_len: %d", ctx.key, req.GetRequestId(), req.GetExecType(), req.GetBatchLen(), req.GetCommandData().GetMd5(), req.GetCommandData().GetTotalLen())
+		} else {
+			log.Infof("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d, exec_type: %s, batch_len: %d", ctx.key, req.GetRequestId(), req.GetExecType(), req.GetBatchLen())
+		}
+	} else {
+		b, _ := json.Marshal(req)
+		log.Infof("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d: %s", ctx.key, req.GetRequestId(), string(b))
+	}
 }

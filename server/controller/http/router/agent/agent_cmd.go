@@ -279,6 +279,9 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 			}
 		}
 
+		// TODO remove
+		notfound := "notfound"
+		req.CommandIdent = &notfound
 		agentReq := grpcapi.RemoteExecRequest{
 			ExecType: grpcapi.ExecutionType_RUN_COMMAND.Enum(),
 			// CommandId:    req.CommandId, // deprecated
