@@ -113,6 +113,9 @@ func shouldSplitFileAggByIdleGap(current, next *dbwriter.FileAggEventStore) bool
 }
 
 func (r *FileAggReducer) Add(raw *dbwriter.EventStore) []*dbwriter.FileAggEventStore {
+	if raw == nil || raw.RootPID == 0 {
+		return nil
+	}
 	next := cloneRawFileEventToAgg(raw)
 	if next == nil {
 		return nil

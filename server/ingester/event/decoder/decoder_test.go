@@ -259,3 +259,12 @@ func TestExtractFileMgmtTargets(t *testing.T) {
 		t.Fatalf("chmod targets = (%d,%d,%d)", uid, gid, mode)
 	}
 }
+
+func TestShouldAggregateFileAggEvent(t *testing.T) {
+	if shouldAggregateFileAggEvent(0) {
+		t.Fatalf("expected root pid 0 to skip file_agg_event aggregation")
+	}
+	if !shouldAggregateFileAggEvent(42) {
+		t.Fatalf("expected non-zero root pid to allow file_agg_event aggregation")
+	}
+}

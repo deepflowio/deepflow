@@ -402,6 +402,10 @@ func splitFilePath(fullPath string) (string, string) {
 	return "", fullPath
 }
 
+func shouldAggregateFileAggEvent(rootPID uint32) bool {
+	return rootPID != 0
+}
+
 func (d *Decoder) emitFileAggItems(items []*dbwriter.FileAggEventStore) {
 	if len(items) == 0 {
 		return
@@ -456,7 +460,7 @@ func (d *Decoder) writeRawFileEvent(vtapId uint16, e *pb.ProcEvent) {
 
 	d.export(s)
 	d.rawFileWriter().Write(s)
-	if d.fileAggReducer != nil {
+	if d.fileAggReducer != nil && shouldAggregateFileAggEvent(s.RootPID) {
 		d.emitFileAggItems(d.fileAggReducer.Add(s))
 	}
 }

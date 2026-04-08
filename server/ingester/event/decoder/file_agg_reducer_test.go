@@ -195,3 +195,19 @@ func TestFileAggReducerSplitsSameKeyWhenIdleGapExceeded(t *testing.T) {
 		t.Fatalf("remaining event_count = %d, want 1", remaining[0].EventCount)
 	}
 }
+
+func TestFileAggReducerSkipsNonAiAgentEvent(t *testing.T) {
+	reducer := NewFileAggReducer()
+	raw := makeRawFileEvent("bash", "read", "plain.txt", 16)
+	raw.RootPID = 0
+
+	flushed := reducer.Add(raw)
+	if flushed != nil {
+		t.Fatalf("add returned %d flushed items, want nil", len(flushed))
+	}
+
+	remaining := reducer.Flush()
+	if remaining != nil {
+		t.Fatalf("flush returned %d items, want nil", len(remaining))
+	}
+}
