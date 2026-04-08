@@ -89,6 +89,10 @@ func (v *Vtap) getVtaps() gin.HandlerFunc {
 		if value, ok := c.GetQuery("vtap_group_lcuuid"); ok {
 			args["vtap_group_lcuuid"] = value
 		}
+		vtapGroupIDs := c.QueryArray("vtap_group_id")
+		if len(vtapGroupIDs) > 0 {
+			args["vtap_group_ids"] = vtapGroupIDs
+		}
 		if value, ok := c.GetQuery("controller_ip"); ok {
 			args["controller_ip"] = value
 		}

@@ -77,6 +77,28 @@ func (a *Agent) Get(filter map[string]interface{}) (resp []model.Vtap, err error
 		return nil, err
 	}
 	Db, vtapDB := dbInfo.DB, dbInfo.DB
+
+	if vtapGroupIDs, ok := filter["vtap_group_ids"]; ok {
+		vtapGroupIDStrs := vtapGroupIDs.([]string)
+		if len(vtapGroupIDStrs) > 0 {
+			var targetGroups []metadbmodel.VTapGroup
+			if err := Db.Select("id", "lcuuid").Where("id IN (?)", vtapGroupIDStrs).Find(&targetGroups).Error; err != nil {
+				return nil, err
+			}
+
+			var lcuuids []string
+			for _, group := range targetGroups {
+				lcuuids = append(lcuuids, group.Lcuuid)
+			}
+
+			if len(lcuuids) > 0 {
+				vtapDB = vtapDB.Where("vtap_group_lcuuid IN (?)", lcuuids)
+			} else {
+				vtapDB = vtapDB.Where("1 = 0")
+			}
+		}
+	}
+
 	for _, param := range []string{
 		"lcuuid", "name", "type", "vtap_group_lcuuid", "controller_ip", "analyzer_ip", "team_id",
 	} {
