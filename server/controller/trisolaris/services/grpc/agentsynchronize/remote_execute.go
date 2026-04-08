@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	api "github.com/deepflowio/deepflow/message/agent"
@@ -110,7 +111,7 @@ func (e *RemoteExecute) receiveAndHandle(
 			// Handle any errors that occur during stream reception
 			// if server restart, an io.EOF error may be received
 			if err == io.EOF {
-				e.handleStreamEOF(ctx, err)
+				e.handleStreamEOF(ctx, stream, err)
 				return
 			}
 
@@ -290,8 +291,13 @@ func (e *RemoteExecute) handleAgentInactivityTimeout(ctx *remoteExecContext) {
 	}
 }
 
-func (e *RemoteExecute) handleStreamEOF(ctx *remoteExecContext, err error) {
-	log.Errorf("[REMOTE_EXEC] agent(key: %s) command stream error: %v", ctx.key, err)
+func (e *RemoteExecute) handleStreamEOF(ctx *remoteExecContext, stream api.Synchronizer_RemoteExecuteServer, err error) {
+	// Extract gRPC status for more diagnostic detail (code + message)
+	st, _ := status.FromError(err)
+	// stream.Context().Err() reveals whether the closure was due to deadline exceeded or cancellation
+	ctxErr := stream.Context().Err()
+	log.Errorf("[REMOTE_EXEC] agent(key: %s) command stream EOF: grpc_status_code=%s, grpc_message=%q, ctx_err=%v",
+		ctx.key, st.Code(), st.Message(), ctxErr)
 	// Send error to errChan in a non-blocking way to prevent deadlock
 	select {
 	case ctx.streamHandleErrChan <- err:
@@ -353,12 +359,15 @@ func (e *RemoteExecute) logRequest(ctx *remoteExecContext, req *api.RemoteExecRe
 	if req.RequestId != nil && *req.RequestId == reqeustIDOfResponseToHeartbeat {
 		return
 	}
-	if req.GetCommandData() != nil {
-		log.Infof("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d, exec_type: %s, batch_len: %d, MD5: %s, total_len: %d", ctx.key, req.GetRequestId(), req.GetExecType(), req.GetBatchLen(), req.GetCommandData().GetMd5(), req.GetCommandData().GetTotalLen())
-	} else {
-		log.Infof("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d, exec_type: %s, batch_len: %d", ctx.key, req.GetRequestId(), req.GetExecType(), req.GetBatchLen())
-	}
 
-	b, _ := json.Marshal(req)
-	log.Debugf("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d: %s", ctx.key, req.GetRequestId(), string(b))
+	if req.GetExecType() == api.ExecutionType_DRY_REPLAY_PCAP {
+		if req.GetCommandData() != nil {
+			log.Infof("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d, exec_type: %s, batch_len: %d, MD5: %s, total_len: %d", ctx.key, req.GetRequestId(), req.GetExecType(), req.GetBatchLen(), req.GetCommandData().GetMd5(), req.GetCommandData().GetTotalLen())
+		} else {
+			log.Infof("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d, exec_type: %s, batch_len: %d", ctx.key, req.GetRequestId(), req.GetExecType(), req.GetBatchLen())
+		}
+	} else {
+		b, _ := json.Marshal(req)
+		log.Infof("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d: %s", ctx.key, req.GetRequestId(), string(b))
+	}
 }
