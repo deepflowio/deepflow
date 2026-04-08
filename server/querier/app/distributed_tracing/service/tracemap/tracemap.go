@@ -22,8 +22,12 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/config"
 )
 
-func TraceMap(args model.TraceMap, cfg *config.QuerierConfig, c *gin.Context, done chan bool, generator *TraceMapGenerator) {
+func TraceMapAsync(args model.TraceMap, cfg *config.QuerierConfig, c *gin.Context, done chan bool, generator *TraceMapGenerator) {
 	done <- true
+	return
+}
+
+func TraceMapSync(args model.TraceMap, cfg *config.QuerierConfig, c *gin.Context, generator *TraceMapGenerator) {
 	return
 }
 
