@@ -29,12 +29,6 @@ type TraceMap struct {
 }
 
 type FlowMap struct {
-	QueryCondition string            `json:"query_condition"`
-	TimeStart      int               `json:"time_start" binding:"required"`
-	TimeEnd        int               `json:"time_end" binding:"required"`
-	Debug          bool              `json:"debug"`
-	Regions        map[string]string `json:"regions" binding:"required"`
-	TopoFrame      TopoFrame         `json:"topo_frame,omitempty"`
-	Context        context.Context
-	OrgID          string
+	TraceMap
+	TopoFrame TopoFrame `json:"topo_frame,omitempty"`
 }

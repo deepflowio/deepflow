@@ -31,11 +31,12 @@ import (
 var log = logging.MustGetLogger("tracemap")
 
 func TraceMapRouter(e *gin.Engine, cfg *config.QuerierConfig, generator *tracemap.TraceMapGenerator) {
-	e.POST("/v1/trace_map", traceMap(cfg, generator))
+	e.POST("/v1/trace_map", traceMap(cfg, generator, false))
+	e.POST("/v1/trace_map/sync", traceMap(cfg, generator, true))
 	e.POST("/v1/flow_map", flowMap(cfg, generator))
 }
 
-func traceMap(cfg *config.QuerierConfig, generator *tracemap.TraceMapGenerator) gin.HandlerFunc {
+func traceMap(cfg *config.QuerierConfig, generator *tracemap.TraceMapGenerator, synchronous bool) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var args model.TraceMap
 
@@ -48,10 +49,15 @@ func traceMap(cfg *config.QuerierConfig, generator *tracemap.TraceMapGenerator) 
 		args.Context = c.Request.Context()
 		args.OrgID = c.Request.Header.Get(common.HEADER_KEY_X_ORG_ID)
 		c.Header("Content-Type", "application/json")
-		done := make(chan bool)
-		defer close(done)
-		go tracemap.TraceMap(args, cfg, c, done, generator)
-		<-done
+		// support synchronous mode default: async
+		if synchronous {
+			tracemap.TraceMapSync(args, cfg, c, generator)
+		} else {
+			done := make(chan bool)
+			defer close(done)
+			go tracemap.TraceMapAsync(args, cfg, c, done, generator)
+			<-done
+		}
 	})
 }
 
