@@ -144,6 +144,7 @@ pub struct MysqlInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
+    endpoint_disabled: bool,
 
     // Server Greeting
     #[l7_log(version)]
@@ -328,6 +329,9 @@ impl MysqlInfo {
     }
 
     fn endpoint_field(&self) -> Field<'_> {
+        if self.endpoint_disabled {
+            return Field::None;
+        }
         match self.endpoint.as_deref() {
             Some(endpoint) => Field::Str(Cow::Borrowed(endpoint)),
             None if !self.context.is_empty() => Field::Str(Cow::Borrowed(&self.context)),
@@ -336,6 +340,9 @@ impl MysqlInfo {
     }
 
     fn set_endpoint(&mut self, endpoint: FieldSetter) {
+        if self.endpoint_disabled {
+            return;
+        }
         match endpoint.into_inner() {
             Field::Str(s) if !s.is_empty() => self.endpoint = Some(s.into_owned()),
             _ => self.endpoint = None,
@@ -372,6 +379,9 @@ impl MysqlInfo {
     }
 
     fn generate_endpoint(&mut self) {
+        if self.endpoint_disabled {
+            return;
+        }
         self.endpoint = None;
         if self.context.is_empty() {
             return;
@@ -456,9 +466,6 @@ impl MysqlInfo {
         #[cfg(feature = "enterprise")] custom_policies: Option<PolicySlice>,
     ) -> Result<()> {
         let config = param.parse_config.as_ref();
-        let endpoint_disabled = config
-            .map(|c| c.mysql_endpoint_disabled)
-            .unwrap_or_else(|| LogParserConfig::default().mysql_endpoint_disabled);
         let payload = mysql_string(payload);
         if (self.command == COM_QUERY || self.command == COM_STMT_PREPARE) && !is_mysql(payload) {
             return Err(Error::InvalidSqlStatement);
@@ -485,9 +492,7 @@ impl MysqlInfo {
             Ok(obfuscated) => obfuscated.into_owned(),
             _ => sql_string.to_string(),
         };
-        if !endpoint_disabled {
-            self.generate_endpoint();
-        }
+        self.generate_endpoint();
         Ok(())
     }
 
@@ -729,9 +734,15 @@ impl L7ProtocolParserInterface for MysqlLog {
                 )
             })
             .unwrap_or((false, false));
+        let endpoint_disabled = param
+            .parse_config
+            .as_ref()
+            .map(|c| c.mysql_endpoint_disabled)
+            .unwrap_or_else(|| LogParserConfig::default().mysql_endpoint_disabled);
         let mut info = MysqlInfo {
             protocol_version: self.protocol_version,
             is_tls: param.is_tls(),
+            endpoint_disabled,
             copy_apm_trace_id,
             trace_ids: PrioStrings::new(multiple_trace_id_collection),
             ..Default::default()
@@ -1183,11 +1194,7 @@ impl MysqlLog {
         str::from_utf8(&payload[..n]).ok()
     }
 
-    fn login(
-        payload: &[u8],
-        mut info: Option<&mut MysqlInfo>,
-        endpoint_disabled: bool,
-    ) -> Result<()> {
+    fn login(payload: &[u8], mut info: Option<&mut MysqlInfo>) -> Result<()> {
         if payload.len() < LOGIN_USERNAME_OFFSET {
             return Err(Error::Truncated(TruncationType::Login));
         }
@@ -1236,9 +1243,7 @@ impl MysqlLog {
                     format!("Login username: {}", username)
                 };
 
-                if !endpoint_disabled {
-                    info.generate_endpoint();
-                }
+                info.generate_endpoint();
             }
         }
 
@@ -1260,9 +1265,6 @@ impl MysqlLog {
         let decompress = config
             .map(|c| c.mysql_decompress_payload)
             .unwrap_or_else(|| LogParserConfig::default().mysql_decompress_payload);
-        let endpoint_disabled = config
-            .map(|c| c.mysql_endpoint_disabled)
-            .unwrap_or_else(|| LogParserConfig::default().mysql_endpoint_disabled);
 
         let mut parser = match PayloadParser::new(decompress, has_compressed_header, payload) {
             Ok(parser) => parser,
@@ -1292,7 +1294,7 @@ impl MysqlLog {
                 let context = mysql_string(&payload[1..]);
                 context.is_ascii() && is_mysql(context)
             }
-            _ if header.seq_id != 0 => MysqlLog::login(payload, None, endpoint_disabled).is_ok(),
+            _ if header.seq_id != 0 => MysqlLog::login(payload, None).is_ok(),
             _ => false,
         }
     }
@@ -1341,9 +1343,6 @@ impl MysqlLog {
         let decompress = config
             .map(|c| c.mysql_decompress_payload)
             .unwrap_or_else(|| LogParserConfig::default().mysql_decompress_payload);
-        let endpoint_disabled = config
-            .map(|c| c.mysql_endpoint_disabled)
-            .unwrap_or_else(|| LogParserConfig::default().mysql_endpoint_disabled);
 
         let mut parser =
             PayloadParser::new(decompress, self.has_compressed_header.unwrap(), payload)?;
@@ -1398,7 +1397,7 @@ impl MysqlLog {
             LogMessageType::Request
                 if direction == PacketDirection::ClientToServer && header.seq_id == 1 =>
             {
-                Self::login(payload, Some(info), endpoint_disabled)?;
+                Self::login(payload, Some(info))?;
                 self.has_login = true;
             }
             LogMessageType::Response
