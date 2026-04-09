@@ -1381,9 +1381,190 @@ Recovered crash frame[2]: ... symbol=_ZN8profiler4main17h... file=/work/agent/sr
 
 > **当前实现已经能在真实日志中同时证明“应用帧可符号化”和“older-frame 参数可部分恢复”；剩下没有恢复出的部分，更多是 best-effort 的天然边界，而不是实现根本不可用。**
 
+### 14.10 常见问题（Q&A）
+
+#### Q1：older frame 的参数是怎么恢复的？
+
+**A：**older frame 的参数恢复不是靠“还原完整寄存器现场”，而是靠 **Stage-1 留下的有限证据** 与 **Stage-2 的 DWARF location 求值** 组合完成的。
+
+可以把主链路概括为：
+
+1. **Stage-1 先留证据**
+   - 记录每帧的 `absolute_pc`、`frame_fp`、`frame_flags`；
+   - 为每帧注释 `module_index + rel_pc`；
+   - 持久化 top-frame 的 full regs / `args[]`；
+   - 持久化一小段有界 `stack_window`。
+
+2. **Stage-2 先把“这是哪个函数”搞清楚**
+   - 通过 `module_index` 找到该帧所属模块；
+   - 用 `file_offset_pc = module->file_offset + frame->rel_pc` 重建 file-relative PC；
+   - 再把 file-relative PC 转回 ELF / DWARF 需要的 `elf_vaddr`；
+   - 用这个 `elf_vaddr` 去匹配 `DW_TAG_subprogram`、行表和参数 DIE。
+
+3. **Stage-2 再枚举 formal parameters 并解释 `DW_AT_location`**
+   - 对每个 `DW_TAG_formal_parameter`，读取它在当前 PC 下的 `DW_AT_location`；
+   - 在求值前，尽量准备 `frame_base` 和简单 `CFA`；
+   - 若表达式落到寄存器、`frame_base + offset` 或 `CFA + offset` 这类当前实现支持的形式，就继续恢复。
+
+4. **最后看能不能把“位置”变成“值”**
+   - 如果位置对应 top frame 仍然活着的 ABI 参数寄存器，可直接给值；
+   - 如果位置落在 `stack_window` 覆盖范围内，可从快照中的栈副本读取值；
+   - 如果只能确定位置但读不到值，就输出 `name=<unavailable> @location`；
+   - 如果连位置也无法稳定解释，就只剩 `<unavailable>`。
+
+因此 older frame 的参数恢复本质上是：**先靠 `module_index + rel_pc` 找到正确的 DWARF 子程序，再用 `frame_fp + stack_window + 受限 DWARF 表达式求值` 去 best-effort 恢复参数位置和值。**
+
+**实现对应代码位置：**
+
+- Stage-1 模块缓存与快照复制：`agent/src/ebpf/user/crash_monitor.c:376`、`agent/src/ebpf/user/crash_monitor.c:446`
+- Stage-1 为帧补 `module_index + rel_pc`：`agent/src/ebpf/user/crash_monitor.c:467`
+- Stage-1 记录帧与 `frame_fp`：`agent/src/ebpf/user/crash_monitor.c:537`、`agent/src/ebpf/user/crash_monitor.c:551`、`agent/src/ebpf/user/crash_monitor.c:765`
+- Stage-1 采集 `stack_window` / full regs / `ucontext_t`：`agent/src/ebpf/user/crash_monitor.c:564`、`agent/src/ebpf/user/crash_monitor.c:594`、`agent/src/ebpf/user/crash_monitor.c:825`
+- Stage-2 单帧符号化入口：`agent/src/ebpf/user/crash_symbolize.c:2710`
+- Stage-2 参数恢复入口：`agent/src/ebpf/user/crash_symbolize.c:2442`
+- Stage-2 formal parameter 递归收集：`agent/src/ebpf/user/crash_symbolize.c:1933`
+- Stage-2 单参数恢复：`agent/src/ebpf/user/crash_symbolize.c:1810`
+- Stage-2 栈窗口读值：`agent/src/ebpf/user/crash_symbolize.c:878`
+
+#### Q2：这个恢复原理到底是什么？
+
+**A：**核心原理是：**DWARF 保存的不是“参数值”，而是“参数在某个 PC 点位于哪里”。**
+
+也就是说，Stage-2 真正做的是两步：
+
+1. **先定位当前帧在源码语义里属于哪个函数/哪个 PC；**
+2. **再解释这个 PC 下参数的 location expression。**
+
+举例来说，DWARF 可能告诉你某个参数当前位于：
+
+- 某个寄存器；
+- `rbp - 0x20`；
+- `CFA + 0x18`；
+- 或者一个更复杂、当前实现尚不支持的表达式。
+
+于是 Stage-2 需要把 crash-time 证据代入这个“位置描述”里：
+
+- 有寄存器值，就直接读寄存器；
+- 有 `frame_fp`，就把它当成 `frame_base` fallback；
+- 能推出 `CFA`，就支持 `DW_OP_call_frame_cfa`；
+- 地址刚好落在 `stack_window` 里，就去读快照里的那段栈副本；
+- 如果表达式太复杂，或者地址超出 `stack_window`，就诚实降级。
+
+所以它不是“凭空推测 older frame 的参数”，而是：**用崩溃时保留下来的少量机器状态，去解释 debuginfo 里已经存在的位置规则。**
+
+**实现对应代码位置：**
+
+- 初始化参数求值上下文：`agent/src/ebpf/user/crash_symbolize.c:1345`
+- 按 DWARF 寄存器号取值：`agent/src/ebpf/user/crash_symbolize.c:965`
+- 简化 `CFA` 推导：`agent/src/ebpf/user/crash_symbolize.c:1360`
+- DWARF location expression 求值：`agent/src/ebpf/user/crash_symbolize.c:1418`
+- 递归解析 `DW_AT_location` / `DW_AT_frame_base`：`agent/src/ebpf/user/crash_symbolize.c:1684`
+- `frame_base` 准备与 `frame_fp` fallback：`agent/src/ebpf/user/crash_symbolize.c:1742`
+- 单参数恢复：`agent/src/ebpf/user/crash_symbolize.c:1810`
+
+#### Q3：可以用 Stage-1 / Stage-2 的方式怎么描述？
+
+**A：**可以直接这样理解：
+
+**Stage-1：fatal signal context，只做证据保全**
+
+- 运行在 `SIGSEGV` / `SIGABRT` / `SIGBUS` / `SIGILL` / `SIGFPE` handler 中；
+- 从 `ucontext_t` 里抓 top-frame 的 `ip/sp/fp/lr`、`args[]` 与 full regs；
+- 做有界 frame-pointer walk，记录 `absolute_pc`、`frame_fp`、`frame_flags`；
+- 给每帧注释 `module_index + rel_pc`；
+- 复制有界 `stack_window`；
+- 以固定大小二进制 record 直接 `write()` 落盘；
+- 然后恢复默认信号行为并重新抛出原始 signal。
+
+**Stage-2：normal context，负责解释这些证据**
+
+- 在下一次正常启动时读取旧 snapshot；
+- 按 `module_index + rel_pc` 重建稳定的 ELF / DWARF PC；
+- 打开原始模块或外部 debuginfo，恢复 `symbol`、`file:line`；
+- 找到 `DW_TAG_subprogram` 与 `DW_TAG_formal_parameter`；
+- 准备 `frame_base` / 简单 `CFA`，解释 `DW_AT_location`；
+- 能读出值就输出值，读不出就输出 location 或 `<unavailable>`；
+- 最后输出人类可读日志并清空已消费的 `.crash` 文件。
+
+一句话概括就是：
+
+> **Stage-1 负责“保住现场”，Stage-2 负责“解释现场”。**
+
+**实现对应代码位置：**
+
+- Stage-1 初始化入口：`agent/src/ebpf/user/crash_monitor.c:1275`
+- Stage-1 每线程 altstack 准备：`agent/src/ebpf/user/crash_monitor.c:1260`
+- Stage-1 安装 fatal signal handlers：`agent/src/ebpf/user/crash_monitor.c:989`
+- Stage-1 fatal signal handler：`agent/src/ebpf/user/crash_monitor.c:940`
+- Stage-1 从 `ucontext_t` 填充 record：`agent/src/ebpf/user/crash_monitor.c:825`
+- Stage-1 采集 `stack_window` / registers / frame walk：`agent/src/ebpf/user/crash_monitor.c:564`、`agent/src/ebpf/user/crash_monitor.c:594`、`agent/src/ebpf/user/crash_monitor.c:765`
+- Stage-1 把 record 追加写盘：`agent/src/ebpf/user/crash_monitor.c:973`
+- Stage-2 启动期消费旧快照入口：`agent/src/ebpf/user/crash_monitor.c:1212`
+- Stage-2 单帧符号化：`agent/src/ebpf/user/crash_symbolize.c:2710`
+- Stage-2 `file:line` / params 恢复：`agent/src/ebpf/user/crash_symbolize.c:2572`、`agent/src/ebpf/user/crash_symbolize.c:2442`
+
+#### Q4：Stage-1 保存的 `frame_fp` 都是绝对地址，到了 Stage-2，怎么利用这些地址去读取二进制文件的 debuginfo？
+
+**A：**这里最关键的一点是：**Stage-2 并不是用 `frame_fp` 去定位 debuginfo。**
+
+真正用于 debuginfo 查找的主链路是：
+
+1. 先用 `frame->module_index` 找到 snapshot 里记录的模块；
+2. 再用 `frame->rel_pc` 计算：
+
+   ```c
+   file_offset_pc = module->file_offset + frame->rel_pc;
+   ```
+
+3. 然后把这个 file-relative PC 转换成 ELF 虚拟地址：
+
+   ```c
+   elf_vaddr = phdr.p_vaddr + (file_offset - phdr.p_offset);
+   ```
+
+4. 后续的 ELF symbol、DWARF line、`DW_TAG_subprogram`、`DW_AT_location` 匹配，都是围绕这个 `elf_vaddr` 展开的。
+
+也就是说：
+
+- **用于进入 debuginfo 世界的是 `module_index + rel_pc`；**
+- **不是 `frame_fp`。**
+
+`frame_fp` 保存为绝对地址，作用在另外一个维度：它仍然属于“崩溃时线程栈地址空间”的证据，主要用于：
+
+- `DW_AT_frame_base` 缺失时，作为 frame base fallback；
+- 计算简单 `CFA`；
+- 解释 `DW_OP_fbreg` 这类基于 frame base 的位置表达式；
+- 把 `frame_fp + offset` 之类的位置落回 snapshot 的 `stack_window` 中读取真实值。
+
+换句话说，Stage-2 同时在处理两套地址语义：
+
+1. **代码地址语义**
+   - 用 `module_index + rel_pc -> file_offset_pc -> elf_vaddr` 进入 ELF / DWARF；
+2. **栈地址语义**
+   - 用绝对 `frame_fp`、`sp`、`stack_window_start` 去解释参数位于哪一段 crash-time 栈内存。
+
+所以“absolute `frame_fp` 到底怎么用于 debuginfo”这个问题，最准确的回答其实是：
+
+> **它不直接用于 debuginfo 定位；它用于在 Stage-2 解释 DWARF location 时，重建该帧的栈语义。真正把帧映射回 debuginfo 的，是 `module_index + rel_pc`。**
+
+**实现对应代码位置：**
+
+- Stage-1 用绝对 `absolute_pc` 标注 `module_index + rel_pc`：`agent/src/ebpf/user/crash_monitor.c:467`
+- Stage-2 通过 `module_index` 找模块：`agent/src/ebpf/user/crash_symbolize.c:546`
+- Stage-2 对 non-top frame 做 PC 归一化：`agent/src/ebpf/user/crash_symbolize.c:668`
+- Stage-2 计算 `file_offset_pc` 并驱动单帧符号化：`agent/src/ebpf/user/crash_symbolize.c:2710`
+- Stage-2 把 file-relative PC 转成 `elf_vaddr`：`agent/src/ebpf/user/crash_symbolize.c:682`
+- ELF program header 中 `file_offset -> vaddr` 转换：`agent/src/ebpf/user/elf.c:618`
+- Stage-2 读取 `frame_fp`：`agent/src/ebpf/user/crash_symbolize.c:853`
+- Stage-2 从 `stack_window` 按绝对地址读值：`agent/src/ebpf/user/crash_symbolize.c:878`
+- Stage-2 用 `frame_fp` 计算简单 `CFA`：`agent/src/ebpf/user/crash_symbolize.c:1360`
+- Stage-2 用 `frame_fp` 作为 `frame_base` fallback：`agent/src/ebpf/user/crash_symbolize.c:1742`
+
 ---
 
 ## 15. 当前能力总结
+
+
 
 当前 crash monitor 已具备以下能力：
 
