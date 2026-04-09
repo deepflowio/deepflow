@@ -19,6 +19,7 @@ package monitor
 import (
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -91,4 +92,62 @@ func getIPMap(hostType string) (map[string]bool, error) {
 		return nil, fmt.Errorf("does not support type: %s", hostType)
 	}
 	return res, nil
+}
+
+type SysComponent interface {
+	GetLcuuid() string
+	GetName() string
+	GetIP() string
+	GetState() int
+}
+
+type SysState struct {
+	Name  string `statsd:"name"`
+	IP    string `statsd:"ip"`
+	State uint64 `statsd:"state"`
+}
+
+type SysStateCounter[T SysComponent] struct {
+	mu       sync.Mutex
+	counters map[string]*SysState
+}
+
+func NewSysStateCounter[T SysComponent]() *SysStateCounter[T] {
+	return &SysStateCounter[T]{
+		counters: make(map[string]*SysState),
+	}
+}
+
+func (s *SysStateCounter[T]) GetCounter() interface{} {
+	s.mu.Lock()
+	counters := s.counters
+	counterSize := len(counters)
+	s.counters = make(map[string]*SysState, counterSize)
+	s.mu.Unlock()
+
+	if counterSize == 0 {
+		return nil
+	}
+
+	result := make([]*SysState, 0, counterSize)
+	for _, counter := range counters {
+		result = append(result, counter)
+	}
+	return result
+}
+
+func (s *SysStateCounter[T]) AddSysStateCounters(sysComponents []T) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, sysComponent := range sysComponents {
+		s.counters[sysComponent.GetLcuuid()] = &SysState{
+			Name:  sysComponent.GetName(),
+			IP:    sysComponent.GetIP(),
+			State: uint64(sysComponent.GetState()),
+		}
+	}
+}
+
+func (s *SysStateCounter[T]) Closed() bool {
+	return false
 }

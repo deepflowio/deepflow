@@ -117,6 +117,22 @@ type Controller struct {
 	Lcuuid             string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 }
 
+func (c Controller) GetLcuuid() string {
+	return c.Lcuuid
+}
+
+func (c Controller) GetName() string {
+	return c.Name
+}
+
+func (c Controller) GetIP() string {
+	return c.IP
+}
+
+func (c Controller) GetState() int {
+	return c.State
+}
+
 type AZControllerConnection struct {
 	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	AZ           string `gorm:"column:az;type:char(64);default:ALL" json:"AZ"`
@@ -151,6 +167,22 @@ type Analyzer struct {
 	PodName           string    `gorm:"column:pod_name;type:char(64);default:null" json:"pod_name"`
 	CAMD5             string    `gorm:"column:ca_md5;type:char(64);default:null" json:"CA_MD5"`
 	Lcuuid            string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
+}
+
+func (a Analyzer) GetLcuuid() string {
+	return a.Lcuuid
+}
+
+func (a Analyzer) GetName() string {
+	return a.Name
+}
+
+func (a Analyzer) GetIP() string {
+	return a.IP
+}
+
+func (a Analyzer) GetState() int {
+	return a.State
 }
 
 type AZAnalyzerConnection struct {
