@@ -2021,16 +2021,19 @@ impl FlowMap {
         collect_stats: bool,
         tagged_flow: Arc<BatchedBox<TaggedFlow>>,
         flow_end: bool,
+        cached_l7_perf_stats: Option<(L7PerfStats, L7PerfStats)>,
     ) {
         if collect_stats {
             let flow = &tagged_flow.flow;
             if let Some(flow_perf) = flow.flow_perf_stats.as_ref() {
                 let mut perf_cache = self.perf_cache.borrow_mut();
                 let (forward, backward) = if flow_end {
-                    perf_cache
-                        .rrt_cache
-                        .collect_flow_perf_stats(flow.flow_id)
-                        .unwrap_or_default()
+                    cached_l7_perf_stats.unwrap_or_else(|| {
+                        perf_cache
+                            .rrt_cache
+                            .collect_flow_perf_stats(flow.flow_id)
+                            .unwrap_or_default()
+                    })
                 } else {
                     (L7PerfStats::default(), L7PerfStats::default())
                 };
@@ -2106,6 +2109,26 @@ impl FlowMap {
         self.update_flow_direction(&mut node, meta_packet);
 
         let mut flow = &mut node.tagged_flow.flow;
+        let cached_l7_perf_stats = if config.flow.collector_enabled {
+            if let Some(perf_stats) = flow.flow_perf_stats.as_mut() {
+                let cached = self
+                    .perf_cache
+                    .borrow_mut()
+                    .rrt_cache
+                    .collect_flow_perf_stats(flow.flow_id);
+                if let Some((forward, backward)) = cached {
+                    perf_stats.l7.sequential_merge(&forward);
+                    perf_stats.l7.sequential_merge(&backward);
+                    Some((forward, backward))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         if flow.signal_source == SignalSource::EBPF {
             // the flow which from eBPF, it's close_type always be CloseType::Timeout
             flow.close_type = CloseType::Timeout;
@@ -2153,7 +2176,12 @@ impl FlowMap {
         );
         let flow_id = tagged_flow.flow.flow_id;
 
-        self.flush_l7_perf_stats(collect_stats, tagged_flow.clone(), true);
+        self.flush_l7_perf_stats(
+            collect_stats,
+            tagged_flow.clone(),
+            true,
+            cached_l7_perf_stats,
+        );
         self.push_to_flow_stats_queue(tagged_flow);
         if let Some(log) = node.meta_flow_log.take() {
             FlowLog::recycle(&mut self.tcp_perf_pool, *log);
@@ -2203,7 +2231,7 @@ impl FlowMap {
                 self.tagged_flow_allocator
                     .allocate_one_with(node.tagged_flow.clone()),
             );
-            self.flush_l7_perf_stats(collect_stats, tagged_flow.clone(), false);
+            self.flush_l7_perf_stats(collect_stats, tagged_flow.clone(), false, None);
             self.push_to_flow_stats_queue(tagged_flow);
             node.reset_flow_stat_info();
         }
@@ -2794,7 +2822,13 @@ mod tests {
     use super::*;
 
     use crate::{
-        common::{enums::EthernetType, flow::CloseType, tap_port::TapPort},
+        common::{
+            enums::EthernetType,
+            flow::CloseType,
+            l7_protocol_log::{LogCache, LogCacheKey, ParseParam},
+            tap_port::TapPort,
+        },
+        flow_generator::protocol_logs::L7ResponseStatus,
         utils::test_utils::Capture,
     };
     use npb_pcap_policy::{DirectionType, NpbAction, NpbTunnelType, PolicyData, TapSide};
@@ -3508,6 +3542,175 @@ mod tests {
         let perf_stats = &tagged_flow.flow.flow_perf_stats.as_ref().unwrap().tcp;
         assert_eq!(perf_stats.counts_peers[0].zero_win_count, 0);
         assert_eq!(perf_stats.counts_peers[1].zero_win_count, 1);
+    }
+
+    #[test]
+    fn cached_l7_success_should_affect_final_close_type_before_flow_end() {
+        let (module_config, mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
+        let config = Config {
+            flow: &module_config.flow,
+            log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            ebpf: None,
+        };
+        let mut packet = _new_meta_packet();
+        let mut node = flow_map.init_flow(&config, &mut packet);
+        node.flow_state = FlowState::Reset;
+        node.tagged_flow.flow.flow_key.proto = IpProtocol::TCP;
+        node.tagged_flow.flow.flow_perf_stats = Some(FlowPerfStats {
+            l7_protocol: L7Protocol::Http1,
+            ..Default::default()
+        });
+        node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].total_tcp_flags =
+            TcpFlags::RST;
+        node.meta_flow_log = FlowLog::new(
+            false,
+            &mut flow_map.tcp_perf_pool,
+            true,
+            flow_map.perf_cache.clone(),
+            L4Protocol::Tcp,
+            L7ProtocolEnum::L7Protocol(L7Protocol::Http1),
+            false,
+            flow_map.flow_perf_counter.clone(),
+            0,
+            Rc::clone(&flow_map.wasm_vm),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Rc::clone(&flow_map.so_plugin),
+            flow_map.stats_counter.clone(),
+            config.log_parser.l7_log_session_aggr_max_timeout.as_secs() as usize,
+            config.flow.l7_protocol_inference_ttl.try_into().unwrap(),
+            None,
+            flow_map.ntp_diff.clone(),
+            flow_map.obfuscate_cache.clone(),
+        )
+        .map(Box::new);
+
+        packet.flow_id = node.tagged_flow.flow.flow_id;
+        packet.lookup_key.direction = PacketDirection::ClientToServer;
+        let key = LogCacheKey::new(
+            &ParseParam::new(
+                &packet,
+                Some(flow_map.perf_cache.clone()),
+                Rc::clone(&flow_map.wasm_vm),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Rc::clone(&flow_map.so_plugin),
+                true,
+                true,
+            ),
+            None,
+            false,
+        );
+        flow_map.perf_cache.borrow_mut().rrt_cache.put(
+            key,
+            LogCache {
+                msg_type: LogMessageType::Response,
+                time: packet.lookup_key.timestamp.as_micros() as u64,
+                resp_status: L7ResponseStatus::Ok,
+                ..Default::default()
+            },
+        );
+
+        flow_map.node_removed_aftercare(&config, node, Duration::from_secs(1), None);
+        flow_map.flush_queue(config.flow, Duration::from_secs(2));
+
+        let tagged_flow = output_queue_receiver
+            .recv(Some(TIME_UNIT))
+            .expect("expected output flow");
+        let l7 = tagged_flow
+            .flow
+            .flow_perf_stats
+            .as_ref()
+            .unwrap()
+            .l7
+            .clone();
+        assert_eq!(
+            tagged_flow.flow.close_type,
+            CloseType::TcpFinClientRst,
+            "actual close_type={:?}, l7={:?}, tcp_flags_src={:?}, tcp_flags_dst={:?}",
+            tagged_flow.flow.close_type,
+            l7,
+            tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].total_tcp_flags,
+            tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].total_tcp_flags,
+        );
+    }
+
+    #[test]
+    fn cached_l7_client_error_should_keep_client_reset_close_type() {
+        let (module_config, mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(AgentType::TtProcess, None, false);
+        let config = Config {
+            flow: &module_config.flow,
+            log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            ebpf: None,
+        };
+        let mut packet = _new_meta_packet();
+        let mut node = flow_map.init_flow(&config, &mut packet);
+        node.flow_state = FlowState::Reset;
+        node.tagged_flow.flow.flow_key.proto = IpProtocol::TCP;
+        node.tagged_flow.flow.flow_perf_stats = Some(FlowPerfStats {
+            l7_protocol: L7Protocol::Http1,
+            ..Default::default()
+        });
+        node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].total_tcp_flags =
+            TcpFlags::RST;
+        node.meta_flow_log = FlowLog::new(
+            false,
+            &mut flow_map.tcp_perf_pool,
+            true,
+            flow_map.perf_cache.clone(),
+            L4Protocol::Tcp,
+            L7ProtocolEnum::L7Protocol(L7Protocol::Http1),
+            false,
+            flow_map.flow_perf_counter.clone(),
+            0,
+            Rc::clone(&flow_map.wasm_vm),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Rc::clone(&flow_map.so_plugin),
+            flow_map.stats_counter.clone(),
+            config.log_parser.l7_log_session_aggr_max_timeout.as_secs() as usize,
+            config.flow.l7_protocol_inference_ttl.try_into().unwrap(),
+            None,
+            flow_map.ntp_diff.clone(),
+            flow_map.obfuscate_cache.clone(),
+        )
+        .map(Box::new);
+
+        packet.flow_id = node.tagged_flow.flow.flow_id;
+        packet.lookup_key.direction = PacketDirection::ClientToServer;
+        let key = LogCacheKey::new(
+            &ParseParam::new(
+                &packet,
+                Some(flow_map.perf_cache.clone()),
+                Rc::clone(&flow_map.wasm_vm),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Rc::clone(&flow_map.so_plugin),
+                true,
+                true,
+            ),
+            None,
+            false,
+        );
+        flow_map.perf_cache.borrow_mut().rrt_cache.put(
+            key,
+            LogCache {
+                msg_type: LogMessageType::Response,
+                time: packet.lookup_key.timestamp.as_micros() as u64,
+                resp_status: L7ResponseStatus::ClientError,
+                ..Default::default()
+            },
+        );
+
+        flow_map.node_removed_aftercare(&config, node, Duration::from_secs(1), None);
+        flow_map.flush_queue(config.flow, Duration::from_secs(2));
+
+        let tagged_flow = output_queue_receiver
+            .recv(Some(TIME_UNIT))
+            .expect("expected output flow");
+        assert_eq!(tagged_flow.flow.close_type, CloseType::TcpClientRst);
     }
 
     #[test]

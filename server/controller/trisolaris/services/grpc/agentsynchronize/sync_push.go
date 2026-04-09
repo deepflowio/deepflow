@@ -265,6 +265,7 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 	if tridentException != int64(in.GetException()) {
 		vtapCache.UpdateExceptions(int64(in.GetException()))
 	}
+	vtapCache.UpdateExceptionDescription(in.GetExceptionDescription())
 	vtapCache.UpdateVTapRawHostname(in.GetHost())
 	vtapCache.UpdateSyncedControllerAt(time.Now())
 	vtapCache.UpdateSystemInfoFromGrpc(

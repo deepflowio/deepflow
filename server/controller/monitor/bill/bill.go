@@ -14,11 +14,33 @@
  * limitations under the License.
  */
 
-package schema
+package bill
 
-const (
-	RAW_SQL_ROOT_DIR = "/etc/metadb/schema/rawsql"
+import (
+	"context"
 
-	DB_VERSION_TABLE    = "db_version"
-	DB_VERSION_EXPECTED = "7.1.0.38"
+	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 )
+
+type BillCheck struct {
+	vCtx    context.Context
+	vCancel context.CancelFunc
+	config  config.MonitorConfig
+}
+
+func NewBillCheck(method string, cfg config.MonitorConfig, ctx context.Context) *BillCheck {
+	vCtx, vCancel := context.WithCancel(ctx)
+	return &BillCheck{
+		vCtx:    vCtx,
+		vCancel: vCancel,
+		config:  cfg,
+	}
+}
+
+func (b *BillCheck) Start(sCtx context.Context) {}
+
+func (b *BillCheck) Stop() {
+	if b.vCancel != nil {
+		b.vCancel()
+	}
+}

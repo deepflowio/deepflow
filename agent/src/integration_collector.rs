@@ -217,8 +217,9 @@ async fn aggregate_with_catch_exception(
                 .body(e.to_string().into())
                 .unwrap()
         } else {
-            error!("integration collector error: {}", e);
-            exception_handler.set(Exception::IntegrationSocketError);
+            let error_msg = format!("integration collector error: {}", e);
+            error!("{}", error_msg);
+            exception_handler.set(Exception::IntegrationSocketError, Some(error_msg));
             Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                 .body(e.to_string().into())
@@ -1216,8 +1217,13 @@ impl MetricServer {
                                     sleep(Duration::from_secs(1));
                                     continue;
                                 }
-                                error!("integration collector error: {} with addr={}", e, addr);
-                                exception_handler.set(Exception::IntegrationSocketError);
+                                let error_msg = format!(
+                                    "integration collector error: {} with addr={}",
+                                    e, addr
+                                );
+                                error!("{}", error_msg);
+                                exception_handler
+                                    .set(Exception::IntegrationSocketError, Some(error_msg));
                                 sleep(Duration::from_secs(60));
                                 continue;
                             }
@@ -1306,8 +1312,9 @@ impl MetricServer {
                     info!("integration collector started");
                     info!("integration collector listening on http://{}", addr);
                     if let Err(e) = server.await {
-                        error!("external metric collector error: {}", e);
-                        exception_handler.set(Exception::IntegrationSocketError);
+                        let error_msg = format!("external metric collector error: {}", e);
+                        error!("{}", error_msg);
+                        exception_handler.set(Exception::IntegrationSocketError, Some(error_msg));
                     }
                 }
 

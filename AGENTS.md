@@ -44,6 +44,8 @@
 
 ### Rust
 - Format code with rustfmt.
+- While still satisfying rustfmt, prefer code shapes that minimize indentation.
+- Prefer captured formatting arguments such as `format!("{argument}")` over positional forms such as `format!("{}", argument)`.
 - `@agent` uses the `stable` Rust toolchain via `@agent/rust-toolchain`.
 - Prefer placing new Rust code in `@agent/crates`.
 - Dependencies in any `Cargo.toml` must be sorted in alphabet order.

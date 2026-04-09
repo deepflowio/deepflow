@@ -76,7 +76,7 @@ func (g *GenesisKubernetes) receiveKubernetesData(kChan chan common.KubernetesIn
 	for {
 		select {
 		case k := <-kChan:
-			g.data.Store(fmt.Sprintf("%d-%s", k.ORGID, k.ClusterID), k)
+			g.data.Store(fmt.Sprintf("%d-%s", k.ORGID, k.ClusterID), &k)
 		case <-g.ctx.Done():
 			break
 		}
@@ -84,17 +84,23 @@ func (g *GenesisKubernetes) receiveKubernetesData(kChan chan common.KubernetesIn
 }
 
 func (g *GenesisKubernetes) GetKubernetesData(orgID int, clusterID string) (common.KubernetesInfo, bool) {
-	k8sDataInterface, ok := g.data.Load(fmt.Sprintf("%d-%s", orgID, clusterID))
+	key := fmt.Sprintf("%d-%s", orgID, clusterID)
+	k8sDataInterface, ok := g.data.Load(key)
 	if !ok {
 		log.Warningf("kubernetes data not found cluster id (%s)", clusterID, logger.NewORGPrefix(orgID))
 		return common.KubernetesInfo{}, false
 	}
-	k8sData, ok := k8sDataInterface.(common.KubernetesInfo)
+	k8sData, ok := k8sDataInterface.(*common.KubernetesInfo)
 	if !ok {
 		log.Error("kubernetes data interface assert failed", logger.NewORGPrefix(orgID))
 		return common.KubernetesInfo{}, false
 	}
-	return k8sData, true
+	if time.Now().Sub(k8sData.Epoch) > time.Duration(g.config.GenesisCfg.AgingTime)*time.Second {
+		log.Debugf("kubernetes data expired cluster id (%s)", clusterID, logger.NewORGPrefix(orgID))
+		g.data.CompareAndDelete(key, k8sDataInterface)
+		return common.KubernetesInfo{}, false
+	}
+	return *k8sData, true
 }
 
 func (g *GenesisKubernetes) GetKubernetesResponse(orgID int, clusterID, destIP string) (map[string][][]byte, error) {

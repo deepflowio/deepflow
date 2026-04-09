@@ -328,6 +328,13 @@ enum cfg_feature_idx {
  */
 #define KICK_KERN_PERIOD 40000000  // Set default interval to 40 milliseconds
 /*
+ * Default CFS nice value for per-CPU kick threads.
+ *
+ * The actual nice value can be overridden at startup by configuration.
+ */
+#define KICK_KERN_NICE 0
+
+/*
  * A special value should be assigned to indicate the case where no data has
  * been pushed after exceeding 100 milliseconds.
  */

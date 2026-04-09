@@ -648,6 +648,8 @@ extern "C" {
     //            false Define a map without preallocated memory
     pub fn set_bpf_map_prealloc(enabled: bool) -> c_void;
 
+    pub fn set_kick_kern_nice(nice: c_int) -> c_int;
+
     // Parameter descriptions:
     // callback: Callback interface from Rust to C; return values refer to definitions of TRACER_CALLBACK_FLAG_*.
     // thread_nr: Number of worker threads, indicating how many user-space threads participate in data processing.

@@ -100,7 +100,7 @@ func (e *RemoteExecute) receiveAndHandle(
 	for {
 		select {
 		case <-ctx.streamCtx.Done():
-			log.Infof("agent(key: %s) stream context done, err: %v", ctx.key, ctx.streamCtx.Err())
+			log.Infof("[REMOTE_EXEC] agent(key: %s) stream context done, err: %v", ctx.key, ctx.streamCtx.Err())
 			return
 		case <-agentInactivityTimer.C:
 			e.handleAgentInactivityTimeout(ctx)
@@ -178,7 +178,7 @@ func (e *RemoteExecute) handleResponse(ctx *remoteExecContext, resp *api.RemoteE
 
 	cmdRespMng := ctx.cmdMng.GetRespManager(*resp.RequestId)
 	if !cmdRespMng.IsValid() {
-		log.Errorf("[REMOTE_EXEC] agent(key: %s, request id: %v) response manager not found", ctx.key, resp.RequestId)
+		log.Errorf("[REMOTE_EXEC] agent(key: %s, request_id: %d) response manager not found", ctx.key, resp.GetRequestId())
 		return
 	}
 
@@ -186,7 +186,7 @@ func (e *RemoteExecute) handleResponse(ctx *remoteExecContext, resp *api.RemoteE
 
 	switch {
 	case resp.Errmsg != nil:
-		log.Errorf("[REMOTE_EXEC] agent(key: %s, request id: %v) run command error: %s", ctx.key, *resp.RequestId, *resp.Errmsg)
+		log.Errorf("[REMOTE_EXEC] agent(key: %s, request_id: %d) run command error: %s", ctx.key, resp.GetRequestId(), *resp.Errmsg)
 		cmdRespMng.SetErrorMessage(*resp.Errmsg)
 
 		result := resp.CommandResult
@@ -211,7 +211,7 @@ func (e *RemoteExecute) handleResponse(ctx *remoteExecContext, resp *api.RemoteE
 		cmdRespMng.GetRemoteCommandsDoneChan <- struct{}{}
 		return
 	default:
-		log.Infof("[REMOTE_EXEC] agent(key: %s, request id: %v) responsed default", ctx.key, *resp.RequestId)
+		log.Infof("[REMOTE_EXEC] agent(key: %s, request_id: %d) responsed default", ctx.key, resp.GetRequestId())
 		result := resp.CommandResult
 		if result == nil {
 			return
@@ -254,11 +254,10 @@ func (e *RemoteExecute) waitAndSend(
 			return err
 		case req, ok := <-ctx.cmdMng.RequestChan:
 			if !ok {
-				err := fmt.Errorf("[REMOTE_EXEC] agent(key: %s) cmd manager request channel has been closed", ctx.key)
+				err := fmt.Errorf("[REMOTE_EXEC] agent(key: %s) RequestChan has been closed", ctx.key)
 				log.Error(err)
 				return err
 			}
-			log.Infof("[REMOTE_EXEC] agent(key: %s) received request from RequestChan, request_id: %v", ctx.key, req.RequestId)
 			if err := e.sendRequest(ctx, stream, req); err != nil {
 				return err
 			}
@@ -341,14 +340,25 @@ func (e *RemoteExecute) sendRequest(ctx *remoteExecContext, stream api.Synchroni
 }
 
 func (e *RemoteExecute) logResponse(resp *api.RemoteExecResponse, key string) {
+	if resp.GetCommandResult() != nil {
+		log.Infof("[REMOTE_EXEC] get response from agent(key: %s), request_id: %d, MD5: %s, total_len: %d", key, resp.GetRequestId(), resp.GetCommandResult().GetMd5(), resp.GetCommandResult().GetTotalLen())
+	} else {
+		log.Infof("[REMOTE_EXEC] get response from agent(key: %s), request_id: %d", key, resp.GetRequestId())
+	}
 	b, _ := json.Marshal(resp)
-	log.Infof("[REMOTE_EXEC] agent(key: %s) response: %s", key, string(b))
+	log.Debugf("[REMOTE_EXEC] get response from agent(key: %s), request_id: %d: %s", key, resp.GetRequestId(), string(b))
 }
 
 func (e *RemoteExecute) logRequest(ctx *remoteExecContext, req *api.RemoteExecRequest) {
 	if req.RequestId != nil && *req.RequestId == reqeustIDOfResponseToHeartbeat {
 		return
 	}
+	if req.GetCommandData() != nil {
+		log.Infof("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d, exec_type: %s, batch_len: %d, MD5: %s, total_len: %d", ctx.key, req.GetRequestId(), req.GetExecType(), req.GetBatchLen(), req.GetCommandData().GetMd5(), req.GetCommandData().GetTotalLen())
+	} else {
+		log.Infof("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d, exec_type: %s, batch_len: %d", ctx.key, req.GetRequestId(), req.GetExecType(), req.GetBatchLen())
+	}
+
 	b, _ := json.Marshal(req)
-	log.Infof("[REMOTE_EXEC] request to agent(key: %s): %s", ctx.key, string(b))
+	log.Debugf("[REMOTE_EXEC] send request to agent(key: %s), request_id: %d: %s", ctx.key, req.GetRequestId(), string(b))
 }

@@ -66,6 +66,7 @@ char linux_release[128];	// Record the contents of 'uname -r'
  * Used to manage or inspect per-CPU kick threads.
  */
 kick_thread_info_t kick_threads[MAX_CPU_NR];
+static int32_t kick_kern_nice = KICK_KERN_NICE;
 volatile uint32_t *tracers_lock;
 extern volatile uint64_t sys_boot_time_ns;	// System boot time in nanoseconds
 volatile uint64_t prev_sys_boot_time_ns;	// The last updated system boot time, in nanoseconds
@@ -1640,13 +1641,23 @@ static int boot_time_update(void)
 	return ETR_OK;
 }
 
-/* 
+/*
  * Thread function to periodically trigger a kernel-related action.
  *
- * The kernel uses bundled bursts to send data to the user.  
- * The following method triggers a timeout check on all CPUs  
+ * The kernel uses bundled bursts to send data to the user.
+ * The following method triggers a timeout check on all CPUs
  * to push data residing in the eBPF buffer.
  */
+int set_kick_kern_nice(int32_t nice)
+{
+	if (nice < -20 || nice > 19)
+		return ETR_INVAL;
+
+	kick_kern_nice = nice;
+	ebpf_info("Set kick thread nice value to %d.\n", nice);
+	return 0;
+}
+
 static void *kick_kern_push_data(void *arg)
 {
 	int cpu_id = (int)((uintptr_t) arg);	// Extract CPU ID from the argument
@@ -1708,6 +1719,27 @@ retry_bind:
 		ebpf_warning("epoll_ctl failed: %s(%d)\n", strerror(errno),
 			     errno);
 		goto error;
+	}
+
+	/*
+	 * Keep the kick thread on the default SCHED_OTHER/CFS policy and adjust
+	 * only its Linux nice value.
+	 *
+	 * A smaller nice value gives the thread more scheduling preference under
+	 * CPU contention, while a larger value gives it less. Negative values may
+	 * require CAP_SYS_NICE or a sufficient RLIMIT_NICE.
+	 */
+	if (setpriority(PRIO_PROCESS, tid, kick_kern_nice) != 0) {
+		if (kick_kern_nice < 0 && (errno == EACCES || errno == EPERM)) {
+			ebpf_warning("Kick thread %d failed to set nice value %d and will continue with default CFS priority; CAP_SYS_NICE or RLIMIT_NICE may be required: %s(%d)\n",
+				     tid, kick_kern_nice, strerror(errno), errno);
+		} else {
+			ebpf_warning("Kick thread %d failed to set nice value %d and will continue with default CFS priority: %s(%d)\n",
+				     tid, kick_kern_nice, strerror(errno), errno);
+		}
+	} else {
+		ebpf_info("Kick thread %d set nice value %d.\n", tid,
+			  kick_kern_nice);
 	}
 
 	struct epoll_event events[1];

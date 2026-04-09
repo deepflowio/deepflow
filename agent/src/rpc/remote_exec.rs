@@ -292,8 +292,10 @@ impl Interior {
             let mut stream = match client.remote_execute(responser).await {
                 Ok(stream) => stream,
                 Err(e) => {
-                    warn!("calling server remote_execute rpc failed: {:?}", e);
-                    self.exc.set(pb::Exception::ControllerSocketError);
+                    let error_msg = format!("calling server remote_execute rpc failed: {:?}", e);
+                    warn!("{}", error_msg);
+                    self.exc
+                        .set(pb::Exception::ControllerSocketError, Some(error_msg));
                     tokio::time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
@@ -312,8 +314,11 @@ impl Interior {
                         break;
                     }
                     Err(e) => {
-                        warn!("receiving server remote_execute rpc has error: {:?}", e);
-                        self.exc.set(pb::Exception::ControllerSocketError);
+                        let error_msg =
+                            format!("receiving server remote_execute rpc has error: {:?}", e);
+                        warn!("{}", error_msg);
+                        self.exc
+                            .set(pb::Exception::ControllerSocketError, Some(error_msg));
                         tokio::time::sleep(RPC_RECONNECT_INTERVAL).await;
                         break;
                     }
@@ -326,15 +331,8 @@ impl Interior {
                 if message.exec_type.is_none() {
                     continue;
                 }
-                match pb::ExecutionType::try_from(message.exec_type.unwrap()) {
-                    Ok(t) => debug!("received {:?} command from server", t),
-                    Err(_) => {
-                        warn!(
-                            "unsupported remote exec type id {}",
-                            message.exec_type.unwrap()
-                        );
-                        continue;
-                    }
+                if let Ok(t) = pb::ExecutionType::try_from(message.exec_type.unwrap()) {
+                    debug!("received {:?} command from server", t);
                 }
                 if sender.send(message).await.is_err() {
                     debug!("responser channel closed");
@@ -902,30 +900,41 @@ impl Responser {
         match self.msg_recv.poll_recv(ctx) {
             // sender closed, terminate the current stream
             Poll::Ready(None) => ControlFlow::Return(None),
-            Poll::Ready(Some(msg)) => match pb::ExecutionType::try_from(msg.exec_type.unwrap()) {
-                Ok(pb::ExecutionType::ListCommand) => {
-                    let commands = Self::generate_command_list();
-                    debug!("list command returning {} entries", commands.len());
-                    ControlFlow::Return(Some(pb::RemoteExecResponse {
-                        agent_id: Some(self.agent_id.read().deref().into()),
-                        request_id: msg.request_id,
-                        commands,
-                        ..Default::default()
-                    }))
+            Poll::Ready(Some(msg)) => {
+                let raw_exec_type = msg.exec_type.unwrap();
+                match pb::ExecutionType::try_from(raw_exec_type) {
+                    Ok(pb::ExecutionType::ListCommand) => {
+                        let commands = Self::generate_command_list();
+                        debug!("list command returning {} entries", commands.len());
+                        ControlFlow::Return(Some(pb::RemoteExecResponse {
+                            agent_id: Some(self.agent_id.read().deref().into()),
+                            request_id: msg.request_id,
+                            commands,
+                            ..Default::default()
+                        }))
+                    }
+                    Ok(pb::ExecutionType::ListNamespace) => {
+                        trace!("pending list namespace");
+                        self.pending_lsns = Some((msg.request_id, Box::pin(ls_netns())));
+                        ControlFlow::Continue
+                    }
+                    Ok(pb::ExecutionType::RunCommand) => self.handle_run_command_message(msg),
+                    #[cfg(feature = "enterprise")]
+                    Ok(pb::ExecutionType::DryReplayPcap) => {
+                        self.handle_dry_replay_pcap_message(msg)
+                    }
+                    Ok(exec_type) => ControlFlow::Return(self.command_failed_helper(
+                        msg.request_id,
+                        None,
+                        format!("unsupported execution type: {exec_type:?}"),
+                    )),
+                    Err(_) => ControlFlow::Return(self.command_failed_helper(
+                        msg.request_id,
+                        None,
+                        format!("unsupported execution type: {raw_exec_type}"),
+                    )),
                 }
-                Ok(pb::ExecutionType::ListNamespace) => {
-                    trace!("pending list namespace");
-                    self.pending_lsns = Some((msg.request_id, Box::pin(ls_netns())));
-                    ControlFlow::Continue
-                }
-                Ok(pb::ExecutionType::RunCommand) => self.handle_run_command_message(msg),
-                #[cfg(feature = "enterprise")]
-                Ok(pb::ExecutionType::DryReplayPcap) => self.handle_dry_replay_pcap_message(msg),
-                _ => {
-                    warn!("unsupported execution type: {:?}", msg.exec_type.unwrap());
-                    ControlFlow::Fallthrough
-                }
-            },
+            }
             _ => ControlFlow::Fallthrough,
         }
     }
@@ -1417,4 +1426,80 @@ async fn kubectl_log(namespace: String, pod: String, previous: bool) -> Result<O
         stdout: logs.into_bytes(),
         stderr: vec![],
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        net::{IpAddr, Ipv4Addr},
+        sync::Arc,
+    };
+
+    use arc_swap::{access::Map, ArcSwap};
+    use futures::StreamExt;
+    use parking_lot::RwLock;
+
+    use super::*;
+    use crate::config::ModuleConfig;
+
+    fn test_config() -> Config {
+        let current_config = Arc::new(ArcSwap::from_pointee(ModuleConfig::default()));
+        Config {
+            flow: Map::new(current_config.clone(), |config| &config.flow),
+            log_parser: Map::new(current_config, |config| &config.log_parser),
+        }
+    }
+
+    fn test_agent_id() -> Arc<RwLock<AgentId>> {
+        Arc::new(RwLock::new(AgentId {
+            ipmac: (IpAddr::V4(Ipv4Addr::LOCALHOST), Default::default()).into(),
+            ..Default::default()
+        }))
+    }
+
+    async fn next_response_for(exec_type: i32) -> pb::RemoteExecResponse {
+        let (sender, receiver) = mpsc::channel(1);
+        let mut responser = Responser::new(test_agent_id(), receiver, test_config());
+        sender
+            .send(pb::RemoteExecRequest {
+                request_id: Some(42),
+                exec_type: Some(exec_type),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        responser.next().await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn unsupported_exec_type_returns_error_response() {
+        let response = next_response_for(99).await;
+
+        assert_eq!(response.request_id, Some(42));
+        assert_eq!(
+            response.errmsg.as_deref(),
+            Some("unsupported execution type: 99")
+        );
+        assert!(response.agent_id.is_some());
+        assert!(response.command_result.is_some());
+        assert!(response.commands.is_empty());
+        assert!(response.linux_namespaces.is_empty());
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn dry_replay_pcap_returns_error_without_enterprise_feature() {
+        let response = next_response_for(pb::ExecutionType::DryReplayPcap as i32).await;
+
+        assert_eq!(response.request_id, Some(42));
+        assert_eq!(
+            response.errmsg.as_deref(),
+            Some("unsupported execution type: DryReplayPcap")
+        );
+        assert!(response.agent_id.is_some());
+        assert!(response.command_result.is_some());
+        assert!(response.commands.is_empty());
+        assert!(response.linux_namespaces.is_empty());
+    }
 }

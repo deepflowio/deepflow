@@ -490,7 +490,7 @@ impl EbpfDispatcher {
 
                 if !leaky_bucket.acquire(1) {
                     counter.get_token_failed.fetch_add(1, Ordering::Relaxed);
-                    exception_handler.set(Exception::RxPpsThresholdExceeded);
+                    exception_handler.set(Exception::RxPpsThresholdExceeded, None);
                     continue;
                 }
 
@@ -1018,6 +1018,18 @@ impl EbpfCollector {
         }
 
         ebpf::set_bpf_map_prealloc(!config.ebpf.socket.tunning.map_prealloc_disabled);
+
+        if let Err(e) = config.ebpf.tunning.validate() {
+            warn!(
+                "skip setting kick thread nice value to {}: {}",
+                config.ebpf.tunning.kick_kern_nice, e
+            );
+        } else if ebpf::set_kick_kern_nice(config.ebpf.tunning.kick_kern_nice) != 0 {
+            warn!(
+                "failed to set kick thread nice value to {}",
+                config.ebpf.tunning.kick_kern_nice
+            );
+        }
 
         if config.ebpf.socket.tunning.fentry_enabled {
             ebpf::enable_fentry();
