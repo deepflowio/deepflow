@@ -230,7 +230,8 @@ CREATE TABLE IF NOT EXISTS vtap (
     team_id                 INTEGER,
     expected_revision       TEXT,
     upgrade_package         TEXT,
-    lcuuid                  CHAR(64)
+    lcuuid                  CHAR(64),
+    INDEX lcuuid_index(lcuuid)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE vtap;
 
@@ -382,6 +383,7 @@ CREATE TABLE IF NOT EXISTS domain (
     synced_at           DATETIME DEFAULT NULL,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX team_id_index(team_id),
     UNIQUE INDEX lcuuid_index(lcuuid)
 )ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE domain;
@@ -404,6 +406,7 @@ CREATE TABLE IF NOT EXISTS sub_domain (
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at          DATETIME DEFAULT NULL,
+    INDEX team_id_index(team_id),
     UNIQUE INDEX lcuuid_index(lcuuid)
 )ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE sub_domain;
@@ -484,8 +487,7 @@ CREATE TABLE IF NOT EXISTS vm (
     INDEX launch_server_index(launch_server),
     INDEX epc_id_index(epc_id),
     INDEX az_index(az),
-    INDEX region_index(region),
-    INDEX id_index(`id`)
+    INDEX region_index(region)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE vm;
 
@@ -590,7 +592,8 @@ CREATE TABLE IF NOT EXISTS vl2_net (
     lcuuid              CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    INDEX vl2id_index(vl2id)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE vl2_net;
 
@@ -668,7 +671,9 @@ CREATE TABLE IF NOT EXISTS vinterface (
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX epc_id_index(epc_id),
-    INDEX mac_index(mac)
+    INDEX mac_index(mac),
+    INDEX devicetype_index(devicetype),
+    INDEX lcuuid_index(lcuuid)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE vinterface;
 
@@ -689,7 +694,8 @@ CREATE TABLE IF NOT EXISTS vinterface_ip (
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX ip_index(`ip`),
-    INDEX vifid_index(`vifid`)
+    INDEX vifid_index(`vifid`),
+    INDEX lcuuid_index(lcuuid)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE vinterface_ip;
 
@@ -711,7 +717,8 @@ CREATE TABLE IF NOT EXISTS ip_resource (
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX ip_index(`ip`),
-    INDEX vifid_index(`vifid`)
+    INDEX vifid_index(`vifid`),
+    INDEX lcuuid_index(lcuuid)
 )ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE ip_resource;
 
@@ -979,7 +986,8 @@ CREATE TABLE IF NOT EXISTS vm_pod_node_connection (
     sub_domain          CHAR(64) DEFAULT '',
     lcuuid              CHAR(64) DEFAULT '',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX pod_node_id_index(pod_node_id)
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE vm_pod_node_connection;
 
@@ -1095,7 +1103,8 @@ CREATE TABLE IF NOT EXISTS pod_service_port (
     lcuuid              CHAR(64),
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX pod_service_id_index(pod_service_id)
+    INDEX pod_service_id_index(pod_service_id),
+    INDEX lcuuid_index(lcuuid)
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_service_port;
 
@@ -1124,7 +1133,8 @@ CREATE TABLE IF NOT EXISTS pod_group (
     deleted_at          DATETIME DEFAULT NULL,
     INDEX pod_namespace_id_index(pod_namespace_id),
     INDEX pod_cluster_id_index(pod_cluster_id),
-    INDEX lcuuid_index(lcuuid)
+    INDEX lcuuid_index(lcuuid),
+    INDEX deleted_at_index(deleted_at)
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_group;
 
@@ -1162,7 +1172,8 @@ CREATE TABLE IF NOT EXISTS pod_rs (
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at          DATETIME DEFAULT NULL,
     INDEX pod_group_id_index(pod_group_id),
-    INDEX pod_namespace_id_index(pod_namespace_id)
+    INDEX pod_namespace_id_index(pod_namespace_id),
+    INDEX lcuuid_index(lcuuid)
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod_rs;
 
@@ -1201,7 +1212,10 @@ CREATE TABLE IF NOT EXISTS pod (
     INDEX az_index(az),
     INDEX region_index(region),
     INDEX domain_index(domain),
-    INDEX lcuuid_index(lcuuid)
+    INDEX lcuuid_index(lcuuid),
+    INDEX pod_ns_created_at_index(pod_namespace_id, created_at),
+    INDEX pod_cluster_created_at_index(pod_cluster_id, created_at),
+    INDEX deleted_at_index(deleted_at)
 ) ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE pod;
 
@@ -1268,7 +1282,8 @@ CREATE TABLE IF NOT EXISTS process (
     deleted_at          DATETIME DEFAULT NULL,
     INDEX domain_sub_domain_gid_updated_at_index(domain, sub_domain, gid, updated_at DESC),
     INDEX deleted_at_index(deleted_at),
-    INDEX lcuuid_index(lcuuid)
+    INDEX lcuuid_index(lcuuid),
+    INDEX vtap_id_index(vtap_id)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE process;
 
@@ -1729,7 +1744,8 @@ CREATE TABLE IF NOT EXISTS ch_os_app_tag (
     `sub_domain_id`    INTEGER,
     `updated_at`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`, `key`),
-    INDEX updated_at_index(`updated_at`)
+    INDEX updated_at_index(`updated_at`),
+    INDEX domain_sub_domain_id_updated_at_index(domain_id, sub_domain_id, id, updated_at ASC)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_os_app_tag;
 
