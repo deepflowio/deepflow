@@ -241,6 +241,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     lcuuid                  VARCHAR(64)
 );
 TRUNCATE TABLE vtap;
+CREATE INDEX vtap_lcuuid_index ON vtap (lcuuid);
 COMMENT ON COLUMN vtap.state IS '0.not-connected 1.normal';
 COMMENT ON COLUMN vtap.enable IS '0: stop 1: running';
 COMMENT ON COLUMN vtap.type IS '1: process 2: vm 3: public cloud 4: analyzer 5: physical machine 6: dedicated physical machine 7: host pod 8: vm pod';
@@ -456,6 +457,7 @@ CREATE TABLE IF NOT EXISTS domain (
     UNIQUE (lcuuid)
 );
 TRUNCATE TABLE domain;
+CREATE INDEX domain_team_id_index ON domain (team_id);
 COMMENT ON COLUMN domain.role IS '1.BSS 2.OSS 3.OpenStack 4.VSphere';
 COMMENT ON COLUMN domain.type IS '1.openstack 2.vsphere 3.nsp 4.tencent 5.filereader 6.aws 8.zstack 9.aliyun 10.huawei prv 11.k8s 12.simulation 13.huawei 14.qingcloud 15.qingcloud_private 16.F5 17.CMB_CMDB 18.azure 19.apsara_stack 20.tencent_tce 21.qingcloud_k8s 22.kingsoft_private 23.genesis 24.microsoft_acs 25.baidu_bce';
 COMMENT ON COLUMN domain.enabled IS '0.false 1.true';
@@ -482,6 +484,7 @@ CREATE TABLE IF NOT EXISTS sub_domain (
     UNIQUE (lcuuid)
 );
 TRUNCATE TABLE sub_domain;
+CREATE INDEX sub_domain_team_id_index ON sub_domain (team_id);
 COMMENT ON COLUMN sub_domain.create_method IS '0.learning 1.user_defined';
 COMMENT ON COLUMN sub_domain.enabled IS '0.false 1.true';
 COMMENT ON COLUMN sub_domain.state IS '1.normal 2.deleting 3.exception 4.warning 5.no_license';
@@ -668,6 +671,7 @@ CREATE TABLE IF NOT EXISTS vl2_net (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE vl2_net;
+CREATE INDEX vl2_net_vl2id_index ON vl2_net (vl2id);
 
 CREATE TABLE IF NOT EXISTS vnet (
     id                  SERIAL PRIMARY KEY,
@@ -745,6 +749,8 @@ CREATE TABLE IF NOT EXISTS vinterface (
 );
 TRUNCATE TABLE vinterface;
 CREATE INDEX vinterface_epc_id_index ON vinterface (epc_id);
+CREATE INDEX vinterface_devicetype_index ON vinterface (devicetype);
+CREATE INDEX vinterface_lcuuid_index ON vinterface (lcuuid);
 COMMENT ON COLUMN vinterface.state IS '1. Attached 2.Detached 3.Exception';
 COMMENT ON COLUMN vinterface.create_method IS '0.learning 1.user_defined';
 COMMENT ON COLUMN vinterface.iftype IS '0.Unknown 1.Control 2.Service 3.WAN 4.LAN 5.Trunk 6.Tap 7.Tool';
@@ -771,6 +777,7 @@ CREATE TABLE IF NOT EXISTS vinterface_ip (
 TRUNCATE TABLE vinterface_ip;
 CREATE INDEX vinterface_ip_ip_index ON vinterface_ip (ip);
 CREATE INDEX vinterface_ip_vifid_index ON vinterface_ip (vifid);
+CREATE INDEX vinterface_ip_lcuuid_index ON vinterface_ip (lcuuid);
 COMMENT ON COLUMN vinterface_ip.create_method IS '0.learning 1.user_defined';
 COMMENT ON COLUMN vinterface_ip.isp IS 'Used for multi-ISP access';
 
@@ -795,6 +802,7 @@ CREATE TABLE IF NOT EXISTS ip_resource (
 TRUNCATE TABLE ip_resource;
 CREATE INDEX ip_resource_ip_index ON ip_resource (ip);
 CREATE INDEX ip_resource_vifid_index ON ip_resource (vifid);
+CREATE INDEX ip_resource_lcuuid_index ON ip_resource (lcuuid);
 COMMENT ON COLUMN ip_resource.create_method IS '0.learning 1.user_defined';
 
 CREATE TABLE IF NOT EXISTS floatingip (
@@ -1083,6 +1091,7 @@ CREATE TABLE IF NOT EXISTS vm_pod_node_connection (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE vm_pod_node_connection;
+CREATE INDEX vm_pod_node_connection_pod_node_id_index ON vm_pod_node_connection (pod_node_id);
 
 CREATE TABLE IF NOT EXISTS pod_namespace (
     id                  SERIAL PRIMARY KEY,
@@ -1207,6 +1216,7 @@ CREATE TABLE IF NOT EXISTS pod_service_port (
 );
 TRUNCATE TABLE pod_service_port;
 CREATE INDEX pod_service_port_pod_service_id_index ON pod_service_port (pod_service_id);
+CREATE INDEX pod_service_port_lcuuid_index ON pod_service_port (lcuuid);
 
 CREATE TABLE IF NOT EXISTS pod_group (
     id                  SERIAL PRIMARY KEY,
@@ -1235,6 +1245,8 @@ CREATE TABLE IF NOT EXISTS pod_group (
 TRUNCATE TABLE pod_group;
 CREATE INDEX pod_group_pod_namespace_id_index ON pod_group (pod_namespace_id);
 CREATE INDEX pod_group_pod_cluster_id_index ON pod_group (pod_cluster_id);
+CREATE INDEX pod_group_lcuuid_index ON pod_group (lcuuid);
+CREATE INDEX pod_group_deleted_at_index ON pod_group (deleted_at);
 COMMENT ON COLUMN pod_group.type IS '1: Deployment 2: StatefulSet 3: ReplicationController';
 COMMENT ON COLUMN pod_group.label IS 'separated by ,';
 COMMENT ON COLUMN pod_group.metadata IS 'yaml format';
@@ -1254,6 +1266,7 @@ CREATE TABLE IF NOT EXISTS pod_group_port (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 TRUNCATE TABLE pod_group_port;
+CREATE INDEX pod_group_port_lcuuid_index ON pod_group_port (lcuuid);
 
 CREATE TABLE IF NOT EXISTS pod_rs (
     id                  SERIAL PRIMARY KEY,
@@ -1276,6 +1289,7 @@ CREATE TABLE IF NOT EXISTS pod_rs (
 TRUNCATE TABLE pod_rs;
 CREATE INDEX pod_rs_pod_group_id_index ON pod_rs (pod_group_id);
 CREATE INDEX pod_rs_pod_namespace_id_index ON pod_rs (pod_namespace_id);
+CREATE INDEX pod_rs_lcuuid_index ON pod_rs (lcuuid);
 COMMENT ON COLUMN pod_rs.label IS 'separated by ,';
 
 CREATE TABLE IF NOT EXISTS pod (
@@ -1314,6 +1328,10 @@ CREATE INDEX pod_epc_id_index ON pod (epc_id);
 CREATE INDEX pod_az_index ON pod (az);
 CREATE INDEX pod_region_index ON pod (region);
 CREATE INDEX pod_domain_index ON pod (domain);
+CREATE INDEX pod_lcuuid_index ON pod (lcuuid);
+CREATE INDEX pod_pod_ns_created_at_index ON pod (pod_namespace_id, created_at);
+CREATE INDEX pod_pod_cluster_created_at_index ON pod (pod_cluster_id, created_at);
+CREATE INDEX pod_deleted_at_index ON pod (deleted_at);
 COMMENT ON COLUMN pod.label IS 'separated by ,';
 COMMENT ON COLUMN pod.annotation IS 'separated by ,';
 COMMENT ON COLUMN pod.env IS 'separated by ,';
@@ -1387,6 +1405,8 @@ TRUNCATE TABLE process;
 COMMENT ON COLUMN process.os_app_tags IS 'separated by ,';
 CREATE INDEX process_gid_update_index ON process (domain, sub_domain, gid, updated_at);
 CREATE INDEX process_deleted_at_index ON process (deleted_at);
+CREATE INDEX process_lcuuid_index ON process (lcuuid);
+CREATE INDEX process_vtap_id_index ON process (vtap_id);
 
 -- Custom Service
 CREATE TABLE IF NOT EXISTS custom_service (
@@ -1905,6 +1925,7 @@ CREATE TABLE IF NOT EXISTS ch_os_app_tag (
 );
 TRUNCATE TABLE ch_os_app_tag;
 CREATE INDEX ch_os_app_tag_updated_at_index ON ch_os_app_tag(updated_at);
+CREATE INDEX ch_os_app_tag_domain_sub_domain_id_updated_at_index ON ch_os_app_tag(domain_id, sub_domain_id, id, updated_at);
 
 CREATE TABLE IF NOT EXISTS ch_os_app_tags (
     id                      INTEGER NOT NULL PRIMARY KEY,
