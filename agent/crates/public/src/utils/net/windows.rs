@@ -15,12 +15,11 @@
  */
 
 use std::{
-    ffi::CStr,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     ptr,
 };
 
-use log::{debug, trace, warn};
+use log::{debug, warn};
 use pcap;
 use regex::Regex;
 use windows::Win32::{

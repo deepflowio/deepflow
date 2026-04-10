@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::io;
 use std::{
     borrow::Cow,
     cmp::{max, min},
     collections::{HashMap, HashSet},
     fmt,
     hash::{Hash, Hasher},
-    io, iter,
+    iter,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     path::PathBuf,
     str,
