@@ -5652,7 +5652,7 @@ processors:
       #   en: |-
       #     Turning off some protocol identification can reduce deepflow-agent resource consumption.
       #     Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-      #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+      #     <mark>Oracle, SqlServer and TLS is only supported in the Enterprise Edition.</mark>
       #   ch: |-
       #     deepflow-agent 仅对列表内的应用协议进行数据采集。通过该参数可以控制 agent 的数据采集范围以
       #     降低资源消耗。
@@ -6092,7 +6092,7 @@ processors:
       #     1. HTTP2 and TLS are only used for Kprobe, not applicable to Uprobe.
       #        All data obtained through Uprobe is not subject to port restrictions.
       #        - Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
-      #        - <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+      #        - <mark>Oracle, SqlServer and TLS is only supported in the Enterprise Edition.</mark>
       #     2. Attention: use `HTTP2` for `gRPC` Protocol.
       #   ch: |-
       #     配置样例:
@@ -6104,7 +6104,7 @@ processors:
       #     注意：
       #     1. 该参数中，HTTP2 和 TLS 协议的配置仅对 Kprobe 有效，对 Uprobe 无效；
       #        - 支持协议：[https://www.deepflow.io/docs/zh/features/l7-protocols/overview/](https://www.deepflow.io/docs/zh/features/l7-protocols/overview/)
-      #        - <mark>Oracle 和 TLS 仅在企业版中支持。</mark>
+      #        - <mark>Oracle、SqlServer 和 TLS 仅在企业版中支持。</mark>
       #     2. 如需控制 `gRPC` 协议，请使用 `HTTP2` 配置。
       # upgrade_from: static_config.l7-protocol-ports
       port_number_prefilters:
@@ -6119,6 +6119,7 @@ processors:
         MySQL: 1-65535
         PostgreSQL: 1-65535
         Oracle: 1521
+        SqlServer: 1433
         Redis: 1-65535
         MongoDB: 1-65535
         Memcached: 11211
@@ -6167,7 +6168,7 @@ processors:
       #
       #     Supported protocols: [https://www.deepflow.io/docs/features/l7-protocols/overview/](https://www.deepflow.io/docs/features/l7-protocols/overview/)
       #
-      #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+      #     <mark>Oracle, SqlServer and TLS is only supported in the Enterprise Edition.</mark>
       #   ch: |-
       #     控制不同应用协议数据采集时的 Tag。协议名不区分大小写。
       #     Tag filter 配置例子:
@@ -6214,7 +6215,7 @@ processors:
         #
         #     Supported protocols: https://www.deepflow.io/docs/features/l7-protocols/overview/
         #
-        #     <mark>Oracle and TLS is only supported in the Enterprise Edition.</mark>
+        #     <mark>Oracle, SqlServer and TLS is only supported in the Enterprise Edition.</mark>
         # upgrade_from: static_config.l7-log-blacklist.$protocol
         # ---
         # type: string
@@ -6282,6 +6283,7 @@ processors:
         MySQL: []
         PostgreSQL: []
         Oracle: []
+        SqlServer: []
         Redis: []
         MongoDB: []
         Memcached: []
