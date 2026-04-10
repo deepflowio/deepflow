@@ -64,7 +64,7 @@ jobs:
           fetch-depth: 0
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@v1.0.84
+        uses: anthropics/claude-code-action@v1.0.85
         env:
           ANTHROPIC_BASE_URL: "${{ secrets.ANTHROPIC_BASE_URL }}"
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
