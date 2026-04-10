@@ -64,13 +64,15 @@ jobs:
           fetch-depth: 0
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@v1.0.85
+        uses: anthropics/claude-code-action@v1
         env:
           ANTHROPIC_BASE_URL: "${{ secrets.ANTHROPIC_BASE_URL }}"
-          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
-          CLAUDE_CODE_ATTRIBUTION_HEADER: "0"
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: 1
+          CLAUDE_CODE_ATTRIBUTION_HEADER: 0
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
           claude_args: |
             --model claude-opus-4-6
             --max-turns 100
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
