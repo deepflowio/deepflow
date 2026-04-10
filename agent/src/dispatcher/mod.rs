@@ -1020,6 +1020,7 @@ impl DispatcherBuilder {
             .dispatcher_config
             .take()
             .ok_or(Error::ConfigIncomplete("no dispatcher config".into()))?;
+        #[cfg(target_os = "linux")]
         let inner_interface_capture_enabled =
             dispatcher_config.load().inner_interface_capture_enabled;
 
