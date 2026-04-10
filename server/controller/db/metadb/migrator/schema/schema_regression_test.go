@@ -34,6 +34,27 @@ func TestDBVersionExpectedMatchesHighestMySQLIssue(t *testing.T) {
 	}
 }
 
+func TestMySQLDMLInsert_AIAgentEventDataSourcesShareDefaultRetention(t *testing.T) {
+	sqlPath := filepath.Join("rawsql", "mysql", "dml_insert.sql")
+	content, err := os.ReadFile(sqlPath)
+	if err != nil {
+		t.Fatalf("read dml_insert sql failed: %v", err)
+	}
+	sql := string(content)
+
+	required := []string{
+		"VALUES (27, '事件-文件读写聚合事件', 'event.file_agg_event', 0, 7*24, @lcuuid);",
+		"VALUES (28, '事件-文件管理事件', 'event.file_mgmt_event', 0, 7*24, @lcuuid);",
+		"VALUES (29, '事件-进程权限事件', 'event.proc_perm_event', 0, 7*24, @lcuuid);",
+		"VALUES (30, '事件-进程操作事件', 'event.proc_ops_event', 0, 7*24, @lcuuid);",
+	}
+	for _, item := range required {
+		if !strings.Contains(sql, item) {
+			t.Fatalf("missing AI event data source default retention entry: %s", item)
+		}
+	}
+}
+
 func versionGreater(left, right string) bool {
 	leftParts := strings.Split(left, ".")
 	rightParts := strings.Split(right, ".")
