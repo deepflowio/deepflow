@@ -40,6 +40,8 @@ pub mod rpc;
 mod sender;
 pub mod trident;
 pub mod utils;
+#[cfg(unix)]
+pub mod watchdog;
 
 // for benchmarks
 #[doc(hidden)]

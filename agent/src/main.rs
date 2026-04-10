@@ -74,6 +74,14 @@ struct Opts {
     /// Disable cgroups, deepflow-agent will default to checking the CPU and memory resource usage in a loop every 10 seconds to prevent resource usage from exceeding limits.
     #[clap(long)]
     cgroups_disabled: bool,
+
+    #[cfg(unix)]
+    #[clap(long, hide = true)]
+    watchdog_parent_pid: Option<u32>,
+
+    #[cfg(unix)]
+    #[clap(long, hide = true)]
+    watchdog_liveness_url: Option<String>,
 }
 
 #[cfg(unix)]
@@ -115,6 +123,15 @@ fn main() -> Result<()> {
     if opts.version {
         println!("{}", VERSION_INFO);
         return Ok(());
+    }
+    #[cfg(unix)]
+    if let Some(parent_pid) = opts.watchdog_parent_pid {
+        return watchdog::run(
+            parent_pid,
+            opts.watchdog_liveness_url
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("watchdog liveness url is required"))?,
+        );
     }
     let mut t = trident::Trident::start(
         &Path::new(&opts.config_file),

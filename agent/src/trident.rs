@@ -43,6 +43,8 @@ use tokio::runtime::{Builder, Runtime};
 use tokio::sync::broadcast;
 use zstd::Encoder as ZstdEncoder;
 
+#[cfg(unix)]
+use crate::watchdog;
 use crate::{
     collector::{
         flow_aggr::FlowAggrThread, quadruple_generator::QuadrupleGeneratorThread, CollectorThread,
@@ -770,6 +772,25 @@ impl Trident {
                 Ok::<_, anyhow::Error>(server)
             })
             .transpose()?;
+        #[cfg(unix)]
+        if liveness_server.is_some() && !running_in_k8s() {
+            let url = watchdog::liveness_url(config_handler.static_config.liveness_probe_port);
+            match watchdog::spawn(std::process::id(), &url) {
+                Ok(mut child) => {
+                    let pid = child.id();
+                    info!("spawned watchdog child pid={} for {}", pid, url);
+                    thread::Builder::new()
+                        .name("watchdog-reaper".to_owned())
+                        .spawn(move || {
+                            if let Err(e) = child.wait() {
+                                warn!("watchdog child pid={} wait failed: {}", pid, e);
+                            }
+                        })
+                        .ok();
+                }
+                Err(e) => warn!("failed to spawn watchdog child: {}", e),
+            }
+        }
         let main_loop_liveness = liveness_registry.as_ref();
         let main_loop_liveness = liveness::register(
             main_loop_liveness,
