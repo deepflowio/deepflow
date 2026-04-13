@@ -197,15 +197,11 @@ func TestSelect_MetricName_LoadOnlyIDAndName(t *testing.T) {
 	err := mn.refresh()
 	require.NoError(t, err)
 
-	assert.Equal(t, 1000, countSyncMap(mn.Get()))
+	assert.Equal(t, 1000, len(mn.GetNameToID()))
 	for i := 0; i < 1000; i++ {
 		id, ok := mn.GetIDByName(fmt.Sprintf("metric_%d", i))
 		assert.True(t, ok)
 		assert.Equal(t, i+1, id)
-
-		name, ok := mn.GetNameByID(i + 1)
-		assert.True(t, ok)
-		assert.Equal(t, fmt.Sprintf("metric_%d", i), name)
 	}
 }
 
@@ -222,15 +218,11 @@ func TestSelect_LabelName_LoadOnlyIDAndName(t *testing.T) {
 	err := ln.refresh()
 	require.NoError(t, err)
 
-	assert.Equal(t, 1000, countSyncMap(&ln.nameToID))
+	assert.Equal(t, 1000, len(ln.GetNameToID()))
 	for i := 0; i < 1000; i++ {
 		id, ok := ln.GetIDByName(fmt.Sprintf("ln_%d", i))
 		assert.True(t, ok)
 		assert.Equal(t, i+1, id)
-
-		name, ok := ln.GetNameByID(i + 1)
-		assert.True(t, ok)
-		assert.Equal(t, fmt.Sprintf("ln_%d", i), name)
 	}
 }
 
@@ -290,7 +282,7 @@ func TestSelect_Layout_LoadOnlyNeededColumns(t *testing.T) {
 	err := mll.refresh()
 	require.NoError(t, err)
 
-	assert.NotZero(t, countSyncMap(mll.Get()))
+	assert.NotZero(t, len(mll.GetLayoutKeyToIndex()))
 	for _, item := range items {
 		idx, ok := mll.GetIndexByKey(NewLayoutKey(item.MetricName, item.APPLabelName))
 		assert.True(t, ok, "layout %s/%s should exist", item.MetricName, item.APPLabelName)
@@ -337,13 +329,13 @@ func TestSelect_MetricName_RefreshDiscardsDeletedRows(t *testing.T) {
 	mn := newTestMetricName()
 	mn.org = newTestORG(db)
 	require.NoError(t, mn.refresh())
-	assert.Equal(t, 200, countSyncMap(mn.Get()))
+	assert.Equal(t, 200, len(mn.GetNameToID()))
 
 	// 删除后半部分
 	db.Where("id > ?", 100).Delete(&metadbmodel.PrometheusMetricName{})
 
 	require.NoError(t, mn.refresh())
-	assert.Equal(t, 100, countSyncMap(mn.Get()))
+	assert.Equal(t, 100, len(mn.GetNameToID()))
 
 	_, ok := mn.GetIDByName("metric_150")
 	assert.False(t, ok)
