@@ -126,7 +126,7 @@ wasmtime = "12.0.1"
 wasmtime-wasi = "12.0.1"
 zstd = "0.13.2"
 
-[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+[target.'cfg(unix)'.dependencies]
 cgroups-rs = "0.2.9"
 nix = "0.23"
 # As of procfs 0.16.0, Process::fd().iter() still not giving correct results on kernel 2.6.32

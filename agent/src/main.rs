@@ -81,6 +81,10 @@ struct Opts {
 
     #[cfg(unix)]
     #[clap(long, hide = true)]
+    watchdog_parent_start_time: Option<u64>,
+
+    #[cfg(unix)]
+    #[clap(long, hide = true)]
     watchdog_liveness_url: Option<String>,
 }
 
@@ -128,6 +132,8 @@ fn main() -> Result<()> {
     if let Some(parent_pid) = opts.watchdog_parent_pid {
         return watchdog::run(
             parent_pid,
+            opts.watchdog_parent_start_time
+                .ok_or_else(|| anyhow::anyhow!("watchdog parent start time is required"))?,
             opts.watchdog_liveness_url
                 .as_deref()
                 .ok_or_else(|| anyhow::anyhow!("watchdog liveness url is required"))?,
