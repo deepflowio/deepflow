@@ -90,12 +90,18 @@ impl Hessian2Decoder {
                 }
             }
             // int
-            0x80..=0xbf | 0xc0..=0xcf | 0xd0..=0xd7 | BC_INT => {
-                Self::to_hessian_value(Self::decode_i32(bytes, start), bytes.len(), HessianValue::Int)
-            }
+            0x80..=0xbf | 0xc0..=0xcf | 0xd0..=0xd7 | BC_INT => Self::to_hessian_value(
+                Self::decode_i32(bytes, start),
+                bytes.len(),
+                HessianValue::Int,
+            ),
             // long
             0xd8..=0xef | 0xf0..=0xff | 0x38..=0x3f | BC_LONG_INT | BC_LONG => {
-                Self::to_hessian_value(Self::decode_i64(bytes, start), bytes.len(), HessianValue::Long)
+                Self::to_hessian_value(
+                    Self::decode_i64(bytes, start),
+                    bytes.len(),
+                    HessianValue::Long,
+                )
             }
             // date
             BC_DATE | BC_DATE_MINUTE => Self::to_hessian_value(
@@ -139,12 +145,18 @@ impl Hessian2Decoder {
                 None => (None, bytes.len()),
             },
             // hashmap
-            BC_MAP | BC_MAP_UNTYPED => {
-                Self::to_hessian_value(self.decode_map(bytes, start), bytes.len(), HessianValue::Map)
-            }
+            BC_MAP | BC_MAP_UNTYPED => Self::to_hessian_value(
+                self.decode_map(bytes, start),
+                bytes.len(),
+                HessianValue::Map,
+            ),
             // object，只能处理为 hashmap
             BC_OBJECT_DEF | BC_OBJECT | BC_OBJECT_DIRECT..=BC_OBJECT_DIRECT_MAX => {
-                Self::to_hessian_value(self.decode_obj(bytes, start), bytes.len(), HessianValue::Map)
+                Self::to_hessian_value(
+                    self.decode_obj(bytes, start),
+                    bytes.len(),
+                    HessianValue::Map,
+                )
             }
             _ => (None, bytes.len()), // 如果不符合任何一种，表示这个 tag 没有意义，直接丢弃剩余所有数据
         }
