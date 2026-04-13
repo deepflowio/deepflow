@@ -636,7 +636,7 @@ impl MemoryProfiler {
             return;
         }
         if self.inner_recv.is_none() || self.thread_handle.is_some() {
-            warn!("memory profiler is in invalid state, terminating agent");
+            warn!("memory profiler is in invalid state, deepflow-agent restart...");
             crate::utils::clean_and_exit(1);
         }
 
