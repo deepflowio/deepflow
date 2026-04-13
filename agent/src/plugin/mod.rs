@@ -626,6 +626,12 @@ impl L7ProtocolInfoInterface for CustomInfo {
         })
     }
 
+    fn needs_session_aggregation(&self) -> bool {
+        // Returns true if `is_async` is None (not set) or Some(false).
+        // Returns false only if `is_async` is explicitly set to Some(true).
+        !self.is_async.unwrap_or(false)
+    }
+
     fn is_tls(&self) -> bool {
         false
     }
