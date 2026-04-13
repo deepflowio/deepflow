@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cornelk/hashmap"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -140,34 +139,19 @@ func newTestLabel() *label {
 }
 
 func newTestMetricName() *metricName {
-	return &metricName{}
+	return newMetricName(nil)
 }
 
 func newTestLabelName() *labelName {
-	return &labelName{
-		idToName: hashmap.New[int, string](),
-	}
+	return newLabelName(nil)
 }
 
 func newTestLabelValue() *labelValue {
-	lv := &labelValue{
-		pending: make(map[string]int),
-	}
-	lv.active.Store(make(map[string]int))
-	return lv
+	return newLabelValue(nil)
 }
 
 func newTestLayout() *metricAndAPPLabelLayout {
-	return &metricAndAPPLabelLayout{}
-}
-
-func countSyncMap(m *sync.Map) int {
-	count := 0
-	m.Range(func(_, _ any) bool {
-		count++
-		return true
-	})
-	return count
+	return newMetricAndAPPLabelLayout(nil)
 }
 
 func countStringIntMap(m map[string]int) int {
@@ -206,14 +190,35 @@ func resetLabelValueState(lv *labelValue, active map[string]int) {
 	lv.replaceActive(active)
 }
 
-func resetMetricNameSyncMaps(mn *metricName, n int) {
-	mn.nameToID = sync.Map{}
-	mn.idToName = sync.Map{}
+func resetMetricNameState(mn *metricName, n int) {
+	items := make([]*metadbmodel.PrometheusMetricName, n)
 	for i := 0; i < n; i++ {
-		name := fmt.Sprintf("metric_%d", i)
-		mn.nameToID.Store(name, i+1)
-		mn.idToName.Store(i+1, name)
+		items[i] = &metadbmodel.PrometheusMetricName{Name: fmt.Sprintf("metric_%d", i)}
+		items[i].ID = i + 1
 	}
+	mn.processLoadedData(items)
+}
+
+func resetLabelNameState(ln *labelName, n int) {
+	newActive := make(map[string]int, n)
+	for i := 0; i < n; i++ {
+		newActive[fmt.Sprintf("ln_%d", i)] = i + 1
+	}
+	ln.mu.Lock()
+	ln.pendingNameToID = make(map[string]int)
+	ln.mu.Unlock()
+	ln.replaceActive(newActive)
+}
+
+func resetLayoutState(mll *metricAndAPPLabelLayout, n int) {
+	newActive := make(map[LayoutKey]uint8, n)
+	for i := 0; i < n; i++ {
+		newActive[NewLayoutKey(fmt.Sprintf("metric_%d", i/10), fmt.Sprintf("app_label_%d", i%10))] = uint8(i%10 + 1)
+	}
+	mll.mu.Lock()
+	mll.pending = make(map[LayoutKey]uint8)
+	mll.mu.Unlock()
+	mll.replaceActive(newActive)
 }
 
 func refreshLabelCurrent(l *label, batch []*controller.PrometheusLabel) {
@@ -345,10 +350,6 @@ func TestMetricName_AddAndGet(t *testing.T) {
 		id, ok := mn.GetIDByName(item.GetName())
 		assert.True(t, ok)
 		assert.Equal(t, int(item.GetId()), id)
-
-		name, ok := mn.GetNameByID(int(item.GetId()))
-		assert.True(t, ok)
-		assert.Equal(t, item.GetName(), name)
 	}
 }
 
@@ -362,10 +363,6 @@ func TestLabelName_AddAndGet(t *testing.T) {
 		id, ok := ln.GetIDByName(item.GetName())
 		assert.True(t, ok)
 		assert.Equal(t, int(item.GetId()), id)
-
-		name, ok := ln.GetNameByID(int(item.GetId()))
-		assert.True(t, ok)
-		assert.Equal(t, item.GetName(), name)
 	}
 }
 
@@ -431,14 +428,14 @@ func TestMetricName_GetNameToID_SnapshotIsolation(t *testing.T) {
 	mn := newTestMetricName()
 	mn.Add(generateProtoMetricNames(50))
 
-	snapshot := mn.Get()
-	assert.Equal(t, 50, countSyncMap(snapshot))
+	snapshot := mn.GetNameToID()
+	assert.Equal(t, 50, len(snapshot))
 
 	mn.Add([]*controller.PrometheusMetricName{
 		{Name: proto.String("extra_metric"), Id: proto.Uint32(999)},
 	})
 
-	assert.Equal(t, 50, countSyncMap(snapshot)) // 快照隔离
+	assert.Equal(t, 50, len(snapshot)) // 快照隔离
 }
 func TestLabelValue_GetValueToID_SnapshotIsolation(t *testing.T) {
 	lv := newTestLabelValue()
@@ -487,12 +484,12 @@ func TestLabel_SnapshotSwap_DiscardsOldEntries(t *testing.T) {
 
 func TestMetricName_SnapshotSwap_DiscardsOldEntries(t *testing.T) {
 	mn := newTestMetricName()
-	mn.Add(generateProtoMetricNames(200))
+	// 模拟第一次 refresh：200 条
+	resetMetricNameState(mn, 200)
+	// 模拟第二次 refresh：只有前 50 条（后 150 条被 Cleaner 删除）
+	resetMetricNameState(mn, 50)
 
-	// 模拟 refresh：只有前 50 条
-	resetMetricNameSyncMaps(mn, 50)
-
-	assert.Equal(t, 50, countSyncMap(mn.Get()))
+	assert.Equal(t, 50, len(mn.GetNameToID()))
 	_, ok := mn.GetIDByName("metric_100")
 	assert.False(t, ok)
 }
@@ -575,7 +572,13 @@ func TestConcurrentLabel_ReadDuringSwap(t *testing.T) {
 
 func TestConcurrentMetricName_ReadDuringSwap(t *testing.T) {
 	mn := newTestMetricName()
-	mn.Add(generateProtoMetricNames(1000))
+	resetMetricNameState(mn, 1000)
+
+	items := make([]*metadbmodel.PrometheusMetricName, 1000)
+	for i := 0; i < 1000; i++ {
+		items[i] = &metadbmodel.PrometheusMetricName{Name: fmt.Sprintf("metric_%d", i)}
+		items[i].ID = i + 1
+	}
 
 	var wg sync.WaitGroup
 
@@ -587,7 +590,6 @@ func TestConcurrentMetricName_ReadDuringSwap(t *testing.T) {
 			for i := 0; i < 5000; i++ {
 				idx := rng.Intn(1000)
 				mn.GetIDByName(fmt.Sprintf("metric_%d", idx))
-				mn.GetNameByID(idx + 1)
 			}
 		}()
 	}
@@ -596,11 +598,7 @@ func TestConcurrentMetricName_ReadDuringSwap(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for s := 0; s < 20; s++ {
-			for i := 0; i < 1000; i++ {
-				name := fmt.Sprintf("metric_%d", i)
-				mn.nameToID.Store(name, i+1)
-				mn.idToName.Store(i+1, name)
-			}
+			mn.processLoadedData(items)
 			runtime.Gosched()
 		}
 	}()
@@ -700,7 +698,16 @@ func TestConcurrentLabelValue_SnapshotDuringSwap(t *testing.T) {
 
 func TestConcurrentLayout_ReadDuringSwap(t *testing.T) {
 	mll := newTestLayout()
-	mll.Add(generateProtoLayouts(1000))
+	resetLayoutState(mll, 1000)
+
+	items := make([]*metadbmodel.PrometheusMetricAPPLabelLayout, 1000)
+	for i := 0; i < 1000; i++ {
+		items[i] = &metadbmodel.PrometheusMetricAPPLabelLayout{
+			MetricName:          fmt.Sprintf("metric_%d", i/10),
+			APPLabelName:        fmt.Sprintf("app_label_%d", i%10),
+			APPLabelColumnIndex: uint8(i%10 + 1),
+		}
+	}
 
 	var wg sync.WaitGroup
 
@@ -723,12 +730,7 @@ func TestConcurrentLayout_ReadDuringSwap(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for s := 0; s < 20; s++ {
-			for i := 0; i < 1000; i++ {
-				mll.layoutKeyToIndex.Store(
-					NewLayoutKey(fmt.Sprintf("metric_%d", i/10), fmt.Sprintf("app_label_%d", i%10)),
-					uint8(i%10+1),
-				)
-			}
+			mll.processLoadedData(items)
 			runtime.Gosched()
 		}
 	}()
