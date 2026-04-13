@@ -590,6 +590,8 @@ impl L7ProtocolInfoInterface for CustomInfo {
 
             swap_if!(self.resp, exception, is_empty, w.resp);
             swap_if!(self.resp, result, is_empty, w.resp);
+            swap_if!(self.resp, req_type, is_empty, w.resp);
+            swap_if!(self.resp, endpoint, is_empty, w.resp);
 
             if self.resp_len.is_none() {
                 self.resp_len = w.resp_len;
@@ -664,10 +666,18 @@ impl From<CustomInfo> for L7ProtocolSendLog {
             captured_response_byte: w.captured_response_byte,
 
             req: L7Request {
-                req_type: w.req.req_type,
+                req_type: if w.req.req_type.is_empty() {
+                    w.resp.req_type
+                } else {
+                    w.req.req_type
+                },
                 domain: w.req.domain,
                 resource: w.req.resource,
-                endpoint: w.req.endpoint,
+                endpoint: if w.req.endpoint.is_empty() {
+                    w.resp.endpoint
+                } else {
+                    w.req.endpoint
+                },
             },
             resp: L7Response {
                 status: w.resp.status,
@@ -696,6 +706,13 @@ impl From<CustomInfo> for L7ProtocolSendLog {
                 x_request_id_1: w.trace.x_request_id_1,
                 ..Default::default()
             }),
+            version: if w.req.version.is_empty() {
+                None
+            } else {
+                Some(w.req.version)
+            },
+            biz_code: w.biz_code.unwrap_or_default(),
+            biz_scenario: w.biz_scenario.unwrap_or_default(),
             ..Default::default()
         }
     }
