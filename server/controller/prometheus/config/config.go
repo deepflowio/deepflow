@@ -17,8 +17,8 @@
 package config
 
 type Config struct {
-	SynchronizerCacheRefreshInterval int `default:"60" yaml:"synchronizer_cache_refresh_interval"`
-	EncoderCacheRefreshInterval      int `default:"3600" yaml:"encoder_cache_refresh_interval"`
+	SynchronizerCacheRefreshInterval int `default:"300" yaml:"synchronizer_cache_refresh_interval"`
+	EncoderCacheRefreshInterval      int `default:"36000" yaml:"encoder_cache_refresh_interval"`
 	ResourceMaxID0                   int `default:"64000" yaml:"resource_max_id_0"`
 	ResourceMaxID1                   int `default:"499999" yaml:"resource_max_id_1"`
 	APPLabelIndexMax                 int `default:"255" yaml:"app_label_index"`
