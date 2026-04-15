@@ -32,7 +32,6 @@ type label struct {
 	lock         sync.Mutex
 	resourceType string
 	labelKeyToID sync.Map
-	labelIDToKey sync.Map
 }
 
 func newLabel(org *common.ORG) *label {
@@ -44,14 +43,6 @@ func newLabel(org *common.ORG) *label {
 
 func (l *label) store(item *metadbmodel.PrometheusLabel) {
 	l.labelKeyToID.Store(cache.NewLabelKey(item.Name, item.Value), item.ID)
-	l.labelIDToKey.Store(item.ID, cache.NewLabelKey(item.Name, item.Value))
-}
-
-func (l *label) getKey(id int) (cache.LabelKey, bool) {
-	if item, ok := l.labelIDToKey.Load(id); ok {
-		return item.(cache.LabelKey), true
-	}
-	return cache.LabelKey{}, false
 }
 
 func (l *label) getID(key cache.LabelKey) (int, bool) {
