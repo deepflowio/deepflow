@@ -638,7 +638,10 @@ impl Trident {
         let handle = match main_loop {
             Ok(h) => Some(h),
             Err(e) => {
-                error!("Failed to create main-loop thread: {}", e);
+                error!(
+                    "Failed to create main-loop thread: {}, deepflow-agent restart...",
+                    e
+                );
                 crate::utils::clean_and_exit(1);
                 None
             }
@@ -652,6 +655,7 @@ impl Trident {
         let action = kernel_version_check();
         if action.contains(ActionFlags::TERMINATE) {
             exception_handler.set(Exception::KernelVersionCircuitBreaker);
+            error!("kernel check indicates TERMINATE action, deepflow-agent restart...");
             crate::utils::clean_and_exit(1);
         } else if action.contains(ActionFlags::MELTDOWN) {
             exception_handler.set(Exception::KernelVersionCircuitBreaker);
