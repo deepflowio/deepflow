@@ -275,7 +275,12 @@ impl AgentState {
             return;
         }
         let mut sg = self.state.lock().unwrap();
+        let old_state: State = sg.0.into();
         sg.0.enabled = config.user_config.global.common.enabled;
+        let new_state: State = sg.0.into();
+        if old_state != new_state {
+            info!("Agent state changed from {old_state:?} to {new_state:?} (enabled: {} melted_down: {})", sg.0.enabled, sg.0.melted_down);
+        }
         sg.1.replace(config);
         self.notifier.notify_one();
     }
@@ -287,7 +292,12 @@ impl AgentState {
             return;
         }
         let mut sg = self.state.lock().unwrap();
+        let old_state: State = sg.0.into();
         sg.0.enabled = user_config.global.common.enabled;
+        let new_state: State = sg.0.into();
+        if old_state != new_state {
+            info!("Agent state changed from {old_state:?} to {new_state:?} (enabled: {} melted_down: {})", sg.0.enabled, sg.0.melted_down);
+        }
         if let Some(changed_config) = sg.1.as_mut() {
             changed_config.user_config = user_config;
         } else {
