@@ -19,6 +19,7 @@ package encoder
 import (
 	"sync"
 
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
@@ -30,13 +31,14 @@ type labelValue struct {
 	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
-	strToID      sync.Map
+	strToID      cmap.ConcurrentMap[string, int]
 }
 
 func newLabelValue(org *common.ORG) *labelValue {
 	return &labelValue{
 		org:          org,
 		resourceType: "label_value",
+		strToID:      cmap.New[int](),
 	}
 }
 
@@ -84,12 +86,12 @@ func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue,
 }
 
 func (lv *labelValue) getID(str string) (int, bool) {
-	if item, ok := lv.strToID.Load(str); ok {
-		return item.(int), true
+	if item, ok := lv.strToID.Get(str); ok {
+		return item, true
 	}
 	return 0, false
 }
 
 func (lv *labelValue) store(item *metadbmodel.PrometheusLabelValue) {
-	lv.strToID.Store(item.Value, item.ID)
+	lv.strToID.Set(item.Value, item.ID)
 }
