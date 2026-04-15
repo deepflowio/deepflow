@@ -746,6 +746,54 @@ func TestParseSQLKeepsBizTypeAsRawIntField(t *testing.T) {
 	}
 }
 
+func TestParseSQLEnumGProcessBizTypeNumericStringFallsBackToRawBizType(t *testing.T) {
+	if err := Load(); err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+
+	e := CHEngine{DB: "flow_log", Language: "en"}
+	e.Context = context.Background()
+	e.Init()
+
+	parser := parse.Parser{Engine: &e}
+	input := "select Enum(`gprocess.biz_type_0`) from l7_flow_log where Enum(`gprocess.biz_type_0`)='0' limit 10"
+	if err := parser.ParseSQL(input); err != nil {
+		t.Fatalf("parse sql failed: %v", err)
+	}
+
+	got := parser.Engine.ToSQLString()
+	if !strings.Contains(got, "biz_type = 0") {
+		t.Fatalf("sql should fall back to raw biz_type for numeric enum filter: %s", got)
+	}
+	if strings.Contains(got, "gprocess.biz_type_0 =") || strings.Contains(got, "toUInt64(gprocess.biz_type_0)") {
+		t.Fatalf("sql should not compare non-physical gprocess.biz_type field directly: %s", got)
+	}
+}
+
+func TestParseSQLEnumGProcessBizTypeNumericStringNotEqualFallsBackToRawBizType(t *testing.T) {
+	if err := Load(); err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+
+	e := CHEngine{DB: "flow_log", Language: "en"}
+	e.Context = context.Background()
+	e.Init()
+
+	parser := parse.Parser{Engine: &e}
+	input := "select Enum(`gprocess.biz_type_0`) from l7_flow_log where Enum(`gprocess.biz_type_0`)!='0' limit 10"
+	if err := parser.ParseSQL(input); err != nil {
+		t.Fatalf("parse sql failed: %v", err)
+	}
+
+	got := parser.Engine.ToSQLString()
+	if !strings.Contains(got, "biz_type != 0") {
+		t.Fatalf("sql should fall back to raw biz_type for numeric enum inequality filter: %s", got)
+	}
+	if strings.Contains(got, "gprocess.biz_type_0 !=") || strings.Contains(got, "toUInt64(gprocess.biz_type_0)") {
+		t.Fatalf("sql should not compare non-physical gprocess.biz_type field directly: %s", got)
+	}
+}
+
 /* func TestGetSqltest(t *testing.T) {
 	 for _, pcase := range parsetest {
 		 e := CHEngine{DB: "flow_log"}
