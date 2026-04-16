@@ -405,8 +405,9 @@ func (g *GenesisSync) Start() {
 		vStorage := NewSyncStorage(g.ctx, g.config.GenesisCfg, sDataChan)
 		vStorage.Start()
 
+		minuteCD := common.NewCoolDownFunc(time.Minute)
+		updaterMap := map[int]*updater.GenesisSyncRpcUpdater{}
 		genesisSyncDataByVtap := map[string]common.GenesisSyncDataResponse{}
-		vUpdater := updater.NewGenesisSyncRpcUpdater(g.config.GenesisCfg)
 		for {
 			genesisSyncData := common.GenesisSyncDataResponse{}
 			info := g.queue.Get().(common.VIFRPCMessage)
@@ -416,6 +417,17 @@ func (g *GenesisSync) Start() {
 			}
 
 			log.Debugf("sync received (%s) vtap_id (%v) type (%v) workload resource enabled (%t) received (%s)", info.Peer, info.VtapID, info.MessageType, info.WorkloadResourceEnabled, info.Message, logger.NewORGPrefix(info.ORGID))
+
+			vUpdater, ok := updaterMap[info.ORGID]
+			if !ok {
+				vUpdater = updater.NewGenesisSyncRpcUpdater(info.ORGID)
+				updaterMap[info.ORGID] = vUpdater
+			}
+
+			// load config when first time receive sync message and every minute after
+			minuteCD.Call(info.ORGID, func() {
+				vUpdater.LoadConfig(g.config.GenesisCfg)
+			})
 
 			vtap := fmt.Sprintf("%d%d", info.ORGID, info.VtapID)
 			if info.MessageType == common.TYPE_RENEW {
@@ -433,13 +445,13 @@ func (g *GenesisSync) Start() {
 				agentType := info.Message.GetAgentType()
 				switch agentType {
 				case agent.AgentType_TT_PHYSICAL_MACHINE:
-					genesisSyncData = vUpdater.UnmarshalWorkloadProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, common.DEVICE_TYPE_PHYSICAL_MACHINE, info.WorkloadResourceEnabled, info.Message)
+					genesisSyncData = vUpdater.UnmarshalWorkloadProtobuf(info.TeamID, info.VtapID, info.Peer, common.DEVICE_TYPE_PHYSICAL_MACHINE, info.WorkloadResourceEnabled, info.Message)
 				case agent.AgentType_TT_PUBLIC_CLOUD:
-					genesisSyncData = vUpdater.UnmarshalWorkloadProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, common.DEVICE_TYPE_PUBLIC_CLOUD, info.WorkloadResourceEnabled, info.Message)
+					genesisSyncData = vUpdater.UnmarshalWorkloadProtobuf(info.TeamID, info.VtapID, info.Peer, common.DEVICE_TYPE_PUBLIC_CLOUD, info.WorkloadResourceEnabled, info.Message)
 				case agent.AgentType_TT_HOST_POD, agent.AgentType_TT_VM_POD, agent.AgentType_TT_K8S_SIDECAR:
-					genesisSyncData = vUpdater.UnmarshalKubernetesProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, info.WorkloadResourceEnabled, info.Message)
+					genesisSyncData = vUpdater.UnmarshalKubernetesProtobuf(info.TeamID, info.VtapID, info.Peer, info.WorkloadResourceEnabled, info.Message)
 				default:
-					genesisSyncData = vUpdater.UnmarshalProtobuf(info.ORGID, info.TeamID, info.VtapID, info.Peer, info.Message)
+					genesisSyncData = vUpdater.UnmarshalProtobuf(info.TeamID, info.VtapID, info.Peer, info.Message)
 				}
 
 				if info.VtapID != 0 {
