@@ -19,7 +19,6 @@ package encoder
 import (
 	"sync"
 
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
@@ -31,27 +30,48 @@ type labelValue struct {
 	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
-	strToID      cmap.ConcurrentMap[string, int]
+	strToID      map[string]int
 }
 
 func newLabelValue(org *common.ORG) *labelValue {
 	return &labelValue{
 		org:          org,
 		resourceType: "label_value",
-		strToID:      cmap.New[int](),
+		strToID:      make(map[string]int),
 	}
 }
 
 func (lv *labelValue) refresh(args ...interface{}) error {
+	// Snapshot existing keys before querying DB, to identify entries added
+	// by encode() during the query window (those must be preserved even if
+	// not yet visible in the DB snapshot).
+	lv.lock.Lock()
+	preKeys := make(map[string]struct{}, len(lv.strToID))
+	for k := range lv.strToID {
+		preKeys[k] = struct{}{}
+	}
+	lv.lock.Unlock()
+
 	var items []*metadbmodel.PrometheusLabelValue
-	err := lv.org.DB.Unscoped().Find(&items).Error
-	if err != nil {
+	if err := lv.org.DB.Select("id", "value").Find(&items).Error; err != nil {
 		log.Errorf("db query %s failed: %v", lv.resourceType, err, lv.org.LogPrefix)
 		return err
 	}
+	newMap := make(map[string]int, len(items))
 	for _, item := range items {
-		lv.store(item)
+		newMap[item.Value] = item.ID
 	}
+
+	lv.lock.Lock()
+	for k, v := range lv.strToID {
+		if _, wasInSnapshot := preKeys[k]; !wasInSnapshot {
+			// Written by encode() after the snapshot; may not be in the DB
+			// snapshot yet, so preserve it to avoid a spurious cache miss.
+			newMap[k] = v
+		}
+	}
+	lv.strToID = newMap
+	lv.lock.Unlock()
 	return nil
 }
 
@@ -86,12 +106,10 @@ func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue,
 }
 
 func (lv *labelValue) getID(str string) (int, bool) {
-	if item, ok := lv.strToID.Get(str); ok {
-		return item, true
-	}
-	return 0, false
+	id, ok := lv.strToID[str]
+	return id, ok
 }
 
 func (lv *labelValue) store(item *metadbmodel.PrometheusLabelValue) {
-	lv.strToID.Set(item.Value, item.ID)
+	lv.strToID[item.Value] = item.ID
 }

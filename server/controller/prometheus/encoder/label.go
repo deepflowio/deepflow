@@ -31,36 +31,56 @@ type label struct {
 	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
-	labelKeyToID sync.Map
+	labelKeyToID map[cache.LabelKey]int
 }
 
 func newLabel(org *common.ORG) *label {
 	return &label{
 		org:          org,
 		resourceType: "label",
+		labelKeyToID: make(map[cache.LabelKey]int),
 	}
 }
 
 func (l *label) store(item *metadbmodel.PrometheusLabel) {
-	l.labelKeyToID.Store(cache.NewLabelKey(item.Name, item.Value), item.ID)
+	l.labelKeyToID[cache.NewLabelKey(item.Name, item.Value)] = item.ID
 }
 
 func (l *label) getID(key cache.LabelKey) (int, bool) {
-	if item, ok := l.labelKeyToID.Load(key); ok {
-		return item.(int), true
-	}
-	return 0, false
+	id, ok := l.labelKeyToID[key]
+	return id, ok
 }
 
 func (l *label) refresh(args ...interface{}) error {
+	// Snapshot existing keys before querying DB, to identify entries added
+	// by encode() during the query window (those must be preserved even if
+	// not yet visible in the DB snapshot).
+	l.lock.Lock()
+	preKeys := make(map[cache.LabelKey]struct{}, len(l.labelKeyToID))
+	for k := range l.labelKeyToID {
+		preKeys[k] = struct{}{}
+	}
+	l.lock.Unlock()
+
 	var items []*metadbmodel.PrometheusLabel
-	err := l.org.DB.Find(&items).Error
-	if err != nil {
+	if err := l.org.DB.Select("id", "name", "value").Find(&items).Error; err != nil {
 		return err
 	}
+	newMap := make(map[cache.LabelKey]int, len(items))
 	for _, item := range items {
-		l.store(item)
+		newMap[cache.NewLabelKey(item.Name, item.Value)] = item.ID
 	}
+
+	l.lock.Lock()
+	for k, v := range l.labelKeyToID {
+		if _, wasInSnapshot := preKeys[k]; !wasInSnapshot {
+			// Written by encode() after the snapshot; may not be in the DB
+			// snapshot yet, so preserve it to avoid a spurious cache miss.
+			newMap[k] = v
+		}
+	}
+	l.labelKeyToID = newMap
+	l.lock.Unlock()
 	return nil
 }
 
