@@ -5198,8 +5198,12 @@ inputs:
 
 **详细描述**:
 
-禁用 Lua 解释器剖析。禁用后将不采集 Lua 进程的函数调用栈，
-可节省约 13 MB 内核内存（lua_tstate_map、lua_lang_flags_map、lua_unwind_info_map、lua_offsets_map、luajit_offsets_map）。
+禁用 Lua 解释器剖析功能。禁用后将不会采集 Lua 进程的函数调用栈，可节省约 13 MB 的内核内存。
+此配置项控制以下 eBPF maps 的创建：
+- lua_tstate_map：缓存每线程 lua_State 栈（按线程，容量较大，约 7 MB）
+- lua_lang_flags_map：记录进程 Lua/LuaJIT 类型标记（约 2.5 MB）
+- lua_unwind_info_map：存储进程级 unwinding 元信息（约 3 MB）
+- lua_offsets_map、luajit_offsets_map：存储 Lua/LuaJIT 结构偏移表（总计 < 2 KB）
 
 ### 网络 {#inputs.ebpf.network}
 
@@ -6521,7 +6525,7 @@ inputs:
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -6550,7 +6554,7 @@ Telegraf、OpenTelemetry 和 Skywalking、Vector 的数据。
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 

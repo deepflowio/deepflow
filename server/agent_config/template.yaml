@@ -4972,7 +4972,7 @@ inputs:
     # unit:
     # range: []
     # enum_options: []
-    # modification: hot_update
+    # modification: agent_restart
     # ee_feature: false
     # description:
     #   en: |-
@@ -4990,7 +4990,7 @@ inputs:
     # unit:
     # range: [1, 65535]
     # enum_options: []
-    # modification: hot_update
+    # modification: agent_restart 
     # ee_feature: false
     # description:
     #   en: |-
