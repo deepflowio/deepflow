@@ -18,14 +18,29 @@ package common
 
 import (
 	"context"
+	"fmt"
+	"runtime/debug"
 
 	"golang.org/x/sync/errgroup"
+
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
+
+var log = logger.MustGetLogger("prometheus.synchronizer.common")
 
 type ErrFunc func(...interface{}) error
 
 func AppendErrGroupWithContext(ctx context.Context, eg *errgroup.Group, f ErrFunc, args ...interface{}) {
-	eg.Go(func() error {
+	eg.Go(func() (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				// NOTE: fatal errors such as "concurrent map read and map write" are
+				// thrown by the runtime and cannot be caught here; prevent them by
+				// fixing the underlying data race instead.
+				log.Errorf("prometheus goroutine recovered from panic: %v\n%s", r, debug.Stack())
+				err = fmt.Errorf("panic: %v", r)
+			}
+		}()
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -36,7 +51,13 @@ func AppendErrGroupWithContext(ctx context.Context, eg *errgroup.Group, f ErrFun
 }
 
 func AppendErrGroup(eg *errgroup.Group, f ErrFunc, args ...interface{}) {
-	eg.Go(func() error {
+	eg.Go(func() (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Errorf("prometheus goroutine recovered from panic: %v\n%s", r, debug.Stack())
+				err = fmt.Errorf("panic: %v", r)
+			}
+		}()
 		return f(args...)
 	})
 }

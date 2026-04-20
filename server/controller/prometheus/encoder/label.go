@@ -32,18 +32,22 @@ type label struct {
 	lock         sync.Mutex
 	resourceType string
 	labelKeyToID map[cache.LabelKey]int
+	labelName    *labelName
+	labelValue   *labelValue
 }
 
-func newLabel(org *common.ORG) *label {
+func newLabel(org *common.ORG, ln *labelName, lv *labelValue) *label {
 	return &label{
 		org:          org,
 		resourceType: "label",
 		labelKeyToID: make(map[cache.LabelKey]int),
+		labelName:    ln,
+		labelValue:   lv,
 	}
 }
 
 func (l *label) store(item *metadbmodel.PrometheusLabel) {
-	l.labelKeyToID[cache.NewLabelKey(item.Name, item.Value)] = item.ID
+	l.labelKeyToID[cache.NewLabelKey(item.NameID, item.ValueID)] = item.ID
 }
 
 func (l *label) getID(key cache.LabelKey) (int, bool) {
@@ -63,12 +67,12 @@ func (l *label) refresh(args ...interface{}) error {
 	l.lock.Unlock()
 
 	var items []*metadbmodel.PrometheusLabel
-	if err := l.org.DB.Select("id", "name", "value").Find(&items).Error; err != nil {
+	if err := l.org.DB.Select("id", "name_id", "value_id").Find(&items).Error; err != nil {
 		return err
 	}
 	newMap := make(map[cache.LabelKey]int, len(items))
 	for _, item := range items {
-		newMap[cache.NewLabelKey(item.Name, item.Value)] = item.ID
+		newMap[cache.NewLabelKey(item.NameID, item.ValueID)] = item.ID
 	}
 
 	l.lock.Lock()
@@ -88,38 +92,51 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
+	type pendingLabel struct {
+		item *metadbmodel.PrometheusLabel
+	}
+
 	resp := make([]*controller.PrometheusLabel, 0)
-	var dbToAdd []*metadbmodel.PrometheusLabel
+	var pending []pendingLabel
 	for _, item := range toAdd {
 		n := item.GetName()
 		v := item.GetValue()
-		if id, ok := l.getID(cache.NewLabelKey(n, v)); ok {
+		nameID, okN := l.labelName.getID(n)
+		valueID, okV := l.labelValue.getID(v)
+		if !okN || !okV {
+			// Name or value not yet encoded — skip; the next encode round
+			// (after the caller retries) will succeed once they are present.
+			log.Warningf("label (%s=%s): name_id or value_id not found, skipping", n, v, l.org.LogPrefix)
+			continue
+		}
+		if id, ok := l.getID(cache.NewLabelKey(nameID, valueID)); ok {
 			resp = append(resp, &controller.PrometheusLabel{
-				Name:  &n,
-				Value: &v,
-				Id:    proto.Uint32(uint32(id)),
+				Id:      proto.Uint32(uint32(id)),
+				NameId:  proto.Uint32(uint32(nameID)),
+				ValueId: proto.Uint32(uint32(valueID)),
 			})
 			continue
 		}
-		dbToAdd = append(dbToAdd, &metadbmodel.PrometheusLabel{
-			Name:  n,
-			Value: v,
+		pending = append(pending, pendingLabel{
+			item: &metadbmodel.PrometheusLabel{NameID: nameID, ValueID: valueID},
 		})
 	}
 
-	err := addBatch(l.org.DB, dbToAdd, l.resourceType)
-	if err != nil {
+	dbToAdd := make([]*metadbmodel.PrometheusLabel, len(pending))
+	for i := range pending {
+		dbToAdd[i] = pending[i].item
+	}
+	if err := addBatch(l.org.DB, dbToAdd, l.resourceType); err != nil {
 		log.Errorf("add %s error: %s", l.resourceType, err.Error(), l.org.LogPrefix)
 		return nil, err
 	}
-	for _, item := range dbToAdd {
-		l.store(item)
+	for i, p := range pending {
+		l.store(dbToAdd[i])
 		resp = append(resp, &controller.PrometheusLabel{
-			Name:  &item.Name,
-			Value: &item.Value,
-			Id:    proto.Uint32(uint32(item.ID)),
+			Id:      proto.Uint32(uint32(dbToAdd[i].ID)),
+			NameId:  proto.Uint32(uint32(p.item.NameID)),
+			ValueId: proto.Uint32(uint32(p.item.ValueID)),
 		})
-
 	}
 	return resp, nil
 }

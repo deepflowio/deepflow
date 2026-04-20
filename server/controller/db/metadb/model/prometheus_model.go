@@ -52,8 +52,8 @@ type PrometheusLabelValue struct {
 type PrometheusLabel struct {
 	PrometheusAutoIncID    `gorm:"embedded"`
 	PrometheusOperatedTime `gorm:"embedded"`
-	Name                   string `gorm:"column:name;type:varchar(256);not null"`
-	Value                  string `gorm:"column:value;type:text;default:''"`
+	NameID                 int `gorm:"column:name_id;type:int;not null;default:0"`
+	ValueID                int `gorm:"column:value_id;type:int;not null;default:0"`
 }
 
 type PrometheusMetricLabelName struct {

@@ -155,7 +155,13 @@ func (ll *labelLayout) refresh(args ...interface{}) error {
 		ia, _ := ll.createIndexAllocatorIfNotExists(mn)
 		ia.refresh(lnToIdx)
 	}
+	ll.lock.Lock()
+	currentAllocators := make(map[string]*indexAllocator, len(ll.metricNameToIdxAllocator))
 	for mn, ia := range ll.metricNameToIdxAllocator {
+		currentAllocators[mn] = ia
+	}
+	ll.lock.Unlock()
+	for mn, ia := range currentAllocators {
 		if _, ok := mnToLnIdx[mn]; !ok {
 			ia.refresh(make(map[string]int))
 		}
@@ -193,15 +199,15 @@ func (ll *labelLayout) createIndexAllocatorIfNotExists(metricName string) (*inde
 	ia := newIndexAllocator(ll.org, metricName, ll.appLabelIndexMax)
 	ia.refresh(make(map[string]int))
 	ll.metricNameToIdxAllocator[metricName] = ia
-	return ll.metricNameToIdxAllocator[metricName], nil
+	return ia, nil
 }
 
-func (ll *labelLayout) getIndexAllocator(metricName string) (*indexAllocator, bool) {
-	ll.lock.Lock()
-	defer ll.lock.Unlock()
-	allocator, ok := ll.metricNameToIdxAllocator[metricName]
-	return allocator, ok
-}
+// func (ll *labelLayout) getIndexAllocator(metricName string) (*indexAllocator, bool) {
+// 	ll.lock.Lock()
+// 	defer ll.lock.Unlock()
+// 	allocator, ok := ll.metricNameToIdxAllocator[metricName]
+// 	return allocator, ok
+// }
 
 func (ll *labelLayout) SingleEncode(metricName string, labelNames []string) ([]*controller.PrometheusMetricAPPLabelLayout, error) {
 	log.Infof("encode metric: %s app label names: %v", metricName, labelNames, ll.org.LogPrefix)

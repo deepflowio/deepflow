@@ -233,7 +233,7 @@ func (d *deleter) deleteExpiredMetricName() error {
 func (d *deleter) deleteExpiredLabel() error {
 	toDelete := make([]metadbmodel.PrometheusLabel, 0)
 	for _, item := range d.dataToCheck.labels {
-		if !d.activeData.getLabel(item.Name, item.Value) {
+		if !d.activeData.getLabel(item.NameID, item.ValueID) {
 			toDelete = append(toDelete, item)
 		}
 	}
@@ -478,6 +478,7 @@ func (q *querier) getRegionToDomainNamePrefix() (map[string]string, error) {
 }
 
 type activeData struct {
+	cache            *cache.Cache
 	metricNames      map[string]struct{}             // for prometheus_metric_name
 	labelNames       map[string]struct{}             // for prometheus_label_name
 	labelValues      map[string]struct{}             // for prometheus_label_value
@@ -487,6 +488,7 @@ type activeData struct {
 
 func newActiveData(c *cache.Cache) *activeData {
 	return &activeData{
+		cache:            c,
 		metricNames:      make(map[string]struct{}),
 		labelNames:       make(map[string]struct{}),
 		labelValues:      make(map[string]struct{}),
@@ -517,8 +519,8 @@ func (d *activeData) getLabelValue(value string) bool {
 	return ok
 }
 
-func (d *activeData) getLabel(name, value string) bool {
-	_, ok := d.labels[newLabelKey(name, value)]
+func (d *activeData) getLabel(nameID, valueID int) bool {
+	_, ok := d.labels[newLabelKey(nameID, valueID)]
 	return ok
 }
 
@@ -540,7 +542,14 @@ func (d *activeData) appendLabelValue(value string) {
 }
 
 func (d *activeData) appendLabel(name, value string) {
-	d.labels[newLabelKey(name, value)] = struct{}{}
+	// Resolve to int IDs via the cache to keep the labels map compact.
+	nameID, okN := d.cache.LabelName.GetIDByName(name)
+	valueID, okV := d.cache.LabelValue.GetIDByValue(value)
+	if !okN || !okV {
+		// Name or value not yet registered — label can't exist in DB either.
+		return
+	}
+	d.labels[newLabelKey(nameID, valueID)] = struct{}{}
 }
 
 func (d *activeData) appendMetricLabelName(metricName, labelName string) {
@@ -560,15 +569,12 @@ func newMetricLabelNameKey(metricName, labelName string) metricLabelNameKey {
 }
 
 type labelKey struct {
-	name  string
-	value string
+	nameID  int
+	valueID int
 }
 
-func newLabelKey(name, value string) labelKey {
-	return labelKey{
-		name:  name,
-		value: value,
-	}
+func newLabelKey(nameID, valueID int) labelKey {
+	return labelKey{nameID: nameID, valueID: valueID}
 }
 
 type dataToCheck struct {

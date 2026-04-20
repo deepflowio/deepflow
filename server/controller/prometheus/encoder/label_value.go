@@ -83,7 +83,7 @@ func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue,
 	dbToAdd := make([]*metadbmodel.PrometheusLabelValue, 0)
 	for i := range strs {
 		str := strs[i]
-		if id, ok := lv.getID(str); ok {
+		if id, ok := lv.getIDLocked(str); ok {
 			resp = append(resp, &controller.PrometheusLabelValue{Value: &str, Id: proto.Uint32(uint32(id))})
 			continue
 		}
@@ -105,9 +105,17 @@ func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue,
 	return resp, nil
 }
 
-func (lv *labelValue) getID(str string) (int, bool) {
+// getIDLocked reads strToID without acquiring lv.lock. Caller must hold lv.lock.
+func (lv *labelValue) getIDLocked(str string) (int, bool) {
 	id, ok := lv.strToID[str]
 	return id, ok
+}
+
+// getID is safe for concurrent callers; it acquires lv.lock internally.
+func (lv *labelValue) getID(str string) (int, bool) {
+	lv.lock.Lock()
+	defer lv.lock.Unlock()
+	return lv.getIDLocked(str)
 }
 
 func (lv *labelValue) store(item *metadbmodel.PrometheusLabelValue) {
