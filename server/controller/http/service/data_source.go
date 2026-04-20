@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -488,17 +489,22 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 	}
 
 	if len(errs) == 0 {
-		for _, target := range targets {
-			if err := db.Model(&target).Updates(
-				map[string]interface{}{
-					"state":          common.DATA_SOURCE_STATE_NORMAL,
-					"retention_time": target.RetentionTime,
-				},
-			).Error; err != nil {
-				return model.DataSource{}, err
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			for _, target := range targets {
+				if err := tx.Model(&target).Updates(
+					map[string]interface{}{
+						"state":          common.DATA_SOURCE_STATE_NORMAL,
+						"retention_time": target.RetentionTime,
+					},
+				).Error; err != nil {
+					return err
+				}
+				log.Infof("update data_source (%s), retention time change: %ds -> %ds",
+					target.DisplayName, oldRetentionTimes[target.Lcuuid], target.RetentionTime, dbInfo.LogPrefixORGID)
 			}
-			log.Infof("update data_source (%s), retention time change: %ds -> %ds",
-				target.DisplayName, oldRetentionTimes[target.Lcuuid], target.RetentionTime, dbInfo.LogPrefixORGID)
+			return nil
+		}); err != nil {
+			return model.DataSource{}, err
 		}
 	}
 	var errStrs []string

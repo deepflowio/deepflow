@@ -481,3 +481,94 @@ func TestUpdateDataSourceMarksWholeAIAgentRetentionGroupExceptionOnFailure(t *te
 		t.Fatalf("non-linked collection state = %d, want %d", updated[4].State, common.DATA_SOURCE_STATE_NORMAL)
 	}
 }
+
+func TestUpdateDataSourceRollsBackLinkedRetentionGroupOnMetadbFailure(t *testing.T) {
+	gormDB, err := gorm.Open(
+		sqlite.Open("file::memory:?cache=shared"),
+		&gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}},
+	)
+	if err != nil {
+		t.Fatalf("open sqlite failed: %v", err)
+	}
+	sqlDB, _ := gormDB.DB()
+	defer sqlDB.Close()
+
+	if err := gormDB.AutoMigrate(&metadbmodel.DataSource{}, &metadbmodel.Analyzer{}); err != nil {
+		t.Fatalf("auto migrate failed: %v", err)
+	}
+
+	retention := 7 * 24
+	dataSources := []metadbmodel.DataSource{
+		{ID: 27, DisplayName: "事件-文件读写聚合事件", DataTableCollection: "event.file_agg_event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "a", UpdatedAt: time.Now()},
+		{ID: 28, DisplayName: "事件-文件管理事件", DataTableCollection: "event.file_mgmt_event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "b", UpdatedAt: time.Now()},
+		{ID: 29, DisplayName: "事件-进程权限事件", DataTableCollection: "event.proc_perm_event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "c", UpdatedAt: time.Now()},
+		{ID: 30, DisplayName: "事件-进程操作事件", DataTableCollection: "event.proc_ops_event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "d", UpdatedAt: time.Now()},
+	}
+	if err := gormDB.Create(&dataSources).Error; err != nil {
+		t.Fatalf("insert data sources failed: %v", err)
+	}
+	analyzers := []metadbmodel.Analyzer{
+		{ID: 1, Name: "analyzer-1", IP: "10.0.0.1", Lcuuid: "analyzer-1"},
+	}
+	if err := gormDB.Create(&analyzers).Error; err != nil {
+		t.Fatalf("insert analyzers failed: %v", err)
+	}
+
+	if _, err := sqlDB.Exec(`
+CREATE TRIGGER fail_proc_perm_retention_update
+BEFORE UPDATE ON data_source
+WHEN NEW.data_table_collection = 'event.proc_perm_event'
+BEGIN
+    SELECT RAISE(FAIL, 'forced metadb update failure');
+END;
+`); err != nil {
+		t.Fatalf("create trigger failed: %v", err)
+	}
+
+	db := &metadb.DB{
+		DB:             gormDB,
+		ORGID:          1,
+		Name:           "test",
+		LogPrefixORGID: logger.NewORGPrefix(1),
+		LogPrefixName:  metadb.NewDBNameLogPrefix("test"),
+	}
+
+	patches := gomonkey.NewPatches()
+	defer patches.Reset()
+
+	patches.ApplyFunc(metadb.GetDB, func(orgID int) (*metadb.DB, error) {
+		return db, nil
+	})
+
+	patches.ApplyMethod(reflect.TypeOf(&DataSource{}), "CallIngesterAPIModRP",
+		func(_ *DataSource, orgID int, ip string, dataSource metadbmodel.DataSource) error {
+			return nil
+		})
+
+	newRetention := 30 * 24
+	svc := &DataSource{
+		cfg: &config.ControllerConfig{
+			Spec: config.Specification{
+				DataSourceRetentionTimeMax: 24000,
+			},
+		},
+		resourceAccess: &ResourceAccess{
+			UserInfo: &httpcommon.UserInfo{Type: common.USER_TYPE_SUPER_ADMIN, ORGID: 1},
+		},
+	}
+
+	if _, err := svc.UpdateDataSource(1, "a", model.DataSourceUpdate{RetentionTime: &newRetention}); err == nil {
+		t.Fatal("UpdateDataSource() error = nil, want metadb failure")
+	}
+
+	var updated []metadbmodel.DataSource
+	if err := gormDB.Order("id asc").Find(&updated).Error; err != nil {
+		t.Fatalf("query updated data sources failed: %v", err)
+	}
+
+	for _, item := range updated {
+		if item.RetentionTime != retention {
+			t.Fatalf("collection %s retention = %d, want rolled back %d", item.DataTableCollection, item.RetentionTime, retention)
+		}
+	}
+}

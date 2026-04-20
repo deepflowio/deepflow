@@ -222,6 +222,59 @@ func TestResolveGProcessIDAiAgentRootPidFallback(t *testing.T) {
 	}
 }
 
+func TestResolveGProcessIDExitEventClearsCacheWhenParentPidMissing(t *testing.T) {
+	orgId := uint16(1)
+	vtapId := uint16(2)
+	pid := uint32(9100)
+	cache := NewAiAgentRootPidCache()
+	cache.Set(orgId, vtapId, pid, pid)
+
+	event := &pb.ProcEvent{
+		Pid:       pid,
+		EventType: pb.EventType_ProcLifecycleEvent,
+		ProcLifecycleEventData: &pb.ProcLifecycleEventData{
+			LifecycleType: pb.ProcLifecycleType_ProcLifecycleExit,
+			Pid:           pid,
+			ParentPid:     0,
+		},
+	}
+
+	got := resolveGProcessID(func(uint32) uint32 { return 0 }, cache, orgId, vtapId, event)
+	if got != 0 {
+		t.Fatalf("expected gprocess_id 0 for exit event, got %d", got)
+	}
+	if _, ok := cache.Get(orgId, vtapId, pid); ok {
+		t.Fatalf("expected pid %d to be removed from cache on exit", pid)
+	}
+}
+
+func TestResolveGProcessIDExitEventClearsCacheWhenParentLookupMisses(t *testing.T) {
+	orgId := uint16(1)
+	vtapId := uint16(2)
+	pid := uint32(9200)
+	parentPid := uint32(9300)
+	cache := NewAiAgentRootPidCache()
+	cache.Set(orgId, vtapId, pid, pid)
+
+	event := &pb.ProcEvent{
+		Pid:       pid,
+		EventType: pb.EventType_ProcLifecycleEvent,
+		ProcLifecycleEventData: &pb.ProcLifecycleEventData{
+			LifecycleType: pb.ProcLifecycleType_ProcLifecycleExit,
+			Pid:           pid,
+			ParentPid:     parentPid,
+		},
+	}
+
+	got := resolveGProcessID(func(uint32) uint32 { return 0 }, cache, orgId, vtapId, event)
+	if got != 0 {
+		t.Fatalf("expected gprocess_id 0 for exit event, got %d", got)
+	}
+	if _, ok := cache.Get(orgId, vtapId, pid); ok {
+		t.Fatalf("expected pid %d to be removed from cache when parent lookup misses", pid)
+	}
+}
+
 func TestExtractProcOpsCommandData(t *testing.T) {
 	event := &pb.ProcEvent{
 		EventType: pb.EventType_ProcLifecycleEvent,

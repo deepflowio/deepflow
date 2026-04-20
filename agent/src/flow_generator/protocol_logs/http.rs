@@ -1274,7 +1274,7 @@ impl HttpLog {
             false
         };
 
-        if !ai_agent_matched && !config.http_endpoint_disabled {
+        if !ai_agent_matched && !endpoint_already_set && !config.http_endpoint_disabled {
             info.endpoint = Some(handle_endpoint(config, &path_owned));
         }
     }
@@ -2615,6 +2615,7 @@ mod tests {
             parse_perf: false,
             parse_log: true,
             parse_config: Some(config),
+            obfuscate_cache: None,
             l7_perf_cache: None,
             wasm_vm: Default::default(),
             #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -2626,6 +2627,7 @@ mod tests {
             oracle_parse_conf: OracleConfig::default(),
             iso8583_parse_conf: Iso8583ParseConfig::default(),
             web_sphere_mq_parse_conf: WebSphereMqParseConfig::default(),
+            net_sign_parse_conf: NetSignParseConfig::default(),
             icmp_data: None,
             process_id,
             socket_role,
@@ -3385,6 +3387,36 @@ mod tests {
         assert_eq!(info.endpoint.as_deref(), Some("/v1/chat/completions"));
         assert_eq!(info.biz_type, BIZ_TYPE_AI_AGENT);
         assert_eq!(info.protocol_str.as_deref(), Some("LLM"));
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "libtrace"))]
+    #[test]
+    fn test_pre_set_endpoint_is_not_rewritten_by_http_endpoint() {
+        let mut parser = HttpLog::new_v1();
+        let mut config = LogParserConfig::default();
+        config.http_endpoint_trie = HttpEndpointTrie::from(&HttpEndpoint {
+            extraction_disabled: false,
+            match_rules: vec![HttpEndpointMatchRule {
+                url_prefix: "/api/v1".to_string(),
+                keep_segments: 2,
+            }],
+        });
+
+        let param = make_ai_agent_parse_param(&config, 42, 1);
+        let mut info = HttpInfo::default();
+        info.path = "/v1/chat/completions?model=gpt-4o".to_string();
+        info.endpoint = Some("/biz/override".to_string());
+
+        parser.set_endpoint_by_config(
+            &param,
+            &config,
+            &mut info,
+            |_endpoints, _path, _pid, _socket_role, _now| None,
+        );
+
+        assert_eq!(info.endpoint.as_deref(), Some("/biz/override"));
+        assert_eq!(info.biz_type, 0);
+        assert_eq!(info.protocol_str, None);
     }
 
     #[test]

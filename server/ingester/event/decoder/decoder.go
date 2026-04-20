@@ -656,10 +656,12 @@ func resolveGProcessID(queryProcessInfo func(pid uint32) uint32, rootPidCache *A
 	}
 	parentPid := e.ProcLifecycleEventData.ParentPid
 	if parentPid == 0 || parentPid == e.Pid {
+		cleanupOnExit()
 		return 0
 	}
 	gprocessID := queryProcessInfo(parentPid)
 	if gprocessID == 0 {
+		cleanupOnExit()
 		return 0
 	}
 	cleanupOnExit()
