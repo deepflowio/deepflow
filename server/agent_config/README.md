@@ -5143,6 +5143,49 @@ The number of worker threads refers to how many threads participate
 in data processing in user-space. The actual maximal value is the number
 of CPU logical cores on the host.
 
+#### Kick Thread Nice Value {#inputs.ebpf.tunning.kick_kern_nice}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.tunning.kick_kern_nice`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    tunning:
+      kick_kern_nice: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [-20, 19] |
+
+**Description**:
+
+Controls the Linux nice value of per-CPU kick threads.
+
+These threads wake up after the periodic timer expires and issue a
+lightweight syscall to trigger kernel-side timeout checks that flush
+batched eBPF data.
+
+Pay attention to this option when `metrics.period_push_max_delay`
+under `deepflow_tenant -> deepflow_agent_ebpf_collector` in Metrics
+Center reaches 199 ms. This means the periodic push delay has hit
+the exceeded marker, and the value can be decreased appropriately to
+give the kick threads more scheduling preference.
+
+Smaller nice values mean higher scheduling preference. Larger nice
+values mean lower scheduling preference. Valid values range from
+-20 to 19. A negative value may require CAP_SYS_NICE or a sufficient
+RLIMIT_NICE. This can still affect other workloads.
+
 #### Perf Pages Count {#inputs.ebpf.tunning.perf_pages_count}
 
 **Tags**:
