@@ -26,8 +26,9 @@ import (
 )
 
 type labelName struct {
-	org    *common.ORG
-	active atomic.Value // map[string]int
+	org     *common.ORG
+	active  atomic.Value // map[string]int (nameToID)
+	activeR atomic.Value // map[int]string (idToName), rebuilt on every refresh
 
 	mu              sync.RWMutex
 	pendingNameToID map[string]int
@@ -51,6 +52,16 @@ func (ln *labelName) getActive() map[string]int {
 
 func (ln *labelName) replaceActive(newActive map[string]int) {
 	ln.active.Store(newActive)
+}
+
+// GetNameByID returns the label name string for a given ID.
+// Only reflects the last committed refresh snapshot (pending entries are excluded).
+func (ln *labelName) GetNameByID(id int) (string, bool) {
+	if r := ln.activeR.Load(); r != nil {
+		name, ok := r.(map[int]string)[id]
+		return name, ok
+	}
+	return "", false
 }
 
 func (ln *labelName) GetIDByName(n string) (int, bool) {
@@ -96,8 +107,10 @@ func (ln *labelName) refresh(args ...interface{}) error {
 
 func (ln *labelName) processLoadedData(items []*metadbmodel.PrometheusLabelName) {
 	newActive := make(map[string]int, len(items))
+	newActiveR := make(map[int]string, len(items))
 	for _, item := range items {
 		newActive[item.Name] = item.ID
+		newActiveR[item.ID] = item.Name
 	}
 
 	ln.mu.Lock()
@@ -108,6 +121,7 @@ func (ln *labelName) processLoadedData(items []*metadbmodel.PrometheusLabelName)
 	for k, v := range pending {
 		newActive[k] = v
 	}
+	ln.activeR.Store(newActiveR)
 	ln.replaceActive(newActive)
 }
 

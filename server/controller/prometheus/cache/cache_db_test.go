@@ -159,8 +159,8 @@ func generateDBLabels(n int) []metadbmodel.PrometheusLabel {
 	for i := 0; i < n; i++ {
 		items[i] = metadbmodel.PrometheusLabel{
 			PrometheusOperatedTime: metadbmodel.PrometheusOperatedTime{CreatedAt: now, SyncedAt: now},
-			Name:                   fmt.Sprintf("n_%d", i),
-			Value:                  fmt.Sprintf("v_%d", i),
+			NameID:                 i + 1,
+			ValueID:                i + 1,
 		}
 	}
 	return items
@@ -264,8 +264,8 @@ func TestSelect_Label_LoadOnlyIDNameValue(t *testing.T) {
 	snapshot := l.GetKeyToID()
 	assert.Equal(t, 5000, countLabelConcurrentMap(snapshot))
 	for i := 0; i < 5000; i++ {
-		_, ok := l.GetIDByKey(NewLabelKey(fmt.Sprintf("n_%d", i), fmt.Sprintf("v_%d", i)))
-		assert.True(t, ok, "label n_%d/v_%d should exist", i, i)
+		_, ok := l.GetIDByKey(NewLabelKey(i+1, i+1))
+		assert.True(t, ok, "label name_id=%d/value_id=%d should exist", i+1, i+1)
 	}
 }
 
@@ -315,7 +315,7 @@ func TestSelect_Label_RefreshDiscardsDeletedRows(t *testing.T) {
 	assert.Equal(t, 100, countLabelConcurrentMap(l.GetKeyToID()))
 
 	// 被删除的条目不可访问
-	_, ok := l.GetIDByKey(NewLabelKey("n_150", "v_150"))
+	_, ok := l.GetIDByKey(NewLabelKey(151, 151))
 	assert.False(t, ok, "deleted label should not exist after refresh")
 }
 
@@ -453,10 +453,10 @@ func TestSelect_Label_500K_Refresh(t *testing.T) {
 	assert.Equal(t, N, countLabelConcurrentMap(snapshot))
 	t.Logf("refresh %d labels: duration=%v", N, refreshDuration)
 
-	// 抽检
+	// 正确性抜检
 	for _, idx := range []int{0, 100, 9999, 250000, 499999} {
-		_, ok := l.GetIDByKey(NewLabelKey(fmt.Sprintf("n_%d", idx), fmt.Sprintf("v_%d", idx)))
-		assert.True(t, ok, "label n_%d/v_%d should exist", idx, idx)
+		_, ok := l.GetIDByKey(NewLabelKey(idx+1, idx+1))
+		assert.True(t, ok, "label name_id=%d/value_id=%d should exist", idx+1, idx+1)
 	}
 }
 

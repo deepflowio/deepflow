@@ -17,7 +17,7 @@
 package tagrecorder
 
 import (
-	"slices"
+	// "slices"
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
@@ -48,31 +48,31 @@ func (l *ChAPPLabel) generateNewData(db *metadb.DB) (map[PrometheusAPPLabelKey]m
 		return nil, false
 	}
 
-	appLabelSlice, ok := l.generateAPPLabelData(db)
+	_, ok := l.generateAPPLabelData(db)
 
-	labelNameIDMap, valueNameIDMap, ok := l.generateNameIDData(db)
+	_, _, ok = l.generateNameIDData(db)
 	if !ok {
 		return nil, false
 	}
 
 	keyToItem := make(map[PrometheusAPPLabelKey]metadbmodel.ChAPPLabel)
-	for _, prometheusLabel := range prometheusLabels {
-		labelName := prometheusLabel.Name
-		if slices.Contains(appLabelSlice, labelName) {
-			labelNameID, nameOK := labelNameIDMap[labelName]
-			labelValue := prometheusLabel.Value
-			labelValueID, valueOK := valueNameIDMap[labelValue]
-			if !nameOK || !valueOK {
-				log.Warningf("label name or value not found in db, labelName: %s, labelValue: %s", labelName, labelValue)
-				continue
-			}
-			keyToItem[PrometheusAPPLabelKey{LabelNameID: labelNameID, LabelValueID: labelValueID}] = metadbmodel.ChAPPLabel{
-				LabelNameID:  labelNameID,
-				LabelValue:   labelValue,
-				LabelValueID: labelValueID,
-			}
-		}
-
+	for _, _ = range prometheusLabels {
+		// @jinzhou TODO
+		// labelName := prometheusLabel.Name
+		// if slices.Contains(appLabelSlice, labelName) {
+		// 	labelNameID, nameOK := labelNameIDMap[labelName]
+		// 	labelValue := prometheusLabel.Value
+		// 	labelValueID, valueOK := valueNameIDMap[labelValue]
+		// 	if !nameOK || !valueOK {
+		// 		log.Warningf("label name or value not found in db, labelName: %s, labelValue: %s", labelName, labelValue)
+		// 		continue
+		// 	}
+		// 	keyToItem[PrometheusAPPLabelKey{LabelNameID: labelNameID, LabelValueID: labelValueID}] = metadbmodel.ChAPPLabel{
+		// 		LabelNameID:  labelNameID,
+		// 		LabelValue:   labelValue,
+		// 		LabelValueID: labelValueID,
+		// 	}
+		// }
 	}
 	return keyToItem, true
 }

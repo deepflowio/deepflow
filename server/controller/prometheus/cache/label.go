@@ -17,28 +17,35 @@
 package cache
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 
-	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
+// LabelKey identifies a prometheus_label by its foreign-key IDs, avoiding
+// repeated string storage for the hot in-memory map.
 type LabelKey struct {
-	Name  string
-	Value string
+	NameID  int
+	ValueID int
 }
 
 func (k LabelKey) String() string {
-	return k.Name + "-" + k.Value
+	return fmt.Sprintf("%d-%d", k.NameID, k.ValueID)
 }
 
-func NewLabelKey(name, value string) LabelKey {
-	return LabelKey{
-		Name:  name,
-		Value: value,
-	}
+func NewLabelKey(nameID, valueID int) LabelKey {
+	return LabelKey{NameID: nameID, ValueID: valueID}
+}
+
+// LabelCacheEntry is used by callers to batch-add newly encoded labels to
+// the cache after the name_id and value_id are known.
+type LabelCacheEntry struct {
+	NameID  int
+	ValueID int
+	LabelID int
 }
 
 type label struct {
@@ -104,12 +111,13 @@ func (l *label) GetIDByKey(key LabelKey) (int, bool) {
 	return 0, false
 }
 
-func (l *label) Add(batch []*controller.PrometheusLabel) {
+// Add inserts newly encoded labels into the pending map. Callers must resolve
+// name_id and value_id before calling (see LabelCacheEntry).
+func (l *label) Add(entries []LabelCacheEntry) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	for _, item := range batch {
-		k := NewLabelKey(item.GetName(), item.GetValue())
-		l.pending[k] = int(item.GetId())
+	for _, e := range entries {
+		l.pending[NewLabelKey(e.NameID, e.ValueID)] = e.LabelID
 	}
 }
 
@@ -125,8 +133,7 @@ func (l *label) refresh(args ...interface{}) error {
 func (l *label) processLoadedData(data []*metadbmodel.PrometheusLabel) {
 	newActive := make(map[LabelKey]int, len(data))
 	for _, item := range data {
-		k := NewLabelKey(item.Name, item.Value)
-		newActive[k] = item.ID
+		newActive[NewLabelKey(item.NameID, item.ValueID)] = item.ID
 	}
 
 	l.mu.Lock()
@@ -142,6 +149,6 @@ func (l *label) processLoadedData(data []*metadbmodel.PrometheusLabel) {
 
 func (l *label) load() ([]*metadbmodel.PrometheusLabel, error) {
 	var labels []*metadbmodel.PrometheusLabel
-	err := l.org.DB.Select("id", "name", "value").Find(&labels).Error
+	err := l.org.DB.Select("id", "name_id", "value_id").Find(&labels).Error
 	return labels, err
 }

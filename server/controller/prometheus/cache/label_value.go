@@ -28,13 +28,24 @@ import (
 type labelValue struct {
 	org *common.ORG
 
-	active  atomic.Value
+	active  atomic.Value // map[string]int (valueToID)
+	activeR atomic.Value // map[int]string (idToValue), rebuilt on every refresh
 	pending map[string]int
 	mu      sync.RWMutex
 }
 
 func (lv *labelValue) replaceActive(newActive map[string]int) {
 	lv.active.Store(newActive)
+}
+
+// GetValueByID returns the label value string for a given ID.
+// Only reflects the last committed refresh snapshot (pending entries are excluded).
+func (lv *labelValue) GetValueByID(id int) (string, bool) {
+	if r := lv.activeR.Load(); r != nil {
+		value, ok := r.(map[int]string)[id]
+		return value, ok
+	}
+	return "", false
 }
 
 func newLabelValue(org *common.ORG) *labelValue {
@@ -103,7 +114,12 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 		return err
 	}
 
-	newActive := lv.processLoadedData(data)
+	newActive := make(map[string]int, len(data))
+	newActiveR := make(map[int]string, len(data))
+	for _, item := range data {
+		newActive[item.Value] = item.ID
+		newActiveR[item.ID] = item.Value
+	}
 
 	lv.mu.Lock()
 	pending := lv.pending
@@ -113,16 +129,9 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 	}
 	lv.mu.Unlock()
 
+	lv.activeR.Store(newActiveR)
 	lv.replaceActive(newActive)
 	return nil
-}
-
-func (lv *labelValue) processLoadedData(data []*metadbmodel.PrometheusLabelValue) map[string]int {
-	newActive := make(map[string]int, len(data))
-	for _, item := range data {
-		newActive[item.Value] = item.ID
-	}
-	return newActive
 }
 
 func (lv *labelValue) load() ([]*metadbmodel.PrometheusLabelValue, error) {

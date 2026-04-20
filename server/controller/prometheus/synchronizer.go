@@ -37,17 +37,20 @@ const (
 	maxLogSize  = 64 * 1024 // 64KB
 )
 
-func logNotFoundDetail(items []string) string {
-	logItems := items
-	if len(items) > maxLogCount {
-		logItems = items[:maxLogCount]
+func logNotFoundDetail(items interface{}) string {
+	logItems := items.([]interface{})
+	if len(logItems) > maxLogCount {
+		logItems = logItems[:maxLogCount]
 	}
-
-	logItemsStr := strings.Join(logItems, ",")
-	if len(logItemsStr) > maxLogSize {
-		logItemsStr = logItemsStr[:maxLogSize] + "... (truncated)"
+	logItemsStr := make([]string, 0, len(logItems))
+	for _, item := range logItems {
+		logItemsStr = append(logItemsStr, fmt.Sprintf("%v", item))
 	}
-	return fmt.Sprintf("count: %d, <= %d items: %s", len(items), maxLogCount, logItemsStr)
+	itemsStr := strings.Join(logItemsStr, ",")
+	if len(itemsStr) > maxLogSize {
+		itemsStr = itemsStr[:maxLogSize] + "... (truncated)"
+	}
+	return fmt.Sprintf("count: %d, <= %d items: %s", len(logItems), maxLogCount, itemsStr)
 }
 
 type counter struct {
@@ -103,39 +106,40 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 		s.counter.SendMetricCount++
 	}
 	if nonLabelNames.Cardinality() > 0 {
-		log.Warningf("ids of label names not found, %s", logNotFoundDetail(nonLabelNames.ToSlice()), s.org.LogPrefix)
+		log.Warningf("ids of label names not found, %s", logNotFoundDetail(nonLabelNames.ToSlice()))
 	}
 	return mLabels, nil
 }
 
 func (s *Synchronizer) assembleLabelFully() ([]*trident.LabelResponse, error) {
 	ls := make([]*trident.LabelResponse, 0)
-	nonLabelNames := mapset.NewSet[string]()
-	nonLabelValues := mapset.NewSet[string]()
+	nonNameIDs := mapset.NewSet[int]()
+	nonValueIDs := mapset.NewSet[int]()
 	for k := range s.cache.Label.GetKeyToID() {
-		ni, ok := s.cache.LabelName.GetIDByName(k.Name)
-		if !ok {
-			nonLabelNames.Add(k.Name)
+		name, okN := s.cache.LabelName.GetNameByID(k.NameID)
+		if !okN {
+			nonNameIDs.Add(k.NameID)
 			continue
 		}
-		vi, ok := s.cache.LabelValue.GetIDByValue(k.Value)
-		if !ok {
-			nonLabelValues.Add(k.Value)
+		value, okV := s.cache.LabelValue.GetValueByID(k.ValueID)
+		if !okV {
+			nonValueIDs.Add(k.ValueID)
 			continue
 		}
+		n, v := name, value
 		ls = append(ls, &trident.LabelResponse{
-			Name:    &k.Name,
-			Value:   &k.Value,
-			NameId:  proto.Uint32(uint32(ni)),
-			ValueId: proto.Uint32(uint32(vi)),
+			Name:    &n,
+			Value:   &v,
+			NameId:  proto.Uint32(uint32(k.NameID)),
+			ValueId: proto.Uint32(uint32(k.ValueID)),
 		})
 		s.counter.SendLabelCount++
 	}
-	if nonLabelNames.Cardinality() > 0 {
-		log.Warningf("ids of label names not found, %s", logNotFoundDetail(nonLabelNames.ToSlice()), s.org.LogPrefix)
+	if nonNameIDs.Cardinality() > 0 {
+		log.Warningf("strings for label name ids not found, %s", logNotFoundDetail(nonNameIDs.ToSlice()))
 	}
-	if nonLabelValues.Cardinality() > 0 {
-		log.Warningf("ids of label values not found, %s", logNotFoundDetail(nonLabelValues.ToSlice()), s.org.LogPrefix)
+	if nonValueIDs.Cardinality() > 0 {
+		log.Warningf("strings for label value ids not found, %s", logNotFoundDetail(nonValueIDs.ToSlice()))
 	}
 	return ls, nil
 }

@@ -51,7 +51,7 @@ func newEncoder(cfg prometheuscfg.Config, orgID int) (*Encoder, error) {
 	e.metricName = newMetricName(org, cfg.ResourceMaxID1)
 	e.labelName = newLabelName(org, cfg.ResourceMaxID0)
 	e.labelValue = newLabelValue(org)
-	e.label = newLabel(org)
+	e.label = newLabel(org, e.labelName, e.labelValue)
 	e.LabelLayout = newLabelLayout(org, cfg)
 	return e, nil
 }
