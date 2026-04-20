@@ -314,6 +314,8 @@ func (d *Decoder) initEventStoreCommon(s *dbwriter.EventStore, vtapId uint16, e 
 
 	s.GProcessID = resolveGProcessID(
 		func(pid uint32) uint32 {
+			// Event-side gprocess_id follows the same platform-cache timing as L7 logs,
+			// so early AI events may transiently remain 0 before the cache catches up.
 			return d.platformData.QueryProcessInfo(s.OrgId, vtapId, pid)
 		},
 		d.aiAgentRootPidCache,

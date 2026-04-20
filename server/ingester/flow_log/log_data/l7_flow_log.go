@@ -583,7 +583,9 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 
 	b.KnowledgeGraph.FillL7(l, platformData, layers.IPProtocol(b.Protocol))
 
-	// if ProcessId exists and GpId does not exist, get GpId through ProcessId
+	// Resolve gprocess_id from the ingester platform cache instead of querying MySQL directly.
+	// Newly identified AI processes can still see gprocess_id=0 on early rows until process sync,
+	// GPID generation, and the next platform cache refresh have all completed.
 	if l.ProcessId_0 != 0 && l.Gpid_0 == 0 {
 		b.GPID0 = platformData.QueryProcessInfo(b.OrgId, uint16(l.VtapId), l.ProcessId_0)
 		b.TagSource0 |= uint8(flow_metrics.ProcessId)
