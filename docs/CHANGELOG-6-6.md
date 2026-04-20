@@ -42,6 +42,8 @@
 * fix: trim-tunnel-type has not taken effect [#8578](https://github.com/deepflowio/deepflow/pull/8578) by [yuanchaoa](https://github.com/yuanchaoa)
 
 #### Performance
+* perf: set default write queue count to 2 for Flow Log data [#11638](https://github.com/deepflowio/deepflow/pull/11638) by [lzf575](https://github.com/lzf575)
+* perf: make kick thread nice value configurable [#11635](https://github.com/deepflowio/deepflow/pull/11635) by [yinjiping](https://github.com/yinjiping)
 * perf: add primary key for in_process table [#8624](https://github.com/deepflowio/deepflow/pull/8624) by [lzf575](https://github.com/lzf575)
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
