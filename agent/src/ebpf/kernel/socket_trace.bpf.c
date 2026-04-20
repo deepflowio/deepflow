@@ -1552,9 +1552,9 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	if (is_socket_info_valid(socket_info_ptr)) {
 		if (!socket_info_ptr->allow_reassembly &&
 		    is_proto_reasm_enabled(conn_info->protocol)) {
-			socket_info_ptr->allow_reassembly = true;
-			socket_info_ptr->finish_reasm = false;
 			socket_info_ptr->reasm_bytes = 0;
+			socket_info_ptr->finish_reasm = false;
+			socket_info_ptr->allow_reassembly = true;
 		}
 		sk_info->uid = socket_info_ptr->uid;
 		sk_info->allow_reassembly = socket_info_ptr->allow_reassembly;

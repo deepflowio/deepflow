@@ -2346,7 +2346,7 @@ static inline int __set_ai_agent_data_limit_max(unsigned int limit_size)
 		ai_agent_data_limit_max = limit_size;
 	}
 
-	ebpf_info("Received ai_agent limit_size (%d), the final value is set to '%u'\n",
+	ebpf_info("Received ai_agent limit_size (%u), the final value is set to '%u'\n",
 		  limit_size, ai_agent_data_limit_max);
 
 	return ai_agent_data_limit_max;
@@ -2402,7 +2402,13 @@ int set_data_limit_max(int limit_size)
 
 int set_ai_agent_data_limit_max(int limit_size)
 {
-	int set_val = __set_ai_agent_data_limit_max(limit_size);
+	if (limit_size < 0) {
+		ebpf_warning("set_ai_agent_data_limit_max: invalid negative value %d\n",
+			     limit_size);
+		return -1;
+	}
+
+	int set_val = __set_ai_agent_data_limit_max((unsigned int) limit_size);
 	if (set_val < 0)
 		return set_val;
 
