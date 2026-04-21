@@ -299,7 +299,10 @@ func TestUpdateDataSourceLinksAIAgentRetentionGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite failed: %v", err)
 	}
-	sqlDB, _ := gormDB.DB()
+	sqlDB, err := gormDB.DB()
+	if err != nil {
+		t.Fatalf("get sql.DB failed: %v", err)
+	}
 	defer sqlDB.Close()
 
 	if err := gormDB.AutoMigrate(&metadbmodel.DataSource{}, &metadbmodel.Analyzer{}); err != nil {
@@ -399,7 +402,10 @@ func TestUpdateDataSourceMarksWholeAIAgentRetentionGroupExceptionOnFailure(t *te
 	if err != nil {
 		t.Fatalf("open sqlite failed: %v", err)
 	}
-	sqlDB, _ := gormDB.DB()
+	sqlDB, err := gormDB.DB()
+	if err != nil {
+		t.Fatalf("get sql.DB failed: %v", err)
+	}
 	defer sqlDB.Close()
 
 	if err := gormDB.AutoMigrate(&metadbmodel.DataSource{}, &metadbmodel.Analyzer{}); err != nil {
@@ -490,7 +496,10 @@ func TestUpdateDataSourceRollsBackLinkedRetentionGroupOnMetadbFailure(t *testing
 	if err != nil {
 		t.Fatalf("open sqlite failed: %v", err)
 	}
-	sqlDB, _ := gormDB.DB()
+	sqlDB, err := gormDB.DB()
+	if err != nil {
+		t.Fatalf("get sql.DB failed: %v", err)
+	}
 	defer sqlDB.Close()
 
 	if err := gormDB.AutoMigrate(&metadbmodel.DataSource{}, &metadbmodel.Analyzer{}); err != nil {

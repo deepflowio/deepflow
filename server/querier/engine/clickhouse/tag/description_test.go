@@ -31,11 +31,19 @@ func loadTagDescriptionsForTest(t *testing.T) {
 	if !ok {
 		t.Fatalf("clickhouse not in dbDescription")
 	}
-	tagData, ok := dbData.(map[string]interface{})["tag"]
+	dbDataMap, ok := dbData.(map[string]interface{})
+	if !ok {
+		t.Fatalf("unexpected clickhouse dbData type: %T", dbData)
+	}
+	tagData, ok := dbDataMap["tag"]
 	if !ok {
 		t.Fatalf("clickhouse not has tag descriptions")
 	}
-	if err := LoadTagDescriptions(tagData.(map[string]interface{})); err != nil {
+	tagDataMap, ok := tagData.(map[string]interface{})
+	if !ok {
+		t.Fatalf("unexpected tagData type: %T", tagData)
+	}
+	if err := LoadTagDescriptions(tagDataMap); err != nil {
 		t.Fatalf("LoadTagDescriptions failed: %v", err)
 	}
 }

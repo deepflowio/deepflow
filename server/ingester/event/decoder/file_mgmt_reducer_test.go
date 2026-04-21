@@ -34,7 +34,10 @@ func TestFileMgmtReducerSuppressesDuplicateCreateUntilDelete(t *testing.T) {
 	}
 
 	if out := reducer.Add(second); out != nil {
+		out.Release()
 		t.Fatalf("duplicate create should be suppressed")
+	} else {
+		second.Release()
 	}
 
 	if out := reducer.Add(deleteEvent); out == nil {
