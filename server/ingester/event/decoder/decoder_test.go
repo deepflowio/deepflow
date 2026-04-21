@@ -2,6 +2,7 @@ package decoder
 
 import (
 	"testing"
+	"time"
 
 	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/libs/flow-metrics/pb"
@@ -272,6 +273,33 @@ func TestResolveGProcessIDExitEventClearsCacheWhenParentLookupMisses(t *testing.
 	}
 	if _, ok := cache.Get(orgId, vtapId, pid); ok {
 		t.Fatalf("expected pid %d to be removed from cache when parent lookup misses", pid)
+	}
+}
+
+func TestAiAgentRootPidCacheExpiresEntriesOnGet(t *testing.T) {
+	cache := newAiAgentRootPidCacheWithOptions(20*time.Millisecond, 0, time.Now)
+	defer cache.Close()
+
+	cache.Set(1, 2, 100, 200)
+	time.Sleep(30 * time.Millisecond)
+
+	if rootPid, ok := cache.Get(1, 2, 100); ok || rootPid != 0 {
+		t.Fatalf("expected expired cache entry to miss, got rootPid=%d ok=%v", rootPid, ok)
+	}
+}
+
+func TestAiAgentRootPidCachePrunesExpiredEntriesWithoutAccess(t *testing.T) {
+	cache := newAiAgentRootPidCacheWithOptions(20*time.Millisecond, 10*time.Millisecond, time.Now)
+	defer cache.Close()
+
+	cache.Set(1, 2, 100, 200)
+	time.Sleep(60 * time.Millisecond)
+
+	cache.mu.RLock()
+	_, ok := cache.rootPidByKey[aiAgentRootPidKey(1, 2, 100)]
+	cache.mu.RUnlock()
+	if ok {
+		t.Fatalf("expected expired cache entry to be pruned without explicit access")
 	}
 }
 

@@ -173,6 +173,35 @@ func TestFileAggReducerFlushesOnlySameFileOnMgmtBoundary(t *testing.T) {
 	}
 }
 
+func TestFileAggReducerFlushFileFlushesAllMatchingEntries(t *testing.T) {
+	reducer := NewFileAggReducer()
+	writeSame := makeRawFileEvent("codex", "write", "same.txt", 8)
+	readSame := makeRawFileEvent("codex", "read", "same.txt", 16)
+	readSame.EventType = "read"
+	readSame.StartTime = 1020
+	readSame.EndTime = 1030
+	otherFile := makeRawFileEvent("codex", "write", "other.txt", 4)
+	otherFile.StartTime = 1040
+	otherFile.EndTime = 1050
+
+	reducer.Add(writeSame)
+	reducer.Add(readSame)
+	reducer.Add(otherFile)
+
+	flushed := reducer.FlushFile(1, 42, "/tmp/", "same.txt")
+	if len(flushed) != 2 {
+		t.Fatalf("flush len = %d, want 2", len(flushed))
+	}
+
+	remaining := reducer.Flush()
+	if len(remaining) != 1 {
+		t.Fatalf("remaining len = %d, want 1", len(remaining))
+	}
+	if remaining[0].FileName != "other.txt" {
+		t.Fatalf("remaining file = %q, want other.txt", remaining[0].FileName)
+	}
+}
+
 func TestFileAggReducerSplitsSameKeyWhenIdleGapExceeded(t *testing.T) {
 	reducer := NewFileAggReducer()
 	first := makeTimedRawFileEvent("codex", "write", "same.txt", 8, 1000, 1010)

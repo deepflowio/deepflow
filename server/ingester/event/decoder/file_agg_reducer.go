@@ -152,6 +152,7 @@ func (r *FileAggReducer) FlushFile(vtapID uint16, rootPID uint32, fileDir, fileN
 	}
 	target := newFileAggFileKey(vtapID, rootPID, fileDir, fileName)
 	var flushed []*dbwriter.FileAggEventStore
+	var keysToRemove []fileAggKey
 	for _, key := range r.order {
 		item, ok := r.pending[key]
 		if !ok {
@@ -162,6 +163,9 @@ func (r *FileAggReducer) FlushFile(vtapID uint16, rootPID uint32, fileDir, fileN
 		}
 		flushed = append(flushed, item)
 		delete(r.pending, key)
+		keysToRemove = append(keysToRemove, key)
+	}
+	for _, key := range keysToRemove {
 		r.removeOrderKey(key)
 	}
 	return flushed

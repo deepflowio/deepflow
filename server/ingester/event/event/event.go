@@ -51,6 +51,7 @@ type Eventor struct {
 	Config        *config.Config
 	Decoders      []*decoder.Decoder
 	PlatformDatas []*grpc.PlatformInfoTable
+	RootPidCache  *decoder.AiAgentRootPidCache
 }
 
 func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager, exporters *exporters.Exporters) (*Event, error) {
@@ -259,6 +260,7 @@ func NewEventor(eventType common.EventType, config *config.Config, recv *receive
 		Config:        config,
 		Decoders:      decoders,
 		PlatformDatas: platformDatas,
+		RootPidCache:  aiAgentRootPidCache,
 	}, nil
 }
 
@@ -274,6 +276,9 @@ func (e *Eventor) Start() {
 func (e *Eventor) Close() {
 	for _, decoder := range e.Decoders {
 		decoder.Close()
+	}
+	if e.RootPidCache != nil {
+		e.RootPidCache.Close()
 	}
 	for _, platformData := range e.PlatformDatas {
 		platformData.ClosePlatformInfoTable()

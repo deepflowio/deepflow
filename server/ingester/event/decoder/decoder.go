@@ -57,15 +57,47 @@ type Counter struct {
 	ErrorCount int64 `statsd:"err-count"`
 }
 
+const (
+	aiAgentRootPidCacheTTL           = 10 * time.Minute
+	aiAgentRootPidCachePruneInterval = time.Minute
+)
+
+type aiAgentRootPidEntry struct {
+	rootPid    uint32
+	insertedAt time.Time
+}
+
 type AiAgentRootPidCache struct {
 	mu           sync.RWMutex
-	rootPidByKey map[uint64]uint32
+	rootPidByKey map[uint64]aiAgentRootPidEntry
+	ttl          time.Duration
+	now          func() time.Time
+	stopCh       chan struct{}
+	doneCh       chan struct{}
+	closeOnce    sync.Once
 }
 
 func NewAiAgentRootPidCache() *AiAgentRootPidCache {
-	return &AiAgentRootPidCache{
-		rootPidByKey: make(map[uint64]uint32),
+	return newAiAgentRootPidCacheWithOptions(aiAgentRootPidCacheTTL, aiAgentRootPidCachePruneInterval, time.Now)
+}
+
+func newAiAgentRootPidCacheWithOptions(ttl, pruneInterval time.Duration, now func() time.Time) *AiAgentRootPidCache {
+	if now == nil {
+		now = time.Now
 	}
+	cache := &AiAgentRootPidCache{
+		rootPidByKey: make(map[uint64]aiAgentRootPidEntry),
+		ttl:          ttl,
+		now:          now,
+		stopCh:       make(chan struct{}),
+		doneCh:       make(chan struct{}),
+	}
+	if pruneInterval > 0 {
+		go cache.runPrune(pruneInterval)
+	} else {
+		close(cache.doneCh)
+	}
+	return cache
 }
 
 func aiAgentRootPidKey(orgId, vtapId uint16, pid uint32) uint64 {
@@ -78,9 +110,16 @@ func (c *AiAgentRootPidCache) Get(orgId, vtapId uint16, pid uint32) (uint32, boo
 	}
 	key := aiAgentRootPidKey(orgId, vtapId, pid)
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-	rootPid, ok := c.rootPidByKey[key]
-	return rootPid, ok
+	entry, ok := c.rootPidByKey[key]
+	c.mu.RUnlock()
+	if !ok {
+		return 0, false
+	}
+	if c.ttl > 0 && c.now().Sub(entry.insertedAt) > c.ttl {
+		c.Delete(orgId, vtapId, pid)
+		return 0, false
+	}
+	return entry.rootPid, true
 }
 
 func (c *AiAgentRootPidCache) Set(orgId, vtapId uint16, pid, rootPid uint32) {
@@ -89,7 +128,7 @@ func (c *AiAgentRootPidCache) Set(orgId, vtapId uint16, pid, rootPid uint32) {
 	}
 	key := aiAgentRootPidKey(orgId, vtapId, pid)
 	c.mu.Lock()
-	c.rootPidByKey[key] = rootPid
+	c.rootPidByKey[key] = aiAgentRootPidEntry{rootPid: rootPid, insertedAt: c.now()}
 	c.mu.Unlock()
 }
 
@@ -120,6 +159,46 @@ func (c *AiAgentRootPidCache) ResolveRootPid(orgId, vtapId uint16, pid, parentPi
 	}
 	c.Set(orgId, vtapId, pid, pid)
 	return pid
+}
+
+func (c *AiAgentRootPidCache) pruneExpired() {
+	if c == nil || c.ttl <= 0 {
+		return
+	}
+	now := c.now()
+	c.mu.Lock()
+	for key, entry := range c.rootPidByKey {
+		if now.Sub(entry.insertedAt) > c.ttl {
+			delete(c.rootPidByKey, key)
+		}
+	}
+	c.mu.Unlock()
+}
+
+func (c *AiAgentRootPidCache) runPrune(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer func() {
+		ticker.Stop()
+		close(c.doneCh)
+	}()
+	for {
+		select {
+		case <-ticker.C:
+			c.pruneExpired()
+		case <-c.stopCh:
+			return
+		}
+	}
+}
+
+func (c *AiAgentRootPidCache) Close() {
+	if c == nil {
+		return
+	}
+	c.closeOnce.Do(func() {
+		close(c.stopCh)
+		<-c.doneCh
+	})
 }
 
 type Decoder struct {
