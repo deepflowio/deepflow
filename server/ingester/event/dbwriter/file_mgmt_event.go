@@ -13,6 +13,7 @@ var fileMgmtEventPool = pool.NewLockFreePool(func() *FileMgmtEventStore {
 			AttributeValues: []string{},
 			StoreEventType:  common.FILE_MGMT_EVENT,
 			IsFileEvent:     true,
+			IsIPv4:          true,
 		},
 	}
 })

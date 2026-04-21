@@ -1289,6 +1289,7 @@ impl fmt::Debug for LogParserConfig {
             .field("custom_app", &self.custom_app)
             .field("ai_agent_endpoints", &self.ai_agent_endpoints)
             .field("ai_agent_max_payload_size", &self.ai_agent_max_payload_size)
+            .field("ai_agent_file_io_enabled", &self.ai_agent_file_io_enabled)
             .finish()
     }
 }
@@ -6156,6 +6157,18 @@ mod tests {
         assert!(!trie.is_unconcerned("xx.yyy.zzz"));
         assert!(!trie.is_unconcerned("xxx.yyy.zzz.aaa"));
         assert!(!trie.is_unconcerned("yyy.zzz"));
+    }
+
+    #[test]
+    fn test_log_parser_debug_includes_ai_agent_file_io_enabled() {
+        let mut config = LogParserConfig::default();
+        config.ai_agent_file_io_enabled = false;
+
+        let debug = format!("{config:?}");
+        assert!(
+            debug.contains("ai_agent_file_io_enabled: false"),
+            "debug output missing ai_agent_file_io_enabled: {debug}"
+        );
     }
 
     #[cfg(any(target_os = "linux", target_os = "android"))]

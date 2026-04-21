@@ -397,7 +397,7 @@ static __inline int trace_io_event_common(void *ctx,
 	buffer->operation = direction;
 #ifdef EXTENDED_AI_AGENT_FILE_IO
 	buffer->access_permission =
-	    ai_agent_get_access_permission(pid_tgid, data_args->fd, offset);
+	    ai_agent_get_access_permission(data_args->fd, offset);
 #else
 	buffer->access_permission = 0;
 #endif

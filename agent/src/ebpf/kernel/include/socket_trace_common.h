@@ -250,7 +250,7 @@ struct tracer_ctx_s {
 	__u64 coroutine_trace_id; /**< Data forwarding association within the same coroutine */
 	__u64 thread_trace_id;	  /**< Data forwarding association within the same process/thread, used for multi-transaction scenarios */
 	__u32 data_limit_max;	  /**< Maximum number of data transfers */
-	__u32 ai_agent_data_limit_max; /**< AI Agent max reassembly limit (0 = unlimited) */
+	__u32 ai_agent_data_limit_max; /**< AI Agent max reassembly limit (0 = use AI_AGENT_DATA_LIMIT_MAX_UNLIMITED) */
 	__u32 go_tracing_timeout; /**< Go tracing timeout */
 	__u32 io_event_collect_mode; /**< IO event collection mode */
 	__u64 io_event_minimal_duration; /**< Minimum duration for IO events */
