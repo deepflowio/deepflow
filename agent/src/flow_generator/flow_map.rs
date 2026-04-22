@@ -53,6 +53,7 @@ use super::{
 };
 
 use crate::{
+    collector::types::MiniFlow,
     common::{
         ebpf::EbpfType,
         endpoint::{EndpointData, EndpointDataPov, EndpointInfo, EPC_DEEPFLOW, EPC_INTERNET},
@@ -153,13 +154,16 @@ struct BufferedSender<T: std::fmt::Debug> {
 
     limit: usize,
     buffer: Vec<T>,
+
+    stats_counter: Arc<FlowMapCounter>,
 }
 
 impl<T: std::fmt::Debug> BufferedSender<T> {
-    fn new(queue: DebugSender<T>, limit: usize) -> Self {
+    fn new(queue: DebugSender<T>, limit: usize, stats_counter: Arc<FlowMapCounter>) -> Self {
         Self {
             queue,
             limit,
+            stats_counter,
             buffer: Vec::with_capacity(limit),
         }
     }
@@ -181,6 +185,9 @@ impl<T: std::fmt::Debug> BufferedSender<T> {
                 std::any::type_name::<T>(),
                 e
             );
+            self.stats_counter
+                .drop_by_queue
+                .fetch_add(self.buffer.len() as u64, Ordering::Relaxed);
             self.buffer.clear();
         }
     }
@@ -332,13 +339,24 @@ impl FlowMap {
                 );
                 allocator
             },
-            tflow_output: output_queue.map(|q| BufferedSender::new(q, QUEUE_BATCH_SIZE)),
-            l7_stats_output: BufferedSender::new(l7_stats_output_queue, QUEUE_BATCH_SIZE),
-            l7_log_output: BufferedSender::new(app_proto_log_queue, QUEUE_BATCH_SIZE),
+            tflow_output: output_queue
+                .map(|q| BufferedSender::new(q, QUEUE_BATCH_SIZE, stats_counter.clone())),
+            l7_stats_output: BufferedSender::new(
+                l7_stats_output_queue,
+                QUEUE_BATCH_SIZE,
+                stats_counter.clone(),
+            ),
+            l7_log_output: BufferedSender::new(
+                app_proto_log_queue,
+                QUEUE_BATCH_SIZE,
+                stats_counter.clone(),
+            ),
             pseq_output: match packet_sequence_queue {
-                Some(q) if packet_sequence_enabled => {
-                    Some(BufferedSender::new(q, QUEUE_BATCH_SIZE))
-                }
+                Some(q) if packet_sequence_enabled => Some(BufferedSender::new(
+                    q,
+                    QUEUE_BATCH_SIZE,
+                    stats_counter.clone(),
+                )),
                 _ => None,
             },
             last_queue_flush: Duration::ZERO,
@@ -1649,13 +1667,16 @@ impl FlowMap {
         consistent_timestamp_in_l7_metrics: bool,
         time_in_micros: u64,
     ) {
-        let flow = &mut node.tagged_flow.flow;
-        let Some(mut perf_stats) = flow.flow_perf_stats.take() else {
+        if node.tagged_flow.flow.flow_perf_stats.is_none() {
             return;
-        };
-        perf_stats.l7.sequential_merge(&l7_stat);
-        flow.flow_perf_stats = Some(perf_stats);
+        }
+        node.tagged_flow
+            .flow
+            .flow_perf_stats
+            .as_mut()
+            .map(|perf_stats| perf_stats.l7.sequential_merge(&l7_stat));
 
+        let flow = &node.tagged_flow.flow;
         let app_proto_head = l7_info.app_proto_head().unwrap();
         let time_span = if consistent_timestamp_in_l7_metrics
             && app_proto_head.msg_type == LogMessageType::Response
@@ -1677,7 +1698,7 @@ impl FlowMap {
         l7_stats.l7_protocol = l7_protocol;
         l7_stats.time_span = time_span as u32;
         l7_stats.biz_type = l7_info.get_biz_type();
-        l7_stats.flow = None;
+        l7_stats.mini_flow = MiniFlow::from(flow);
 
         self.l7_stats_output
             .send(self.l7_stats_allocator.allocate_one_with(l7_stats));
@@ -2040,7 +2061,7 @@ impl FlowMap {
                     signal_source: flow.signal_source,
                     time_in_second: self.start_time,
                     l7_protocol: flow_perf.l7_protocol,
-                    flow: Some(tagged_flow.clone()),
+                    mini_flow: MiniFlow::from(flow),
                     is_reversed: false,
                     ..Default::default()
                 };
@@ -2060,7 +2081,7 @@ impl FlowMap {
                     signal_source: flow.signal_source,
                     time_in_second: self.start_time,
                     l7_protocol: flow_perf.l7_protocol,
-                    flow: Some(tagged_flow.clone()),
+                    mini_flow: MiniFlow::from(flow),
                     is_reversed: true,
                     ..Default::default()
                 };
@@ -2568,6 +2589,7 @@ pub struct FlowMapCounter {
     closed: AtomicU64,                   // the number of closed flow
     drop_by_window: AtomicU64,           // times of flush which drop by window
     drop_by_capacity: AtomicU64,         // packet counter which drop by capacity
+    drop_by_queue: AtomicU64,            // packet counter which drop by queue
     packet_delay: AtomicI64,             // inject_meta_packet delay compared to ntp corrected system time
     flush_delay: AtomicI64,              // inject_flush_ticker delay compared to ntp corrected system time
     flow_delay: AtomicI64,               // output flow `flow_stat_time` delay compared to ntp corrected system time
@@ -2586,6 +2608,7 @@ impl FlowMapCounter {
             closed: AtomicU64::new(0),
             drop_by_window: AtomicU64::new(0),
             drop_by_capacity: AtomicU64::new(0),
+            drop_by_queue: AtomicU64::new(0),
             packet_delay: AtomicI64::new(0),
             flush_delay: AtomicI64::new(0),
             flow_delay: AtomicI64::new(0),
@@ -2624,6 +2647,11 @@ impl RefCountable for FlowMapCounter {
                 "drop_by_capacity",
                 CounterType::Gauged,
                 CounterValue::Unsigned(self.drop_by_capacity.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "drop_by_queue",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.drop_by_queue.swap(0, Ordering::Relaxed)),
             ),
             (
                 "packet_delay",
