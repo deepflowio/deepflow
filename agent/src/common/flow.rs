@@ -18,7 +18,6 @@ use std::{
     fmt,
     mem::swap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    sync::Arc,
     time::Duration,
 };
 
@@ -29,22 +28,21 @@ use super::{
     decapsulate::TunnelType,
     enums::{CaptureNetworkType, EthernetType, IpProtocol, TcpFlags},
     tap_port::TapPort,
-    TaggedFlow,
 };
 
 use crate::{
-    common::{endpoint::EPC_INTERNET, timestamp_to_micros, Timestamp},
-    metric::document::Direction,
-};
-use crate::{
+    collector::types::MiniFlow,
     flow_generator::protocol_logs::to_string_format,
     flow_generator::FlowState,
     metric::document::TapSide,
     utils::environment::{is_tt_pod, is_tt_workload},
 };
+use crate::{
+    common::{endpoint::EPC_INTERNET, timestamp_to_micros, Timestamp},
+    metric::document::Direction,
+};
 use public::utils::net::MacAddr;
 use public::{
-    buffer::BatchedBox,
     packet::SECONDS_IN_MINUTE,
     proto::{agent::AgentType, flow_log},
 };
@@ -542,7 +540,7 @@ impl From<FlowPerfStats> for flow_log::FlowPerfStats {
 #[derive(Clone, Debug, Default)]
 pub struct L7Stats {
     pub stats: L7PerfStats,
-    pub flow: Option<Arc<BatchedBox<TaggedFlow>>>,
+    pub mini_flow: MiniFlow,
     pub endpoint: Option<String>,
     pub flow_id: u64,
     pub l7_protocol: L7Protocol,

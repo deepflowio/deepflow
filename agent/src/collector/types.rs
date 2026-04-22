@@ -31,7 +31,7 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct MiniFlow {
     pub flow_key: FlowKey,
     pub eth_type: EthernetType,
@@ -44,6 +44,7 @@ pub struct MiniFlow {
     pub otel_service: Option<String>,
     pub otel_instance: Option<String>,
     pub pod_id: u32,
+    pub direction_score: u8,
 }
 
 impl From<&Flow> for MiniFlow {
@@ -63,6 +64,7 @@ impl From<&Flow> for MiniFlow {
             otel_service: flow.otel_service.clone(),
             otel_instance: flow.otel_instance.clone(),
             pod_id: flow.pod_id,
+            direction_score: flow.direction_score,
         }
     }
 }
@@ -78,6 +80,22 @@ pub struct PeerInfo {
     pub gpid: u32,
     pub nat_real_ip: IpAddr,
     pub nat_real_port: u16,
+}
+
+impl Default for PeerInfo {
+    fn default() -> Self {
+        Self {
+            l3_epc_id: 0,
+            is_active_host: false,
+            is_device: false,
+            is_vip_interface: false,
+            has_packets: false,
+
+            gpid: 0,
+            nat_real_ip: IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
+            nat_real_port: 0,
+        }
+    }
 }
 
 impl From<&FlowMetricsPeer> for PeerInfo {

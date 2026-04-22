@@ -65,6 +65,7 @@ pub struct CollectorCounter {
     out: AtomicU64,
     drop_before_window: AtomicU64,
     drop_inactive: AtomicU64,
+    drop_by_queue: AtomicU64,
     no_endpoint: AtomicU64,
     stash_len: AtomicU64,
     stash_capacity: AtomicU64,
@@ -99,6 +100,11 @@ impl RefCountable for CollectorCounter {
                 "drop-inactive",
                 CounterType::Counted,
                 CounterValue::Unsigned(self.drop_inactive.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "drop-by-queue",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.drop_by_queue.swap(0, Ordering::Relaxed)),
             ),
             (
                 "no-endpoint",
@@ -804,6 +810,9 @@ impl Stash {
         if self.closed_docs.len() >= QUEUE_BATCH_SIZE {
             if let Err(e) = self.sender.send_all(&mut self.closed_docs) {
                 warn!("queue failed to send Document data, because {:?}", e);
+                self.counter
+                    .drop_by_queue
+                    .fetch_add(self.closed_docs.len() as u64, Ordering::Relaxed);
                 self.closed_docs.clear();
             }
         }
@@ -835,6 +844,9 @@ impl Stash {
                         "{} queue failed to send data, because {:?}",
                         self.context.name, e
                     );
+                    self.counter
+                        .drop_by_queue
+                        .fetch_add(batch.len() as u64, Ordering::Relaxed);
                     return;
                 }
             }
@@ -848,6 +860,9 @@ impl Stash {
                     "{} queue failed to send data, because {:?}",
                     self.context.name, e
                 );
+                self.counter
+                    .drop_by_queue
+                    .fetch_add(batch.len() as u64, Ordering::Relaxed);
             }
         }
 
@@ -1252,7 +1267,7 @@ impl Collector {
         let thread = thread::Builder::new()
             .name("collector".to_owned())
             .spawn(move || {
-                let mut stash = Stash::new(ctx, sender, counter);
+                let mut stash = Stash::new(ctx, sender, counter.clone());
                 let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
                 while running.load(Ordering::Relaxed) {
                     let config = config.load();
@@ -1264,6 +1279,9 @@ impl Collector {
                             }
                             if let Err(e) = stash.sender.send_all(&mut stash.closed_docs) {
                                 warn!("queue failed to send l4 Document data, because {:?}", e);
+                                counter
+                                    .drop_by_queue
+                                    .fetch_add(stash.closed_docs.len() as u64, Ordering::Relaxed);
                                 stash.closed_docs.clear();
                             }
                             stash.calc_stash_counters();
@@ -1277,6 +1295,9 @@ impl Collector {
                             );
                             if let Err(e) = stash.sender.send_all(&mut stash.closed_docs) {
                                 warn!("queue failed to send l4 Document data, because {:?}", e);
+                                counter
+                                    .drop_by_queue
+                                    .fetch_add(stash.closed_docs.len() as u64, Ordering::Relaxed);
                                 stash.closed_docs.clear();
                             }
                         }
@@ -1384,7 +1405,7 @@ impl L7Collector {
         let thread = thread::Builder::new()
             .name("l7_collector".to_owned())
             .spawn(move || {
-                let mut stash = Stash::new(ctx, sender, counter);
+                let mut stash = Stash::new(ctx, sender, counter.clone());
                 let mut l7_batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
                 while running.load(Ordering::Relaxed) {
                     let config = config.load();
@@ -1396,6 +1417,9 @@ impl L7Collector {
                             }
                             if let Err(e) = stash.sender.send_all(&mut stash.closed_docs) {
                                 warn!("queue failed to send l7 Document data, because {:?}", e);
+                                counter
+                                    .drop_by_queue
+                                    .fetch_add(stash.closed_docs.len() as u64, Ordering::Relaxed);
                                 stash.closed_docs.clear();
                             }
                             stash.calc_stash_counters();
@@ -1409,6 +1433,9 @@ impl L7Collector {
                             );
                             if let Err(e) = stash.sender.send_all(&mut stash.closed_docs) {
                                 warn!("queue failed to send l7 Document data, because {:?}", e);
+                                counter
+                                    .drop_by_queue
+                                    .fetch_add(stash.closed_docs.len() as u64, Ordering::Relaxed);
                                 stash.closed_docs.clear();
                             }
                         }
