@@ -125,6 +125,7 @@ cfg_if::cfg_if! {
             PostgreInfo(PostgreInfo),
             OpenWireInfo(OpenWireInfo),
             OracleInfo(crate::flow_generator::protocol_logs::OracleInfo),
+            DamengInfo(crate::flow_generator::protocol_logs::DamengInfo),
             SofaRpcInfo(SofaRpcInfo),
             TlsInfo(crate::flow_generator::protocol_logs::TlsInfo),
             SomeIpInfo(crate::flow_generator::protocol_logs::SomeIpInfo),
