@@ -52,7 +52,7 @@ cfg_if::cfg_if! {
 
         pub use mq::{WebSphereMqInfo, WebSphereMqLog};
         pub use rpc::{Iso8583Info, Iso8583Log, NetSignInfo, NetSignLog, SomeIpInfo, SomeIpLog};
-        pub use sql::{OracleInfo, OracleLog};
+        pub use sql::{DamengInfo, DamengLog, OracleInfo, OracleLog};
         pub use tls::{TlsInfo, TlsLog};
     }
 }
