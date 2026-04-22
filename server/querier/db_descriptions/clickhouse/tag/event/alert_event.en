@@ -68,6 +68,8 @@ biz_service.group     , Biz Service Group                 ,
 user                       , Creator                    ,
 alert_policy               , AlarmPolicy                ,
 policy_type                , PolicyType                 ,
+biz_feature_type           , BusinessFeatureType        , Is this service system (system topology) or scenario (scenario topology)
+biz_name                   , BusinessName               , The business name to which this alarm belongs
 event_level                , EventLevel                 ,
 target_tags                , TargetTags                 , 
 _target_uid                ,                            , 

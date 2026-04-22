@@ -2207,6 +2207,33 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 		),
 	}
 
+	tagResourceMap["biz_name"] = map[string]*Tag{
+		"default": NewTag(
+			"tag_string_values[indexOf(tag_string_names,'biz_name')]",
+			"",
+			"if(indexOf(tag_string_names,'biz_name')=0,NULL,tag_string_values[indexOf(tag_string_names,'biz_name')]) %s %s",
+			"%s(if(indexOf(tag_string_names,'biz_name')=0,NULL,tag_string_values[indexOf(tag_string_names,'biz_name')]), %s)",
+			"",
+		),
+	}
+
+	tagResourceMap["biz_feature_type"] = map[string]*Tag{
+		"default": NewTag(
+			"tag_int_values[indexOf(tag_int_names,'biz_feature_type')]",
+			"",
+			"if(indexOf(tag_int_names,'biz_feature_type')=0,NULL,tag_int_values[indexOf(tag_int_names,'biz_feature_type')]) %s %s",
+			"",
+			"",
+		),
+		"enum": NewTag(
+			"dictGetOrDefault('flow_tag.int_enum_map', '%s', ('%s',toUInt64(tag_int_values[indexOf(tag_int_names,'biz_feature_type')])), tag_int_values[indexOf(tag_int_names,'biz_feature_type')])",
+			"",
+			"toUInt64(tag_int_values[indexOf(tag_int_names,'biz_feature_type')]) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
+			"toUInt64(tag_int_values[indexOf(tag_int_names,'biz_feature_type')]) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
+			"tag_int_values[indexOf(tag_int_names,'biz_feature_type')]",
+		),
+	}
+
 	// int_tags
 	tagResourceMap["int_tags"] = map[string]*Tag{
 		"default": NewTag(
