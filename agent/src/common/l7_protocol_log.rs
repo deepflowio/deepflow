@@ -203,6 +203,7 @@ cfg_if::cfg_if! {
                 Brpc(BrpcLog),
                 Tars(TarsLog),
                 Oracle(crate::flow_generator::protocol_logs::OracleLog),
+                Dameng(crate::flow_generator::protocol_logs::DamengLog),
                 Iso8583(crate::flow_generator::protocol_logs::Iso8583Log),
                 NetSign(crate::flow_generator::protocol_logs::NetSignLog),
                 MQTT(MqttLog),

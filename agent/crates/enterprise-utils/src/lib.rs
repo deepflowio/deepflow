@@ -323,6 +323,24 @@ pub mod l7 {
                 }
             }
         }
+
+        pub mod dameng {
+            use public::l7_protocol::{L7LogBase, LogMessageType};
+
+            pub struct DamengParseConfig;
+
+            pub struct DamengParser;
+
+            impl DamengParser {
+                pub fn check_payload(_: &[u8], _: &DamengParseConfig) -> Option<LogMessageType> {
+                    unimplemented!()
+                }
+
+                pub fn parse_payload(_: &[u8], _: &DamengParseConfig) -> Vec<L7LogBase> {
+                    unimplemented!()
+                }
+            }
+        }
     }
 
     pub mod mq {

@@ -40,7 +40,9 @@ pub use redis::{RedisInfo, RedisLog};
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
+        mod dameng;
         mod oracle;
+        pub use dameng::{DamengInfo, DamengLog};
         pub use oracle::{OracleInfo, OracleLog};
     }
 }
