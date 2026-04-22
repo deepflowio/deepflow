@@ -1228,6 +1228,92 @@ static __inline enum message_type infer_oracle_tns_message(const char *buf,
 	}
 }
 
+#define DAMENG_HEADER_LEN 64
+#define DAMENG_HEADER_MSG_TYPE_OFFSET 4
+#define DAMENG_HEADER_BODY_LEN_OFFSET 6
+#define DAMENG_HEADER_RET_CODE_OFFSET 10
+#define DAMENG_INFER_HEADER_LEN 14
+
+static __inline __u16 read_u16_le(const char *p)
+{
+	return (__u16)(__u8)p[0] | ((__u16)(__u8)p[1] << 8);
+}
+
+static __inline __u32 read_u32_le(const char *p)
+{
+	return (__u32)(__u8)p[0] | ((__u32)(__u8)p[1] << 8)
+		| ((__u32)(__u8)p[2] << 16) | ((__u32)(__u8)p[3] << 24);
+}
+
+static __inline __s32 read_s32_le(const char *p)
+{
+	return (__s32)read_u32_le(p);
+}
+
+static __inline bool dameng_is_valid_response_ret_code(__s32 ret_code)
+{
+	/*
+	 * Source: DM Programmer Appendix "DM服务器错误码汇编"
+	 * warning: (520, 0) => 1..=519
+	 * errors: (-1, -14999)
+	 */
+	return ret_code == 0 || (ret_code >= 1 && ret_code <= 519)
+		|| (ret_code >= -14999 && ret_code <= -1);
+}
+
+static __inline enum message_type infer_dameng_msg_type(__u16 msg_type,
+						       __s32 ret_code)
+{
+	switch (msg_type) {
+	case 0x00:
+	case 0xbb:
+		if (dameng_is_valid_response_ret_code(ret_code))
+			return MSG_RESPONSE;
+		return MSG_UNKNOWN;
+	case 0x03:
+	case 0x04:
+	case 0x05:
+	case 0x07:
+	case 0x08:
+	case 0x0d:
+	case 0x1d:
+	case 0x20:
+	case 0x2c:
+	case 0xc8:
+		if (ret_code == 0)
+			return MSG_REQUEST;
+		return MSG_UNKNOWN;
+	default:
+		return MSG_UNKNOWN;
+	}
+}
+
+static __inline enum message_type infer_dameng_message(const char *buf,
+						      size_t count,
+						      struct conn_info_s *conn_info)
+{
+	(void)buf;
+	(void)count;
+
+	if (!protocol_port_check_2(PROTO_DAMENG, conn_info))
+		return MSG_UNKNOWN;
+	if (conn_info->tuple.l4_protocol != IPPROTO_TCP)
+		return MSG_UNKNOWN;
+
+	if (is_infer_socket_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_DAMENG)
+			return MSG_UNKNOWN;
+	}
+
+	if (count < DAMENG_INFER_HEADER_LEN)
+		return MSG_UNKNOWN;
+
+	__u16 msg_type = read_u16_le(buf + DAMENG_HEADER_MSG_TYPE_OFFSET);
+	__s32 ret_code = read_s32_le(buf + DAMENG_HEADER_RET_CODE_OFFSET);
+
+	return infer_dameng_msg_type(msg_type, ret_code);
+}
+
 // https://en.wikipedia.org/wiki/ISO_8583
 static __inline enum message_type infer_iso8583_message(const char *buf,
 						     size_t count,
@@ -4250,6 +4336,15 @@ infer_protocol_2(const char *infer_buf, size_t count,
 						conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_ORACLE;
 #if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+	} else if (skip_proto != PROTO_DAMENG && (inferred_message.type =
+#else
+	} else if ((inferred_message.type =
+#endif
+		    infer_dameng_message(infer_buf,
+					 count,
+					 conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_DAMENG;
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
 	} else if (skip_proto != PROTO_ISO8583 && (inferred_message.type =
 #else
 	} else if ((inferred_message.type =
@@ -4602,6 +4697,14 @@ infer_protocol_1(struct ctx_info_s *ctx,
 			     infer_oracle_tns_message(infer_buf, count,
 						conn_info)) != MSG_UNKNOWN) {
 				inferred_message.protocol = PROTO_ORACLE;
+				return inferred_message;
+			}
+			break;
+		case PROTO_DAMENG:
+			if ((inferred_message.type =
+			     infer_dameng_message(infer_buf, count,
+						conn_info)) != MSG_UNKNOWN) {
+				inferred_message.protocol = PROTO_DAMENG;
 				return inferred_message;
 			}
 			break;
