@@ -19,7 +19,6 @@ use std::mem;
 use std::ptr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use chrono::{DateTime, TimeZone, Utc};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, IntoPrimitive, TryFromPrimitive)]
@@ -36,6 +35,10 @@ pub enum NtpMode {
 }
 
 const NSEC_IN_SEC: u32 = 1_000_000_000;
+const NTP_ERA_SECONDS: i128 = 1i128 << 32;
+const NTP_HALF_ERA_SECONDS: i128 = NTP_ERA_SECONDS / 2;
+const NTP_UNIX_OFFSET_SECONDS: i128 = 2_208_988_800;
+const NTP_FRACTION_MASK: u64 = u32::MAX as u64;
 
 /// An NTP version 3 / 4 packet
 #[repr(C)]
@@ -103,27 +106,26 @@ impl NtpPacket {
         v
     }
 
-    pub fn offset(&self, recv_time: &SystemTime) -> i64 {
+    pub fn offset(&self, recv_time: &SystemTime) -> Option<i64> {
         // local clock offset
         //   offset = ((rec-org) + (xmt-dst)) / 2
-        let recv = SystemTime::from(&NtpTime(self.ts_recv))
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as i64;
-        let orig = SystemTime::from(&NtpTime(self.ts_orig))
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as i64;
-        let xmit = SystemTime::from(&NtpTime(self.ts_xmit))
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as i64;
-        let dest = recv_time.duration_since(UNIX_EPOCH).unwrap().as_nanos() as i64;
+        let recv = NtpTime(self.ts_recv).to_unix_nanos_near(recv_time)?;
+        let orig = NtpTime(self.ts_orig).to_unix_nanos_near(recv_time)?;
+        let xmit = NtpTime(self.ts_xmit).to_unix_nanos_near(recv_time)?;
+        let dest = unix_nanos(recv_time)?;
 
         let a = recv - orig;
         let b = xmit - dest;
-        a + (b - a) / 2
+        Some(a + (b - a) / 2)
     }
+}
+
+fn unix_nanos(time: &SystemTime) -> Option<i64> {
+    time.duration_since(UNIX_EPOCH)
+        .ok()?
+        .as_nanos()
+        .try_into()
+        .ok()
 }
 
 impl TryFrom<&[u8]> for NtpPacket {
@@ -152,28 +154,31 @@ impl TryFrom<&[u8]> for NtpPacket {
 
 pub struct NtpTime(pub u64);
 
-impl From<&SystemTime> for NtpTime {
-    fn from(t: &SystemTime) -> Self {
-        let n = DateTime::<Utc>::from(*t)
-            .signed_duration_since(Utc.with_ymd_and_hms(1900, 1, 1, 0, 0, 0).unwrap());
-        let secs = n.num_seconds() as u64;
-        let frac = (((n.num_nanoseconds().unwrap() as u64 - secs * NSEC_IN_SEC as u64) << 32)
-            + NSEC_IN_SEC as u64
-            - 1)
-            / NSEC_IN_SEC as u64;
-        Self(secs << 32 | frac)
+impl NtpTime {
+    fn to_unix_nanos_near(&self, reference_time: &SystemTime) -> Option<i64> {
+        let reference = unix_nanos(reference_time)? as i128;
+        let reference_seconds = reference / NSEC_IN_SEC as i128;
+        let ntp_seconds = (self.0 >> 32) as i128;
+        let era = (reference_seconds + NTP_UNIX_OFFSET_SECONDS - ntp_seconds
+            + NTP_HALF_ERA_SECONDS)
+            / NTP_ERA_SECONDS;
+        let unix_seconds = ntp_seconds + era * NTP_ERA_SECONDS - NTP_UNIX_OFFSET_SECONDS;
+        if unix_seconds < 0 {
+            return None;
+        }
+        let nanos = unix_seconds * NSEC_IN_SEC as i128
+            + ((self.0 & NTP_FRACTION_MASK) as i128 * NSEC_IN_SEC as i128 >> 32);
+        nanos.try_into().ok()
     }
 }
 
-impl From<&NtpTime> for SystemTime {
-    fn from(t: &NtpTime) -> Self {
-        let nanos =
-            (t.0 >> 32) * NSEC_IN_SEC as u64 + ((t.0 & 0xFFFFFFFF) * NSEC_IN_SEC as u64 >> 32);
-        Utc.with_ymd_and_hms(1900, 1, 1, 0, 0, 0)
-            .unwrap()
-            .checked_add_signed(chrono::Duration::nanoseconds(nanos as i64))
-            .unwrap()
-            .into()
+impl From<&SystemTime> for NtpTime {
+    fn from(t: &SystemTime) -> Self {
+        let duration = t.duration_since(UNIX_EPOCH).unwrap();
+        let secs = duration.as_secs() + NTP_UNIX_OFFSET_SECONDS as u64;
+        let frac = (((duration.subsec_nanos() as u64) << 32) + NSEC_IN_SEC as u64 - 1)
+            / NSEC_IN_SEC as u64;
+        Self(secs << 32 | frac)
     }
 }
 
@@ -192,8 +197,34 @@ mod tests {
     fn time_convert() {
         let t = SystemTime::now();
         let nt = NtpTime::from(&t);
-        let new_t = SystemTime::from(&nt);
+        let new_t =
+            UNIX_EPOCH + std::time::Duration::from_nanos(nt.to_unix_nanos_near(&t).unwrap() as u64);
         assert_eq!(t, new_t);
+    }
+
+    #[test]
+    fn time_convert_after_2200_does_not_panic() {
+        let t = UNIX_EPOCH + std::time::Duration::from_secs(7_258_118_400);
+        let nt = NtpTime::from(&t);
+        let new_t =
+            UNIX_EPOCH + std::time::Duration::from_nanos(nt.to_unix_nanos_near(&t).unwrap() as u64);
+        assert_eq!(t, new_t);
+    }
+
+    #[test]
+    fn offset_uses_local_send_time_without_panic() {
+        let send_time = UNIX_EPOCH + std::time::Duration::from_secs(10);
+        let recv_time = send_time + std::time::Duration::from_millis(40);
+        let server_recv = send_time + std::time::Duration::from_millis(10);
+        let server_xmit = send_time + std::time::Duration::from_millis(20);
+        let packet = NtpPacket {
+            ts_orig: NtpTime::from(&send_time).0,
+            ts_recv: NtpTime::from(&server_recv).0,
+            ts_xmit: NtpTime::from(&server_xmit).0,
+            ..Default::default()
+        };
+
+        assert_eq!(packet.offset(&recv_time), Some(-5_000_000));
     }
 
     #[test]

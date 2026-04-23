@@ -1512,7 +1512,7 @@ impl Synchronizer {
                     time::sleep(sync_interval).await;
                     continue;
                 }
-                let mut resp_packet = resp_packet.unwrap();
+                let resp_packet = resp_packet.unwrap();
 
                 if resp_packet.get_mode() != NtpMode::Server {
                     warn!("NTP: invalid mod in response, If NTP has never completed synchronization the agent will remain temporarily disabled until the initial NTP synchronization is completed.");
@@ -1543,8 +1543,17 @@ impl Synchronizer {
 
                 // Correct the received message's origin time using the actual
                 // transmit time.
+                let mut resp_packet = resp_packet;
                 resp_packet.ts_orig = NtpTime::from(&send_time).0;
-                let offset = resp_packet.offset(&recv_time) / NANOS_IN_SECOND * NANOS_IN_SECOND;
+                let offset = match resp_packet.offset(&recv_time) {
+                    Some(offset) => offset / NANOS_IN_SECOND * NANOS_IN_SECOND,
+                    None => {
+                        warn!("NTP: failed to calculate offset, If NTP has never completed synchronization the agent will remain temporarily disabled until the initial NTP synchronization is completed.");
+                        time::sleep(sync_interval).await;
+                        continue;
+                    }
+                };
+
                 match ntp_diff.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |x| {
                     if (x - offset).abs() >= min_interval {
                         info!("NTP Set time offset {}s.", offset / NANOS_IN_SECOND);
