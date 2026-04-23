@@ -22,7 +22,7 @@ use std::{
     path::Path,
     string::String,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering::Relaxed},
+        atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering::Relaxed},
         Arc, Condvar, Mutex,
     },
     thread::{self, sleep, JoinHandle},
@@ -142,13 +142,15 @@ impl SystemLoadGuard {
 }
 
 pub struct Feed {
-    timestamp_and_title: AtomicU64,
+    timestamp: AtomicU64,
+    title: AtomicU16,
 }
 
 impl Default for Feed {
     fn default() -> Self {
         Self {
-            timestamp_and_title: AtomicU64::new(0),
+            timestamp: AtomicU64::new(0),
+            title: AtomicU16::new(0),
         }
     }
 }
@@ -203,18 +205,18 @@ enum FeedTitle {
     RunningLock,
     #[strum(serialize = "timer.wait_timeout")]
     WaitTimeout,
+    #[strum(serialize = "watchdog_timeout")]
+    WatchdogTimeout,
 }
 
 impl Feed {
     fn timestamp(&self) -> Duration {
-        let timestamp_and_title = self.timestamp_and_title.load(Relaxed);
-
-        Duration::from_secs(timestamp_and_title & 0xffffffff)
+        let timestamp = self.timestamp.load(Relaxed);
+        Duration::from_secs(timestamp)
     }
 
     fn title(&self) -> String {
-        let timestamp_and_title = self.timestamp_and_title.load(Relaxed);
-        let title = timestamp_and_title >> 32;
+        let title = self.title.load(Relaxed);
 
         FeedTitle::try_from(title as u32).unwrap().to_string()
     }
@@ -224,9 +226,8 @@ impl Feed {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let timestamp_and_title = (timestamp & 0xffffffff) | ((title as u32 as u64) << 32);
-
-        self.timestamp_and_title.store(timestamp_and_title, Relaxed);
+        self.timestamp.store(timestamp, Relaxed);
+        self.title.store(title as u16, Relaxed);
     }
 
     fn timeout(&self, t: Duration) -> (bool, Duration) {
@@ -237,8 +238,13 @@ impl Feed {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         let last = self.timestamp();
         if now < last {
-            error!("Clock may have gone backwards, restart agent ...");
-            crate::utils::clean_and_exit(-1);
+            if self.title() == FeedTitle::WatchdogTimeout.to_string() {
+                error!("Watchdog thread timeout, but feed timestamp goes backwards twice, which is unexpected. This may be caused by the ntp or system clock going backwards. Restart deepflow-agent to avoid potential issues.");
+                crate::utils::clean_and_exit(-1);
+            } else {
+                warn!("Feed timestamp goes backwards first, which is unexpected. This may be caused by ntp or the system clock going backwards. ");
+                self.add(FeedTitle::WatchdogTimeout);
+            }
             return (false, Duration::ZERO);
         }
 
