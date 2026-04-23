@@ -1232,6 +1232,16 @@ impl HttpLog {
         }
     }
 
+    fn preferred_endpoint_path<'a>(info: &'a HttpInfo) -> Option<&'a str> {
+        if let Some(endpoint) = info.endpoint.as_deref().filter(|p| !p.is_empty()) {
+            Some(endpoint)
+        } else if !info.path.is_empty() {
+            Some(info.path.as_str())
+        } else {
+            None
+        }
+    }
+
     #[cfg(feature = "enterprise")]
     fn set_endpoint_by_config<F>(
         &mut self,
@@ -1242,23 +1252,18 @@ impl HttpLog {
     ) where
         F: FnOnce(&[String], &str, u32, u8, std::time::Duration) -> Option<String>,
     {
-        if info.path.is_empty() {
+        let Some(path_owned) = Self::preferred_endpoint_path(info) else {
             return;
-        }
+        };
 
         // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
         let endpoint_already_set = matches!(info.endpoint.as_ref(), Some(p) if !p.is_empty());
-        let path_owned = if let Some(p) = info.endpoint.as_ref().filter(|p| !p.is_empty()) {
-            p.clone()
-        } else {
-            info.path.clone()
-        };
 
         // Priority chain: WASM/biz_field > AI Agent detection > http_endpoint Trie
         let ai_agent_matched = if !endpoint_already_set {
             if let Some(matched_path) = ai_matcher(
                 &config.ai_agent_endpoints,
-                path_owned.as_str(),
+                path_owned,
                 param.process_id,
                 param.socket_role,
                 std::time::Duration::from_micros(param.time),
@@ -1275,7 +1280,7 @@ impl HttpLog {
         };
 
         if !ai_agent_matched && !endpoint_already_set && !config.http_endpoint_disabled {
-            info.endpoint = Some(handle_endpoint(config, &path_owned));
+            info.endpoint = Some(handle_endpoint(config, path_owned));
         }
     }
 
@@ -1286,16 +1291,14 @@ impl HttpLog {
         config: &LogParserConfig,
         info: &mut HttpInfo,
     ) {
-        if config.http_endpoint_disabled || info.path.is_empty() {
+        if config.http_endpoint_disabled {
             return;
         }
 
-        let path_owned = if let Some(p) = info.endpoint.as_ref().filter(|p| !p.is_empty()) {
-            p.clone()
-        } else {
-            info.path.clone()
+        let Some(path_owned) = Self::preferred_endpoint_path(info) else {
+            return;
         };
-        info.endpoint = Some(handle_endpoint(config, &path_owned));
+        info.endpoint = Some(handle_endpoint(config, path_owned));
     }
 
     fn set_info_by_config(
@@ -2532,7 +2535,7 @@ impl<'a> V1Structure<'a> {
     }
 }
 
-pub fn handle_endpoint(config: &LogParserConfig, path: &String) -> String {
+pub fn handle_endpoint(config: &LogParserConfig, path: &str) -> String {
     let keep_segments = config.http_endpoint_trie.find_matching_rule(path);
     if keep_segments <= 0 {
         return "".to_string();
@@ -3417,6 +3420,28 @@ mod tests {
         assert_eq!(info.endpoint.as_deref(), Some("/biz/override"));
         assert_eq!(info.biz_type, 0);
         assert_eq!(info.protocol_str, None);
+    }
+
+    #[test]
+    fn test_preferred_endpoint_path_prefers_endpoint_then_path() {
+        let mut info = HttpInfo::default();
+        info.path = "/v1/chat/completions".to_string();
+        assert_eq!(
+            HttpLog::preferred_endpoint_path(&info),
+            Some("/v1/chat/completions")
+        );
+
+        info.endpoint = Some("/biz/override".to_string());
+        assert_eq!(
+            HttpLog::preferred_endpoint_path(&info),
+            Some("/biz/override")
+        );
+
+        info.endpoint = Some(String::new());
+        assert_eq!(
+            HttpLog::preferred_endpoint_path(&info),
+            Some("/v1/chat/completions")
+        );
     }
 
     #[test]

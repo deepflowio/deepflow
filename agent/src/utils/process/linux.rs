@@ -477,7 +477,12 @@ impl ProcessListener {
         process_data_cache.retain(|pid, _| alive_pids.contains(pid));
 
         for (key, value) in features.iter_mut() {
-            let ai_agent_pids = fetch_ai_agent_pids(key.as_str());
+            let ai_agent_pids =
+                if should_fetch_ai_agent_pids(key.as_str(), value.callback.is_none()) {
+                    fetch_ai_agent_pids(key.as_str())
+                } else {
+                    Vec::new()
+                };
 
             if should_skip_feature(
                 value.process_matcher.is_empty(),
@@ -588,7 +593,14 @@ fn should_skip_feature(
     if callback_missing {
         return true;
     }
-    !(!process_matcher_empty || !previous_pids_empty || !ai_agent_pids_empty)
+    process_matcher_empty && previous_pids_empty && ai_agent_pids_empty
+}
+
+fn should_fetch_ai_agent_pids(feature: &str, callback_missing: bool) -> bool {
+    if callback_missing {
+        return false;
+    }
+    feature == "proc.gprocess_info" || feature == "proc.socket_list"
 }
 
 #[cfg(feature = "enterprise")]
@@ -720,5 +732,13 @@ mod tests {
     fn should_skip_feature_allows_ai_agent_without_matcher() {
         let skip = should_skip_feature(true, true, false, false);
         assert!(!skip);
+    }
+
+    #[test]
+    fn should_fetch_ai_agent_pids_only_for_ai_agent_features() {
+        assert!(should_fetch_ai_agent_pids("proc.gprocess_info", false));
+        assert!(should_fetch_ai_agent_pids("proc.socket_list", false));
+        assert!(!should_fetch_ai_agent_pids("proc.process_info", false));
+        assert!(!should_fetch_ai_agent_pids("proc.socket_list", true));
     }
 }
