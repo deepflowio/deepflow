@@ -1252,7 +1252,7 @@ impl HttpLog {
     ) where
         F: FnOnce(&[String], &str, u32, u8, std::time::Duration) -> Option<String>,
     {
-        let Some(path_owned) = Self::preferred_endpoint_path(info) else {
+        let Some(path_owned) = Self::preferred_endpoint_path(info).map(str::to_owned) else {
             return;
         };
 
@@ -1263,7 +1263,7 @@ impl HttpLog {
         let ai_agent_matched = if !endpoint_already_set {
             if let Some(matched_path) = ai_matcher(
                 &config.ai_agent_endpoints,
-                path_owned,
+                &path_owned,
                 param.process_id,
                 param.socket_role,
                 std::time::Duration::from_micros(param.time),
@@ -1280,7 +1280,7 @@ impl HttpLog {
         };
 
         if !ai_agent_matched && !endpoint_already_set && !config.http_endpoint_disabled {
-            info.endpoint = Some(handle_endpoint(config, path_owned));
+            info.endpoint = Some(handle_endpoint(config, &path_owned));
         }
     }
 
