@@ -2226,7 +2226,7 @@ func GenerateAlarmEventTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 		"enum": NewTag(
-			"dictGetOrDefault('flow_tag.int_enum_map', '%s', ('%s',toUInt64(tag_int_values[indexOf(tag_int_names,'biz_feature_type')])), tag_int_values[indexOf(tag_int_names,'biz_feature_type')])",
+			"dictGet('flow_tag.int_enum_map', '%s', ('%s',toUInt64(tag_int_values[indexOf(tag_int_names,'biz_feature_type')])))",
 			"",
 			"toUInt64(tag_int_values[indexOf(tag_int_names,'biz_feature_type')]) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s %s %s and tag_name='%s')",
 			"toUInt64(tag_int_values[indexOf(tag_int_names,'biz_feature_type')]) GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(%s,%s) and tag_name='%s')",
