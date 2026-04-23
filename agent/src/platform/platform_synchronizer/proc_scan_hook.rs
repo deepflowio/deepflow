@@ -16,6 +16,16 @@
 
 use super::ProcessData;
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn open_process_with_root(
+    proc_root: &str,
+    pid: u32,
+) -> procfs::ProcResult<procfs::process::Process> {
+    procfs::process::Process::new_with_root(
+        std::path::PathBuf::from(proc_root).join(pid.to_string()),
+    )
+}
+
 pub fn proc_scan_hook(_proc_root: &str, _process_datas: &mut Vec<ProcessData>) {
     // Enterprise: clean dead AI Agent PIDs and mark alive ones with biz_type
     #[cfg(all(
@@ -53,7 +63,7 @@ pub fn proc_scan_hook(_proc_root: &str, _process_datas: &mut Vec<ProcessData>) {
                 if existing_pids.contains(&pid) {
                     continue;
                 }
-                if let Ok(proc) = procfs::process::Process::new(pid as i32) {
+                if let Ok(proc) = open_process_with_root(_proc_root, pid) {
                     if let Ok(mut pd) = ProcessData::try_from(&proc) {
                         pd.biz_type = crate::common::flow::BIZ_TYPE_AI_AGENT;
                         _process_datas.push(pd);
@@ -61,5 +71,28 @@ pub fn proc_scan_hook(_proc_root: &str, _process_datas: &mut Vec<ProcessData>) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[test]
+    fn test_open_process_with_root_uses_custom_proc_root() {
+        use std::os::unix::fs::symlink;
+
+        let tmp = tempfile::tempdir().expect("create tempdir");
+        let fake_pid = 999_999_u32;
+        let fake_proc = tmp.path().join(fake_pid.to_string());
+        symlink(format!("/proc/{}", std::process::id()), &fake_proc).expect("create proc symlink");
+
+        let proc = open_process_with_root(tmp.path().to_str().unwrap(), fake_pid)
+            .expect("open process via custom proc root");
+        assert_eq!(proc.pid, fake_pid as i32);
+
+        let exe = proc.exe().expect("read exe through custom proc root");
+        assert!(!exe.as_os_str().is_empty(), "exe path should not be empty");
     }
 }

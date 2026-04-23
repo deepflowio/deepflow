@@ -36,4 +36,15 @@ require(
     "ai_agent limit log must use unsigned format specifiers",
 )
 
+data_submit_start = socket_trace_text.find("__data_submit(")
+require(data_submit_start != -1, "missing __data_submit definition")
+push_close_start = socket_trace_text.find("__push_close_event(", data_submit_start)
+require(push_close_start != -1, "missing __push_close_event definition")
+data_submit_text = socket_trace_text[data_submit_start:push_close_start]
+
+require(
+    "__u64 pid_tgid = bpf_get_current_pid_tgid();" in data_submit_text,
+    "__data_submit must define pid_tgid before EXTENDED_AI_AGENT_FILE_IO branch uses it",
+)
+
 print("[OK]")

@@ -14,9 +14,13 @@
  * limitations under the License.
  */
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::os::unix::ffi::OsStrExt;
 use std::{
     fmt::{self, Debug, Formatter},
-    fs, slice, str,
+    fs,
+    path::Path,
+    slice, str,
 };
 
 use prost::Message;
@@ -281,7 +285,11 @@ fn read_proc_exec_path(pid: u32) -> Vec<u8> {
     let Ok(path) = fs::read_link(format!("/proc/{pid}/exe")) else {
         return Vec::new();
     };
-    path.to_string_lossy().into_owned().into_bytes()
+    path_to_bytes(&path)
+}
+
+fn path_to_bytes(path: &Path) -> Vec<u8> {
+    path.as_os_str().as_bytes().to_vec()
 }
 
 fn enrich_proc_lifecycle_metadata(pid: u32, lifecycle_type: u8) -> (Vec<u8>, Vec<u8>) {
@@ -569,6 +577,7 @@ impl Sendable for BoxedProcEvents {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_proc_lifecycle_info_extracts_fields() {
@@ -629,5 +638,17 @@ mod tests {
         let pb: metric::ProcLifecycleEventData = event.into();
         assert_eq!(pb.cmdline, cmdline);
         assert_eq!(pb.exec_path, exec_path);
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[test]
+    fn test_path_to_bytes_preserves_non_utf8_bytes() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let raw = b"/tmp/non-utf8-\xff-agent".to_vec();
+        let path = PathBuf::from(OsString::from_vec(raw.clone()));
+
+        assert_eq!(path_to_bytes(&path), raw);
     }
 }

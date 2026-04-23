@@ -2409,8 +2409,6 @@ int set_ai_agent_data_limit_max(int limit_size)
 	}
 
 	int set_val = __set_ai_agent_data_limit_max((unsigned int) limit_size);
-	if (set_val < 0)
-		return set_val;
 
 	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
 	if (tracer == NULL) {
