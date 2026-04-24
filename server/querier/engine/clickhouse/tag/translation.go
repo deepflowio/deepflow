@@ -859,8 +859,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet('flow_tag.gprocess_map', 'biz_type', (toUInt64("+processIDSuffix+")))",
 				processIDSuffix+"!=0",
-				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.gprocess_map WHERE biz_type GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE tag_name='biz_type' AND (name_en %[1]s %[2]s OR name_zh %[1]s %[2]s)))",
-				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.gprocess_map WHERE biz_type GLOBAL IN (SELECT value FROM flow_tag.int_enum_map WHERE tag_name='biz_type' AND (%[1]s(name_en,%[2]s) OR %[1]s(name_zh,%[2]s))))",
+				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.gprocess_map WHERE biz_type %s %s) AND "+processIDSuffix+"!=0",
+				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.gprocess_map WHERE %s(biz_type, %s)) AND "+processIDSuffix+"!=0",
 				processIDSuffix,
 			),
 			"enum": NewTag(
