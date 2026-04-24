@@ -1252,35 +1252,33 @@ impl HttpLog {
     ) where
         F: FnOnce(&[String], &str, u32, u8, std::time::Duration) -> Option<String>,
     {
-        let Some(path_owned) = Self::preferred_endpoint_path(info).map(str::to_owned) else {
-            return;
-        };
-
         // Priority use of info.endpoint, because info.endpoint may be set by the wasm plugin
         let endpoint_already_set = matches!(info.endpoint.as_ref(), Some(p) if !p.is_empty());
 
         // Priority chain: WASM/biz_field > AI Agent detection > http_endpoint Trie
-        let ai_agent_matched = if !endpoint_already_set {
-            if let Some(matched_path) = ai_matcher(
-                &config.ai_agent_endpoints,
-                &path_owned,
-                param.process_id,
-                param.socket_role,
-                std::time::Duration::from_micros(param.time),
-            ) {
-                info.endpoint = Some(matched_path);
-                info.biz_type = BIZ_TYPE_AI_AGENT;
-                info.protocol_str = Some("LLM".to_string());
-                true
-            } else {
-                false
-            }
+        let ai_agent_match = if !endpoint_already_set {
+            Self::preferred_endpoint_path(info).and_then(|path| {
+                ai_matcher(
+                    &config.ai_agent_endpoints,
+                    path,
+                    param.process_id,
+                    param.socket_role,
+                    std::time::Duration::from_micros(param.time),
+                )
+            })
         } else {
-            false
+            None
         };
 
-        if !ai_agent_matched && !endpoint_already_set && !config.http_endpoint_disabled {
-            info.endpoint = Some(handle_endpoint(config, &path_owned));
+        if let Some(matched_path) = ai_agent_match {
+            info.endpoint = Some(matched_path);
+            info.biz_type = BIZ_TYPE_AI_AGENT;
+            info.protocol_str = Some("LLM".to_string());
+        } else if !endpoint_already_set && !config.http_endpoint_disabled {
+            let Some(path) = Self::preferred_endpoint_path(info) else {
+                return;
+            };
+            info.endpoint = Some(handle_endpoint(config, path));
         }
     }
 
@@ -1295,10 +1293,10 @@ impl HttpLog {
             return;
         }
 
-        let Some(path_owned) = Self::preferred_endpoint_path(info) else {
+        let Some(path) = Self::preferred_endpoint_path(info) else {
             return;
         };
-        info.endpoint = Some(handle_endpoint(config, path_owned));
+        info.endpoint = Some(handle_endpoint(config, path));
     }
 
     fn set_info_by_config(
@@ -3441,6 +3439,34 @@ mod tests {
         assert_eq!(
             HttpLog::preferred_endpoint_path(&info),
             Some("/v1/chat/completions")
+        );
+    }
+
+    #[test]
+    fn test_enterprise_set_endpoint_by_config_avoids_path_owned_clone() {
+        let source = include_str!("http.rs");
+        let implementation = source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("missing implementation section");
+        assert!(
+            !implementation.contains(
+                "let Some(path_owned) = Self::preferred_endpoint_path(info).map(str::to_owned)"
+            ),
+            "enterprise path should avoid cloning preferred endpoint"
+        );
+    }
+
+    #[test]
+    fn test_non_enterprise_set_endpoint_by_config_uses_borrowed_path_name() {
+        let source = include_str!("http.rs");
+        let implementation = source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("missing implementation section");
+        assert!(
+            !implementation.contains("let Some(path_owned) = Self::preferred_endpoint_path(info)"),
+            "non-enterprise path variable should not keep the *_owned name"
         );
     }
 
