@@ -13,11 +13,11 @@ type PodNode struct {
 	id           int
 	domainLcuuid string
 	name         string
-	regionID     int
-	azID         int
-	vpcID        int
-	podClusterID int
-	vmID         int
+	regionId     int
+	azId         int
+	vpcId        int
+	podClusterId int
+	vmId         int
 }
 
 func (t *PodNode) IsValid() bool {
@@ -28,7 +28,7 @@ func (t *PodNode) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *PodNode) ID() int {
+func (t *PodNode) Id() int {
 	return t.id
 }
 
@@ -40,28 +40,28 @@ func (t *PodNode) Name() string {
 	return t.name
 }
 
-func (t *PodNode) RegionID() int {
-	return t.regionID
+func (t *PodNode) RegionId() int {
+	return t.regionId
 }
 
-func (t *PodNode) AZID() int {
-	return t.azID
+func (t *PodNode) AzId() int {
+	return t.azId
 }
 
-func (t *PodNode) VPCID() int {
-	return t.vpcID
+func (t *PodNode) VpcId() int {
+	return t.vpcId
 }
 
-func (t *PodNode) PodClusterID() int {
-	return t.podClusterID
+func (t *PodNode) PodClusterId() int {
+	return t.podClusterId
 }
 
-func (t *PodNode) VMID() int {
-	return t.vmID
+func (t *PodNode) VmId() int {
+	return t.vmId
 }
 
-func (t *PodNode) SetVMID(vmID int) {
-	t.vmID = vmID
+func (t *PodNode) SetVmId(vmId int) {
+	t.vmId = vmId
 }
 
 func (t *PodNode) reset(dbItem *metadbmodel.PodNode, tool *Tool) {
@@ -69,10 +69,10 @@ func (t *PodNode) reset(dbItem *metadbmodel.PodNode, tool *Tool) {
 	t.id = dbItem.ID
 	t.domainLcuuid = dbItem.Domain
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
-	t.vpcID = dbItem.VPCID
-	t.podClusterID = dbItem.PodClusterID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
+	t.vpcId = dbItem.VPCID
+	t.podClusterId = dbItem.PodClusterID
 }
 
 func NewPodNodeCollection(t *Tool) *PodNodeCollection {

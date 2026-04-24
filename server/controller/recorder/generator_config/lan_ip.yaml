@@ -1,20 +1,37 @@
 name: lan_ip
-public_name: LANIP
+orm_name: LANIP
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: sub_domain_lcuuid
+      orm_name: SubDomain
+      type: string
+
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: ip
-    public_name: IP
+    orm_name: IP
     type: string
-  - name: vInterfaceID
-    public_name: VInterfaceID
+  - name: vinterface_id
+    orm_name: VInterfaceID
     type: int
-  has_extension: true
-  collection_extension: true
+  extensions:
+    - collection
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: subnet_id
+        type: int
+      - name: subnet_lcuuid
+        type: string

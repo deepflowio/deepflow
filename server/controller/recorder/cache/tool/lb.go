@@ -7,59 +7,59 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// LB defines cache data structure.
-type LB struct {
+// Lb defines cache data structure.
+type Lb struct {
 	lcuuid   string
 	id       int
 	name     string
-	regionID int
-	vpcID    int
+	regionId int
+	vpcId    int
 }
 
-func (t *LB) IsValid() bool {
+func (t *Lb) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *LB) Lcuuid() string {
+func (t *Lb) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *LB) ID() int {
+func (t *Lb) Id() int {
 	return t.id
 }
 
-func (t *LB) Name() string {
+func (t *Lb) Name() string {
 	return t.name
 }
 
-func (t *LB) RegionID() int {
-	return t.regionID
+func (t *Lb) RegionId() int {
+	return t.regionId
 }
 
-func (t *LB) VPCID() int {
-	return t.vpcID
+func (t *Lb) VpcId() int {
+	return t.vpcId
 }
 
-func (t *LB) reset(dbItem *metadbmodel.LB, tool *Tool) {
+func (t *Lb) reset(dbItem *metadbmodel.LB, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.vpcID = dbItem.VPCID
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.vpcId = dbItem.VPCID
 }
 
-func NewLBCollection(t *Tool) *LBCollection {
-	c := new(LBCollection)
-	c.collection = newCollectionBuilder[*LB]().
+func NewLbCollection(t *Tool) *LbCollection {
+	c := new(LbCollection)
+	c.collection = newCollectionBuilder[*Lb]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_LB_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.LB { return new(metadbmodel.LB) }).
-		withCacheItemFactory(func() *LB { return new(LB) }).
+		withCacheItemFactory(func() *Lb { return new(Lb) }).
 		build()
 	return c
 }
 
-// LBCollection defines a collection that maps individual fields to the LB cache data structure.
-type LBCollection struct {
-	collection[*LB, *metadbmodel.LB]
+// LbCollection defines a collection that maps individual fields to the Lb cache data structure.
+type LbCollection struct {
+	collection[*Lb, *metadbmodel.LB]
 }

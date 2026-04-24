@@ -61,7 +61,7 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN,
 			wholeCache,
 			db.NewPodIngressRule().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.PodIngressRules,
+			wholeCache.DiffBases().PodIngressRule().GetAll(),
 			cloudData,
 		),
 	}
@@ -76,7 +76,8 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 
 // Implement DataGenerator interface
 func (r *PodIngressRule) generateDBItemToAdd(cloudItem *cloudmodel.PodIngressRule) (*metadbmodel.PodIngressRule, bool) {
-	podIngressID, exists := r.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
+	podIngressItem := r.cache.Tool().PodIngress().GetByLcuuid(cloudItem.PodIngressLcuuid)
+	podIngressID, exists := podIngressItem.Id(), podIngressItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,

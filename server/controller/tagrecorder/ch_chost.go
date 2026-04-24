@@ -27,12 +27,12 @@ import (
 
 type ChChost struct {
 	SubscriberComponent[
-		*message.AddedVMs,
-		message.AddedVMs,
-		*message.UpdatedVM,
-		message.UpdatedVM,
-		*message.DeletedVMs,
-		message.DeletedVMs,
+		*message.AddedVms,
+		message.AddedVms,
+		*message.UpdatedVm,
+		message.UpdatedVm,
+		*message.DeletedVms,
+		message.DeletedVms,
 		metadbmodel.VM,
 		metadbmodel.ChChost,
 		IDKey,
@@ -42,12 +42,12 @@ type ChChost struct {
 func NewChChost() *ChChost {
 	mng := &ChChost{
 		newSubscriberComponent[
-			*message.AddedVMs,
-			message.AddedVMs,
-			*message.UpdatedVM,
-			message.UpdatedVM,
-			*message.DeletedVMs,
-			message.DeletedVMs,
+			*message.AddedVms,
+			message.AddedVms,
+			*message.UpdatedVm,
+			message.UpdatedVm,
+			*message.DeletedVms,
+			message.DeletedVms,
 			metadbmodel.VM,
 			metadbmodel.ChChost,
 			IDKey,
@@ -83,7 +83,7 @@ func (c *ChChost) sourceToTarget(md *message.Metadata, source *metadbmodel.VM) (
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChost) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
+func (c *ChChost) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVm) {
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

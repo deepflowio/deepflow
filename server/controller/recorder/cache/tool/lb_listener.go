@@ -7,53 +7,53 @@ import (
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
 
-// LBListener defines cache data structure.
-type LBListener struct {
+// LbListener defines cache data structure.
+type LbListener struct {
 	lcuuid string
 	id     int
 	name   string
-	lbID   int
+	lbId   int
 }
 
-func (t *LBListener) IsValid() bool {
+func (t *LbListener) IsValid() bool {
 	return t.lcuuid != ""
 }
 
-func (t *LBListener) Lcuuid() string {
+func (t *LbListener) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *LBListener) ID() int {
+func (t *LbListener) Id() int {
 	return t.id
 }
 
-func (t *LBListener) Name() string {
+func (t *LbListener) Name() string {
 	return t.name
 }
 
-func (t *LBListener) LBID() int {
-	return t.lbID
+func (t *LbListener) LbId() int {
+	return t.lbId
 }
 
-func (t *LBListener) reset(dbItem *metadbmodel.LBListener, tool *Tool) {
+func (t *LbListener) reset(dbItem *metadbmodel.LBListener, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.lbID = dbItem.LBID
+	t.lbId = dbItem.LBID
 }
 
-func NewLBListenerCollection(t *Tool) *LBListenerCollection {
-	c := new(LBListenerCollection)
-	c.collection = newCollectionBuilder[*LBListener]().
+func NewLbListenerCollection(t *Tool) *LbListenerCollection {
+	c := new(LbListenerCollection)
+	c.collection = newCollectionBuilder[*LbListener]().
 		withResourceType(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN).
 		withTool(t).
 		withDBItemFactory(func() *metadbmodel.LBListener { return new(metadbmodel.LBListener) }).
-		withCacheItemFactory(func() *LBListener { return new(LBListener) }).
+		withCacheItemFactory(func() *LbListener { return new(LbListener) }).
 		build()
 	return c
 }
 
-// LBListenerCollection defines a collection that maps individual fields to the LBListener cache data structure.
-type LBListenerCollection struct {
-	collection[*LBListener, *metadbmodel.LBListener]
+// LbListenerCollection defines a collection that maps individual fields to the LbListener cache data structure.
+type LbListenerCollection struct {
+	collection[*LbListener, *metadbmodel.LBListener]
 }

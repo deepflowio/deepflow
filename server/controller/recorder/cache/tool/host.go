@@ -12,8 +12,8 @@ type Host struct {
 	lcuuid   string
 	id       int
 	name     string
-	regionID int
-	azID     int
+	regionId int
+	azId     int
 	ip       string
 }
 
@@ -25,7 +25,7 @@ func (t *Host) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *Host) ID() int {
+func (t *Host) Id() int {
 	return t.id
 }
 
@@ -33,15 +33,15 @@ func (t *Host) Name() string {
 	return t.name
 }
 
-func (t *Host) Region() int {
-	return t.regionID
+func (t *Host) RegionId() int {
+	return t.regionId
 }
 
-func (t *Host) AZ() int {
-	return t.azID
+func (t *Host) AzId() int {
+	return t.azId
 }
 
-func (t *Host) IP() string {
+func (t *Host) Ip() string {
 	return t.ip
 }
 
@@ -49,8 +49,8 @@ func (t *Host) reset(dbItem *metadbmodel.Host, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.regionID = tool.Region().GetByLcuuid(dbItem.Region).ID()
-	t.azID = tool.AZ().GetByLcuuid(dbItem.AZ).ID()
+	t.regionId = tool.Region().GetByLcuuid(dbItem.Region).Id()
+	t.azId = tool.Az().GetByLcuuid(dbItem.AZ).Id()
 	t.ip = dbItem.IP
 }
 
@@ -75,8 +75,8 @@ type HostCollection struct {
 
 // OnAfterAdd implements CollectionExtender interface
 func (c *HostCollection) OnAfterAdd(item *Host, dbItem *metadbmodel.Host) {
-	if item.IP() != "" {
-		c.ipToItem[item.IP()] = item
+	if item.Ip() != "" {
+		c.ipToItem[item.Ip()] = item
 	}
 }
 
@@ -84,26 +84,26 @@ func (c *HostCollection) OnAfterAdd(item *Host, dbItem *metadbmodel.Host) {
 func (c *HostCollection) OnAfterUpdate(item *Host, dbItem *metadbmodel.Host) {
 	// Remove old ip mapping if exists
 	for ip, hostItem := range c.ipToItem {
-		if hostItem == item && ip != item.IP() {
+		if hostItem == item && ip != item.Ip() {
 			delete(c.ipToItem, ip)
 			break
 		}
 	}
 	// Add new ip mapping
-	if item.IP() != "" {
-		c.ipToItem[item.IP()] = item
+	if item.Ip() != "" {
+		c.ipToItem[item.Ip()] = item
 	}
 }
 
 // OnAfterDelete implements CollectionExtender interface
 func (c *HostCollection) OnAfterDelete(item *Host, dbItem *metadbmodel.Host) {
-	if item.IP() != "" {
-		delete(c.ipToItem, item.IP())
+	if item.Ip() != "" {
+		delete(c.ipToItem, item.Ip())
 	}
 }
 
-// GetOrLoadByIP returns the Host by its ip, loading from DB if not found in cache.
-func (c *HostCollection) GetOrLoadByIP(ip string) *Host {
+// GetOrLoadByIp returns the Host by its ip, loading from DB if not found in cache.
+func (c *HostCollection) GetOrLoadByIp(ip string) *Host {
 
 	if ip == "" {
 		return new(Host)
@@ -125,8 +125,8 @@ func (c *HostCollection) GetOrLoadByIP(ip string) *Host {
 	}
 }
 
-// GetByIP returns the Host by its ip directly from cache.
-func (c *HostCollection) GetByIP(ip string) *Host {
+// GetByIp returns the Host by its ip directly from cache.
+func (c *HostCollection) GetByIp(ip string) *Host {
 
 	if ip == "" {
 		return new(Host)

@@ -35,24 +35,24 @@ import (
 type VMMessageFactory struct{}
 
 func (f *VMMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedVMs{}
+	return &message.AddedVms{}
 }
 
 func (f *VMMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedVM{}
+	return &message.UpdatedVm{}
 }
 
 func (f *VMMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedVMs{}
+	return &message.DeletedVms{}
 }
 
 func (f *VMMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedVMFields{}
+	return &message.UpdatedVmFields{}
 }
 
 type VM struct {
 	UpdaterBase[cloudmodel.VM,
-		*diffbase.VM,
+		*diffbase.Vm,
 		*metadbmodel.VM,
 		metadbmodel.VM,
 	]
@@ -64,7 +64,7 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 			ctrlrcommon.RESOURCE_TYPE_VM_EN,
 			wholeCache,
 			db.NewVM().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.VMs,
+			wholeCache.DiffBases().VM().GetAll(),
 			cloudData,
 		),
 	}
@@ -78,7 +78,8 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 }
 
 func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*metadbmodel.VM, bool) {
-	vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := m.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -88,7 +89,8 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*metadbmodel.VM, boo
 	}
 	var hostID int
 	if cloudItem.LaunchServer != "" {
-		hostID, _ = m.cache.ToolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
+		hostItem := m.cache.Tool().Host().GetByIp(cloudItem.LaunchServer)
+		hostID, _ = hostItem.Id(), hostItem.IsValid()
 	}
 	cloudTags := map[string]string{}
 	if cloudItem.CloudTags != nil {
@@ -96,7 +98,8 @@ func (m *VM) generateDBItemToAdd(cloudItem *cloudmodel.VM) (*metadbmodel.VM, boo
 	}
 	networkID := 0
 	if cloudItem.NetworkLcuuid != "" {
-		networkID, exists = m.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+		networkItem := m.cache.Tool().Network().GetByLcuuid(cloudItem.NetworkLcuuid)
+		networkID, exists = networkItem.Id(), networkItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
@@ -138,11 +141,12 @@ func (m *VM) recordStatsd(cloudItem *cloudmodel.VM) {
 	m.statsd.GetMonitor(statsd.TagTypeVMSyncDelay).Fill(int(syncDelay))
 }
 
-func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedVMFields)
+func (m *VM) generateUpdateInfo(diffBase *diffbase.Vm, cloudItem *cloudmodel.VM) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedVmFields)
 	mapInfo := make(map[string]interface{})
-	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
-		vpcID, exists := m.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	if diffBase.VpcLcuuid != cloudItem.VPCLcuuid {
+		vpcItem := m.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+		vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -151,8 +155,8 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 			return nil, nil, false
 		}
 		mapInfo["epc_id"] = vpcID
-		structInfo.VPCID.SetNew(vpcID) // TODO is old value needed?
-		structInfo.VPCLcuuid.Set(diffBase.VPCLcuuid, cloudItem.VPCLcuuid)
+		structInfo.VpcId.SetNew(vpcID) // TODO is old value needed?
+		structInfo.VpcLcuuid.Set(diffBase.VpcLcuuid, cloudItem.VPCLcuuid)
 	}
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -170,9 +174,9 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 		mapInfo["label"] = cloudItem.Label
 		structInfo.Label.Set(diffBase.Label, cloudItem.Label)
 	}
-	if diffBase.IP != cloudItem.IP {
+	if diffBase.Ip != cloudItem.IP {
 		mapInfo["ip"] = cloudItem.IP
-		structInfo.IP.Set(diffBase.IP, cloudItem.IP)
+		structInfo.Ip.Set(diffBase.Ip, cloudItem.IP)
 	}
 	if diffBase.Hostname != cloudItem.Hostname {
 		mapInfo["hostname"] = cloudItem.Hostname
@@ -182,28 +186,29 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 		mapInfo["state"] = cloudItem.State
 		structInfo.State.Set(diffBase.State, cloudItem.State)
 	}
-	if diffBase.HType != cloudItem.HType {
+	if diffBase.Htype != cloudItem.HType {
 		mapInfo["htype"] = cloudItem.HType
-		structInfo.HType.Set(diffBase.HType, cloudItem.HType)
+		structInfo.Htype.Set(diffBase.Htype, cloudItem.HType)
 	}
 	if diffBase.LaunchServer != cloudItem.LaunchServer {
 		mapInfo["launch_server"] = cloudItem.LaunchServer
 		structInfo.LaunchServer.Set(diffBase.LaunchServer, cloudItem.LaunchServer)
 	}
 	if cloudItem.LaunchServer != "" {
-		hostID, _ := m.cache.ToolDataSet.GetHostIDByIP(cloudItem.LaunchServer)
-		if diffBase.HostID != hostID {
+		hostItem := m.cache.Tool().Host().GetByIp(cloudItem.LaunchServer)
+		hostID, _ := hostItem.Id(), hostItem.IsValid()
+		if diffBase.HostId != hostID {
 			mapInfo["host_id"] = hostID
-			structInfo.HostID.Set(diffBase.HostID, hostID)
+			structInfo.HostId.Set(diffBase.HostId, hostID)
 		}
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid
 		structInfo.RegionLcuuid.Set(diffBase.RegionLcuuid, cloudItem.RegionLcuuid)
 	}
-	if diffBase.AZLcuuid != cloudItem.AZLcuuid {
+	if diffBase.AzLcuuid != cloudItem.AZLcuuid {
 		mapInfo["az"] = cloudItem.AZLcuuid
-		structInfo.AZLcuuid.Set(diffBase.AZLcuuid, cloudItem.AZLcuuid)
+		structInfo.AzLcuuid.Set(diffBase.AzLcuuid, cloudItem.AZLcuuid)
 	}
 	if cloudcommon.DiffMap(diffBase.LearnedCloudTags, cloudItem.CloudTags) {
 		updateTags := map[string]string{}
@@ -218,7 +223,8 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 		networkID := 0
 		if cloudItem.NetworkLcuuid != "" {
 			var exists bool
-			networkID, exists = m.cache.ToolDataSet.GetNetworkIDByLcuuid(cloudItem.NetworkLcuuid)
+			networkItem := m.cache.Tool().Network().GetByLcuuid(cloudItem.NetworkLcuuid)
+			networkID, exists = networkItem.Id(), networkItem.IsValid()
 			if !exists {
 				log.Error(resourceAForResourceBNotFound(
 					ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.NetworkLcuuid,
@@ -227,7 +233,7 @@ func (m *VM) generateUpdateInfo(diffBase *diffbase.VM, cloudItem *cloudmodel.VM)
 			}
 		}
 		mapInfo["vl2id"] = networkID
-		structInfo.NetworkID.SetNew(networkID)
+		structInfo.NetworkId.SetNew(networkID)
 		structInfo.NetworkLcuuid.Set(diffBase.NetworkLcuuid, cloudItem.NetworkLcuuid)
 	}
 

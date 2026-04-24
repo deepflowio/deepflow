@@ -1,38 +1,137 @@
 name: vm
-public_name: VM
+orm_name: VM
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: label
+      orm_name: Label
+      type: string
+    - name: ip
+      orm_name: IP
+      type: string
+    - name: hostname
+      orm_name: Hostname
+      type: string
+    - name: state
+      orm_name: State
+      type: int
+    - name: htype
+      orm_name: HType
+      type: int
+    - name: launch_server
+      orm_name: LaunchServer
+      type: string
+    - name: vpc_lcuuid
+      orm_name: VPCID
+      type: string
+      ref:
+        resource: vpc
+        lookup_by: id
+        target: lcuuid
+    - name: region_lcuuid
+      orm_name: Region
+      type: string
+    - name: az_lcuuid
+      orm_name: AZ
+      type: string
+    - name: learned_cloud_tags
+      orm_name: LearnedCloudTags
+      type: map[string]string
+    - name: network_lcuuid
+      orm_name: NetworkID
+      type: string
+      ref:
+        resource: network
+        lookup_by: id
+        target: lcuuid
+    - name: host_id
+      orm_name: LaunchServer
+      type: int
+      ref:
+        resource: host
+        lookup_by: ip
+        target: id
+
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: regionID
-    public_name: RegionID
+  - name: region_id
+    orm_name: Region
     type: int
-    ref: Region
-    db_field_name: Region
-  - name: azID
-    public_name: AZID
+    ref:
+      resource: region
+      lookup_by: lcuuid
+      target: id
+  - name: az_id
+    orm_name: AZ
     type: int
-    ref: AZ
-    db_field_name: AZ
-  - name: vpcID
-    public_name: VPCID
+    ref:
+      resource: az
+      lookup_by: lcuuid
+      target: id
+  - name: vpc_id
+    orm_name: VPCID
     type: int
-  - name: hostID
-    public_name: HostID
+  - name: host_id
+    orm_name: HostID
     type: int
-  - name: networkID
-    public_name: NetworkID
+  - name: network_id
+    orm_name: NetworkID
     type: int
-  - name: podNodeID
-    public_name: PodNodeID
+  - name: pod_node_id
+    orm_name: PodNodeID
     type: int
-    has_setter: true
+    for_mutation: true
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: ip
+        type: string
+      - name: label
+        type: string
+      - name: state
+        type: int
+      - name: htype
+        type: int
+      - name: launch_server
+        type: string
+      - name: learned_cloud_tags
+        type: map[string]string
+      - name: custom_cloud_tags
+        type: map[string]string
+      - name: host_id
+        type: int
+      - name: uid
+        type: string
+      - name: hostname
+        type: string
+      - name: vpc_id
+        type: int
+      - name: vpc_lcuuid
+        type: string
+      - name: az_lcuuid
+        type: string
+      - name: region_lcuuid
+        type: string
+      - name: network_id
+        type: int
+      - name: network_lcuuid
+        type: string

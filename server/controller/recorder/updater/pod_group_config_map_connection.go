@@ -61,7 +61,7 @@ func NewPodGroupConfigMapConnection(wholeCache *cache.Cache, cloudData []cloudmo
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN,
 			wholeCache,
 			db.NewPodGroupConfigMapConnection().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.PodGroupConfigMapConnections,
+			wholeCache.DiffBases().PodGroupConfigMapConnection().GetAll(),
 			cloudData,
 		),
 	}
@@ -76,7 +76,8 @@ func NewPodGroupConfigMapConnection(wholeCache *cache.Cache, cloudData []cloudmo
 
 // Implement DataGenerator interface
 func (h *PodGroupConfigMapConnection) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupConfigMapConnection) (*metadbmodel.PodGroupConfigMapConnection, bool) {
-	podGroupID, exists := h.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
+	podGroupItem := h.cache.Tool().PodGroup().GetByLcuuid(cloudItem.PodGroupLcuuid)
+	podGroupID, exists := podGroupItem.Id(), podGroupItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
@@ -84,7 +85,8 @@ func (h *PodGroupConfigMapConnection) generateDBItemToAdd(cloudItem *cloudmodel.
 		), h.metadata.LogPrefixes)
 		return nil, false
 	}
-	configMapID, exists := h.cache.ToolDataSet.GetConfigMapIDByLcuuid(cloudItem.ConfigMapLcuuid)
+	configMapItem := h.cache.Tool().ConfigMap().GetByLcuuid(cloudItem.ConfigMapLcuuid)
+	configMapID, exists := configMapItem.Id(), configMapItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, cloudItem.ConfigMapLcuuid,

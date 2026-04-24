@@ -27,12 +27,12 @@ import (
 
 type ChVPC struct {
 	SubscriberComponent[
-		*message.AddedVPCs,
-		message.AddedVPCs,
-		*message.UpdatedVPC,
-		message.UpdatedVPC,
-		*message.DeletedVPCs,
-		message.DeletedVPCs,
+		*message.AddedVpcs,
+		message.AddedVpcs,
+		*message.UpdatedVpc,
+		message.UpdatedVpc,
+		*message.DeletedVpcs,
+		message.DeletedVpcs,
 		metadbmodel.VPC,
 		metadbmodel.ChVPC,
 		IDKey,
@@ -43,12 +43,12 @@ type ChVPC struct {
 func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 	mng := &ChVPC{
 		newSubscriberComponent[
-			*message.AddedVPCs,
-			message.AddedVPCs,
-			*message.UpdatedVPC,
-			message.UpdatedVPC,
-			*message.DeletedVPCs,
-			message.DeletedVPCs,
+			*message.AddedVpcs,
+			message.AddedVpcs,
+			*message.UpdatedVpc,
+			message.UpdatedVpc,
+			*message.DeletedVpcs,
+			message.DeletedVpcs,
 			metadbmodel.VPC,
 			metadbmodel.ChVPC,
 			IDKey,
@@ -85,7 +85,7 @@ func (c *ChVPC) sourceToTarget(md *message.Metadata, source *metadbmodel.VPC) (k
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChVPC) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVPC) {
+func (c *ChVPC) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVpc) {
 }
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator

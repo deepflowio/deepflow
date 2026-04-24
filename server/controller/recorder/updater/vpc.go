@@ -32,25 +32,25 @@ import (
 type VPCMessageFactory struct{}
 
 func (f *VPCMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedVPCs{}
+	return &message.AddedVpcs{}
 }
 
 func (f *VPCMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedVPC{}
+	return &message.UpdatedVpc{}
 }
 
 func (f *VPCMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedVPCs{}
+	return &message.DeletedVpcs{}
 }
 
 func (f *VPCMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedVPCFields{}
+	return &message.UpdatedVpcFields{}
 }
 
 type VPC struct {
 	UpdaterBase[
 		cloudmodel.VPC,
-		*diffbase.VPC,
+		*diffbase.Vpc,
 		*metadbmodel.VPC,
 		metadbmodel.VPC,
 	]
@@ -62,7 +62,7 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN,
 			wholeCache,
 			db.NewVPC().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.VPCs,
+			wholeCache.DiffBases().VPC().GetAll(),
 			cloudData,
 		),
 	}
@@ -94,8 +94,8 @@ func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*metadbmodel.VPC, 
 	return dbItem, true
 }
 
-func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.VPC) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedVPCFields)
+func (v *VPC) generateUpdateInfo(diffBase *diffbase.Vpc, cloudItem *cloudmodel.VPC) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedVpcFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -122,13 +122,13 @@ func (v *VPC) generateUpdateInfo(diffBase *diffbase.VPC, cloudItem *cloudmodel.V
 		mapInfo["owner"] = cloudItem.Owner
 		structInfo.Owner.Set(diffBase.Owner, cloudItem.Owner)
 	}
-	if diffBase.CIDR != cloudItem.CIDR {
+	if diffBase.Cidr != cloudItem.CIDR {
 		mapInfo["cidr"] = cloudItem.CIDR
-		structInfo.CIDR.Set(diffBase.CIDR, cloudItem.CIDR)
+		structInfo.Cidr.Set(diffBase.Cidr, cloudItem.CIDR)
 	}
-	if diffBase.TunnelID != cloudItem.TunnelID {
+	if diffBase.TunnelId != cloudItem.TunnelID {
 		mapInfo["tunnel_id"] = cloudItem.TunnelID
-		structInfo.TunnelID.Set(diffBase.TunnelID, cloudItem.TunnelID)
+		structInfo.TunnelId.Set(diffBase.TunnelId, cloudItem.TunnelID)
 	}
 
 	return structInfo, mapInfo, len(mapInfo) > 0

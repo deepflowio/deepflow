@@ -12,7 +12,7 @@ type Network struct {
 	lcuuid string
 	id     int
 	name   string
-	vpcID  int
+	vpcId  int
 }
 
 func (t *Network) IsValid() bool {
@@ -23,7 +23,7 @@ func (t *Network) Lcuuid() string {
 	return t.lcuuid
 }
 
-func (t *Network) ID() int {
+func (t *Network) Id() int {
 	return t.id
 }
 
@@ -31,15 +31,15 @@ func (t *Network) Name() string {
 	return t.name
 }
 
-func (t *Network) VPCID() int {
-	return t.vpcID
+func (t *Network) VpcId() int {
+	return t.vpcId
 }
 
 func (t *Network) reset(dbItem *metadbmodel.Network, tool *Tool) {
 	t.lcuuid = dbItem.Lcuuid
 	t.id = dbItem.ID
 	t.name = dbItem.Name
-	t.vpcID = dbItem.VPCID
+	t.vpcId = dbItem.VPCID
 }
 
 func NewNetworkCollection(t *Tool) *NetworkCollection {

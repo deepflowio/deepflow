@@ -1,21 +1,45 @@
 name: config_map
-public_name: ConfigMap
+orm_name: ConfigMap
+
+cache_diffbase:
+  enabled: true
+  fields:
+    - name: name
+      orm_name: Name
+      type: string
+    - name: data
+      orm_name: Data
+      type: string
+      from: bytes
+      is_large: true
+    - name: data_hash
+      orm_name: DataHash
+      type: string
+
 cache_tool:
   enabled: true
   fields:
   - name: lcuuid
-    public_name: Lcuuid
+    orm_name: Lcuuid
     type: string
-    is_validation_field: true
+    for_validation: true
   - name: id
-    public_name: ID
+    orm_name: ID
     type: int
   - name: name
-    public_name: Name
+    orm_name: Name
     type: string
-  - name: podGroupIDs
-    public_name: PodGroupIDs
-    type: mapset.Set[int]
-    is_plural: true
+  - name: pod_group_ids
+    orm_name: PodGroupIDs
+    type: set
+    of: int
     comment: 'data source: pod_group_config_map_connection'
-  has_mapset: true
+
+pubsub:
+  message:
+    enabled: true
+    fields:
+      - name: name
+        type: string
+      - name: data
+        type: string

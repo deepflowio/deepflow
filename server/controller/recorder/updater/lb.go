@@ -31,25 +31,25 @@ import (
 type LBMessageFactory struct{}
 
 func (f *LBMessageFactory) CreateAddedMessage() types.Added {
-	return &message.AddedLBs{}
+	return &message.AddedLbs{}
 }
 
 func (f *LBMessageFactory) CreateUpdatedMessage() types.Updated {
-	return &message.UpdatedLB{}
+	return &message.UpdatedLb{}
 }
 
 func (f *LBMessageFactory) CreateDeletedMessage() types.Deleted {
-	return &message.DeletedLBs{}
+	return &message.DeletedLbs{}
 }
 
 func (f *LBMessageFactory) CreateUpdatedFields() types.UpdatedFields {
-	return &message.UpdatedLBFields{}
+	return &message.UpdatedLbFields{}
 }
 
 type LB struct {
 	UpdaterBase[
 		cloudmodel.LB,
-		*diffbase.LB,
+		*diffbase.Lb,
 		*metadbmodel.LB,
 		metadbmodel.LB,
 	]
@@ -61,7 +61,7 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 			ctrlrcommon.RESOURCE_TYPE_LB_EN,
 			wholeCache,
 			db.NewLB().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.LBs,
+			wholeCache.DiffBases().LB().GetAll(),
 			cloudData,
 		),
 	}
@@ -75,7 +75,8 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 }
 
 func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*metadbmodel.LB, bool) {
-	vpcID, exists := l.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+	vpcItem := l.cache.Tool().Vpc().GetByLcuuid(cloudItem.VPCLcuuid)
+	vpcID, exists := vpcItem.Id(), vpcItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
@@ -98,8 +99,8 @@ func (l *LB) generateDBItemToAdd(cloudItem *cloudmodel.LB) (*metadbmodel.LB, boo
 	return dbItem, true
 }
 
-func (l *LB) generateUpdateInfo(diffBase *diffbase.LB, cloudItem *cloudmodel.LB) (types.UpdatedFields, map[string]interface{}, bool) {
-	structInfo := new(message.UpdatedLBFields)
+func (l *LB) generateUpdateInfo(diffBase *diffbase.Lb, cloudItem *cloudmodel.LB) (types.UpdatedFields, map[string]interface{}, bool) {
+	structInfo := new(message.UpdatedLbFields)
 	mapInfo := make(map[string]interface{})
 	if diffBase.Name != cloudItem.Name {
 		mapInfo["name"] = cloudItem.Name
@@ -109,9 +110,9 @@ func (l *LB) generateUpdateInfo(diffBase *diffbase.LB, cloudItem *cloudmodel.LB)
 		mapInfo["model"] = cloudItem.Model
 		structInfo.Model.Set(diffBase.Model, cloudItem.Model)
 	}
-	if diffBase.VIP != cloudItem.VIP {
+	if diffBase.Vip != cloudItem.VIP {
 		mapInfo["vip"] = cloudItem.VIP
-		structInfo.VIP.Set(diffBase.VIP, cloudItem.VIP)
+		structInfo.Vip.Set(diffBase.Vip, cloudItem.VIP)
 	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		mapInfo["region"] = cloudItem.RegionLcuuid

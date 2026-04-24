@@ -23,7 +23,6 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowio/deepflow/server/controller/recorder/db"
-	"github.com/deepflowio/deepflow/server/controller/recorder/listener"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message"
 	"github.com/deepflowio/deepflow/server/controller/recorder/pubsub/message/types"
@@ -85,16 +84,15 @@ type UpdaterBase[
 
 	// === 数据管理 ===
 	cache             *cache.Cache              // 基于 Domain 或者 SubDomain 范围构造
-	domainToolDataSet *tool.DataSet             // 基于 Domain 构造，仅当 Updater 资源属于 SubDomain 时使用
+	domainToolDataSet *tool.Tool                // 基于 Domain 构造，仅当 Updater 资源属于 SubDomain 时使用
 	dbOperator        db.Operator[MPT, MT]      // 数据库操作对象
 	diffBaseData      map[string]BT             // 用于比对的旧资源数据
 	cloudData         []CT                      // 定时获取的新资源数据
 	dataGenerator     DataGenerator[CT, MT, BT] // 提供各类数据生成的方法
 
 	// === 扩展机制 ===
-	hookers   map[int]interface{}             // 批量增删改的 hooker
-	listeners []listener.Listener[CT, MT, BT] // 关注 Updater 的增删改操作行为及详情的监听器
-	pubsub    pubsub.ResourcePubSub           // 用于发布订阅的消息中心
+	hookers map[int]interface{}    // 批量增删改的 hooker
+	pubsub  pubsub.ResourcePubSub // 用于发布订阅的消息中心
 
 	// === 消息工厂 ===
 	messageFactory MessageFactory // 消息创建工厂
@@ -131,7 +129,7 @@ func newUpdaterBase[
 	u.msgMetadata = message.NewMetadata(
 		message.MetadataPlatform(u.metadata.Platform),
 		message.MetadataSoftDelete(u.dbOperator.GetSoftDelete()),
-		message.MetadataToolDataSet(cache.ToolDataSet),
+		message.MetadataToolDataSet(cache.Tool()),
 	)
 
 	// 获取消息工厂
@@ -163,14 +161,11 @@ func (u *UpdaterBase[CT, BT, MPT, MT]) setDataGenerator(dataGenerator DataGenera
 	u.dataGenerator = dataGenerator
 }
 
-func (u *UpdaterBase[CT, BT, MPT, MT]) setDomainToolDataSet(domainToolDataSet *tool.DataSet) {
+func (u *UpdaterBase[CT, BT, MPT, MT]) setDomainToolDataSet(domainToolDataSet *tool.Tool) {
 	u.domainToolDataSet = domainToolDataSet
 }
 
-func (u *UpdaterBase[CT, BT, MPT, MT]) RegisterListener(listener listener.Listener[CT, MT, BT]) ResourceUpdater {
-	u.listeners = append(u.listeners, listener)
-	return u
-}
+
 
 func (u *UpdaterBase[CT, BT, MPT, MT]) GetResourceType() string {
 	return u.resourceType
@@ -270,9 +265,6 @@ func (u *UpdaterBase[CT, BT, MPT, MT]) addPage(dbItemsToAdd []*MT) {
 
 	// 执行数据库批量插入
 	if dbItems, ok := u.dbOperator.AddBatch(dbItemsToAdd); ok {
-		// 通知监听器
-		u.notifyOnAdded(dbItems)
-
 		// 发布消息
 		if u.messageFactory != nil {
 			msgData := u.messageFactory.CreateAddedMessage()
@@ -289,9 +281,6 @@ func (u *UpdaterBase[CT, BT, MPT, MT]) addPage(dbItemsToAdd []*MT) {
 
 func (u *UpdaterBase[CT, BT, MPT, MT]) update(cloudItem *CT, diffBase BT, mapInfo map[string]interface{}, structInfo types.UpdatedFields) {
 	if dbItem, ok := u.dbOperator.Update(diffBase.GetLcuuid(), mapInfo); ok {
-		// 通知监听器
-		u.notifyOnUpdated(cloudItem, diffBase)
-
 		// 设置更新字段信息
 		structInfo.SetID(MPT(dbItem).GetID())
 		structInfo.SetLcuuid(diffBase.GetLcuuid())
@@ -327,9 +316,6 @@ func (u *UpdaterBase[CT, BT, MPT, MT]) delete(lcuuids []string) {
 
 func (u *UpdaterBase[CT, BT, MPT, MT]) deletePage(lcuuids []string) {
 	if dbItems, ok := u.dbOperator.DeleteBatch(lcuuids); ok {
-		// 通知监听器
-		u.notifyOnDeleted(lcuuids, dbItems)
-
 		var addition interface{}
 
 		// 执行后置钩子（如果存在）
@@ -363,22 +349,4 @@ func (u *UpdaterBase[CT, BT, MPT, MT]) deletePage(lcuuids []string) {
 	}
 }
 
-// 监听器通知方法
 
-func (u *UpdaterBase[CT, BT, MPT, MT]) notifyOnAdded(addedDBItems []*MT) {
-	for _, l := range u.listeners {
-		l.OnUpdaterAdded(addedDBItems)
-	}
-}
-
-func (u *UpdaterBase[CT, BT, MPT, MT]) notifyOnUpdated(cloudItem *CT, diffBaseItem BT) {
-	for _, l := range u.listeners {
-		l.OnUpdaterUpdated(cloudItem, diffBaseItem)
-	}
-}
-
-func (u *UpdaterBase[CT, BT, MPT, MT]) notifyOnDeleted(lcuuids []string, deletedDBItems []*MT) {
-	for _, l := range u.listeners {
-		l.OnUpdaterDeleted(lcuuids, deletedDBItems)
-	}
-}

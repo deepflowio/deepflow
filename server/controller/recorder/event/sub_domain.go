@@ -72,16 +72,16 @@ func (r *WholeSubDomain) OnAnyChanged(md *message.Metadata) {
 			eventapi.RESOURCE_EVENT_TYPE_ATTACH_CONFIG_MAP,
 			eventapi.RESOURCE_EVENT_TYPE_MODIFY_CONFIG_MAP,
 			eventapi.RESOURCE_EVENT_TYPE_DETACH_CONFIG_MAP}, event.Type) {
-			podGroupIDs := md.GetToolDataSet().GetPodGroupIDsByConfigMapID(int(event.ConfigMapID))
+			podGroupIDs := md.GetToolDataSet().ConfigMap().GetById(int(event.ConfigMapID)).PodGroupIdsToSlice()
 			if len(podGroupIDs) != 0 {
 				log.Infof("pod group ids: %v connected to config map (id: %d)", podGroupIDs, event.ConfigMapID, md.LogPrefixes)
 			}
 			for _, podGroupID := range podGroupIDs {
-				gtype, ok := md.GetToolDataSet().GetPodGroupTypeByID(podGroupID)
-				if !ok {
+				pgItem := md.GetToolDataSet().PodGroup().GetById(podGroupID)
+				if !pgItem.IsValid() {
 					log.Errorf("get pod group (id: %d) type failed", podGroupID, md.LogPrefixes)
 				}
-				event.PodGroupType = uint8(common.RESOURCE_POD_GROUP_TYPE_MAP[gtype])
+				event.PodGroupType = uint8(common.RESOURCE_POD_GROUP_TYPE_MAP[pgItem.GType()])
 				event.PodGroupID = uint32(podGroupID)
 				event.InstanceType = uint32(common.VIF_DEVICE_TYPE_POD) // 此处如此赋值原因同 RESOURCE_EVENT_TYPE_MODIFY 类型变更事件
 				r.convertAndEnqueue(md, item.ResourceLcuuid, event)
@@ -92,13 +92,7 @@ func (r *WholeSubDomain) OnAnyChanged(md *message.Metadata) {
 }
 
 func (r *WholeSubDomain) fillRecreatePodEvent(md *message.Metadata, event *eventapi.ResourceEvent) {
-	var networkIDs []uint32
-	var ips []string
-	ipNetworkMap, _ := md.GetToolDataSet().EventDataSet.GetPodIPNetworkMapByID(int(event.InstanceID))
-	for ip, nID := range ipNetworkMap {
-		networkIDs = append(networkIDs, uint32(nID))
-		ips = append(ips, ip.IP)
-	}
+	networkIDs, ips := getDeviceIPNetworks(md.GetToolDataSet(), common.VIF_DEVICE_TYPE_POD, int(event.InstanceID))
 	event.AttributeSubnetIDs = networkIDs
 	event.AttributeIPs = ips
 }
@@ -108,12 +102,12 @@ func (r *WholeSubDomain) fillL3DeviceInfo(md *message.Metadata, event *eventapi.
 	if event.InstanceType == common.VIF_DEVICE_TYPE_POD_NODE {
 		podNodeID = int(event.InstanceID)
 	} else if event.InstanceType == common.VIF_DEVICE_TYPE_POD {
-		podInfo, err := md.GetToolDataSet().GetPodInfoByID(int(event.InstanceID))
-		if err != nil {
-			log.Errorf("get pod (id: %d) pod node ID failed: %s", event.InstanceID, err.Error(), md.LogPrefixes)
+		podItem := md.GetToolDataSet().Pod().GetById(int(event.InstanceID))
+		if !podItem.IsValid() {
+			log.Errorf("get pod (id: %d) pod node ID failed: pod not found", event.InstanceID, md.LogPrefixes)
 			return false
 		}
-		podNodeID = podInfo.PodNodeID
+		podNodeID = podItem.PodNodeId()
 	}
 	l3DeviceOpts, ok := r.tool.getL3DeviceOptionsByPodNodeID(md, podNodeID)
 	if ok {

@@ -28,12 +28,12 @@ import (
 
 type ChChostCloudTags struct {
 	SubscriberComponent[
-		*message.AddedVMs,
-		message.AddedVMs,
-		*message.UpdatedVM,
-		message.UpdatedVM,
-		*message.DeletedVMs,
-		message.DeletedVMs,
+		*message.AddedVms,
+		message.AddedVms,
+		*message.UpdatedVm,
+		message.UpdatedVm,
+		*message.DeletedVms,
+		message.DeletedVms,
 		metadbmodel.VM,
 		metadbmodel.ChChostCloudTags,
 		IDKey,
@@ -43,12 +43,12 @@ type ChChostCloudTags struct {
 func NewChChostCloudTags() *ChChostCloudTags {
 	mng := &ChChostCloudTags{
 		newSubscriberComponent[
-			*message.AddedVMs,
-			message.AddedVMs,
-			*message.UpdatedVM,
-			message.UpdatedVM,
-			*message.DeletedVMs,
-			message.DeletedVMs,
+			*message.AddedVms,
+			message.AddedVms,
+			*message.UpdatedVm,
+			message.UpdatedVm,
+			*message.DeletedVms,
+			message.DeletedVms,
 			metadbmodel.VM,
 			metadbmodel.ChChostCloudTags,
 			IDKey,
@@ -61,7 +61,7 @@ func NewChChostCloudTags() *ChChostCloudTags {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator
-func (c *ChChostCloudTags) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVM) {
+func (c *ChChostCloudTags) onResourceUpdated(md *message.Metadata, updateMessage *message.UpdatedVm) {
 }
 
 // onResourceUpdated implements SubscriberDataGenerator

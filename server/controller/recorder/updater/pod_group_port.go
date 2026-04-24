@@ -61,7 +61,7 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN,
 			wholeCache,
 			db.NewPodGroupPort().SetMetadata(wholeCache.GetMetadata()),
-			wholeCache.DiffBaseDataSet.PodGroupPorts,
+			wholeCache.DiffBases().PodGroupPort().GetAll(),
 			cloudData,
 		),
 	}
@@ -76,7 +76,8 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 
 // Implement DataGenerator interface
 func (p *PodGroupPort) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupPort) (*metadbmodel.PodGroupPort, bool) {
-	podGroupID, exists := p.cache.ToolDataSet.GetPodGroupIDByLcuuid(cloudItem.PodGroupLcuuid)
+	podGroupItem := p.cache.Tool().PodGroup().GetByLcuuid(cloudItem.PodGroupLcuuid)
+	podGroupID, exists := podGroupItem.Id(), podGroupItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_GROUP_EN, cloudItem.PodGroupLcuuid,
@@ -84,7 +85,8 @@ func (p *PodGroupPort) generateDBItemToAdd(cloudItem *cloudmodel.PodGroupPort) (
 		), p.metadata.LogPrefixes)
 		return nil, false
 	}
-	podServiceID, exists := p.cache.ToolDataSet.GetPodServiceIDByLcuuid(cloudItem.PodServiceLcuuid)
+	podServiceItem := p.cache.Tool().PodService().GetByLcuuid(cloudItem.PodServiceLcuuid)
+	podServiceID, exists := podServiceItem.Id(), podServiceItem.IsValid()
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.PodServiceLcuuid,
