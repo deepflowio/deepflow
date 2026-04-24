@@ -1,8 +1,6 @@
 module github.com/deepflowio/deepflow/server
 
-go 1.24.0
-
-toolchain go1.24.3
+go 1.26.2
 
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.103.0
@@ -53,7 +51,7 @@ require (
 	github.com/baidubce/bce-sdk-go v0.9.141
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/bxcodec/faker/v3 v3.8.0
-	github.com/bytedance/sonic v1.12.5
+	github.com/bytedance/sonic v1.15.0
 	github.com/cornelk/hashmap v1.0.8
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
@@ -122,7 +120,7 @@ require (
 	github.com/shirou/gopsutil/v3 v3.22.5
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/spf13/cobra v1.4.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.726
@@ -133,15 +131,15 @@ require (
 	github.com/yuin/gopher-lua v1.1.1
 	go.opentelemetry.io/collector/pdata v1.0.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin v0.49.0
-	go.opentelemetry.io/otel v1.34.0
+	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.24.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.24.0
-	go.opentelemetry.io/otel/sdk v1.34.0
-	go.opentelemetry.io/otel/trace v1.34.0
+	go.opentelemetry.io/otel/sdk v1.43.0
+	go.opentelemetry.io/otel/trace v1.43.0
 	go.opentelemetry.io/proto/otlp v1.1.0
 	golang.org/x/net v0.40.0
 	golang.org/x/sync v0.15.0
-	golang.org/x/sys v0.33.0
+	golang.org/x/sys v0.42.0
 	google.golang.org/grpc v1.62.1
 	google.golang.org/protobuf v1.36.5
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
@@ -183,12 +181,12 @@ require (
 	github.com/aws/smithy-go v1.23.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
-	github.com/bytedance/sonic/loader v0.2.0 // indirect
+	github.com/bytedance/gopkg v0.1.3 // indirect
+	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
-	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/cloudwego/base64x v0.1.4 // indirect
-	github.com/cloudwego/iasm v0.2.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dennwc/varint v1.0.0 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.2 // indirect
@@ -211,7 +209,7 @@ require (
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
@@ -249,7 +247,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/jtolds/gls v4.20.0+incompatible // indirect
-	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/knadh/koanf/maps v0.1.1 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lestrrat-go/strftime v1.0.6 // indirect
@@ -294,9 +292,9 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
-	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
+	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
-	go.opentelemetry.io/otel/metric v1.34.0 // indirect
+	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
