@@ -72,6 +72,26 @@ biz_field:
           value: 5
       output:
         attribute_name: "tlv_c5"
+    - name: "xml_attr_field"
+      type: "payload_xml_value"
+      match:
+        type: "string"
+        keyword: "data"
+        xml_attribute:
+          name: "name"
+          value: "TRAN_TIMESTAMP"
+          ignore_case: false
+      post:
+      - type: parse_xml_value
+        settings:
+        - key: keyword
+          value: "field"
+        - key: type
+          value: "string"
+        - key: ignore_case
+          value: false
+      output:
+        attribute_name: "xml_attr_field"
     - name: "my_field"
       enabled: false
       type: "http_url_field"
