@@ -140,6 +140,7 @@ pub fn get_interface_by_index_from_win32(if_index: u32) -> Result<Link> {
         );
 
         if result != 111 {
+            println!("{} {} GetAdaptersAddresses {}", file!(), line!(), result);
             return Err(Error::Windows(format!(
                 "Get buffer len by GetAdaptersAddresses failed error code {}",
                 result
@@ -159,6 +160,7 @@ pub fn get_interface_by_index_from_win32(if_index: u32) -> Result<Link> {
             &mut buffer_len,
         );
         if result != 0 {
+            println!("{} {} GetAdaptersAddresses {}", file!(), line!(), result);
             return Err(Error::Windows(format!(
                 "Get adapter addresses by GetAdaptersAddresses failed error code {}",
                 result
@@ -170,6 +172,7 @@ pub fn get_interface_by_index_from_win32(if_index: u32) -> Result<Link> {
     while !current_adapter.is_null() {
         let mac_address = unsafe {
             let adapter_ref = &*current_adapter;
+            println!("{} {} adapter ifindex {}", file!(), line!(), adapter_ref.Anonymous1.Anonymous.IfIndex);
             if if_index != adapter_ref.Anonymous1.Anonymous.IfIndex {
                 current_adapter = adapter_ref.Next;
                 continue;
@@ -326,6 +329,7 @@ pub fn route_get(dest_addr: IpAddr) -> Result<Route> {
                 "failed to run GetBestInterfaceEx function with destination address={} because of win32 error code({}),\n{}",
                 dest_addr, ret_code, WIN_ERROR_CODE_STR
             );
+            println!("{} {} {}", file!(), line!(), err_msg);
             return Err(Error::Windows(err_msg));
         }
 
@@ -351,6 +355,7 @@ pub fn route_get(dest_addr: IpAddr) -> Result<Route> {
                 "failed to run GetBestRoute2 function with destination address={} error: {}",
                 dest_addr, err
             );
+            println!("{} {} {}", file!(), line!(), err_msg);
             return Err(Error::Windows(err_msg));
         }
 
@@ -381,6 +386,7 @@ pub fn route_get(dest_addr: IpAddr) -> Result<Route> {
                 (src_addr, gateway)
             }
         };
+        println!("{} {} route_get({}) return {} {}", file!(), line!(), dest_addr, src_addr, best_if_index);
 
         Ok(Route {
             pref_src: Some(src_addr),
