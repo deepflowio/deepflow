@@ -218,6 +218,8 @@ pub const MSG_CLOSE: u8 = 10;
 pub const EVENT_TYPE_PROC_EXEC: u32 = 1 << 9;
 #[allow(dead_code)]
 pub const EVENT_TYPE_PROC_EXIT: u32 = 1 << 10;
+#[allow(dead_code)]
+pub const EVENT_TYPE_LIB_LOAD: u32 = 1 << 11;
 
 // Profiler types
 #[allow(dead_code)]

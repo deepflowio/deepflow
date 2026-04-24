@@ -1087,7 +1087,7 @@ void process_event_free(struct process_create_event *event)
 void add_event_to_proc_list(proc_event_list_t * list, struct bpf_tracer *tracer,
 			    int pid, char *path)
 {
-	static const uint32_t PROC_EVENT_HANDLE_DELAY = 120;
+	static const uint32_t PROC_EVENT_HANDLE_DELAY = 0;
 	struct process_create_event *event = NULL;
 
 	event = calloc(1, sizeof(struct process_create_event));
