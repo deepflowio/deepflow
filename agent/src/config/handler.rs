@@ -3855,6 +3855,11 @@ impl ConfigHandler {
                     "inputs.ebpf.socket.tunning.fentry_enabled"
                 ),
                 (
+                    tunning.hooked_socket_syscalls,
+                    new_tunning.hooked_socket_syscalls,
+                    "inputs.ebpf.socket.tunning.hooked_socket_syscalls"
+                ),
+                (
                     tunning.map_prealloc_disabled,
                     new_tunning.map_prealloc_disabled,
                     "inputs.ebpf.socket.tunning.map_prealloc_disabled"

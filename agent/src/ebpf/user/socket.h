@@ -65,6 +65,21 @@ enum probes_act_type {
 	ACT_DETACH
 };
 
+enum hooked_socket_syscall_bits {
+	HOOKED_SOCKET_SYSCALL_READ = 1U << 0,
+	HOOKED_SOCKET_SYSCALL_READV = 1U << 1,
+	HOOKED_SOCKET_SYSCALL_RECVFROM = 1U << 2,
+	HOOKED_SOCKET_SYSCALL_RECVMSG = 1U << 3,
+	HOOKED_SOCKET_SYSCALL_RECVMMSG = 1U << 4,
+	HOOKED_SOCKET_SYSCALL_SENDMSG = 1U << 5,
+	HOOKED_SOCKET_SYSCALL_SENDMMSG = 1U << 6,
+	HOOKED_SOCKET_SYSCALL_SENDTO = 1U << 7,
+	HOOKED_SOCKET_SYSCALL_WRITE = 1U << 8,
+	HOOKED_SOCKET_SYSCALL_WRITEV = 1U << 9,
+};
+
+#define HOOKED_SOCKET_SYSCALL_ALL ((uint64_t)((1U << 10) - 1))
+
 struct socket_bpf_data {
 	/* session info */
 	uint32_t process_id;	// tgid in kernel struct task_struct
@@ -431,6 +446,7 @@ int socket_tracer_start(void);
 enum tracer_state get_socket_tracer_state(void);
 int set_protocol_ports_bitmap(int proto_type, const char *ports);
 int disable_syscall_trace_id(void);
+void set_hooked_socket_syscalls(uint64_t bitmap);
 
 /**
  * eBPF Probe Point Configuration

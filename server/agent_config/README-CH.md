@@ -4218,6 +4218,67 @@ inputs:
 但这可能会导致一些性能下降。此配置仅适用于 `BPF_MAP_TYPE_HASH` 类型的 bpf map。
 目前适用于 socket trace 和 uprobe Golang/OpenSSL trace 功能。禁用内存预分配大约会减少45M的内存占用。
 
+##### Socket Hook Syscall 列表 {#inputs.ebpf.socket.tunning.hooked_socket_syscalls}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.hooked_socket_syscalls`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        hooked_socket_syscalls:
+        - read
+        - readv
+        - recvfrom
+        - recvmsg
+        - recvmmsg
+        - sendmsg
+        - sendmmsg
+        - sendto
+        - write
+        - writev
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| read | |
+| readv | |
+| recvfrom | |
+| recvmsg | |
+| recvmmsg | |
+| sendmsg | |
+| sendmmsg | |
+| sendto | |
+| write | |
+| writev | |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+控制为哪些受支持的 socket syscall 安装 eBPF hook。
+
+该列表只控制是否 hook 某个 syscall，不控制具体使用哪种 backend。每个启用的
+syscall 仍然遵循当前运行模式下既有的 backend 选择逻辑。例如 mixed 模式继续保留
+现有的 hybrid 与 tracepoint-only 分工，pure-kprobe 模式继续保留既有的 kprobe
+行为，kfunc 模式继续保留既有的 kfunc 行为，以及 `recvfrom` 和 `recvmmsg`
+的 tracepoint fallback。
+
+支持的配置值：`read`、`readv`、`recvfrom`、`recvmsg`、`recvmmsg`、`sendmsg`、
+`sendmmsg`、`sendto`、`write`、`writev`。
+
 ##### 启用fentry/fexit特性 {#inputs.ebpf.socket.tunning.fentry_enabled}
 
 **标签**:
@@ -5198,8 +5259,12 @@ inputs:
 
 **详细描述**:
 
-禁用 Lua 解释器剖析。禁用后将不采集 Lua 进程的函数调用栈，
-可节省约 13 MB 内核内存（lua_tstate_map、lua_lang_flags_map、lua_unwind_info_map、lua_offsets_map、luajit_offsets_map）。
+禁用 Lua 解释器剖析功能。禁用后将不会采集 Lua 进程的函数调用栈，可节省约 13 MB 的内核内存。
+此配置项控制以下 eBPF maps 的创建：
+- lua_tstate_map：缓存每线程 lua_State 栈（按线程，容量较大，约 7 MB）
+- lua_lang_flags_map：记录进程 Lua/LuaJIT 类型标记（约 2.5 MB）
+- lua_unwind_info_map：存储进程级 unwinding 元信息（约 3 MB）
+- lua_offsets_map、luajit_offsets_map：存储 Lua/LuaJIT 结构偏移表（总计 < 2 KB）
 
 ### 网络 {#inputs.ebpf.network}
 
