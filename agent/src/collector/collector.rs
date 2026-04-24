@@ -137,7 +137,7 @@ struct StashKey {
     dst_ip: IpAddr,
     src_gpid: u32,
     dst_gpid: u32,
-    endpoint_hash: u32,
+    endpoint_hash: u64,
     // request-reponse time span
     time_span: u32,
     biz_type: u8,
@@ -198,7 +198,7 @@ impl StashKey {
 
     const ACL: Code = Code::ACL_GID.union(Code::TUNNEL_IP_ID).union(Code::VTAP_ID);
 
-    fn new(tagger: &Tagger, src_ip: IpAddr, dst_ip: Option<IpAddr>, endpoint_hash: u32) -> Self {
+    fn new(tagger: &Tagger, src_ip: IpAddr, dst_ip: Option<IpAddr>, endpoint_hash: u64) -> Self {
         let mut fast_id = 0;
         match tagger.code {
             // single point
@@ -779,7 +779,7 @@ impl Stash {
         }
     }
 
-    fn fill_single_l7_stats(&mut self, tagger: Tagger, endpoint_hash: u32, app_meter: AppMeter) {
+    fn fill_single_l7_stats(&mut self, tagger: Tagger, endpoint_hash: u64, app_meter: AppMeter) {
         // The l7_protocol of otel data may not be available, so report all otel data metrics.
         if tagger.l7_protocol != L7Protocol::Unknown || tagger.signal_source == SignalSource::OTel {
             // Only data whose direction is c|s|local|c-p|s-p|c-app|s-app|app has app_meter.
@@ -796,7 +796,7 @@ impl Stash {
         }
     }
 
-    fn fill_edge_l7_stats(&mut self, tagger: Tagger, endpoint_hash: u32, app_meter: AppMeter) {
+    fn fill_edge_l7_stats(&mut self, tagger: Tagger, endpoint_hash: u64, app_meter: AppMeter) {
         // The l7_protocol of otel data may not be available, so report all otel data metrics.
         // application metrics (vtap_app_edge_port)
         if tagger.l7_protocol != L7Protocol::Unknown || tagger.signal_source == SignalSource::OTel {
