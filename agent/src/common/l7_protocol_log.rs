@@ -479,7 +479,17 @@ impl RrtCache {
         self.logs.get_mut(key)
     }
 
-    pub fn put(&mut self, key: LogCacheKey, value: LogCache) -> Option<LogCache> {
+    // Returns `(same_key_displaced, lru_evicted)`:
+    // - `same_key_displaced`: the previous value for the same key (from `logs.put`).
+    // - `lru_evicted`: a *different* key's entry that was silently evicted from the
+    //   per-flow LRU when `MAX_RRT_CACHE_PER_FLOW` was exceeded.  Callers must account
+    //   for the evicted entry's perf stats (especially unmatched Responses) so that
+    //   those counts are not permanently lost.
+    pub fn put(
+        &mut self,
+        key: LogCacheKey,
+        value: LogCache,
+    ) -> (Option<LogCache>, Option<LogCache>) {
         let now = value.time;
         if self.logs.len() >= usize::from(self.logs.cap())
             && self.last_log_time + Self::LOG_INTERVAL < now
@@ -491,10 +501,11 @@ impl RrtCache {
         let keys = self.flows.get_or_insert_mut(key.flow_id(), || {
             LruCache::new(Self::MAX_RRT_CACHE_PER_FLOW.try_into().unwrap())
         });
+        let mut lru_evicted: Option<LogCache> = None;
         match keys.push(key, ()) {
             // Another cache entry is removed due to the lru's capacity.
             Some((old, _)) if key != old => {
-                self.logs.pop(&old);
+                lru_evicted = self.logs.pop(&old);
                 if self.last_log_time + Self::LOG_INTERVAL < now {
                     self.last_log_time = now;
                     debug!(
@@ -507,10 +518,10 @@ impl RrtCache {
             _ => (),
         }
 
-        let ret = self.logs.put(key, value);
+        let same_key_displaced = self.logs.put(key, value);
         self.cache_len
             .store(self.logs.len() as u64, Ordering::Relaxed);
-        ret
+        (same_key_displaced, lru_evicted)
     }
 
     pub fn pop(&mut self, key: &LogCacheKey) -> Option<LogCache> {
