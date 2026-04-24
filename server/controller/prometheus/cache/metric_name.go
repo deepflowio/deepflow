@@ -27,53 +27,75 @@ import (
 type metricName struct {
 	org *common.ORG
 
-	nameToID sync.Map
-	idToName sync.Map
+	mu       sync.RWMutex
+	nameToID map[string]int
+	idToName map[int]string
 }
 
 func newMetricName(org *common.ORG) *metricName {
-	return &metricName{org: org}
+	return &metricName{
+		org:      org,
+		nameToID: make(map[string]int),
+		idToName: make(map[int]string),
+	}
 }
 
-func (mn *metricName) Get() *sync.Map {
-	return &mn.nameToID
+// GetNameToID returns a snapshot copy of the nameToID map.
+func (mn *metricName) GetNameToID() map[string]int {
+	mn.mu.RLock()
+	defer mn.mu.RUnlock()
+	result := make(map[string]int, len(mn.nameToID))
+	for k, v := range mn.nameToID {
+		result[k] = v
+	}
+	return result
 }
 
 func (mn *metricName) GetIDByName(n string) (int, bool) {
-	if id, ok := mn.nameToID.Load(n); ok {
-		return id.(int), true
-	}
-	return 0, false
+	mn.mu.RLock()
+	defer mn.mu.RUnlock()
+	id, ok := mn.nameToID[n]
+	return id, ok
 }
 
 func (mn *metricName) GetNameByID(id int) (string, bool) {
-	if name, ok := mn.idToName.Load(id); ok {
-		return name.(string), true
-	}
-	return "", false
+	mn.mu.RLock()
+	defer mn.mu.RUnlock()
+	name, ok := mn.idToName[id]
+	return name, ok
 }
 
 func (mn *metricName) Add(batch []*controller.PrometheusMetricName) {
+	mn.mu.Lock()
+	defer mn.mu.Unlock()
 	for _, item := range batch {
-		mn.nameToID.Store(item.GetName(), int(item.GetId()))
-		mn.idToName.Store(int(item.GetId()), item.GetName())
+		mn.nameToID[item.GetName()] = int(item.GetId())
+		mn.idToName[int(item.GetId())] = item.GetName()
 	}
 }
 
+// refresh rebuilds the entire cache from DB (snapshot-and-swap).
+// Old entries not present in DB are naturally discarded, solving the memory leak.
 func (mn *metricName) refresh(args ...interface{}) error {
 	metricNames, err := mn.load()
 	if err != nil {
 		return err
 	}
+	newN2I := make(map[string]int, len(metricNames))
+	newI2N := make(map[int]string, len(metricNames))
 	for _, item := range metricNames {
-		mn.nameToID.Store(item.Name, item.ID)
-		mn.idToName.Store(item.ID, item.Name)
+		newN2I[item.Name] = item.ID
+		newI2N[item.ID] = item.Name
 	}
+	mn.mu.Lock()
+	mn.nameToID = newN2I
+	mn.idToName = newI2N
+	mn.mu.Unlock()
 	return nil
 }
 
 func (mn *metricName) load() ([]*metadbmodel.PrometheusMetricName, error) {
 	var metricNames []*metadbmodel.PrometheusMetricName
-	err := mn.org.DB.Find(&metricNames).Error
+	err := mn.org.DB.Select("id", "name").Find(&metricNames).Error
 	return metricNames, err
 }

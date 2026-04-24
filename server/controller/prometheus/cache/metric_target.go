@@ -152,6 +152,6 @@ func (mt *metricTarget) refresh(args ...interface{}) error {
 
 func (mt *metricTarget) load() ([]*metadbmodel.PrometheusMetricTarget, error) {
 	var metricTargets []*metadbmodel.PrometheusMetricTarget
-	err := mt.org.DB.Find(&metricTargets).Error
+	err := mt.org.DB.Select("metric_name", "target_id").Find(&metricTargets).Error
 	return metricTargets, err
 }
