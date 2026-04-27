@@ -563,7 +563,7 @@ impl L7ProtocolParserInterface for FastCGILog {
 
         if param.parse_perf {
             let mut perf_stat = L7PerfStats::default();
-            if info.msg_type == LogMessageType::Response {
+            if info.msg_type == LogMessageType::Response && info.endpoint.is_none() {
                 if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
                     info.endpoint = Some(endpoint.to_string());
                 }

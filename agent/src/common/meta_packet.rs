@@ -1287,6 +1287,7 @@ impl<'a> MetaPacket<'a> {
             header_type: self.header_type,
             l2_l3_opt_size: self.l2_l3_opt_size,
             l4_opt_size: self.l4_opt_size,
+            flow_id: self.flow_id,
             ..Default::default()
         })
     }

@@ -1920,7 +1920,7 @@ impl L7ProtocolParserInterface for OpenWireLog {
 
             if param.parse_perf {
                 let mut perf_stat = L7PerfStats::default();
-                if info.msg_type == LogMessageType::Response {
+                if info.msg_type == LogMessageType::Response && info.topic.is_none() {
                     if let Some(endpoint) = info.load_endpoint_from_cache(param, false) {
                         info.topic = Some(endpoint.to_string());
                     }
