@@ -3187,6 +3187,50 @@ inputs:
         #     目前适用于 socket trace 和 uprobe Golang/OpenSSL trace 功能。禁用内存预分配大约会减少45M的内存占用。
         # upgrade_from: static_config.ebpf.map-prealloc-disabled
         map_prealloc_disabled: false
+        # type: string
+        # name:
+        #   en: Hooked Socket Syscalls
+        #   ch: Socket Hook Syscall 列表
+        # unit:
+        # range: []
+        # enum_options: [read, readv, recvfrom, recvmsg, recvmmsg, sendmsg, sendmmsg, sendto, write, writev]
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Controls which supported socket syscalls will have eBPF hooks installed.
+        #
+        #     This list only controls whether a syscall is hooked. The backend type used for each
+        #     enabled syscall still follows the current runtime mode selection logic. For example,
+        #     the mixed mode keeps its existing hybrid and tracepoint-only split, the pure-kprobe
+        #     mode keeps its existing kprobe behavior, and the kfunc mode keeps its existing kfunc
+        #     behavior plus the tracepoint fallback for `recvfrom` and `recvmmsg`.
+        #
+        #     Supported values: `read`, `readv`, `recvfrom`, `recvmsg`, `recvmmsg`, `sendmsg`,
+        #     `sendmmsg`, `sendto`, `write`, `writev`.
+        #   ch: |-
+        #     控制为哪些受支持的 socket syscall 安装 eBPF hook。
+        #
+        #     该列表只控制是否 hook 某个 syscall，不控制具体使用哪种 backend。每个启用的
+        #     syscall 仍然遵循当前运行模式下既有的 backend 选择逻辑。例如 mixed 模式继续保留
+        #     现有的 hybrid 与 tracepoint-only 分工，pure-kprobe 模式继续保留既有的 kprobe
+        #     行为，kfunc 模式继续保留既有的 kfunc 行为，以及 `recvfrom` 和 `recvmmsg`
+        #     的 tracepoint fallback。
+        #
+        #     支持的配置值：`read`、`readv`、`recvfrom`、`recvmsg`、`recvmmsg`、`sendmsg`、
+        #     `sendmmsg`、`sendto`、`write`、`writev`。
+        # upgrade_from:
+        hooked_socket_syscalls:
+          - read
+          - readv
+          - recvfrom
+          - recvmsg
+          - recvmmsg
+          - sendmsg
+          - sendmmsg
+          - sendto
+          - write
+          - writev
         # type: bool
         # name:
         #   en: Enable the fentry/fexit feature

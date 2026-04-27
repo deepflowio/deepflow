@@ -92,6 +92,48 @@ use public::{
 };
 use reorder::{Reorder, ReorderCounter, StatsReorderCounter};
 
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+struct HookedSocketSyscallBitmap(c_ulonglong);
+
+impl HookedSocketSyscallBitmap {
+    fn set_enabled(&mut self, bit: c_ulonglong) {
+        self.0 |= bit;
+    }
+}
+
+impl<T: AsRef<str>> From<&[T]> for HookedSocketSyscallBitmap {
+    fn from(vs: &[T]) -> Self {
+        let mut bitmap = HookedSocketSyscallBitmap(0);
+        for v in vs.iter() {
+            match v.as_ref() {
+                "read" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_READ),
+                "readv" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_READV),
+                "recvfrom" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_RECVFROM),
+                "recvmsg" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_RECVMSG),
+                "recvmmsg" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_RECVMMSG),
+                "sendmsg" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_SENDMSG),
+                "sendmmsg" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_SENDMMSG),
+                "sendto" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_SENDTO),
+                "write" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_WRITE),
+                "writev" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_WRITEV),
+                _ => {}
+            }
+        }
+        bitmap
+    }
+}
+
+const HOOKED_SOCKET_SYSCALL_READ: c_ulonglong = 1 << 0;
+const HOOKED_SOCKET_SYSCALL_READV: c_ulonglong = 1 << 1;
+const HOOKED_SOCKET_SYSCALL_RECVFROM: c_ulonglong = 1 << 2;
+const HOOKED_SOCKET_SYSCALL_RECVMSG: c_ulonglong = 1 << 3;
+const HOOKED_SOCKET_SYSCALL_RECVMMSG: c_ulonglong = 1 << 4;
+const HOOKED_SOCKET_SYSCALL_SENDMSG: c_ulonglong = 1 << 5;
+const HOOKED_SOCKET_SYSCALL_SENDMMSG: c_ulonglong = 1 << 6;
+const HOOKED_SOCKET_SYSCALL_SENDTO: c_ulonglong = 1 << 7;
+const HOOKED_SOCKET_SYSCALL_WRITE: c_ulonglong = 1 << 8;
+const HOOKED_SOCKET_SYSCALL_WRITEV: c_ulonglong = 1 << 9;
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("ebpf init error.")]
@@ -1028,6 +1070,10 @@ impl EbpfCollector {
         if config.ebpf.socket.tunning.syscall_trace_id_disabled {
             ebpf::disable_syscall_trace_id();
         }
+
+        ebpf::set_hooked_socket_syscalls(
+            HookedSocketSyscallBitmap::from(config.ebpf.socket.tunning.hooked_socket_syscalls.as_slice()).0,
+        );
 
         ebpf::set_bpf_map_prealloc(!config.ebpf.socket.tunning.map_prealloc_disabled);
 

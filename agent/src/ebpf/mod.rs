@@ -842,6 +842,7 @@ extern "C" {
     pub fn enable_unix_socket_feature();
     pub fn disable_fentry();
     pub fn enable_fentry();
+    pub fn set_hooked_socket_syscalls(bitmap: c_ulonglong);
     pub fn set_virtual_file_collect(enabled: bool) -> c_int;
 
     cfg_if::cfg_if! {

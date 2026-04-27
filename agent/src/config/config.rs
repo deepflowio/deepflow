@@ -69,6 +69,10 @@ use enterprise_utils::l7::custom_policy::config::CustomProtocolConfig;
 pub const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
 const DEFAULT_STANDALONE_CONFIG: &str = "/etc/deepflow-agent-standalone.yaml";
+const HOOKED_SOCKET_SYSCALLS: [&str; 10] = [
+    "read", "readv", "recvfrom", "recvmsg", "recvmmsg", "sendmsg", "sendmmsg", "sendto", "write",
+    "writev",
+];
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -1037,13 +1041,29 @@ pub struct EbpfSocketKprobe {
     pub whitelist: EbpfSocketKprobePorts,
 }
 
-#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct EbpfSocketTunning {
     pub max_capture_rate: u64,
     pub syscall_trace_id_disabled: bool,
     pub map_prealloc_disabled: bool,
     pub fentry_enabled: bool,
+    pub hooked_socket_syscalls: Vec<String>,
+}
+
+impl Default for EbpfSocketTunning {
+    fn default() -> Self {
+        Self {
+            max_capture_rate: 0,
+            syscall_trace_id_disabled: false,
+            map_prealloc_disabled: false,
+            fentry_enabled: false,
+            hooked_socket_syscalls: HOOKED_SOCKET_SYSCALLS
+                .iter()
+                .map(|syscall| syscall.to_string())
+                .collect(),
+        }
+    }
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
