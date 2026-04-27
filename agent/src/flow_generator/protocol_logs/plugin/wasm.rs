@@ -67,11 +67,11 @@ impl L7ProtocolParserInterface for WasmLog {
 
                     if param.parse_perf {
                         let mut perf_stat = L7PerfStats::default();
-                        if i.msg_type == LogMessageType::Response {
+                        if i.msg_type == LogMessageType::Response && i.resp.endpoint.is_empty() {
                             if let Some(endpoint) =
                                 i.load_endpoint_from_cache(param, i.is_reversed())
                             {
-                                i.req.endpoint = endpoint.to_string();
+                                i.resp.endpoint = endpoint.to_string();
                             }
                         }
                         if let Some(stats) = i.perf_stats(param) {
