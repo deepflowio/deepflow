@@ -128,8 +128,8 @@ void insert_prog_to_map(struct bpf_tracer *tracer, const char *map_name,
 {
 	struct ebpf_prog *prog = ebpf_obj__get_prog_by_name(tracer->obj, prog_name);
 	if (prog == NULL) {
-		ebpf_error("bpf_obj__get_prog_by_name() not find \"%s\"\n",
-			   prog_name);
+		ebpf_warning("bpf_obj__get_prog_by_name() not find \"%s\"\n",
+			     prog_name);
 		return;
 	}
 
