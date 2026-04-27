@@ -5339,7 +5339,12 @@ inputs:
 **Description**:
 
 Disable Lua interpreter profiling. When disabled, Lua process stack traces will not be collected,
-saving approximately 13 MB of kernel memory (lua_tstate_map, lua_lang_flags_map, lua_unwind_info_map, lua_offsets_map, luajit_offsets_map).
+saving approximately 13 MB of kernel memory.
+This controls the following eBPF maps:
+- lua_tstate_map: Per-thread lua_State cache (~7 MB)
+- lua_lang_flags_map: Per-process Lua/LuaJIT type flags (~2.5 MB)
+- lua_unwind_info_map: Per-process unwinding metadata (~3 MB)
+- lua_offsets_map, luajit_offsets_map: Lua/LuaJIT struct offset tables (< 2 KB total)
 
 ### Network {#inputs.ebpf.network}
 
@@ -6695,7 +6700,7 @@ K8s cluster to deepflow-agent.
 
 **Tags**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -6724,7 +6729,7 @@ Telegraf, OpenTelemetry, SkyWalking and Vector.
 
 **Tags**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
