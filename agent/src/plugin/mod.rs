@@ -645,7 +645,13 @@ impl L7ProtocolInfoInterface for CustomInfo {
     }
 
     fn get_endpoint(&self) -> Option<String> {
-        return Some(self.req.endpoint.clone());
+        if !self.req.endpoint.is_empty() {
+            return Some(self.req.endpoint.clone());
+        }
+        if !self.resp.endpoint.is_empty() {
+            return Some(self.resp.endpoint.clone());
+        }
+        return None;
     }
 
     fn get_biz_type(&self) -> u8 {
