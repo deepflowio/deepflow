@@ -18,7 +18,7 @@ use std::cell::RefMut;
 
 use super::flow::PacketDirection;
 use enum_dispatch::enum_dispatch;
-use log::{debug, error, warn};
+use log::{debug, error};
 use serde::Serialize;
 
 use crate::{
@@ -224,15 +224,16 @@ where
 
     /*
         calculate rrt
-        if have previous log cache:
+        if session
+            return stats
+        if request
+            update rrt cache
+            return stats
+        if response
             if previous is req and current is resp and current time > previous time
                 rrt = current time - previous time
-            if previous is resp and current is req and current time < previous time, likely ebfp disorder
-                rrt =  previous time - current time
-
-            otherwise can not calculate rrt, cache current log rrt
-
-        if have no previous log cache, cache the current log rrt
+            remove rrt cache
+            return stats
     */
     fn perf_stats(&self, param: &ParseParam) -> Option<L7PerfStats> {
         if param.time == 0 {
@@ -284,14 +285,16 @@ where
             //
             // If the first log is a response, its perf stats will not be counted here.
             // We need to know whether its corresponding request is on blacklist before accounting.
-            let ret = if cur_info.msg_type == LogMessageType::Request && !cur_info.on_blacklist {
-                timeout_counter.in_cache[index] += 1;
-                Some(L7PerfStats::from(&cur_info))
+            return if !cur_info.on_blacklist {
+                let stats = L7PerfStats::from(&cur_info);
+                if cur_info.msg_type == LogMessageType::Request {
+                    timeout_counter.in_cache[index] += 1;
+                    rtt_cache.put(key, cur_info);
+                }
+                Some(stats)
             } else {
                 None
             };
-            rtt_cache.put(key, cur_info);
-            return ret;
         };
 
         let mut keep_prev = false;
@@ -344,84 +347,24 @@ where
             }
 
             result
-        } else if prev_info.is_response_of(&cur_info) {
-            // cur_info is request, prev_info is response
-            // request not accounted before
-            let result = if !cur_info.on_blacklist {
-                let mut perf_stats = L7PerfStats::from(&cur_info);
-
-                if !prev_info.on_blacklist {
-                    let rrt = prev_info.time - cur_info.time;
-                    if rrt > param.rrt_timeout as u64 {
-                        warn!("l7 log info disorder with long time rrt {}", rrt);
-                        match prev_info.multi_merge_info.as_ref() {
-                            Some(info) if info.merged => (),
-                            _ => timeout_counter.timeout[index] += 1,
-                        }
-                    }
-
-                    perf_stats.sequential_merge(&L7PerfStats::from(&*prev_info));
-                    perf_stats.update_rrt(rrt);
-                }
-
-                Some(perf_stats)
-            } else {
-                None
-            };
-
-            if !keep_prev {
-                rtt_cache.pop(&key);
-            }
-
-            result
         } else if !self.need_merge() {
             debug!(
                 "can not calculate rrt, flow_id: {}, previous log type: {:?}, previous time: {}, current log type: {:?}, current time: {}",
                 param.flow_id, prev_info.msg_type, prev_info.time, cur_info.msg_type, cur_info.time,
             );
 
-            if prev_info.time > cur_info.time {
-                if !cur_info.on_blacklist && cur_info.msg_type == LogMessageType::Request {
-                    timeout_counter.timeout[index] += 1;
+            if !keep_prev {
+                rtt_cache.pop(&key);
+            }
+
+            if !cur_info.on_blacklist {
+                let stats = L7PerfStats::from(&cur_info);
+                if cur_info.msg_type == LogMessageType::Request {
+                    rtt_cache.put(key, cur_info);
                 }
-                if !prev_info.on_blacklist && prev_info.msg_type == LogMessageType::Request {
-                    timeout_counter.in_cache[index] += 1;
-                }
-                if !cur_info.on_blacklist {
-                    Some(L7PerfStats::from(&cur_info))
-                } else {
-                    None
-                }
+                Some(stats)
             } else {
-                if !prev_info.on_blacklist && prev_info.msg_type == LogMessageType::Request {
-                    timeout_counter.timeout[index] += 1;
-                }
-                if !cur_info.on_blacklist && cur_info.msg_type == LogMessageType::Request {
-                    timeout_counter.in_cache[index] += 1;
-                }
-                let cur_is_req = cur_info.msg_type == LogMessageType::Request;
-                let cur_on_blacklist = cur_info.on_blacklist;
-                let prev_info = rtt_cache.put(key, cur_info).unwrap();
-                // Requests are counted (req=1) eagerly when they first enter the cache,
-                // so re-emitting a displaced Request here would double-count it.
-                // Responses were cached with None on arrival and must be counted here.
-                let mut result =
-                    if !prev_info.on_blacklist && prev_info.msg_type == LogMessageType::Response {
-                        L7PerfStats::from(&prev_info)
-                    } else {
-                        L7PerfStats::default()
-                    };
-                // A new Request entering the cache via this path (replacing a previous entry)
-                // was never counted by the first-entry path, so emit req=1 now so that
-                // "request accounted before" holds when its response arrives via is_request_of.
-                if !cur_on_blacklist && cur_is_req {
-                    result.inc_req();
-                }
-                if result == L7PerfStats::default() {
-                    None
-                } else {
-                    Some(result)
-                }
+                None
             }
         } else {
             if !prev_info.on_blacklist
