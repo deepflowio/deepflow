@@ -60,7 +60,7 @@ BEGIN
     END IF;
 END;
 
-CALL AddIndexIfNotExists('process', 'domain_sub_domain_gid_updated_at_index', 'domain, sub_domain, gid, updated_at DESC');
+CALL AddIndexIfNotExists('process', 'domain_sub_domain_gid_updated_at_index', 'domain, sub_domain, gid, updated_at');
 CALL AddIndexIfNotExists('ch_chost_cloud_tag', 'domain_id_updated_at_index', 'domain_id, id, updated_at ASC');
 CALL AddIndexIfNotExists('ch_pod_ns_cloud_tag', 'domain_sub_domain_id_updated_at_index', 'domain_id, sub_domain_id, id, updated_at ASC');
 CALL AddIndexIfNotExists('ch_pod_service_k8s_label', 'domain_sub_domain_id_updated_at_index', 'domain_id, sub_domain_id, id, updated_at ASC');
