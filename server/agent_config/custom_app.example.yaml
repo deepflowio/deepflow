@@ -148,6 +148,8 @@ biz_field:
           value: xyz
         - key: ignore_case
           value: true
+        - key: trim
+          value: '"[]'
       - type: parse_dict_value
         settings:
         - key: keyword
