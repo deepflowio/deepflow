@@ -934,6 +934,7 @@ $defs:
         - key_value_separator: Separator between key and value, default is "=".
         - keyword: Field(s) to search for.
         - ignore_case: Whether to ignore case.
+        - trim: Trims the extracted result by removing matching leading and trailing characters. This works as a character set rather than a whole substring. For example, when `trim` is `abc`, `acdbddb` becomes `dbdd`.
       - `Parse Dict Value` (`parse_dict_value`): Parses the value as a dictionary, and outputs the value corresponding to the specified key. Supported configuration:
         - keyword: Field to search for.
         - type: Can only be string.
@@ -978,6 +979,7 @@ $defs:
         - key_value_separator：键值分隔符，默认为"="。
         - keyword：要查找的字段。
         - ignore_case：是否忽略大小写。
+        - trim：对提取结果做首尾裁剪，去掉两端与该配置中任一字符相同的字符。这里按“字符集合”生效，而不是按整段子串生效。例如 `trim` 为 `abc` 时，`acdbddb` 会变成 `dbdd`。
       - `字典提取` (`parse_dict_value`)：将值作为字典解析，并输出指定 key 对应的 value。支持配置为：
         - keyword：要查找的字段。
         - type：类型，只能为 string。
