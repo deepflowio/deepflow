@@ -29,6 +29,10 @@ type FusionComputeConfig struct {
 	DailyTriggerTime string `default:"" yaml:"daily_trigger_time"` // %H:%M 05:00
 }
 
+type HuaweiManageOneConfig struct {
+	DuplicationEnabled bool `default:"false" yaml:"duplication_enabled"` // 支持重复对接
+}
+
 type CloudConfig struct {
 	KubernetesGatherInterval uint32              `default:"30" yaml:"kubernetes_gather_interval"`
 	HostnameToIPFile         string              `default:"/etc/hostname_to_ip.csv" yaml:"hostname_to_ip_file"`
@@ -37,8 +41,9 @@ type CloudConfig struct {
 	CustomTagLenMax          int                 `default:"256" yaml:"custom_tag_len_max"`
 	ProcessNameLenMax        int                 `default:"256" yaml:"process_name_len_max"`
 	DebugEnabled             bool                `default:"false" yaml:"debug_enabled"`
-	QingCloudConfig          QingCloudConfig     `yaml:"qingcloud_config"`
-	FusionComputeConfig      FusionComputeConfig `yaml:"fusioncompute_config"`
+	QingCloudConfig          QingCloudConfig        `yaml:"qingcloud_config"`
+	FusionComputeConfig      FusionComputeConfig    `yaml:"fusioncompute_config"`
+	HuaweiManageOneConfig    HuaweiManageOneConfig  `yaml:"huawei_manageone"`
 }
 
 func SetCloudGlobalConfig(c CloudConfig) {
@@ -49,7 +54,8 @@ func SetCloudGlobalConfig(c CloudConfig) {
 		DebugEnabled:        c.DebugEnabled,
 		CustomTagLenMax:     c.CustomTagLenMax,
 		ProcessNameLenMax:   c.ProcessNameLenMax,
-		QingCloudConfig:     c.QingCloudConfig,
-		FusionComputeConfig: c.FusionComputeConfig,
+		QingCloudConfig:       c.QingCloudConfig,
+		FusionComputeConfig:   c.FusionComputeConfig,
+		HuaweiManageOneConfig: c.HuaweiManageOneConfig,
 	}
 }
