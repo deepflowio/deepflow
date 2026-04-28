@@ -14,15 +14,18 @@
  * limitations under the License.
  */
 
-use std::cell::RefCell;
-use std::fmt;
-use std::net::IpAddr;
-use std::rc::Rc;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
+use std::{
+    cell::RefCell,
+    collections::HashSet,
+    fmt,
+    net::IpAddr,
+    rc::Rc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    time::Duration,
 };
-use std::time::Duration;
 
 use enum_dispatch::enum_dispatch;
 use log::debug;
@@ -452,6 +455,20 @@ pub struct L7PerfCacheCounter {
     pub timeout_cache_len: Arc<AtomicU64>,
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct FlowPerfStatsWithEndpoint {
+    pub stats: L7PerfStats,
+    pub endpoint: Option<String>,
+}
+
+fn resolve_unique_endpoint(endpoints: HashSet<Option<String>>) -> Option<String> {
+    if endpoints.len() == 1 {
+        endpoints.into_iter().next().flatten()
+    } else {
+        None
+    }
+}
+
 pub struct RrtCache {
     // lru cache previous rrt
     logs: LruCache<LogCacheKey, LogCache>,
@@ -527,13 +544,18 @@ impl RrtCache {
         ret
     }
 
-    pub fn collect_flow_perf_stats(&mut self, flow_id: u64) -> Option<(L7PerfStats, L7PerfStats)> {
+    pub fn collect_flow_perf_stats(
+        &mut self,
+        flow_id: u64,
+    ) -> Option<(FlowPerfStatsWithEndpoint, FlowPerfStatsWithEndpoint)> {
         let Some(keys) = self.flows.pop(&flow_id) else {
             return None;
         };
 
-        let mut forward = L7PerfStats::default();
-        let mut backward = L7PerfStats::default();
+        let mut forward = FlowPerfStatsWithEndpoint::default();
+        let mut backward = FlowPerfStatsWithEndpoint::default();
+        let mut forward_endpoints = HashSet::new();
+        let mut backward_endpoints = HashSet::new();
         for (key, _) in keys {
             if let Some(cache) = self.logs.pop(&key) {
                 // Requests were already counted (req=1) when they first entered the cache;
@@ -542,15 +564,26 @@ impl RrtCache {
                 if cache.msg_type != LogMessageType::Response {
                     continue;
                 }
+                let stats = L7PerfStats::from(&cache);
+                if stats == L7PerfStats::default() {
+                    continue;
+                }
                 if key.is_reversed() {
-                    backward.sequential_merge(&L7PerfStats::from(&cache));
+                    backward.stats.sequential_merge(&stats);
+                    backward_endpoints.insert(cache.endpoint);
                 } else {
-                    forward.sequential_merge(&L7PerfStats::from(&cache));
+                    forward.stats.sequential_merge(&stats);
+                    forward_endpoints.insert(cache.endpoint);
                 }
             }
         }
 
-        if forward == L7PerfStats::default() && backward == L7PerfStats::default() {
+        forward.endpoint = resolve_unique_endpoint(forward_endpoints);
+        backward.endpoint = resolve_unique_endpoint(backward_endpoints);
+
+        if forward == FlowPerfStatsWithEndpoint::default()
+            && backward == FlowPerfStatsWithEndpoint::default()
+        {
             None
         } else {
             Some((forward, backward))
