@@ -271,6 +271,12 @@ func (c *CustomAppConfig) GetCustomAppConfigByte(teamID, agentGroupID int) []byt
 				continue
 			}
 
+			// check raw
+			rawEnabled := policyYaml.Bool("raw.save_request_header.enabled") ||
+				policyYaml.Bool("raw.save_request_payload.enabled") ||
+				policyYaml.Bool("raw.save_response_header.enabled") ||
+				policyYaml.Bool("raw.save_response_payload.enabled")
+
 			// fields
 			policyFieldYamls := []map[string]interface{}{}
 			for _, field := range policyYaml.Slices(common.CONFIG_KEY_FIELDS) {
@@ -318,6 +324,12 @@ func (c *CustomAppConfig) GetCustomAppConfigByte(teamID, agentGroupID int) []byt
 				log.Error(errMessage, logger.NewORGPrefix(c.orgID))
 				return []byte("# " + errMessage)
 			}
+
+			if !rawEnabled && len(policyFieldYamls) == 0 && len(policyConstFieldYamls) == 0 && len(policyCompoundFieldYamls) == 0 {
+				log.Debugf("policy (%s) has no enabled raw fields and no fields/const_fields/compound_fields, skip it", p.Name, logger.NewORGPrefix(c.orgID))
+				continue
+			}
+
 			policyYamls = append(policyYamls, policyYaml.Raw())
 		}
 		err := k.Set(common.CONFIG_KEY_BIZ_FIELD_POLICIES, policyYamls)
