@@ -304,6 +304,10 @@ controller:
         fusioncompute_config:
           # 对接 fusioncompute 定时执行，根据配置的时间点每日执行一次，配置后循环执行失效，格式：%H:%M ，例：05:30 ，每日5点30分执行一次对接
           daily_trigger_time: ""
+        # 华为ManageOne配置
+        huawei_manageone:
+          # 支持重复对接
+          duplication_enabled: false
       recorder:
         # recorder模块缓存自愈刷新时间间隔，单位：分钟，默认：60 * 24
         cache_refresh_interval: 1440
