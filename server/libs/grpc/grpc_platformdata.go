@@ -1376,8 +1376,9 @@ func (t *PlatformInfoTable) requestOrgIds() []uint16 {
 	return t.orgIds
 }
 
-func (t *PlatformInfoTable) Version(orgId uint16) uint64 {
-	return t.versionPlatformData[orgId]
+// take the lower 32 bits of versionPlatformData and versionGroups, and combine them to the new version.
+func (t *PlatformInfoTable) PlatformAndGroupsCombineVersion(orgId uint16) uint64 {
+	return t.versionPlatformData[orgId]<<32 | (t.versionGroups[orgId] << 32 >> 32)
 }
 
 func (t *PlatformInfoTable) getCommunicationVtaps(orgId uint16) []*trident.CommunicationVtap {
