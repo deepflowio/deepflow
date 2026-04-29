@@ -66,15 +66,26 @@ func (l *label) refresh(args ...interface{}) error {
 	}
 	l.lock.Unlock()
 
-	var items []*metadbmodel.PrometheusLabel
-	if err := l.org.DB.Select("id", "name_id", "value_id").Find(&items).Error; err != nil {
+	log.Info("TODO start")
+	rows, err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Select("id", "name_id", "value_id").Rows()
+	if err != nil {
 		return err
 	}
-	newMap := make(map[cache.LabelKey]int, len(items))
-	for _, item := range items {
-		newMap[cache.NewLabelKey(item.NameID, item.ValueID)] = item.ID
+	defer rows.Close()
+
+	newMap := make(map[cache.LabelKey]int)
+	for rows.Next() {
+		var id, nameID, valueID int
+		if scanErr := rows.Scan(&id, &nameID, &valueID); scanErr != nil {
+			return scanErr
+		}
+		newMap[cache.NewLabelKey(nameID, valueID)] = id
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 
+	log.Info("TODO end")
 	l.lock.Lock()
 	for k, v := range l.labelKeyToID {
 		if _, wasInSnapshot := preKeys[k]; !wasInSnapshot {

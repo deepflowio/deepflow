@@ -40,11 +40,24 @@ func NewChAPPLabel() *ChAPPLabel {
 
 func (l *ChAPPLabel) generateNewData(db *metadb.DB) (map[PrometheusAPPLabelKey]metadbmodel.ChAPPLabel, bool) {
 	log.Infof("generate data for %s", l.resourceTypeName, db.LogPrefixORGID)
-	var prometheusLabels []metadbmodel.PrometheusLabel
-	err := db.Unscoped().Find(&prometheusLabels).Error
-
+	labelRows, err := db.Unscoped().Model(&metadbmodel.PrometheusLabel{}).Select("id", "name_id", "value_id").Rows()
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
+		return nil, false
+	}
+	defer labelRows.Close()
+
+	var prometheusLabels []metadbmodel.PrometheusLabel
+	for labelRows.Next() {
+		var item metadbmodel.PrometheusLabel
+		if scanErr := labelRows.Scan(&item.ID, &item.NameID, &item.ValueID); scanErr != nil {
+			log.Errorf("stream scan %s prometheus_label interrupted: %v", l.resourceTypeName, scanErr, db.LogPrefixORGID)
+			return nil, false
+		}
+		prometheusLabels = append(prometheusLabels, item)
+	}
+	if err := labelRows.Err(); err != nil {
+		log.Errorf("stream read %s prometheus_label error: %v", l.resourceTypeName, err, db.LogPrefixORGID)
 		return nil, false
 	}
 
@@ -111,29 +124,44 @@ func (l *ChAPPLabel) generateAPPLabelData(db *metadb.DB) ([]string, bool) {
 func (l *ChAPPLabel) generateNameIDData(db *metadb.DB) (map[string]int, map[string]int, bool) {
 	labelNameIDMap := make(map[string]int)
 	valueNameIDMap := make(map[string]int)
-	var prometheusLabelNames []metadbmodel.PrometheusLabelName
-	var prometheusLabelValues []metadbmodel.PrometheusLabelValue
-
-	err := db.Unscoped().Find(&prometheusLabelNames).Error
-
+	nameRows, err := db.Unscoped().Model(&metadbmodel.PrometheusLabelName{}).Select("id", "name").Rows()
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, nil, false
 	}
+	defer nameRows.Close()
+	for nameRows.Next() {
+		var id int
+		var name string
+		if scanErr := nameRows.Scan(&id, &name); scanErr != nil {
+			log.Errorf("stream scan %s prometheus_label_name interrupted: %v", l.resourceTypeName, scanErr, db.LogPrefixORGID)
+			return nil, nil, false
+		}
+		labelNameIDMap[name] = id
+	}
+	if err := nameRows.Err(); err != nil {
+		log.Errorf("stream read %s prometheus_label_name error: %v", l.resourceTypeName, err, db.LogPrefixORGID)
+		return nil, nil, false
+	}
 
-	err = db.Unscoped().Find(&prometheusLabelValues).Error
-
+	valueRows, err := db.Unscoped().Model(&metadbmodel.PrometheusLabelValue{}).Select("id", "value").Rows()
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, nil, false
 	}
-
-	for _, prometheusLabelName := range prometheusLabelNames {
-		labelNameIDMap[prometheusLabelName.Name] = prometheusLabelName.ID
+	defer valueRows.Close()
+	for valueRows.Next() {
+		var id int
+		var value string
+		if scanErr := valueRows.Scan(&id, &value); scanErr != nil {
+			log.Errorf("stream scan %s prometheus_label_value interrupted: %v", l.resourceTypeName, scanErr, db.LogPrefixORGID)
+			return nil, nil, false
+		}
+		valueNameIDMap[value] = id
 	}
-
-	for _, prometheusLabelValue := range prometheusLabelValues {
-		valueNameIDMap[prometheusLabelValue.Value] = prometheusLabelValue.ID
+	if err := valueRows.Err(); err != nil {
+		log.Errorf("stream read %s prometheus_label_value error: %v", l.resourceTypeName, err, db.LogPrefixORGID)
+		return nil, nil, false
 	}
 	return labelNameIDMap, valueNameIDMap, true
 }

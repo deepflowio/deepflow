@@ -109,16 +109,27 @@ func (lv *labelValue) Add(batch []*controller.PrometheusLabelValue) {
 }
 
 func (lv *labelValue) refresh(args ...interface{}) error {
-	data, err := lv.load()
+	rows, err := lv.org.DB.Model(&metadbmodel.PrometheusLabelValue{}).Select("id", "value").Rows()
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
 
-	newActive := make(map[string]int, len(data))
-	newActiveR := make(map[int]string, len(data))
-	for _, item := range data {
-		newActive[item.Value] = item.ID
-		newActiveR[item.ID] = item.Value
+	newActive := make(map[string]int)
+	newActiveR := make(map[int]string)
+	for rows.Next() {
+		var id int
+		var value string
+		if scanErr := rows.Scan(&id, &value); scanErr != nil {
+			log.Errorf("stream scan prometheus_label_value interrupted: %v", scanErr, lv.org.LogPrefix)
+			return scanErr
+		}
+		newActive[value] = id
+		newActiveR[id] = value
+	}
+	if err := rows.Err(); err != nil {
+		log.Errorf("stream read prometheus_label_value error: %v", err, lv.org.LogPrefix)
+		return err
 	}
 
 	lv.mu.Lock()
@@ -132,10 +143,4 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 	lv.activeR.Store(newActiveR)
 	lv.replaceActive(newActive)
 	return nil
-}
-
-func (lv *labelValue) load() ([]*metadbmodel.PrometheusLabelValue, error) {
-	var labelValues []*metadbmodel.PrometheusLabelValue
-	err := lv.org.DB.Select("id", "value").Find(&labelValues).Error
-	return labelValues, err
 }
