@@ -122,13 +122,18 @@ func (l *label) Add(entries []LabelCacheEntry) {
 }
 
 func (l *label) refresh(args ...interface{}) error {
+	var count int64
+	if err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Count(&count).Error; err != nil {
+		return err
+	}
+
 	rows, err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Select("id", "name_id", "value_id").Rows()
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 
-	newActive := make(map[LabelKey]int)
+	newActive := make(map[LabelKey]int, count)
 	for rows.Next() {
 		var id, nameID, valueID int
 		if scanErr := rows.Scan(&id, &nameID, &valueID); scanErr != nil {
