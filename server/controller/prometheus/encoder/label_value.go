@@ -31,6 +31,9 @@ type labelValue struct {
 	lock         sync.Mutex
 	resourceType string
 	strToID      map[string]int
+
+	isRefreshing bool
+	pendingKeys  map[string]int
 }
 
 func newLabelValue(org *common.ORG) *labelValue {
@@ -41,16 +44,29 @@ func newLabelValue(org *common.ORG) *labelValue {
 	}
 }
 
-func (lv *labelValue) refresh(args ...interface{}) error {
-	// Snapshot existing keys before querying DB, to identify entries added
-	// by encode() during the query window (those must be preserved even if
-	// not yet visible in the DB snapshot).
+func (lv *labelValue) MarkRefresh() {
 	lv.lock.Lock()
-	preKeys := make(map[string]struct{}, len(lv.strToID))
-	for k := range lv.strToID {
-		preKeys[k] = struct{}{}
+	defer lv.lock.Unlock()
+	lv.isRefreshing = true
+	lv.pendingKeys = make(map[string]int)
+}
+
+func (lv *labelValue) MarkRefreshDone() {
+	lv.lock.Lock()
+	defer lv.lock.Unlock()
+	lv.isRefreshing = false
+	lv.pendingKeys = nil
+}
+
+func (lv *labelValue) refresh(args ...interface{}) error {
+	lv.MarkRefresh()
+	defer lv.MarkRefreshDone()
+
+	var count int64
+	if err := lv.org.DB.Model(&metadbmodel.PrometheusLabelValue{}).Count(&count).Error; err != nil {
+		log.Errorf("db query %s failed: %v", lv.resourceType, err, lv.org.LogPrefix)
+		return err
 	}
-	lv.lock.Unlock()
 
 	rows, err := lv.org.DB.Model(&metadbmodel.PrometheusLabelValue{}).Select("id", "value").Rows()
 	if err != nil {
@@ -59,7 +75,7 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 	}
 	defer rows.Close()
 
-	newMap := make(map[string]int)
+	newMap := make(map[string]int, count)
 	for rows.Next() {
 		var id int
 		var value string
@@ -75,15 +91,12 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 	}
 
 	lv.lock.Lock()
-	for k, v := range lv.strToID {
-		if _, wasInSnapshot := preKeys[k]; !wasInSnapshot {
-			// Written by encode() after the snapshot; may not be in the DB
-			// snapshot yet, so preserve it to avoid a spurious cache miss.
-			newMap[k] = v
-		}
+	for k, v := range lv.pendingKeys {
+		newMap[k] = v
 	}
 	lv.strToID = newMap
 	lv.lock.Unlock()
+
 	return nil
 }
 
@@ -124,4 +137,8 @@ func (lv *labelValue) getID(str string) (int, bool) {
 
 func (lv *labelValue) store(item *metadbmodel.PrometheusLabelValue) {
 	lv.strToID[item.Value] = item.ID
+
+	if lv.isRefreshing {
+		lv.pendingKeys[item.Value] = item.ID
+	}
 }

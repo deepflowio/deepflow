@@ -114,13 +114,18 @@ func (l *label) Add(batch []*controller.PrometheusLabel) {
 }
 
 func (l *label) refresh(args ...interface{}) error {
+	var count int64
+	if err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Count(&count).Error; err != nil {
+		return err
+	}
+
 	rows, err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Select("id", "name", "value").Rows()
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 
-	newActive := make(map[LabelKey]int)
+	newActive := make(map[LabelKey]int, count)
 	for rows.Next() {
 		var id int
 		var name, value string
