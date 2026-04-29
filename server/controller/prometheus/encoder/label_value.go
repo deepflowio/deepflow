@@ -52,14 +52,26 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 	}
 	lv.lock.Unlock()
 
-	var items []*metadbmodel.PrometheusLabelValue
-	if err := lv.org.DB.Select("id", "value").Find(&items).Error; err != nil {
+	rows, err := lv.org.DB.Model(&metadbmodel.PrometheusLabelValue{}).Select("id", "value").Rows()
+	if err != nil {
 		log.Errorf("db query %s failed: %v", lv.resourceType, err, lv.org.LogPrefix)
 		return err
 	}
-	newMap := make(map[string]int, len(items))
-	for _, item := range items {
-		newMap[item.Value] = item.ID
+	defer rows.Close()
+
+	newMap := make(map[string]int)
+	for rows.Next() {
+		var id int
+		var value string
+		if scanErr := rows.Scan(&id, &value); scanErr != nil {
+			log.Errorf("db stream scan %s interrupted: %v", lv.resourceType, scanErr, lv.org.LogPrefix)
+			return scanErr
+		}
+		newMap[value] = id
+	}
+	if err := rows.Err(); err != nil {
+		log.Errorf("db stream %s error: %v", lv.resourceType, err, lv.org.LogPrefix)
+		return err
 	}
 
 	lv.lock.Lock()

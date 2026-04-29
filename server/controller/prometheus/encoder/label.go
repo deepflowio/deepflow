@@ -62,13 +62,25 @@ func (l *label) refresh(args ...interface{}) error {
 	}
 	l.lock.Unlock()
 
-	var items []*metadbmodel.PrometheusLabel
-	if err := l.org.DB.Select("id", "name", "value").Find(&items).Error; err != nil {
+	rows, err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Select("id", "name", "value").Rows()
+	if err != nil {
 		return err
 	}
-	newMap := make(map[cache.LabelKey]int, len(items))
-	for _, item := range items {
-		newMap[cache.NewLabelKey(item.Name, item.Value)] = item.ID
+	defer rows.Close()
+
+	newMap := make(map[cache.LabelKey]int)
+	for rows.Next() {
+		var id int
+		var name, value string
+		if scanErr := rows.Scan(&id, &name, &value); scanErr != nil {
+			log.Errorf("db stream scan %s interrupted: %v", l.resourceType, scanErr, l.org.LogPrefix)
+			return scanErr
+		}
+		newMap[cache.NewLabelKey(name, value)] = id
+	}
+	if err := rows.Err(); err != nil {
+		log.Errorf("db stream %s error: %v", l.resourceType, err, l.org.LogPrefix)
+		return err
 	}
 
 	l.lock.Lock()
