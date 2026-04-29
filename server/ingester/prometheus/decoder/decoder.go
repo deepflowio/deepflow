@@ -469,7 +469,7 @@ func (b *PrometheusSamplesBuilder) TimeSeriesToStore(vtapID, epcId, podClusterId
 }
 
 func (b *PrometheusSamplesBuilder) fillUniversalTag(m *dbwriter.PrometheusSample, vtapID uint16, podName, instance string, podNameID, instanceID uint32, fillWithVtapId bool) {
-	platformDataVersion := b.platformData.Version(m.OrgId)
+	platformDataVersion := b.platformData.PlatformAndGroupsCombineVersion(m.OrgId)
 	if platformDataVersion != b.platformDataVersion[m.OrgId] {
 		if b.platformDataVersion[m.OrgId] != 0 {
 			log.Infof("platform data version in prometheus-decoder changed from %d to %d",
