@@ -22,6 +22,8 @@ pub const PROCESS_NAME: &str = "deepflow-agent";
 pub const PROCESS_NAME_SECONDARY: &str = "trident";
 #[cfg(target_os = "windows")]
 pub const PROCESS_NAME: &str = "deepflow-agent.exe";
+#[cfg(target_os = "macos")]
+pub const PROCESS_NAME: &str = "deepflow-agent";
 pub const DAEMONSET_NAME: &str = "deepflow-agent";
 pub const CONTAINER_NAME: &str = "deepflow-agent";
 
@@ -77,6 +79,15 @@ mod platform_consts {
         "C:\\DeepFlow\\trident\\trident-windows.yaml";
     pub const DEFAULT_COREFILE_PATH: &'static str = "C:\\DeepFlow\\deepflow-agent";
     pub const COREFILE_FORMAT: &'static str = "dump";
+}
+
+#[cfg(target_os = "macos")]
+mod platform_consts {
+    pub const DEFAULT_LOG_FILE: &'static str = "/var/log/deepflow-agent/deepflow-agent.log";
+    pub const DEFAULT_CONF_FILE: &'static str = "/etc/deepflow-agent.yaml";
+    pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "/etc/trident.yaml";
+    pub const COREFILE_FORMAT: &'static str = "core";
+    pub const DEFAULT_COREFILE_PATH: &'static str = "/tmp";
 }
 
 pub use platform_consts::*;
