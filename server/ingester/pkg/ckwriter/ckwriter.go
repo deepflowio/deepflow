@@ -93,6 +93,24 @@ func (m *CKWriterManager) EndpointsChange(addrs []string) {
 	ckwriterManager.Unlock()
 }
 
+func (m *CKWriterManager) IsHealthy() bool {
+	ckwriterManager.Lock()
+	defer ckwriterManager.Unlock()
+	hasWriteFailure := false
+	for _, writer := range m.ckwriters {
+		for _, queueCtx := range writer.queueContexts {
+			// Consider the writer healthy once any queue succeeds; before that, only an observed failure makes it abnormal.
+			if queueCtx.counter.WriteSuccessCount > 0 {
+				return true
+			}
+			if queueCtx.counter.WriteFailedCount > 0 {
+				hasWriteFailure = true
+			}
+		}
+	}
+	return !hasWriteFailure
+}
+
 type CKWriter struct {
 	addrs         []string
 	user          string
