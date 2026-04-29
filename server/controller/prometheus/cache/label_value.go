@@ -109,14 +109,19 @@ func (lv *labelValue) Add(batch []*controller.PrometheusLabelValue) {
 }
 
 func (lv *labelValue) refresh(args ...interface{}) error {
+	var count int64
+	if err := lv.org.DB.Model(&metadbmodel.PrometheusLabelValue{}).Count(&count).Error; err != nil {
+		return err
+	}
+
 	rows, err := lv.org.DB.Model(&metadbmodel.PrometheusLabelValue{}).Select("id", "value").Rows()
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 
-	newActive := make(map[string]int)
-	newActiveR := make(map[int]string)
+	newActive := make(map[string]int, count)
+	newActiveR := make(map[int]string, count)
 	for rows.Next() {
 		var id int
 		var value string
