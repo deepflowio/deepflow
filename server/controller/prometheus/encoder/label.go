@@ -34,6 +34,9 @@ type label struct {
 	labelKeyToID map[cache.LabelKey]int
 	labelName    *labelName
 	labelValue   *labelValue
+
+	isRefreshing bool
+	pendingKeys  map[cache.LabelKey]int
 }
 
 func newLabel(org *common.ORG, ln *labelName, lv *labelValue) *label {
@@ -47,7 +50,12 @@ func newLabel(org *common.ORG, ln *labelName, lv *labelValue) *label {
 }
 
 func (l *label) store(item *metadbmodel.PrometheusLabel) {
-	l.labelKeyToID[cache.NewLabelKey(item.NameID, item.ValueID)] = item.ID
+	key := cache.NewLabelKey(item.NameID, item.ValueID)
+	l.labelKeyToID[key] = item.ID
+
+	if l.isRefreshing {
+		l.pendingKeys[key] = item.ID
+	}
 }
 
 func (l *label) getID(key cache.LabelKey) (int, bool) {
@@ -55,25 +63,38 @@ func (l *label) getID(key cache.LabelKey) (int, bool) {
 	return id, ok
 }
 
-func (l *label) refresh(args ...interface{}) error {
-	// Snapshot existing keys before querying DB, to identify entries added
-	// by encode() during the query window (those must be preserved even if
-	// not yet visible in the DB snapshot).
+func (l *label) MarkRefresh() {
 	l.lock.Lock()
-	preKeys := make(map[cache.LabelKey]struct{}, len(l.labelKeyToID))
-	for k := range l.labelKeyToID {
-		preKeys[k] = struct{}{}
-	}
-	l.lock.Unlock()
+	defer l.lock.Unlock()
+	l.isRefreshing = true
+	l.pendingKeys = make(map[cache.LabelKey]int)
+}
+
+func (l *label) MarkRefreshDone() {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	l.isRefreshing = false
+	l.pendingKeys = nil
+}
+
+func (l *label) refresh(args ...interface{}) error {
+	l.MarkRefresh()
+	defer l.MarkRefreshDone()
 
 	log.Info("TODO start")
+
+	var count int64
+	if err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Count(&count).Error; err != nil {
+		return err
+	}
+
 	rows, err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Select("id", "name_id", "value_id").Rows()
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 
-	newMap := make(map[cache.LabelKey]int)
+	newMap := make(map[cache.LabelKey]int, count)
 	for rows.Next() {
 		var id, nameID, valueID int
 		if scanErr := rows.Scan(&id, &nameID, &valueID); scanErr != nil {
@@ -86,16 +107,14 @@ func (l *label) refresh(args ...interface{}) error {
 	}
 
 	log.Info("TODO end")
+
 	l.lock.Lock()
-	for k, v := range l.labelKeyToID {
-		if _, wasInSnapshot := preKeys[k]; !wasInSnapshot {
-			// Written by encode() after the snapshot; may not be in the DB
-			// snapshot yet, so preserve it to avoid a spurious cache miss.
-			newMap[k] = v
-		}
+	for k, v := range l.pendingKeys {
+		newMap[k] = v
 	}
 	l.labelKeyToID = newMap
 	l.lock.Unlock()
+
 	return nil
 }
 
