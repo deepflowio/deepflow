@@ -28,7 +28,8 @@ import (
 type labelValue struct {
 	org *common.ORG
 
-	active  atomic.Value
+	active  atomic.Value // map[string]int (valueToID)
+	activeR atomic.Value // map[int]string (idToValue, rebuilt on refresh)
 	pending map[string]int
 	mu      sync.RWMutex
 }
@@ -75,6 +76,15 @@ func (lv *labelValue) GetIDByValue(v string) (int, bool) {
 	return 0, false
 }
 
+// GetValueByID returns the label value string for a given ID.
+func (lv *labelValue) GetValueByID(id int) (string, bool) {
+	if r := lv.activeR.Load(); r != nil {
+		value, ok := r.(map[int]string)[id]
+		return value, ok
+	}
+	return "", false
+}
+
 func (lv *labelValue) GetValueToID() map[string]int {
 	active := lv.getActive()
 
@@ -110,6 +120,7 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 	defer rows.Close()
 
 	newActive := make(map[string]int, count)
+	newActiveR := make(map[int]string, count)
 	for rows.Next() {
 		var id int
 		var value string
@@ -118,6 +129,7 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 			return scanErr
 		}
 		newActive[value] = id
+		newActiveR[id] = value
 	}
 	if err := rows.Err(); err != nil {
 		log.Errorf("stream read prometheus_label_value error: %v", err, lv.org.LogPrefix)
@@ -132,6 +144,7 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 	}
 	lv.mu.Unlock()
 
+	lv.activeR.Store(newActiveR)
 	lv.replaceActive(newActive)
 	return nil
 }
