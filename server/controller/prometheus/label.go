@@ -260,7 +260,7 @@ func (s *LabelSynchronizer) generateSyncRequest(toEncode *dataToEncode) *control
 			return res
 		}(toEncode.metricAPPLabelLayouts.ToSlice()),
 
-		Labels: func(ks []cache.LabelKey) []*controller.PrometheusLabelRequest {
+		Labels: func(ks []labelStrKey) []*controller.PrometheusLabelRequest {
 			res := make([]*controller.PrometheusLabelRequest, 0, len(ks))
 			for i := range ks {
 				res = append(res, &controller.PrometheusLabelRequest{
@@ -363,8 +363,23 @@ func (s *LabelSynchronizer) addMetricAPPLabelLayoutCache(arg ...interface{}) err
 
 func (s *LabelSynchronizer) addLabelCache(arg ...interface{}) error {
 	ls := arg[0].([]*controller.PrometheusLabel)
-	s.cache.Label.Add(ls)
+	entries := make([]cache.LabelCacheEntry, 0, len(ls))
+	for _, l := range ls {
+		entries = append(entries, cache.LabelCacheEntry{
+			NameID:  int(l.GetNameId()),
+			ValueID: int(l.GetValueId()),
+			LabelID: int(l.GetId()),
+		})
+	}
+	s.cache.Label.Add(entries)
 	return nil
+}
+
+// labelStrKey is a temporary string-based label identifier used only within
+// a single encode request to deduplicate pending labels before IDs are assigned.
+type labelStrKey struct {
+	Name  string
+	Value string
 }
 
 type dataToEncode struct {
@@ -374,7 +389,7 @@ type dataToEncode struct {
 	labelNames             mapset.Set[string]
 	labelValues            mapset.Set[string]
 	metricAPPLabelLayouts  mapset.Set[cache.LayoutKey]
-	labels                 mapset.Set[cache.LabelKey]
+	labels                 mapset.Set[labelStrKey]
 	metricNameToLabelNames map[string]mapset.Set[string]
 }
 
@@ -386,7 +401,7 @@ func newDataToEncode(c *cache.Cache) *dataToEncode {
 		labelNames:             mapset.NewSet[string](),
 		labelValues:            mapset.NewSet[string](),
 		metricAPPLabelLayouts:  mapset.NewSet[cache.LayoutKey](),
-		labels:                 mapset.NewSet[cache.LabelKey](),
+		labels:                 mapset.NewSet[labelStrKey](),
 		metricNameToLabelNames: make(map[string]mapset.Set[string], 0),
 	}
 }
@@ -426,7 +441,15 @@ func (d *dataToEncode) appendMetricAPPLabelLayout(metricName, labelName string) 
 }
 
 func (d *dataToEncode) tryAppendLabel(name, value string) {
-	if _, ok := d.cache.Label.GetIDByKey(cache.NewLabelKey(name, value)); !ok {
-		d.labels.Add(cache.NewLabelKey(name, value))
+	// If name_id and value_id are already known, use the int-based label cache
+	// for O(1) lookup before deciding to encode. Otherwise the label is new
+	// (name or value not yet registered) and must be encoded regardless.
+	nameID, okN := d.cache.LabelName.GetIDByName(name)
+	valueID, okV := d.cache.LabelValue.GetIDByValue(value)
+	if okN && okV {
+		if _, ok := d.cache.Label.GetIDByKey(cache.NewLabelKey(nameID, valueID)); ok {
+			return
+		}
 	}
+	d.labels.Add(labelStrKey{Name: name, Value: value})
 }

@@ -244,8 +244,12 @@ message PrometheusMetricTarget {
 
 message PrometheusLabel {
     required uint32 id = 1;
-    required string name = 2;
-    required string value = 3;
+    // Deprecated: use name_id instead.
+    optional string name = 2;
+    // Deprecated: use value_id instead.
+    optional string value = 3;
+    optional uint32 name_id = 4;
+    optional uint32 value_id = 5;
 }
 
 message PrometheusTargetRequest {

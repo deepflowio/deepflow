@@ -2570,10 +2570,11 @@ TRUNCATE TABLE prometheus_label_value;
 
 CREATE TABLE IF NOT EXISTS prometheus_label (
     `id`            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    `name`          VARCHAR(256) NOT NULL,
-    `value`         TEXT,
+    `name_id`       INT NOT NULL DEFAULT 0,
+    `value_id`      INT NOT NULL DEFAULT 0,
     `synced_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX `name_id_value_id_index` (`name_id`, `value_id`) USING BTREE
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_label;
 
