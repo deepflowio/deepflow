@@ -1,8 +1,8 @@
 module github.com/deepflowio/deepflow/cli
 
-go 1.24.0
+go 1.26.2
 
-toolchain go1.24.4
+toolchain go1.26.2
 
 require (
 	github.com/bitly/go-simplejson v0.5.0
