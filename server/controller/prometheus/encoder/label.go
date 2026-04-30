@@ -22,7 +22,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
@@ -31,45 +31,99 @@ type label struct {
 	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
-	labelKeyToID sync.Map
-	labelIDToKey sync.Map
+	labelKeyToID map[cache.IDLabelKey]int
+
+	labelName  *labelName
+	labelValue *labelValue
+
+	isRefreshing bool
+	pendingKeys  map[cache.IDLabelKey]int
 }
 
-func newLabel(org *common.ORG) *label {
+func newLabel(org *common.ORG, ln *labelName, lv *labelValue) *label {
 	return &label{
 		org:          org,
 		resourceType: "label",
+		labelKeyToID: make(map[cache.IDLabelKey]int),
+		labelName:    ln,
+		labelValue:   lv,
 	}
 }
 
-func (l *label) store(item *mysqlmodel.PrometheusLabel) {
-	l.labelKeyToID.Store(cache.NewLabelKey(item.Name, item.Value), item.ID)
-	l.labelIDToKey.Store(item.ID, cache.NewLabelKey(item.Name, item.Value))
+func (l *label) store(item *metadbmodel.PrometheusLabel) {
+	nameID, ok1 := l.labelName.getID(item.Name)
+	valueID, ok2 := l.labelValue.getID(item.Value)
+	if !ok1 || !ok2 {
+		return
+	}
+	key := cache.IDLabelKey{NameID: nameID, ValueID: valueID}
+	l.labelKeyToID[key] = item.ID
+
+	if l.isRefreshing {
+		l.pendingKeys[key] = item.ID
+	}
 }
 
-func (l *label) getKey(id int) (cache.LabelKey, bool) {
-	if item, ok := l.labelIDToKey.Load(id); ok {
-		return item.(cache.LabelKey), true
-	}
-	return cache.LabelKey{}, false
+func (l *label) getID(key cache.IDLabelKey) (int, bool) {
+	id, ok := l.labelKeyToID[key]
+	return id, ok
 }
 
-func (l *label) getID(key cache.LabelKey) (int, bool) {
-	if item, ok := l.labelKeyToID.Load(key); ok {
-		return item.(int), true
-	}
-	return 0, false
+func (l *label) MarkRefresh() {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	l.isRefreshing = true
+	l.pendingKeys = make(map[cache.IDLabelKey]int)
+}
+
+func (l *label) MarkRefreshDone() {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	l.isRefreshing = false
+	l.pendingKeys = nil
 }
 
 func (l *label) refresh(args ...interface{}) error {
-	var items []*mysqlmodel.PrometheusLabel
-	err := l.org.DB.Find(&items).Error
+	l.MarkRefresh()
+	defer l.MarkRefreshDone()
+
+	var count int64
+	if err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Count(&count).Error; err != nil {
+		return err
+	}
+
+	rows, err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Select("id", "name", "value").Rows()
 	if err != nil {
 		return err
 	}
-	for _, item := range items {
-		l.store(item)
+	defer rows.Close()
+
+	newMap := make(map[cache.IDLabelKey]int, count)
+	for rows.Next() {
+		var id int
+		var name, value string
+		if scanErr := rows.Scan(&id, &name, &value); scanErr != nil {
+			log.Errorf("db stream scan %s interrupted: %v", l.resourceType, scanErr, l.org.LogPrefix)
+			return scanErr
+		}
+		nameID, ok1 := l.labelName.getID(name)
+		valueID, ok2 := l.labelValue.getID(value)
+		if ok1 && ok2 {
+			newMap[cache.IDLabelKey{NameID: nameID, ValueID: valueID}] = id
+		}
 	}
+	if err := rows.Err(); err != nil {
+		log.Errorf("db stream %s error: %v", l.resourceType, err, l.org.LogPrefix)
+		return err
+	}
+
+	l.lock.Lock()
+	for k, v := range l.pendingKeys {
+		newMap[k] = v
+	}
+	l.labelKeyToID = newMap
+	l.lock.Unlock()
+
 	return nil
 }
 
@@ -78,19 +132,23 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 	defer l.lock.Unlock()
 
 	resp := make([]*controller.PrometheusLabel, 0)
-	var dbToAdd []*mysqlmodel.PrometheusLabel
+	var dbToAdd []*metadbmodel.PrometheusLabel
 	for _, item := range toAdd {
 		n := item.GetName()
 		v := item.GetValue()
-		if id, ok := l.getID(cache.NewLabelKey(n, v)); ok {
-			resp = append(resp, &controller.PrometheusLabel{
-				Name:  &n,
-				Value: &v,
-				Id:    proto.Uint32(uint32(id)),
-			})
-			continue
+		nameID, ok1 := l.labelName.getID(n)
+		valueID, ok2 := l.labelValue.getID(v)
+		if ok1 && ok2 {
+			if id, ok := l.getID(cache.IDLabelKey{NameID: nameID, ValueID: valueID}); ok {
+				resp = append(resp, &controller.PrometheusLabel{
+					Name:  &n,
+					Value: &v,
+					Id:    proto.Uint32(uint32(id)),
+				})
+				continue
+			}
 		}
-		dbToAdd = append(dbToAdd, &mysqlmodel.PrometheusLabel{
+		dbToAdd = append(dbToAdd, &metadbmodel.PrometheusLabel{
 			Name:  n,
 			Value: v,
 		})

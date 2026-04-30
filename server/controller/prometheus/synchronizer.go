@@ -18,6 +18,8 @@ package prometheus
 
 import (
 	// "sort"
+	"fmt"
+	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"google.golang.org/protobuf/proto"
@@ -29,6 +31,24 @@ import (
 )
 
 var log = logger.MustGetLogger("prometheus.synchronizer")
+
+const (
+	maxLogCount = 10
+	maxLogSize  = 64 * 1024 // 64KB
+)
+
+func logNotFoundDetail(items []string) string {
+	logItems := items
+	if len(items) > maxLogCount {
+		logItems = items[:maxLogCount]
+	}
+
+	logItemsStr := strings.Join(logItems, ",")
+	if len(logItemsStr) > maxLogSize {
+		logItemsStr = logItemsStr[:maxLogSize] + "... (truncated)"
+	}
+	return fmt.Sprintf("count: %d, <= %d items: %s", len(items), maxLogCount, logItemsStr)
+}
 
 type counter struct {
 	SendMetricCount uint64
@@ -51,30 +71,27 @@ func newSynchronizer(c *cache.Cache) Synchronizer {
 }
 
 func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelResponse, error) {
-	var err error
 	nonLabelNames := mapset.NewSet[string]()
 	metricNameToAPPLabelNames := make(map[string][]*trident.LabelResponse, 0)
-	s.cache.MetricAndAPPLabelLayout.Get().Range(func(k, v interface{}) bool {
-		key := k.(cache.LayoutKey)
-		labelNameID, ok := s.cache.LabelName.GetIDByName(key.LabelName)
+	for k, v := range s.cache.MetricAndAPPLabelLayout.GetLayoutKeyToIndex() {
+		labelNameID, ok := s.cache.LabelName.GetIDByName(k.LabelName)
 		if !ok {
-			nonLabelNames.Add(key.LabelName)
-			return true
+			nonLabelNames.Add(k.LabelName)
+			continue
 		}
-		metricNameToAPPLabelNames[key.MetricName] = append(
-			metricNameToAPPLabelNames[key.MetricName],
+		metricNameToAPPLabelNames[k.MetricName] = append(
+			metricNameToAPPLabelNames[k.MetricName],
 			&trident.LabelResponse{
-				Name:                &key.LabelName,
+				Name:                &k.LabelName,
 				NameId:              proto.Uint32(uint32(labelNameID)),
-				AppLabelColumnIndex: proto.Uint32(uint32(v.(uint8))),
+				AppLabelColumnIndex: proto.Uint32(uint32(v)),
 			})
-		return true
-	})
+	}
 
 	mLabels := make([]*trident.MetricLabelResponse, 0)
-	s.cache.MetricName.Get().Range(func(k, v interface{}) bool {
-		metricName := k.(string)
-		metricID := v.(int)
+	for k, v := range s.cache.MetricName.GetNameToID() {
+		metricName := k
+		metricID := v
 		mLabels = append(
 			mLabels,
 			&trident.MetricLabelResponse{
@@ -84,20 +101,18 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 				LabelIds:   metricNameToAPPLabelNames[metricName],
 			})
 		s.counter.SendMetricCount++
-		return true
-	})
-	if nonLabelNames.Cardinality() > 0 {
-		log.Warningf("label name id not found, names: %v", nonLabelNames.ToSlice(), s.org.LogPrefix)
 	}
-	return mLabels, err
+	if nonLabelNames.Cardinality() > 0 {
+		log.Warningf("ids of label names not found, %s", logNotFoundDetail(nonLabelNames.ToSlice()), s.org.LogPrefix)
+	}
+	return mLabels, nil
 }
 
 func (s *Synchronizer) assembleLabelFully() ([]*trident.LabelResponse, error) {
 	ls := make([]*trident.LabelResponse, 0)
 	nonLabelNames := mapset.NewSet[string]()
 	nonLabelValues := mapset.NewSet[string]()
-	for iter := range s.cache.Label.GetKeyToID().IterBuffered() {
-		k := iter.Key
+	for k := range s.cache.Label.GetKeyToID() {
 		ni, ok := s.cache.LabelName.GetIDByName(k.Name)
 		if !ok {
 			nonLabelNames.Add(k.Name)
@@ -117,10 +132,10 @@ func (s *Synchronizer) assembleLabelFully() ([]*trident.LabelResponse, error) {
 		s.counter.SendLabelCount++
 	}
 	if nonLabelNames.Cardinality() > 0 {
-		log.Warningf("label name id not found, names: %v", nonLabelNames.ToSlice(), s.org.LogPrefix)
+		log.Warningf("ids of label names not found, %s", logNotFoundDetail(nonLabelNames.ToSlice()), s.org.LogPrefix)
 	}
 	if nonLabelValues.Cardinality() > 0 {
-		log.Warningf("label value id not found, values: %v", nonLabelValues.ToSlice(), s.org.LogPrefix)
+		log.Warningf("ids of label values not found, %s", logNotFoundDetail(nonLabelValues.ToSlice()), s.org.LogPrefix)
 	}
 	return ls, nil
 }

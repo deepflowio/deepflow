@@ -18,63 +18,114 @@ package cache
 
 import (
 	"sync"
-
-	"github.com/cornelk/hashmap"
+	"sync/atomic"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 type labelName struct {
-	org *common.ORG
+	org     *common.ORG
+	active  atomic.Value // map[string]int
+	activeR atomic.Value // map[int]string (reverse, rebuilt on refresh)
 
-	nameToID sync.Map
-	idToName *hashmap.Map[int, string]
+	mu              sync.RWMutex
+	pendingNameToID map[string]int
 }
 
 func newLabelName(org *common.ORG) *labelName {
-	return &labelName{
-		org:      org,
-		idToName: hashmap.New[int, string](),
+	ln := &labelName{
+		org:             org,
+		pendingNameToID: make(map[string]int),
 	}
+	ln.active.Store(make(map[string]int))
+	return ln
+}
+
+func (ln *labelName) getActive() map[string]int {
+	if active := ln.active.Load(); active != nil {
+		return active.(map[string]int)
+	}
+	return map[string]int{}
+}
+
+func (ln *labelName) replaceActive(newActive map[string]int) {
+	ln.active.Store(newActive)
 }
 
 func (ln *labelName) GetIDByName(n string) (int, bool) {
-	if id, ok := ln.nameToID.Load(n); ok {
-		return id.(int), true
+	if id, ok := ln.getActive()[n]; ok {
+		return id, true
 	}
-	return 0, false
+	ln.mu.RLock()
+	defer ln.mu.RUnlock()
+	id, ok := ln.pendingNameToID[n]
+	return id, ok
 }
 
+// GetNameByID returns the label name string for a given ID.
 func (ln *labelName) GetNameByID(id int) (string, bool) {
-	if name, ok := ln.idToName.Get(id); ok {
-		return name, true
+	if r := ln.activeR.Load(); r != nil {
+		name, ok := r.(map[int]string)[id]
+		return name, ok
 	}
 	return "", false
 }
 
+func (ln *labelName) GetNameToID() map[string]int {
+	active := ln.getActive()
+	ln.mu.RLock()
+	snapshot := make(map[string]int, len(active)+len(ln.pendingNameToID))
+	for k, v := range active {
+		snapshot[k] = v
+	}
+	for k, v := range ln.pendingNameToID {
+		snapshot[k] = v
+	}
+	ln.mu.RUnlock()
+	return snapshot
+}
+
 func (ln *labelName) Add(batch []*controller.PrometheusLabelName) {
+	ln.mu.Lock()
+	defer ln.mu.Unlock()
 	for _, item := range batch {
-		ln.nameToID.Store(item.GetName(), int(item.GetId()))
-		ln.idToName.Set(int(item.GetId()), item.GetName())
+		ln.pendingNameToID[item.GetName()] = int(item.GetId())
 	}
 }
 
 func (ln *labelName) refresh(args ...interface{}) error {
-	labelNames, err := ln.load()
+	items, err := ln.load()
 	if err != nil {
 		return err
 	}
-	for _, item := range labelNames {
-		ln.nameToID.Store(item.Name, item.ID)
-		ln.idToName.Set(item.ID, item.Name)
-	}
+	ln.processLoadedData(items)
 	return nil
 }
 
-func (ln *labelName) load() ([]*mysqlmodel.PrometheusLabelName, error) {
-	var labelNames []*mysqlmodel.PrometheusLabelName
-	err := ln.org.DB.Find(&labelNames).Error
+func (ln *labelName) processLoadedData(items []*metadbmodel.PrometheusLabelName) {
+	newActive := make(map[string]int, len(items))
+	newActiveR := make(map[int]string, len(items))
+	for _, item := range items {
+		newActive[item.Name] = item.ID
+		newActiveR[item.ID] = item.Name
+	}
+
+	ln.mu.Lock()
+	pending := ln.pendingNameToID
+	ln.pendingNameToID = make(map[string]int)
+	ln.mu.Unlock()
+
+	for k, v := range pending {
+		newActive[k] = v
+	}
+	ln.activeR.Store(newActiveR)
+	ln.replaceActive(newActive)
+}
+
+func (ln *labelName) load() ([]*metadbmodel.PrometheusLabelName, error) {
+	var labelNames []*metadbmodel.PrometheusLabelName
+	err := ln.org.DB.Select("id", "name").Find(&labelNames).Error
 	return labelNames, err
 }

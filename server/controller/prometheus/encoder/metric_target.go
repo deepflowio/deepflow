@@ -23,7 +23,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
@@ -46,8 +46,8 @@ func newMetricTarget(org *common.ORG, te *target) *metricTarget {
 }
 
 func (mt *metricTarget) refresh(args ...interface{}) error {
-	var items []*mysqlmodel.PrometheusMetricTarget
-	err := mt.org.DB.Find(&items).Error
+	var items []*metadbmodel.PrometheusMetricTarget
+	err := mt.org.DB.Select("metric_name", "target_id").Find(&items).Error
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func (mt *metricTarget) encode(toAdd []*controller.PrometheusMetricTargetRequest
 	defer mt.lock.Unlock()
 
 	resp := make([]*controller.PrometheusMetricTarget, 0)
-	var dbToAdd []*mysqlmodel.PrometheusMetricTarget
+	var dbToAdd []*metadbmodel.PrometheusMetricTarget
 	for _, item := range toAdd {
 		mn := item.GetMetricName()
 		ti := int(item.GetTargetId())
@@ -77,7 +77,7 @@ func (mt *metricTarget) encode(toAdd []*controller.PrometheusMetricTargetRequest
 				})
 				continue
 			}
-			dbToAdd = append(dbToAdd, &mysqlmodel.PrometheusMetricTarget{
+			dbToAdd = append(dbToAdd, &metadbmodel.PrometheusMetricTarget{
 				MetricName: mn,
 				TargetID:   ti,
 			})

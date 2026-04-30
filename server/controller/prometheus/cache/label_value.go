@@ -17,56 +17,134 @@
 package cache
 
 import (
-	"github.com/cornelk/hashmap"
+	"sync"
+	"sync/atomic"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
 type labelValue struct {
 	org *common.ORG
 
-	valueToID *hashmap.Map[string, int]
+	active  atomic.Value // map[string]int (valueToID)
+	activeR atomic.Value // map[int]string (idToValue, rebuilt on refresh)
+	pending map[string]int
+	mu      sync.RWMutex
+}
+
+func (lv *labelValue) replaceActive(newActive map[string]int) {
+	lv.active.Store(newActive)
 }
 
 func newLabelValue(org *common.ORG) *labelValue {
-	return &labelValue{
-		org:       org,
-		valueToID: hashmap.New[string, int](),
+	lv := &labelValue{
+		org:     org,
+		active:  atomic.Value{},
+		pending: make(map[string]int),
 	}
+	lv.active.Store(make(map[string]int))
+	return lv
+}
+
+func (lv *labelValue) getActive() map[string]int {
+	if active := lv.active.Load(); active != nil {
+		return active.(map[string]int)
+	}
+	return map[string]int{}
+}
+
+func cloneValueMap(src map[string]int, extra int) map[string]int {
+	dst := make(map[string]int, len(src)+extra)
+	for key, value := range src {
+		dst[key] = value
+	}
+	return dst
 }
 
 func (lv *labelValue) GetIDByValue(v string) (int, bool) {
-	if id, ok := lv.valueToID.Get(v); ok {
-		return id, true
+	if item, ok := lv.getActive()[v]; ok {
+		return item, true
+	}
+
+	lv.mu.RLock()
+	defer lv.mu.RUnlock()
+	if item, ok := lv.pending[v]; ok {
+		return item, true
 	}
 	return 0, false
 }
 
-func (lv *labelValue) GetValueToID() *hashmap.Map[string, int] {
-	return lv.valueToID
+// GetValueByID returns the label value string for a given ID.
+func (lv *labelValue) GetValueByID(id int) (string, bool) {
+	if r := lv.activeR.Load(); r != nil {
+		value, ok := r.(map[int]string)[id]
+		return value, ok
+	}
+	return "", false
+}
+
+func (lv *labelValue) GetValueToID() map[string]int {
+	active := lv.getActive()
+
+	lv.mu.RLock()
+	pendingLen := len(lv.pending)
+	snapshot := cloneValueMap(active, pendingLen)
+	for key, value := range lv.pending {
+		snapshot[key] = value
+	}
+	lv.mu.RUnlock()
+
+	return snapshot
 }
 
 func (lv *labelValue) Add(batch []*controller.PrometheusLabelValue) {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
 	for _, item := range batch {
-		lv.valueToID.Set(item.GetValue(), int(item.GetId()))
+		lv.pending[item.GetValue()] = int(item.GetId())
 	}
 }
 
 func (lv *labelValue) refresh(args ...interface{}) error {
-	labelValues, err := lv.load()
+	var count int64
+	if err := lv.org.DB.Model(&metadbmodel.PrometheusLabelValue{}).Count(&count).Error; err != nil {
+		return err
+	}
+
+	rows, err := lv.org.DB.Model(&metadbmodel.PrometheusLabelValue{}).Select("id", "value").Rows()
 	if err != nil {
 		return err
 	}
-	for _, item := range labelValues {
-		lv.valueToID.Set(item.Value, item.ID)
-	}
-	return nil
-}
+	defer rows.Close()
 
-func (lv *labelValue) load() ([]*mysqlmodel.PrometheusLabelValue, error) {
-	var labelValues []*mysqlmodel.PrometheusLabelValue
-	err := lv.org.DB.Find(&labelValues).Error
-	return labelValues, err
+	newActive := make(map[string]int, count)
+	newActiveR := make(map[int]string, count)
+	for rows.Next() {
+		var id int
+		var value string
+		if scanErr := rows.Scan(&id, &value); scanErr != nil {
+			log.Errorf("stream scan prometheus_label_value interrupted: %v", scanErr, lv.org.LogPrefix)
+			return scanErr
+		}
+		newActive[value] = id
+		newActiveR[id] = value
+	}
+	if err := rows.Err(); err != nil {
+		log.Errorf("stream read prometheus_label_value error: %v", err, lv.org.LogPrefix)
+		return err
+	}
+
+	lv.mu.Lock()
+	pending := lv.pending
+	lv.pending = make(map[string]int)
+	for key, value := range pending {
+		newActive[key] = value
+	}
+	lv.mu.Unlock()
+
+	lv.activeR.Store(newActiveR)
+	lv.replaceActive(newActive)
+	return nil
 }

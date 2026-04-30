@@ -58,14 +58,16 @@ func newCache(orgID int) (*Cache, error) {
 	}
 	log.Infof("new prometheus cache", org.LogPrefix)
 	mn := newMetricName(org)
+	ln := newLabelName(org)
+	lv := newLabelValue(org)
 	c := &Cache{
 		org:                     org,
 		canRefresh:              make(chan bool, 1),
 		MetricName:              mn,
-		LabelName:               newLabelName(org),
-		LabelValue:              newLabelValue(org),
+		LabelName:               ln,
+		LabelValue:              lv,
 		MetricAndAPPLabelLayout: newMetricAndAPPLabelLayout(org),
-		Label:                   newLabel(org),
+		Label:                   newLabel(org, ln, lv),
 	}
 	c.canRefresh <- true
 	return c, nil
@@ -93,13 +95,17 @@ LOOP:
 
 func (c *Cache) refresh() error {
 	log.Infof("refresh cache started", c.org.LogPrefix)
+	// LabelName and LabelValue must be refreshed before Label,
+	// because Label.refresh() converts name/value strings to IDs.
 	egRunAhead := &errgroup.Group{}
 	common.AppendErrGroup(egRunAhead, c.MetricName.refresh)
-	common.AppendErrGroup(egRunAhead, c.Label.refresh)
-	egRunAhead.Wait()
+	common.AppendErrGroup(egRunAhead, c.LabelName.refresh)
+	common.AppendErrGroup(egRunAhead, c.LabelValue.refresh)
+	if err := egRunAhead.Wait(); err != nil {
+		return err
+	}
 	eg := &errgroup.Group{}
-	common.AppendErrGroup(eg, c.LabelName.refresh)
-	common.AppendErrGroup(eg, c.LabelValue.refresh)
+	common.AppendErrGroup(eg, c.Label.refresh)
 	common.AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
 	err := eg.Wait()
 	log.Infof("refresh cache completed", c.org.LogPrefix)
@@ -122,10 +128,9 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"name_to_id": make(map[string]interface{}),
 		}
-		tempCache.MetricName.nameToID.Range(func(key, value any) bool {
-			temp["name_to_id"].(map[string]interface{})[key.(string)] = value
-			return true
-		})
+		for k, v := range tempCache.MetricName.GetNameToID() {
+			temp["name_to_id"].(map[string]interface{})[k] = v
+		}
 		if len(temp["name_to_id"].(map[string]interface{})) > 0 {
 			content["metric_name"] = temp
 		}
@@ -134,10 +139,9 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"name_to_id": make(map[string]interface{}),
 		}
-		tempCache.LabelName.nameToID.Range(func(key, value any) bool {
-			temp["name_to_id"].(map[string]interface{})[key.(string)] = value
-			return true
-		})
+		for k, v := range tempCache.LabelName.GetNameToID() {
+			temp["name_to_id"].(map[string]interface{})[k] = v
+		}
 		if len(temp["name_to_id"].(map[string]interface{})) > 0 {
 			content["label_name"] = temp
 		}
@@ -146,10 +150,10 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"value_to_id": make(map[string]interface{}),
 		}
-		tempCache.LabelValue.GetValueToID().Range(func(key string, value int) bool {
+
+		for key, value := range tempCache.LabelValue.GetValueToID() {
 			temp["value_to_id"].(map[string]interface{})[key] = value
-			return true
-		})
+		}
 
 		if len(temp["value_to_id"].(map[string]interface{})) > 0 {
 			content["label_value"] = temp
@@ -159,10 +163,9 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"layout_key_to_index": make(map[string]interface{}),
 		}
-		tempCache.MetricAndAPPLabelLayout.layoutKeyToIndex.Range(func(key, value any) bool {
-			temp["layout_key_to_index"].(map[string]interface{})[marshal(key)] = value
-			return true
-		})
+		for k, v := range tempCache.MetricAndAPPLabelLayout.GetLayoutKeyToIndex() {
+			temp["layout_key_to_index"].(map[string]interface{})[marshal(k)] = v
+		}
 		if len(temp["layout_key_to_index"].(map[string]interface{})) > 0 {
 			content["metric_and_app_label_layout"] = temp
 		}
@@ -171,8 +174,8 @@ func GetDebugCache(t controller.PrometheusCacheType) []byte {
 		temp := map[string]interface{}{
 			"key_to_id": make(map[string]interface{}),
 		}
-		for iter := range tempCache.Label.keyToID.Iter() {
-			temp["key_to_id"].(map[string]interface{})[iter.Key.String()] = iter.Val
+		for key, value := range tempCache.Label.GetKeyToID() {
+			temp["key_to_id"].(map[string]interface{})[key.String()] = value
 		}
 
 		if len(temp["key_to_id"].(map[string]interface{})) > 0 {

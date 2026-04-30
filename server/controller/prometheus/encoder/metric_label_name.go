@@ -23,7 +23,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -60,15 +60,15 @@ func newMetricLabelName(org *common.ORG, mn *metricName, l *labelName) *metricLa
 	}
 }
 
-func (ml *metricLabelName) store(item *mysqlmodel.PrometheusMetricLabelName) {
+func (ml *metricLabelName) store(item *metadbmodel.PrometheusMetricLabelName) {
 	if mni, ok := ml.metricNameEncoder.getID(item.MetricName); ok {
 		ml.keys.Add(newMetricLabelNameKey(mni, item.LabelNameID))
 	}
 }
 
 func (ml *metricLabelName) refresh(args ...interface{}) error {
-	var items []*mysqlmodel.PrometheusMetricLabelName
-	err := ml.org.DB.Find(&items).Error
+	var items []*metadbmodel.PrometheusMetricLabelName
+	err := ml.org.DB.Select("metric_name", "label_name_id").Find(&items).Error
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func (ml *metricLabelName) encode(rMLs []*controller.PrometheusMetricLabelNameRe
 	defer ml.lock.Unlock()
 
 	resp := make([]*controller.PrometheusMetricLabelName, 0)
-	var dbToAdd []*mysqlmodel.PrometheusMetricLabelName
+	var dbToAdd []*metadbmodel.PrometheusMetricLabelName
 	respToAdd := make([]*controller.PrometheusMetricLabelName, 0)
 	for _, rML := range rMLs {
 		mn := rML.GetMetricName()
@@ -104,7 +104,7 @@ func (ml *metricLabelName) encode(rMLs []*controller.PrometheusMetricLabelNameRe
 				lis = append(lis, uint32(lni))
 				continue
 			}
-			dbToAdd = append(dbToAdd, &mysqlmodel.PrometheusMetricLabelName{
+			dbToAdd = append(dbToAdd, &metadbmodel.PrometheusMetricLabelName{
 				MetricName:  mn,
 				LabelNameID: lni,
 			})
