@@ -28,9 +28,11 @@ import (
 type labelValue struct {
 	org *common.ORG
 
-	active  atomic.Value
-	pending map[string]int
-	mu      sync.RWMutex
+	active           atomic.Value // map[string]int (valueToID)
+	activeR          atomic.Value // map[int]string (idToValue, rebuilt on refresh)
+	pending          map[string]int
+	pendingIDToValue map[int]string
+	mu               sync.RWMutex
 }
 
 func (lv *labelValue) replaceActive(newActive map[string]int) {
@@ -39,9 +41,10 @@ func (lv *labelValue) replaceActive(newActive map[string]int) {
 
 func newLabelValue(org *common.ORG) *labelValue {
 	lv := &labelValue{
-		org:     org,
-		active:  atomic.Value{},
-		pending: make(map[string]int),
+		org:              org,
+		active:           atomic.Value{},
+		pending:          make(map[string]int),
+		pendingIDToValue: make(map[int]string),
 	}
 	lv.active.Store(make(map[string]int))
 	return lv
@@ -75,6 +78,19 @@ func (lv *labelValue) GetIDByValue(v string) (int, bool) {
 	return 0, false
 }
 
+// GetValueByID returns the label value string for a given ID.
+func (lv *labelValue) GetValueByID(id int) (string, bool) {
+	if r := lv.activeR.Load(); r != nil {
+		if value, ok := r.(map[int]string)[id]; ok {
+			return value, true
+		}
+	}
+	lv.mu.RLock()
+	defer lv.mu.RUnlock()
+	value, ok := lv.pendingIDToValue[id]
+	return value, ok
+}
+
 func (lv *labelValue) GetValueToID() map[string]int {
 	active := lv.getActive()
 
@@ -94,6 +110,7 @@ func (lv *labelValue) Add(batch []*controller.PrometheusLabelValue) {
 	defer lv.mu.Unlock()
 	for _, item := range batch {
 		lv.pending[item.GetValue()] = int(item.GetId())
+		lv.pendingIDToValue[int(item.GetId())] = item.GetValue()
 	}
 }
 
@@ -110,6 +127,7 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 	defer rows.Close()
 
 	newActive := make(map[string]int, count)
+	newActiveR := make(map[int]string, count)
 	for rows.Next() {
 		var id int
 		var value string
@@ -118,6 +136,7 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 			return scanErr
 		}
 		newActive[value] = id
+		newActiveR[id] = value
 	}
 	if err := rows.Err(); err != nil {
 		log.Errorf("stream read prometheus_label_value error: %v", err, lv.org.LogPrefix)
@@ -126,12 +145,18 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 
 	lv.mu.Lock()
 	pending := lv.pending
+	pendingR := lv.pendingIDToValue
 	lv.pending = make(map[string]int)
+	lv.pendingIDToValue = make(map[int]string)
 	for key, value := range pending {
 		newActive[key] = value
 	}
+	for id, value := range pendingR {
+		newActiveR[id] = value
+	}
 	lv.mu.Unlock()
 
+	lv.activeR.Store(newActiveR)
 	lv.replaceActive(newActive)
 	return nil
 }

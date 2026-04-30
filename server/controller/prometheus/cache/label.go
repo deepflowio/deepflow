@@ -25,6 +25,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
+// LabelKey is the external string-based key used by callers.
 type LabelKey struct {
 	Name  string
 	Value string
@@ -41,64 +42,101 @@ func NewLabelKey(name, value string) LabelKey {
 	}
 }
 
+// IDLabelKey is the internal int-based key used for compact map storage.
+// Avoids storing millions of duplicate string objects in memory.
+type IDLabelKey struct {
+	NameID  int
+	ValueID int
+}
+
 type label struct {
 	org *common.ORG
 
-	active  atomic.Value
-	pending map[LabelKey]int
+	labelName  *labelName
+	labelValue *labelValue
+
+	active  atomic.Value // map[IDLabelKey]int
+	pending map[IDLabelKey]int
 	mu      sync.RWMutex
 }
 
-func newLabel(org *common.ORG) *label {
+func newLabel(org *common.ORG, ln *labelName, lv *labelValue) *label {
 	l := &label{
-		org:     org,
-		pending: make(map[LabelKey]int),
+		org:        org,
+		labelName:  ln,
+		labelValue: lv,
+		pending:    make(map[IDLabelKey]int),
 	}
-	l.active.Store(make(map[LabelKey]int))
+	l.active.Store(make(map[IDLabelKey]int))
 	return l
 }
 
-func (l *label) getActive() map[LabelKey]int {
+func (l *label) getActive() map[IDLabelKey]int {
 	if active := l.active.Load(); active != nil {
-		return active.(map[LabelKey]int)
+		return active.(map[IDLabelKey]int)
 	}
-	return map[LabelKey]int{}
+	return map[IDLabelKey]int{}
 }
 
-func cloneLabelMap(src map[LabelKey]int, extra int) map[LabelKey]int {
-	dst := make(map[LabelKey]int, len(src)+extra)
-	for key, value := range src {
-		dst[key] = value
-	}
-	return dst
-}
-
-func (l *label) replaceActive(newActive map[LabelKey]int) {
+func (l *label) replaceActive(newActive map[IDLabelKey]int) {
 	l.active.Store(newActive)
 }
 
+// toIDKey converts a string-based LabelKey to an int-based IDLabelKey.
+// Returns false if either name or value is not found in the caches.
+func (l *label) toIDKey(key LabelKey) (IDLabelKey, bool) {
+	nameID, ok := l.labelName.GetIDByName(key.Name)
+	if !ok {
+		return IDLabelKey{}, false
+	}
+	valueID, ok := l.labelValue.GetIDByValue(key.Value)
+	if !ok {
+		return IDLabelKey{}, false
+	}
+	return IDLabelKey{NameID: nameID, ValueID: valueID}, true
+}
+
+// GetKeyToID returns a snapshot of all labels as string-based LabelKey map.
+// This is an infrequent operation (debug, full assembly); it converts
+// internal IDLabelKey back to LabelKey using reverse lookups.
 func (l *label) GetKeyToID() map[LabelKey]int {
 	active := l.getActive()
 
 	l.mu.RLock()
 	pendingLen := len(l.pending)
-	snapshot := cloneLabelMap(active, pendingLen)
-	for key, value := range l.pending {
-		snapshot[key] = value
+	merged := make(map[IDLabelKey]int, len(active)+pendingLen)
+	for k, v := range active {
+		merged[k] = v
+	}
+	for k, v := range l.pending {
+		merged[k] = v
 	}
 	l.mu.RUnlock()
 
-	return snapshot
+	result := make(map[LabelKey]int, len(merged))
+	for idk, id := range merged {
+		name, ok1 := l.labelName.GetNameByID(idk.NameID)
+		value, ok2 := l.labelValue.GetValueByID(idk.ValueID)
+		if ok1 && ok2 {
+			result[NewLabelKey(name, value)] = id
+		}
+	}
+	return result
 }
 
 func (l *label) GetIDByKey(key LabelKey) (int, bool) {
-	if item, ok := l.getActive()[key]; ok {
+	idk, ok := l.toIDKey(key)
+	if !ok {
+		return 0, false
+	}
+
+	if item, ok := l.getActive()[idk]; ok {
 		return item, true
 	}
 
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	if item, ok := l.pending[key]; ok {
+	if item, ok := l.pending[idk]; ok {
 		return item, true
 	}
 	return 0, false
@@ -108,8 +146,11 @@ func (l *label) Add(batch []*controller.PrometheusLabel) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for _, item := range batch {
-		k := NewLabelKey(item.GetName(), item.GetValue())
-		l.pending[k] = int(item.GetId())
+		nameID, ok1 := l.labelName.GetIDByName(item.GetName())
+		valueID, ok2 := l.labelValue.GetIDByValue(item.GetValue())
+		if ok1 && ok2 {
+			l.pending[IDLabelKey{NameID: nameID, ValueID: valueID}] = int(item.GetId())
+		}
 	}
 }
 
@@ -125,7 +166,7 @@ func (l *label) refresh(args ...interface{}) error {
 	}
 	defer rows.Close()
 
-	newActive := make(map[LabelKey]int, count)
+	newActive := make(map[IDLabelKey]int, count)
 	for rows.Next() {
 		var id int
 		var name, value string
@@ -133,7 +174,11 @@ func (l *label) refresh(args ...interface{}) error {
 			log.Errorf("stream scan prometheus_label interrupted: %v", scanErr, l.org.LogPrefix)
 			return scanErr
 		}
-		newActive[NewLabelKey(name, value)] = id
+		nameID, ok1 := l.labelName.GetIDByName(name)
+		valueID, ok2 := l.labelValue.GetIDByValue(value)
+		if ok1 && ok2 {
+			newActive[IDLabelKey{NameID: nameID, ValueID: valueID}] = id
+		}
 	}
 	if err := rows.Err(); err != nil {
 		log.Errorf("stream read prometheus_label error: %v", err, l.org.LogPrefix)
@@ -142,7 +187,7 @@ func (l *label) refresh(args ...interface{}) error {
 
 	l.mu.Lock()
 	pending := l.pending
-	l.pending = make(map[LabelKey]int)
+	l.pending = make(map[IDLabelKey]int)
 	for key, value := range pending {
 		newActive[key] = value
 	}
