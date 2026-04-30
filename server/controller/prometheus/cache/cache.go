@@ -58,14 +58,16 @@ func newCache(orgID int) (*Cache, error) {
 	}
 	log.Infof("new prometheus cache", org.LogPrefix)
 	mn := newMetricName(org)
+	ln := newLabelName(org)
+	lv := newLabelValue(org)
 	c := &Cache{
 		org:                     org,
 		canRefresh:              make(chan bool, 1),
 		MetricName:              mn,
-		LabelName:               newLabelName(org),
-		LabelValue:              newLabelValue(org),
+		LabelName:               ln,
+		LabelValue:              lv,
 		MetricAndAPPLabelLayout: newMetricAndAPPLabelLayout(org),
-		Label:                   newLabel(org),
+		Label:                   newLabel(org, ln, lv),
 	}
 	c.canRefresh <- true
 	return c, nil
@@ -93,13 +95,17 @@ LOOP:
 
 func (c *Cache) refresh() error {
 	log.Infof("refresh cache started", c.org.LogPrefix)
+	// LabelName and LabelValue must be refreshed before Label,
+	// because Label.refresh() converts name/value strings to IDs.
 	egRunAhead := &errgroup.Group{}
 	common.AppendErrGroup(egRunAhead, c.MetricName.refresh)
-	common.AppendErrGroup(egRunAhead, c.Label.refresh)
-	egRunAhead.Wait()
+	common.AppendErrGroup(egRunAhead, c.LabelName.refresh)
+	common.AppendErrGroup(egRunAhead, c.LabelValue.refresh)
+	if err := egRunAhead.Wait(); err != nil {
+		return err
+	}
 	eg := &errgroup.Group{}
-	common.AppendErrGroup(eg, c.LabelName.refresh)
-	common.AppendErrGroup(eg, c.LabelValue.refresh)
+	common.AppendErrGroup(eg, c.Label.refresh)
 	common.AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
 	err := eg.Wait()
 	log.Infof("refresh cache completed", c.org.LogPrefix)

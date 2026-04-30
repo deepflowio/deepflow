@@ -26,17 +26,20 @@ import (
 )
 
 type labelName struct {
-	org    *common.ORG
-	active atomic.Value // map[string]int
+	org     *common.ORG
+	active  atomic.Value // map[string]int
+	activeR atomic.Value // map[int]string (reverse, rebuilt on refresh)
 
 	mu              sync.RWMutex
 	pendingNameToID map[string]int
+	pendingIDToName map[int]string
 }
 
 func newLabelName(org *common.ORG) *labelName {
 	ln := &labelName{
 		org:             org,
 		pendingNameToID: make(map[string]int),
+		pendingIDToName: make(map[int]string),
 	}
 	ln.active.Store(make(map[string]int))
 	return ln
@@ -63,6 +66,19 @@ func (ln *labelName) GetIDByName(n string) (int, bool) {
 	return id, ok
 }
 
+// GetNameByID returns the label name string for a given ID.
+func (ln *labelName) GetNameByID(id int) (string, bool) {
+	if r := ln.activeR.Load(); r != nil {
+		if name, ok := r.(map[int]string)[id]; ok {
+			return name, true
+		}
+	}
+	ln.mu.RLock()
+	defer ln.mu.RUnlock()
+	name, ok := ln.pendingIDToName[id]
+	return name, ok
+}
+
 func (ln *labelName) GetNameToID() map[string]int {
 	active := ln.getActive()
 	ln.mu.RLock()
@@ -82,6 +98,7 @@ func (ln *labelName) Add(batch []*controller.PrometheusLabelName) {
 	defer ln.mu.Unlock()
 	for _, item := range batch {
 		ln.pendingNameToID[item.GetName()] = int(item.GetId())
+		ln.pendingIDToName[int(item.GetId())] = item.GetName()
 	}
 }
 
@@ -96,18 +113,26 @@ func (ln *labelName) refresh(args ...interface{}) error {
 
 func (ln *labelName) processLoadedData(items []*metadbmodel.PrometheusLabelName) {
 	newActive := make(map[string]int, len(items))
+	newActiveR := make(map[int]string, len(items))
 	for _, item := range items {
 		newActive[item.Name] = item.ID
+		newActiveR[item.ID] = item.Name
 	}
 
 	ln.mu.Lock()
 	pending := ln.pendingNameToID
+	pendingR := ln.pendingIDToName
 	ln.pendingNameToID = make(map[string]int)
+	ln.pendingIDToName = make(map[int]string)
 	ln.mu.Unlock()
 
 	for k, v := range pending {
 		newActive[k] = v
 	}
+	for k, v := range pendingR {
+		newActiveR[k] = v
+	}
+	ln.activeR.Store(newActiveR)
 	ln.replaceActive(newActive)
 }
 
