@@ -34,6 +34,7 @@ use log::{debug, error, info, trace};
 use nix::sys::utsname::uname;
 use procfs::process::all_processes_with_root;
 
+use crate::common::flow::BIZ_TYPE_AI_AGENT;
 use crate::config::ProcessMatcher;
 use crate::platform::{get_os_app_tag_by_exec, ProcessData, ProcessDataOp};
 
@@ -476,9 +477,19 @@ impl ProcessListener {
         process_data_cache.retain(|pid, _| alive_pids.contains(pid));
 
         for (key, value) in features.iter_mut() {
-            if (value.process_matcher.is_empty() && value.pids.is_empty())
-                || value.callback.is_none()
-            {
+            let ai_agent_pids =
+                if should_fetch_ai_agent_pids(key.as_str(), value.callback.is_none()) {
+                    fetch_ai_agent_pids(key.as_str())
+                } else {
+                    Vec::new()
+                };
+
+            if should_skip_feature(
+                value.process_matcher.is_empty(),
+                value.pids.is_empty(),
+                ai_agent_pids.is_empty(),
+                value.callback.is_none(),
+            ) {
                 continue;
             }
 
@@ -502,12 +513,21 @@ impl ProcessListener {
                 }
             }
 
+            if !ai_agent_pids.is_empty() {
+                merge_ai_agent_processes(
+                    process_data_cache,
+                    &ai_agent_pids,
+                    &mut pids,
+                    &mut process_datas,
+                );
+            }
+
             pids.sort();
             pids.dedup();
             process_datas.sort_by_key(|x| x.pid);
             process_datas.merge_and_dedup();
 
-            if pids != value.pids {
+            if pids != value.pids || process_datas != value.process_datas {
                 debug!("Feature {} update {} pids {:?}.", key, pids.len(), pids);
                 value.callback.as_ref().unwrap()(&pids, &process_datas);
                 value.pids = pids;
@@ -561,5 +581,164 @@ impl ProcessListener {
     pub fn notify_stop(&self) -> Option<JoinHandle<()>> {
         self.running.store(false, Relaxed);
         self.thread_handle.lock().unwrap().take()
+    }
+}
+
+fn should_skip_feature(
+    process_matcher_empty: bool,
+    previous_pids_empty: bool,
+    ai_agent_pids_empty: bool,
+    callback_missing: bool,
+) -> bool {
+    if callback_missing {
+        return true;
+    }
+    process_matcher_empty && previous_pids_empty && ai_agent_pids_empty
+}
+
+fn should_fetch_ai_agent_pids(feature: &str, callback_missing: bool) -> bool {
+    if callback_missing {
+        return false;
+    }
+    feature == "proc.gprocess_info" || feature == "proc.socket_list"
+}
+
+#[cfg(feature = "enterprise")]
+fn fetch_ai_agent_pids(feature: &str) -> Vec<u32> {
+    // AI Agent processes must participate in both gprocess_info and socket_list.
+    // - gprocess_info ensures process metadata sync (MySQL process table, biz_type tagging)
+    // - socket_list ensures GPID sync for EBPF flows (gprocess_id injection)
+    // Without socket_list, GPID sync remains empty, leading to gprocess_id=0 in L7/proc events.
+    if feature == "proc.gprocess_info" || feature == "proc.socket_list" {
+        if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
+            let pids = registry.get_all_pids();
+            trace!("AI Agent: {} fetch {} pids", feature, pids.len());
+            return pids;
+        }
+        trace!("AI Agent: {} registry not initialized", feature);
+    }
+    Vec::new()
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn fetch_ai_agent_pids(_feature: &str) -> Vec<u32> {
+    Vec::new()
+}
+
+fn merge_ai_agent_processes(
+    process_data_cache: &HashMap<i32, ProcessData>,
+    ai_agent_pids: &[u32],
+    pids: &mut Vec<u32>,
+    process_datas: &mut Vec<ProcessData>,
+) {
+    let mut existing_pids: HashSet<u32> = pids.iter().copied().collect();
+    let ai_agent_set: HashSet<u32> = ai_agent_pids.iter().copied().collect();
+    for process_data in process_datas.iter_mut() {
+        if ai_agent_set.contains(&(process_data.pid as u32)) {
+            process_data.biz_type = BIZ_TYPE_AI_AGENT;
+        }
+    }
+    for pid in ai_agent_pids {
+        if existing_pids.contains(pid) {
+            continue;
+        }
+        if let Some(process_data) = process_data_cache.get(&(*pid as i32)) {
+            let mut process_data = process_data.clone();
+            process_data.biz_type = BIZ_TYPE_AI_AGENT;
+            pids.push(*pid);
+            process_datas.push(process_data);
+            existing_pids.insert(*pid);
+        } else {
+            trace!(
+                "AI Agent: pid {} not found in process cache, skip gprocess sync",
+                pid
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn make_process_data(pid: u64) -> ProcessData {
+        ProcessData {
+            name: format!("proc-{pid}"),
+            pid,
+            ppid: 1,
+            process_name: format!("proc-{pid}"),
+            cmd: format!("/proc/{pid}"),
+            cmd_with_args: vec![format!("/proc/{pid}")],
+            user_id: 0,
+            user: "root".to_string(),
+            start_time: Duration::from_secs(0),
+            os_app_tags: vec![],
+            netns_id: 0,
+            container_id: String::new(),
+            biz_type: 0,
+        }
+    }
+
+    #[test]
+    fn merge_ai_agent_processes_adds_missing_pids() {
+        let mut process_data_cache = HashMap::new();
+        process_data_cache.insert(1001, make_process_data(1001));
+        process_data_cache.insert(1002, make_process_data(1002));
+
+        let ai_agent_pids = vec![1002];
+        let mut pids = vec![1001];
+        let mut process_datas = vec![make_process_data(1001)];
+
+        merge_ai_agent_processes(
+            &process_data_cache,
+            &ai_agent_pids,
+            &mut pids,
+            &mut process_datas,
+        );
+
+        pids.sort();
+        assert_eq!(pids, vec![1001, 1002]);
+        assert!(process_datas.iter().any(|pd| pd.pid == 1002));
+    }
+
+    #[test]
+    fn merge_ai_agent_processes_sets_biz_type() {
+        use crate::common::flow::BIZ_TYPE_AI_AGENT;
+
+        let mut process_data_cache = HashMap::new();
+        process_data_cache.insert(2001, make_process_data(2001));
+        process_data_cache.insert(2002, make_process_data(2002));
+
+        let ai_agent_pids = vec![2002];
+        let mut pids = vec![2002];
+        let mut process_datas = vec![make_process_data(2002)];
+
+        merge_ai_agent_processes(
+            &process_data_cache,
+            &ai_agent_pids,
+            &mut pids,
+            &mut process_datas,
+        );
+
+        let ai_agent = process_datas
+            .iter()
+            .find(|pd| pd.pid == 2002)
+            .expect("ai agent process missing");
+        assert_eq!(ai_agent.biz_type, BIZ_TYPE_AI_AGENT);
+    }
+
+    #[test]
+    fn should_skip_feature_allows_ai_agent_without_matcher() {
+        let skip = should_skip_feature(true, true, false, false);
+        assert!(!skip);
+    }
+
+    #[test]
+    fn should_fetch_ai_agent_pids_only_for_ai_agent_features() {
+        assert!(should_fetch_ai_agent_pids("proc.gprocess_info", false));
+        assert!(should_fetch_ai_agent_pids("proc.socket_list", false));
+        assert!(!should_fetch_ai_agent_pids("proc.process_info", false));
+        assert!(!should_fetch_ai_agent_pids("proc.socket_list", true));
     }
 }

@@ -20,6 +20,7 @@ import (
 	"unsafe"
 
 	"github.com/ClickHouse/ch-go/proto"
+	"github.com/deepflowio/deepflow/server/ingester/event/common"
 	"github.com/deepflowio/deepflow/server/libs/ckdb"
 	"github.com/deepflowio/deepflow/server/libs/nativetag"
 )
@@ -72,6 +73,7 @@ type EventBlock struct {
 	ColMountSource      *proto.ColLowCardinality[string]
 	ColMountPoint       *proto.ColLowCardinality[string]
 	ColFileDir          proto.ColStr
+	ColAccessPermission proto.ColUInt32
 
 	*nativetag.NativeTagsBlock
 }
@@ -122,6 +124,7 @@ func (b *EventBlock) Reset() {
 	b.ColMountSource.Reset()
 	b.ColMountPoint.Reset()
 	b.ColFileDir.Reset()
+	b.ColAccessPermission.Reset()
 	if b.NativeTagsBlock != nil {
 		b.NativeTagsBlock.Reset()
 	}
@@ -177,6 +180,7 @@ func (b *EventBlock) ToInput(input proto.Input) proto.Input {
 			proto.InputColumn{Name: ckdb.COLUMN_MOUNT_SOURCE, Data: b.ColMountSource},
 			proto.InputColumn{Name: ckdb.COLUMN_MOUNT_POINT, Data: b.ColMountPoint},
 			proto.InputColumn{Name: ckdb.COLUMN_FILE_DIR, Data: &b.ColFileDir},
+			proto.InputColumn{Name: ckdb.COLUMN_ACCESS_PERMISSION, Data: &b.ColAccessPermission},
 		)
 	}
 	if b.NativeTagsBlock != nil {
@@ -194,9 +198,18 @@ func (n *EventStore) NewColumnBlock() ckdb.CKColumnBlock {
 		ColMountSource:     new(proto.ColStr).LowCardinality(),
 		ColMountPoint:      new(proto.ColStr).LowCardinality(),
 	}
-	if n.IsFileEvent {
+	switch n.storeEventType() {
+	case common.FILE_EVENT:
 		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_FILE_EVENT)
-	} else {
+	case common.FILE_AGG_EVENT:
+		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_FILE_AGG_EVENT)
+	case common.FILE_MGMT_EVENT:
+		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_FILE_MGMT_EVENT)
+	case common.PROC_PERM_EVENT:
+		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_PROC_PERM_EVENT)
+	case common.PROC_OPS_EVENT:
+		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_PROC_OPS_EVENT)
+	default:
 		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_EVENT)
 	}
 	return b
@@ -249,6 +262,7 @@ func (n *EventStore) AppendToColumnBlock(b ckdb.CKColumnBlock) {
 	block.ColMountSource.Append(n.MountSource)
 	block.ColMountPoint.Append(n.MountPoint)
 	block.ColFileDir.Append(n.FileDir)
+	block.ColAccessPermission.Append(n.AccessPermission)
 
 	if block.NativeTagsBlock != nil {
 		block.NativeTagsBlock.AppendToColumnBlock(n.AttributeNames, n.AttributeValues, nil, nil)

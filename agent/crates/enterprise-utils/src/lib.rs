@@ -509,3 +509,89 @@ pub mod rpc {
         }
     }
 }
+
+pub mod ai_agent {
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    #[derive(Debug, Clone, Default)]
+    pub struct AgentMeta {
+        pub first_seen: Duration,
+        pub last_seen: Duration,
+        pub matched_endpoint: String,
+        pub root_pid: u32,
+    }
+
+    #[derive(Debug, Clone, Default)]
+    pub struct AiAgentRegistry;
+
+    impl AiAgentRegistry {
+        pub fn new() -> Self {
+            AiAgentRegistry
+        }
+
+        pub fn register(&self, _pid: u32, _endpoint: &str, _now: Duration) -> bool {
+            false
+        }
+
+        pub fn is_ai_agent(&self, _pid: u32) -> bool {
+            false
+        }
+
+        pub fn get_root_pid(&self, _pid: u32) -> u32 {
+            0
+        }
+
+        pub fn register_child(&self, _parent_pid: u32, _child_pid: u32, _now: Duration) -> bool {
+            false
+        }
+
+        pub fn get_all_pids(&self) -> Vec<u32> {
+            vec![]
+        }
+
+        pub fn cleanup_dead_pids(&self, _alive_pids: &[u32]) -> Vec<u32> {
+            vec![]
+        }
+
+        pub fn len(&self) -> usize {
+            0
+        }
+
+        pub fn is_empty(&self) -> bool {
+            true
+        }
+
+        pub fn sync_bpf_map_add(&self, _pid: u32) {}
+
+        pub fn sync_bpf_map_remove(&self, _pid: u32) {}
+
+        #[cfg(target_os = "linux")]
+        pub fn set_bpf_map_fd(&self, _fd: i32) {}
+
+        pub fn set_file_io_enabled(&self, _enabled: bool) {}
+    }
+
+    /// Check if a URL path matches an AI Agent endpoint pattern.
+    pub fn match_ai_agent_endpoint(
+        _endpoints: &[String],
+        _path: &str,
+        _pid: u32,
+        _socket_role: u8,
+        _now: Duration,
+    ) -> Option<String> {
+        None
+    }
+
+    /// Initialize the global AI Agent registry. Returns the registry Arc.
+    /// Stub: returns a no-op registry.
+    pub fn init_global_registry() -> Arc<AiAgentRegistry> {
+        Arc::new(AiAgentRegistry::new())
+    }
+
+    /// Get a reference to the global AI Agent registry.
+    /// Stub: always returns None.
+    pub fn global_registry() -> Option<&'static Arc<AiAgentRegistry>> {
+        None
+    }
+}

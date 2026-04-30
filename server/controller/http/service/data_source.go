@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
@@ -96,12 +97,47 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"Prometheus 数据", // prometheus.*
 	"事件-资源变更事件",     // event.event
 	"事件-文件读写事件",     // event.file_event
+	"事件-文件读写聚合事件",   // event.file_agg_event
+	"事件-文件管理事件",     // event.file_mgmt_event
+	"事件-进程权限事件",     // event.proc_perm_event
+	"事件-进程操作事件",     // event.proc_ops_event
 	"事件-文件读写指标",     // event.file_event_metrics
 	"事件-告警事件",       // event.alert_event
 	"应用-性能剖析",       // profile.in_process
 	"应用-性能剖析指标",     // profile.in_process_metrics
 	"网络-网络策略",       // flow_metrics.traffic_policy
 	"日志-日志数据",       // application_log.log
+}
+
+var aiAgentRetentionCollections = []string{
+	"event.file_agg_event",
+	"event.file_mgmt_event",
+	"event.proc_perm_event",
+	"event.proc_ops_event",
+}
+
+func linkedRetentionCollections(collection string) []string {
+	for _, item := range aiAgentRetentionCollections {
+		if item == collection {
+			return append([]string(nil), aiAgentRetentionCollections...)
+		}
+	}
+	return nil
+}
+
+func resolveRetentionTargets(current metadbmodel.DataSource, all []metadbmodel.DataSource) []metadbmodel.DataSource {
+	linkedCollections := linkedRetentionCollections(current.DataTableCollection)
+	if len(linkedCollections) == 0 {
+		return []metadbmodel.DataSource{current}
+	}
+
+	targets := make([]metadbmodel.DataSource, 0, len(linkedCollections))
+	for _, dataSource := range all {
+		if utils.Find(linkedCollections, dataSource.DataTableCollection) {
+			targets = append(targets, dataSource)
+		}
+	}
+	return targets
 }
 
 func (d *DataSource) GetDataSources(orgID int, filter map[string]interface{}, specCfg *config.Specification) (resp []model.DataSource, err error) {
@@ -405,8 +441,29 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 		return response[0], nil
 	}
 
-	oldRetentionTime := dataSource.RetentionTime
+	targets := []metadbmodel.DataSource{dataSource}
+	if linkedCollections := linkedRetentionCollections(dataSource.DataTableCollection); len(linkedCollections) > 0 {
+		var grouped []metadbmodel.DataSource
+		if err := db.Where("data_table_collection IN ?", linkedCollections).
+			Order("id ASC").
+			Find(&grouped).Error; err != nil {
+			return model.DataSource{}, err
+		}
+		targets = resolveRetentionTargets(dataSource, grouped)
+		if len(targets) != len(linkedCollections) {
+			return model.DataSource{}, response.ServiceError(
+				httpcommon.SERVER_ERROR,
+				fmt.Sprintf("linked retention data sources incomplete for %s", dataSource.DataTableCollection),
+			)
+		}
+	}
+
+	oldRetentionTimes := make(map[string]int, len(targets))
 	if dataSourceUpdate.RetentionTime != nil {
+		for i := range targets {
+			oldRetentionTimes[targets[i].Lcuuid] = targets[i].RetentionTime
+			targets[i].RetentionTime = *dataSourceUpdate.RetentionTime
+		}
 		dataSource.RetentionTime = *dataSourceUpdate.RetentionTime
 	}
 
@@ -417,29 +474,38 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 	}
 	var errs []error
 	for _, analyzer := range analyzers {
-		err = d.CallIngesterAPIModRP(orgID, analyzer.IP, dataSource)
-		if err != nil {
-			errs = append(errs, fmt.Errorf(
-				"failed to config analyzer (name: %s, ip:%s) update data_source (%s) error: %w",
-				analyzer.Name, analyzer.IP, dataSource.DisplayName, err,
-			))
-			continue
+		for _, target := range targets {
+			err = d.CallIngesterAPIModRP(orgID, analyzer.IP, target)
+			if err != nil {
+				errs = append(errs, fmt.Errorf(
+					"failed to config analyzer (name: %s, ip:%s) update data_source (%s) error: %w",
+					analyzer.Name, analyzer.IP, target.DisplayName, err,
+				))
+				continue
+			}
+			log.Infof("config analyzer (%s) mod data_source (%s) complete, retention time change: %ds -> %ds",
+				analyzer.IP, target.DisplayName, oldRetentionTimes[target.Lcuuid], target.RetentionTime, dbInfo.LogPrefixORGID)
 		}
-		log.Infof("config analyzer (%s) mod data_source (%s) complete, retention time change: %ds -> %ds",
-			analyzer.IP, dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime, dbInfo.LogPrefixORGID)
 	}
 
 	if len(errs) == 0 {
-		if err := db.Model(&dataSource).Updates(
-			map[string]interface{}{
-				"state":          common.DATA_SOURCE_STATE_NORMAL,
-				"retention_time": dataSource.RetentionTime,
-			},
-		).Error; err != nil {
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			for _, target := range targets {
+				if err := tx.Model(&target).Updates(
+					map[string]interface{}{
+						"state":          common.DATA_SOURCE_STATE_NORMAL,
+						"retention_time": target.RetentionTime,
+					},
+				).Error; err != nil {
+					return err
+				}
+				log.Infof("update data_source (%s), retention time change: %ds -> %ds",
+					target.DisplayName, oldRetentionTimes[target.Lcuuid], target.RetentionTime, dbInfo.LogPrefixORGID)
+			}
+			return nil
+		}); err != nil {
 			return model.DataSource{}, err
 		}
-		log.Infof("update data_source (%s), retention time change: %ds -> %ds",
-			dataSource.DisplayName, oldRetentionTime, dataSource.RetentionTime, dbInfo.LogPrefixORGID)
 	}
 	var errStrs []string
 	for _, e := range errs {
@@ -449,10 +515,12 @@ func (d *DataSource) UpdateDataSource(orgID int, lcuuid string, dataSourceUpdate
 
 	for _, e := range errs {
 		if errors.Is(e, httpcommon.ErrorFail) {
-			if err := db.Model(&dataSource).Updates(
-				map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
-			).Error; err != nil {
-				return model.DataSource{}, err
+			for _, target := range targets {
+				if err := db.Model(&target).Updates(
+					map[string]interface{}{"state": common.DATA_SOURCE_STATE_EXCEPTION},
+				).Error; err != nil {
+					return model.DataSource{}, err
+				}
 			}
 			err = response.ServiceError(httpcommon.PARTIAL_CONTENT, errMsg)
 			break

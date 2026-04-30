@@ -753,6 +753,7 @@ type GenesisProcess struct {
 	Lcuuid      string    `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
 	Name        string    `gorm:"column:name;type:text;default:null" json:"NAME"`
 	ProcessName string    `gorm:"column:process_name;type:text;default:null" json:"PROCESS_NAME"`
+	BizType     int       `gorm:"column:biz_type;type:int;default:0" json:"BIZ_TYPE"`
 	CMDLine     string    `gorm:"column:cmd_line;type:text;default:null" json:"CMD_LINE"`
 	ContainerID string    `gorm:"column:container_id;type:char(64);default:''" json:"CONTAINER_ID"`
 	UserName    string    `gorm:"column:user_name;type:varchar(256);default:null" json:"USER"`

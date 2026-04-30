@@ -537,6 +537,10 @@ impl From<FlowPerfStats> for flow_log::FlowPerfStats {
     }
 }
 
+// Business type constants for process classification
+pub const BIZ_TYPE_DEFAULT: u8 = 0;
+pub const BIZ_TYPE_AI_AGENT: u8 = 1;
+
 #[derive(Clone, Debug, Default)]
 pub struct L7Stats {
     pub stats: L7PerfStats,

@@ -51,6 +51,7 @@ type Eventor struct {
 	Config        *config.Config
 	Decoders      []*decoder.Decoder
 	PlatformDatas []*grpc.PlatformInfoTable
+	RootPidCache  *decoder.AiAgentRootPidCache
 }
 
 func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue, recv *receiver.Receiver, platformDataManager *grpc.PlatformDataManager, exporters *exporters.Exporters) (*Event, error) {
@@ -100,9 +101,11 @@ func NewResouceEventor(eventQueue *queue.OverwriteQueue, config *config.Config, 
 		common.RESOURCE_EVENT,
 		queue.QueueReader(eventQueue),
 		eventWriter,
+		nil,
 		platformTable,
 		nil,
 		config,
+		nil,
 	)
 	return &Eventor{
 		Config:   config,
@@ -130,9 +133,11 @@ func NewAlertEventor(config *config.Config, recv *receiver.Receiver, manager *dr
 		common.ALERT_EVENT,
 		queue.QueueReader(decodeQueues.FixedMultiQueue[0]),
 		eventWriter,
+		nil,
 		platformTable,
 		nil,
 		config,
+		nil,
 	)
 	return &Eventor{
 		Config:   config,
@@ -160,9 +165,11 @@ func NewAlertRecordEventor(config *config.Config, recv *receiver.Receiver, manag
 		common.ALERT_RECORD,
 		queue.QueueReader(decodeQueues.FixedMultiQueue[0]),
 		eventWriter,
+		nil,
 		platformTable,
 		nil,
 		config,
+		nil,
 	)
 	return &Eventor{
 		Config:   config,
@@ -198,10 +205,40 @@ func NewEventor(eventType common.EventType, config *config.Config, recv *receive
 
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
+	var aiAgentRootPidCache *decoder.AiAgentRootPidCache
+	if eventType == common.FILE_EVENT {
+		aiAgentRootPidCache = decoder.NewAiAgentRootPidCache()
+	}
 	for i := 0; i < queueCount; i++ {
 		eventWriter, err := dbwriter.NewEventWriter(eventType, i, config)
 		if err != nil {
 			return nil, err
+		}
+		var procEventWriters *decoder.ProcEventWriters
+		if eventType == common.FILE_EVENT {
+			fileAggWriter, err := dbwriter.NewEventWriter(common.FILE_AGG_EVENT, i, config)
+			if err != nil {
+				return nil, err
+			}
+			fileMgmtWriter, err := dbwriter.NewEventWriter(common.FILE_MGMT_EVENT, i, config)
+			if err != nil {
+				return nil, err
+			}
+			procPermWriter, err := dbwriter.NewEventWriter(common.PROC_PERM_EVENT, i, config)
+			if err != nil {
+				return nil, err
+			}
+			procOpsWriter, err := dbwriter.NewEventWriter(common.PROC_OPS_EVENT, i, config)
+			if err != nil {
+				return nil, err
+			}
+			procEventWriters = &decoder.ProcEventWriters{
+				FileWriter:     eventWriter,
+				FileAggWriter:  fileAggWriter,
+				FileMgmtWriter: fileMgmtWriter,
+				ProcPermWriter: procPermWriter,
+				ProcOpsWriter:  procOpsWriter,
+			}
 		}
 		platformDatas[i], err = platformDataManager.NewPlatformInfoTable("event-" + eventType.String() + "-" + strconv.Itoa(i))
 		if err != nil {
@@ -212,15 +249,18 @@ func NewEventor(eventType common.EventType, config *config.Config, recv *receive
 			eventType,
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			eventWriter,
+			procEventWriters,
 			platformDatas[i],
 			exporters,
 			config,
+			aiAgentRootPidCache,
 		)
 	}
 	return &Eventor{
 		Config:        config,
 		Decoders:      decoders,
 		PlatformDatas: platformDatas,
+		RootPidCache:  aiAgentRootPidCache,
 	}, nil
 }
 
@@ -236,6 +276,9 @@ func (e *Eventor) Start() {
 func (e *Eventor) Close() {
 	for _, decoder := range e.Decoders {
 		decoder.Close()
+	}
+	if e.RootPidCache != nil {
+		e.RootPidCache.Close()
 	}
 	for _, platformData := range e.PlatformDatas {
 		platformData.ClosePlatformInfoTable()

@@ -23,6 +23,12 @@
 #define DF_BPF_SOCKET_TRACE_COMMON_H
 #define CAP_DATA_SIZE 1024	// For no-brust send buffer
 #define BURST_DATA_BUF_SIZE  16384	// For brust send buffer
+/*
+ * "Unlimited" here only means "do not stop at the AI-agent logical payload
+ * limit". The actual bytes that can be pushed in one event are still bounded
+ * by the fixed transport buffer size (BURST_DATA_BUF_SIZE).
+ */
+#define AI_AGENT_DATA_LIMIT_MAX_UNLIMITED 0x7fffffff
 
 #include "../config.h"
 
@@ -128,6 +134,12 @@ struct __socket_data {
 	__u32 fd;
 	__u16 data_type;	// HTTP, DNS, MySQL ...
 	__u16 data_len;		// 数据长度
+	/*
+	 * Reassembly-accounted bytes tracked by the tracer for this socket.
+	 * This is capped by the current data_max_sz window rather than the
+	 * unbounded raw syscall length.
+	 */
+	__u32 reasm_bytes;
 	__u8 socket_role;	// this message is created by: 0:unkonwn 1:client(connect) 2:server(accept)
 	char data[BURST_DATA_BUF_SIZE];
 } __attribute__ ((packed));
@@ -181,7 +193,8 @@ struct socket_info_s {
 	 */
 	__u16 no_trace:1;
 	__u16 data_source:4; // The source of the stored data, defined in the 'enum process_data_extra_source'. 
-	__u16 unused_bits:7;
+	__u16 is_ai_agent:1;
+	__u16 unused_bits:6;
 	__u32 reasm_bytes;	// The amount of data bytes that have been reassembled.
 
 	/*
@@ -237,6 +250,7 @@ struct tracer_ctx_s {
 	__u64 coroutine_trace_id; /**< Data forwarding association within the same coroutine */
 	__u64 thread_trace_id;	  /**< Data forwarding association within the same process/thread, used for multi-transaction scenarios */
 	__u32 data_limit_max;	  /**< Maximum number of data transfers */
+	__u32 ai_agent_data_limit_max; /**< AI Agent max reassembly limit (0 = use AI_AGENT_DATA_LIMIT_MAX_UNLIMITED) */
 	__u32 go_tracing_timeout; /**< Go tracing timeout */
 	__u32 io_event_collect_mode; /**< IO event collection mode */
 	__u64 io_event_minimal_duration; /**< Minimum duration for IO events */
@@ -290,6 +304,9 @@ struct __io_event_buffer {
 	// Mount namespace ID of the file’s mount
 	__u32 mntns_id;
 
+	// File access permission bits (inode->i_mode & 0xFFF)
+	__u16 access_permission;
+
 	// filename length
 	__u32 len;
 
@@ -318,6 +335,7 @@ struct user_io_event_buffer {
 	char file_dir[FILE_PATH_SZ];
 	int mnt_id;
 	__u32 mntns_id;
+	__u16 access_permission;
 } __attribute__ ((packed));
 
 // struct ebpf_proc_info -> offsets[]  arrays index.
