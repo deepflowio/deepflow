@@ -482,17 +482,6 @@ func getUInt64MapMaxValue(m *hashmap.Map[uint64, uint64]) uint64 {
 	return maxId
 }
 
-func getArrayUInt64MapMaxValue(m *hashmap.Map[complex128, uint32]) uint32 {
-	maxId := uint32(0)
-	m.Range(func(_ complex128, i uint32) bool {
-		if i > maxId {
-			maxId = i
-		}
-		return true
-	})
-	return maxId
-}
-
 func (t *PrometheusLabelTable) statsString(orgId uint16) string {
 	sb := &strings.Builder{}
 	sb.WriteString(fmt.Sprintf("\norg-id %d\n", orgId))
