@@ -133,9 +133,38 @@ func generateMockDBLabelValues(size int) []*metadbmodel.PrometheusLabelValue {
 	return mockData
 }
 
-// newTestLabel 创建一个不依赖 DB 的 label 实例
+// newTestLabel 创建一个不依赖 DB 的 label 实例，同时创建配套的 labelName/labelValue
 func newTestLabel() *label {
-	return newLabel(nil)
+	ln := newTestLabelName()
+	lv := newTestLabelValue()
+	return newLabel(nil, ln, lv)
+}
+
+// newTestLabelWithRefs 返回 label 及其内部引用的 labelName/labelValue
+func newTestLabelWithRefs() (*label, *labelName, *labelValue) {
+	ln := newTestLabelName()
+	lv := newTestLabelValue()
+	l := newLabel(nil, ln, lv)
+	return l, ln, lv
+}
+
+// populateLabelDeps ensures labelName and labelValue contain entries matching
+// the naming pattern used by generateProtoLabels ("label_name_i" / "label_value_i").
+func populateLabelDeps(l *label, n int) {
+	lnBatch := make([]*controller.PrometheusLabelName, n)
+	lvBatch := make([]*controller.PrometheusLabelValue, n)
+	for i := 0; i < n; i++ {
+		lnBatch[i] = &controller.PrometheusLabelName{
+			Name: proto.String(fmt.Sprintf("label_name_%d", i)),
+			Id:   proto.Uint32(uint32(i + 1)),
+		}
+		lvBatch[i] = &controller.PrometheusLabelValue{
+			Value: proto.String(fmt.Sprintf("label_value_%d", i)),
+			Id:    proto.Uint32(uint32(i + 1)),
+		}
+	}
+	l.labelName.Add(lnBatch)
+	l.labelValue.Add(lvBatch)
 }
 
 func newTestMetricName() *metricName {
@@ -161,10 +190,10 @@ func countLabelConcurrentMap(m map[LabelKey]int) int {
 	return len(m)
 }
 
-func buildLabelConcurrentMap(n int) map[LabelKey]int {
-	m := make(map[LabelKey]int, n)
+func buildLabelConcurrentMap(n int) map[IDLabelKey]int {
+	m := make(map[IDLabelKey]int, n)
 	for i := 0; i < n; i++ {
-		m[NewLabelKey(fmt.Sprintf("label_name_%d", i), fmt.Sprintf("label_value_%d", i))] = i + 1
+		m[IDLabelKey{NameID: i + 1, ValueID: i + 1}] = i + 1
 	}
 	return m
 }
@@ -176,9 +205,9 @@ func buildLabelValueMap(n int) map[string]int {
 	return m
 }
 
-func resetLabelState(l *label, active map[LabelKey]int) {
+func resetLabelState(l *label, active map[IDLabelKey]int) {
 	l.mu.Lock()
-	l.pending = make(map[LabelKey]int)
+	l.pending = make(map[IDLabelKey]int)
 	l.mu.Unlock()
 	l.replaceActive(active)
 }
@@ -268,7 +297,10 @@ func refreshLabelEntriesCurrent(l *label, entries []labelRefreshEntry) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for _, entry := range entries {
-		l.pending[entry.key] = entry.id
+		idk, ok := l.toIDKey(entry.key)
+		if ok {
+			l.pending[idk] = entry.id
+		}
 	}
 }
 func refreshLabelValueEntriesCurrent(lv *labelValue, entries []labelValueRefreshEntry) {
@@ -326,6 +358,7 @@ func benchmarkProtoRefreshSizes() []int {
 func TestLabel_AddAndGet(t *testing.T) {
 	l := newTestLabel()
 	batch := generateProtoLabels(100)
+	populateLabelDeps(l, 100)
 
 	l.Add(batch)
 
@@ -401,6 +434,7 @@ func TestLayout_AddAndGet(t *testing.T) {
 
 func TestLabel_GetKeyToID_SnapshotIsolation(t *testing.T) {
 	l := newTestLabel()
+	populateLabelDeps(l, 101)
 	l.Add(generateProtoLabels(100))
 
 	// 取快照
@@ -411,6 +445,9 @@ func TestLabel_GetKeyToID_SnapshotIsolation(t *testing.T) {
 	extra := []*controller.PrometheusLabel{
 		{Name: proto.String("extra_name"), Value: proto.String("extra_value"), Id: proto.Uint32(999)},
 	}
+	// Populate deps for extra entry
+	l.labelName.Add([]*controller.PrometheusLabelName{{Name: proto.String("extra_name"), Id: proto.Uint32(102)}})
+	l.labelValue.Add([]*controller.PrometheusLabelValue{{Value: proto.String("extra_value"), Id: proto.Uint32(102)}})
 	l.Add(extra)
 
 	// 快照不受影响
@@ -468,6 +505,7 @@ func TestLabelValue_GetValueToID_SnapshotIsolation(t *testing.T) {
 
 func TestLabel_SnapshotSwap_DiscardsOldEntries(t *testing.T) {
 	l := newTestLabel()
+	populateLabelDeps(l, 200)
 
 	// 初始加载 200 条
 	l.Add(generateProtoLabels(200))
@@ -516,6 +554,7 @@ func TestLabelValue_SnapshotSwap_DiscardsOldEntries(t *testing.T) {
 
 func TestConcurrentLabel_ReadDuringSwap(t *testing.T) {
 	l := newTestLabel()
+	populateLabelDeps(l, 1000)
 	l.Add(generateProtoLabels(1000))
 
 	const (
@@ -740,6 +779,7 @@ func TestConcurrentLayout_ReadDuringSwap(t *testing.T) {
 
 func TestConcurrentLabel_SnapshotDuringSwap(t *testing.T) {
 	l := newTestLabel()
+	populateLabelDeps(l, 500)
 	l.Add(generateProtoLabels(500))
 
 	var wg sync.WaitGroup
@@ -785,13 +825,14 @@ func TestLabel_LargeScale_MemoryRelease(t *testing.T) {
 	const N = 1_000_000
 
 	l := newTestLabel()
+	populateLabelDeps(l, N)
 
 	// 阶段1：加载百万条数据
 	batch := make([]*controller.PrometheusLabel, N)
 	for i := 0; i < N; i++ {
 		batch[i] = &controller.PrometheusLabel{
-			Name:  proto.String(fmt.Sprintf("n_%d", i)),
-			Value: proto.String(fmt.Sprintf("v_%d", i)),
+			Name:  proto.String(fmt.Sprintf("label_name_%d", i)),
+			Value: proto.String(fmt.Sprintf("label_value_%d", i)),
 			Id:    proto.Uint32(uint32(i + 1)),
 		}
 	}
@@ -806,9 +847,9 @@ func TestLabel_LargeScale_MemoryRelease(t *testing.T) {
 
 	// 阶段2：模拟 refresh——只保留 10% 的数据（模拟 Cleaner 删除后 refresh）
 	kept := N / 10
-	newMap := make(map[LabelKey]int, kept)
+	newMap := make(map[IDLabelKey]int, kept)
 	for i := 0; i < kept; i++ {
-		newMap[NewLabelKey(fmt.Sprintf("n_%d", i), fmt.Sprintf("v_%d", i))] = i + 1
+		newMap[IDLabelKey{NameID: i + 1, ValueID: i + 1}] = i + 1
 	}
 	resetLabelState(l, newMap)
 
@@ -893,6 +934,7 @@ func BenchmarkLabel_Add(b *testing.B) {
 		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				l := newTestLabel()
+				populateLabelDeps(l, size)
 				l.Add(batch)
 			}
 		})
@@ -902,6 +944,7 @@ func BenchmarkLabel_Add(b *testing.B) {
 func BenchmarkLabel_GetIDByKey(b *testing.B) {
 	for _, size := range benchmarkLabelLookupSizes() {
 		l := newTestLabel()
+		populateLabelDeps(l, size)
 		l.Add(generateProtoLabels(size))
 		keys := generateLabelKeys(size)
 
@@ -919,6 +962,7 @@ func BenchmarkLabel_GetIDByKey(b *testing.B) {
 func BenchmarkLabel_GetKeyToID_Snapshot(b *testing.B) {
 	for _, size := range []int{1000, 10_000, 100_000} {
 		l := newTestLabel()
+		populateLabelDeps(l, size)
 		l.Add(generateProtoLabels(size))
 
 		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
@@ -934,9 +978,9 @@ func BenchmarkLabel_SnapshotSwap(b *testing.B) {
 		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
 			l := newTestLabel()
 			for i := 0; i < b.N; i++ {
-				newMap := make(map[LabelKey]int, size)
+				newMap := make(map[IDLabelKey]int, size)
 				for j := 0; j < size; j++ {
-					newMap[NewLabelKey(fmt.Sprintf("n_%d", j), fmt.Sprintf("v_%d", j))] = j + 1
+					newMap[IDLabelKey{NameID: j + 1, ValueID: j + 1}] = j + 1
 				}
 				resetLabelState(l, newMap)
 			}
@@ -948,11 +992,13 @@ func BenchmarkLabel_Refresh(b *testing.B) {
 	for _, size := range benchmarkRefreshSizes() {
 		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
 			l := newTestLabel()
-			mockData := generateMockDBLabels(size)
+			populateLabelDeps(l, size)
+			batch := generateProtoLabels(size)
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				l.processLoadedData(mockData)
+				l.Add(batch)
+				resetLabelState(l, make(map[IDLabelKey]int))
 			}
 		})
 	}
@@ -1062,6 +1108,16 @@ func BenchmarkLayout_GetIndexByKey(b *testing.B) {
 func BenchmarkLabel_MixedReadWrite(b *testing.B) {
 	for _, size := range []int{10_000, 100_000} {
 		l := newTestLabel()
+		populateLabelDeps(l, size)
+		// Pre-populate deps for "hot" entries used in write path
+		hotLN := make([]*controller.PrometheusLabelName, 100)
+		hotLV := make([]*controller.PrometheusLabelValue, 100)
+		for i := 0; i < 100; i++ {
+			hotLN[i] = &controller.PrometheusLabelName{Name: proto.String(fmt.Sprintf("hot_%d", i)), Id: proto.Uint32(uint32(size + i + 1))}
+			hotLV[i] = &controller.PrometheusLabelValue{Value: proto.String(fmt.Sprintf("hot_v_%d", i)), Id: proto.Uint32(uint32(size + i + 1))}
+		}
+		l.labelName.Add(hotLN)
+		l.labelValue.Add(hotLV)
 		l.Add(generateProtoLabels(size))
 		keys := generateLabelKeys(size)
 
