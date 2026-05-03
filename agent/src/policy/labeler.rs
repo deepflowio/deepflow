@@ -70,7 +70,7 @@ impl EpcNetIpKey {
     fn clone_by_masklen(&self, masklen: usize, is_ipv4: bool) -> Self {
         let max_prefix = if is_ipv4 { IPV4_BITS } else { IPV6_BITS };
         Self {
-            ip: self.ip & (u128::MAX << max_prefix.saturating_sub(masklen)),
+            ip: self.ip & u128::MAX.checked_shl(max_prefix.saturating_sub(masklen) as u32).unwrap_or(0),
             epc_id: self.epc_id,
             masklen: masklen as u8,
         }
@@ -1368,4 +1368,37 @@ mod tests {
         assert_eq!(endpoints.src_info.l2_epc_id, 10);
         assert_eq!(endpoints.src_info.l3_epc_id, 10);
     }
+    /// Regression test for https://github.com/deepflowio/deepflow/issues/8700
+    ///
+    /// When a CIDR with masklen=0 (i.e. ::/0) is registered and an IPv6 lookup
+    /// is performed, `clone_by_masklen(0, false)` used to compute
+    /// `u128::MAX << 128` which panics in debug builds (and is UB in release).
+    /// The fix uses `checked_shl` so the shift is saturated to 0 instead.
+    #[test]
+    fn test_ipv6_zero_masklen_no_panic() {
+        use std::str::FromStr;
+        use ipnet::IpNet;
+        use crate::common::policy::{Cidr, CidrType};
+
+        let mut labeler: Labeler = Default::default();
+
+        // Register a catch-all IPv6 CIDR (::/0) — masklen 0 triggers the shift.
+        let cidr = Cidr {
+            ip: IpNet::from_str("::/0").unwrap(),
+            epc_id: 42,
+            cidr_type: CidrType::Lan,
+            ..Default::default()
+        };
+        labeler.update_cidr_table(&vec![Arc::new(cidr)], false, &mut false);
+
+        // A lookup for any IPv6 address must not panic.
+        let mut endpoint: EndpointInfo = Default::default();
+        labeler.set_epc_by_cidr(
+            "2001:db8::1".parse().unwrap(),
+            42,
+            &mut endpoint,
+        );
+        assert_eq!(endpoint.l3_epc_id, 42);
+    }
+
 }
