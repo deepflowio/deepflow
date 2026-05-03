@@ -21,14 +21,9 @@ type GenesisConfig struct {
 	VinterfaceAgingTime     float64  `default:"300" yaml:"vinterface_aging_time"`
 	AgentHeartBeat          float64  `default:"60" yaml:"agent_heart_beat"`
 	HostIPs                 []string `yaml:"host_ips"`
-	LocalIPRanges           []string `yaml:"local_ip_ranges"`
-	ExcludeIPRanges         []string `yaml:"exclude_ip_ranges"`
 	QueueLengths            int      `default:"60" yaml:"queue_length"`
 	DataPersistenceInterval int      `default:"60" yaml:"data_persistence_interval"`
-	MultiNSMode             bool     `default:"false" yaml:"multi_ns_mode"`
-	SingleVPCMode           bool     `default:"false" yaml:"single_vpc_mode"`
 	Database                string   `default:"mysql" yaml:"database"`
-	DefaultVPCName          string   `default:"default-public-vpc" yaml:"default_vpc_name"`
 	IgnoreNICRegex          string   `default:"^(kube-ipvs)" yaml:"ignore_nic_regex"`
 	VMNameField             string   `default:"metadata" yaml:"vm_name_field"`
 }

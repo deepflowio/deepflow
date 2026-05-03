@@ -399,20 +399,16 @@ controller:
   genesis:
     # 平台数据老化时间，单位：秒
     aging_time: 86400
+
     # 采集器接口数据老化时间，单位：秒
     vinterface_aging_time: 300
-    # 无子网IP的最大掩码长度
-    ipv4_cidr_max_mask: 24
-    ipv6_cidr_max_mask: 64
-
-    # 采集器同步默认vpc名称
-    default_vpc_name: default-public-vpc
 
     # 采集器上报数据处理的队列长度
     queue_length: 1000
 
     # 数据持久化检测间隔，单位：秒
     data_persistence_interval: 60
+
     # 采集器消息心跳时长，单位：秒
     agent_heart_beat: 60
 
@@ -422,22 +418,9 @@ controller:
     # - x.x.x.x/x
     # - x.x.x.x-x.x.x.x
 
-    # 内网IP网段范围配置，配置的IP所在网络会被作为内网进行学习
-    local_ip_ranges:
-    # - x.x.x.x/x
-    # - x.x.x.x-x.x.x.x
-
-    # 排除IP范围
-    exclude_ip_ranges: 
-    # - x.x.x.x/x
-    # - x.x.x.x-x.x.x.x
-
     # 数据存储选择，默认 mysql，可选 redis
     database: mysql
-    # 多namespace模式开关，默认false
-    multi_ns_mode:
-    # 单独vpc模式开关，默认false
-    single_vpc_mode:
+    
     # 忽略网卡正则表达式配置，匹配到会忽略该网卡，默认为 ^(kube-ipvs) ，增加其他的网卡名称需要在此基础上新增
     ignore_nic_regex:
 
