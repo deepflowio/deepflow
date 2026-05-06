@@ -69,6 +69,35 @@ use enterprise_utils::l7::custom_policy::config::CustomProtocolConfig;
 pub const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
 const DEFAULT_STANDALONE_CONFIG: &str = "/etc/deepflow-agent-standalone.yaml";
+#[rustfmt::skip]
+const HOOKED_SOCKET_SYSCALLS: [&str; 10] = [
+    "read",
+    "readv",
+    "recvfrom",
+    "recvmsg",
+    "recvmmsg",
+    "sendmsg",
+    "sendmmsg",
+    "sendto",
+    "write",
+    "writev",
+];
+
+fn normalize_hooked_socket_syscalls<T: AsRef<str>>(syscalls: &[T]) -> Vec<String> {
+    HOOKED_SOCKET_SYSCALLS
+        .iter()
+        .filter(|supported| {
+            syscalls
+                .iter()
+                .any(|syscall| syscall.as_ref() == **supported)
+        })
+        .map(|syscall| syscall.to_string())
+        .collect()
+}
+
+fn default_hooked_socket_syscalls() -> Vec<String> {
+    normalize_hooked_socket_syscalls(&HOOKED_SOCKET_SYSCALLS)
+}
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -1061,13 +1090,30 @@ pub struct EbpfSocketKprobe {
     pub whitelist: EbpfSocketKprobePorts,
 }
 
-#[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct EbpfSocketTunning {
     pub max_capture_rate: u64,
     pub syscall_trace_id_disabled: bool,
     pub map_prealloc_disabled: bool,
     pub fentry_enabled: bool,
+    #[serde(
+        default = "default_hooked_socket_syscalls",
+        deserialize_with = "deser_hooked_socket_syscalls"
+    )]
+    pub hooked_socket_syscalls: Vec<String>,
+}
+
+impl Default for EbpfSocketTunning {
+    fn default() -> Self {
+        Self {
+            max_capture_rate: 0,
+            syscall_trace_id_disabled: false,
+            map_prealloc_disabled: false,
+            fentry_enabled: false,
+            hooked_socket_syscalls: default_hooked_socket_syscalls(),
+        }
+    }
 }
 
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
@@ -4017,6 +4063,22 @@ where
     Ok(v)
 }
 
+fn deser_hooked_socket_syscalls<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw = Vec::<String>::deserialize(deserializer)?;
+    for syscall in &raw {
+        if !HOOKED_SOCKET_SYSCALLS.contains(&syscall.as_str()) {
+            return Err(de::Error::invalid_value(
+                Unexpected::Str(syscall),
+                &"one of read|readv|recvfrom|recvmsg|recvmmsg|sendmsg|sendmmsg|sendto|write|writev",
+            ));
+        }
+    }
+    Ok(normalize_hooked_socket_syscalls(&raw))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4199,5 +4261,40 @@ processors:
         assert_eq!(apps[0].timeout, Duration::from_secs(150));
         assert_eq!(apps[1].protocol, L7Protocol::Grpc);
         assert_eq!(apps[1].timeout, Duration::from_secs(130));
+    }
+
+    #[test]
+    fn parse_hooked_socket_syscalls_normalizes_order_and_duplicates() {
+        let yaml = r#"
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        hooked_socket_syscalls: [write, read, write, sendto]
+"#;
+        let cfg: UserConfig = serde_yaml::from_str(yaml).unwrap();
+
+        assert_eq!(
+            cfg.inputs.ebpf.socket.tunning.hooked_socket_syscalls,
+            vec!["read", "sendto", "write"]
+        );
+    }
+
+    #[test]
+    fn parse_hooked_socket_syscalls_rejects_invalid_values() {
+        let yaml = r#"
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        hooked_socket_syscalls: [read, invalid_syscall]
+"#;
+        let result: Result<UserConfig, _> = serde_yaml::from_str(yaml);
+
+        assert!(result.is_err());
+        let error = result.unwrap_err().to_string();
+        assert!(error.contains("invalid value: string \"invalid_syscall\""));
+        assert!(error
+            .contains("read|readv|recvfrom|recvmsg|recvmmsg|sendmsg|sendmmsg|sendto|write|writev"));
     }
 }
