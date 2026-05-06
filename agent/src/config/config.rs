@@ -69,8 +69,17 @@ use enterprise_utils::l7::custom_policy::config::CustomProtocolConfig;
 pub const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
 const DEFAULT_STANDALONE_CONFIG: &str = "/etc/deepflow-agent-standalone.yaml";
+#[rustfmt::skip]
 const HOOKED_SOCKET_SYSCALLS: [&str; 10] = [
-    "read", "readv", "recvfrom", "recvmsg", "recvmmsg", "sendmsg", "sendmmsg", "sendto", "write",
+    "read",
+    "readv",
+    "recvfrom",
+    "recvmsg",
+    "recvmmsg",
+    "sendmsg",
+    "sendmmsg",
+    "sendto",
+    "write",
     "writev",
 ];
 
