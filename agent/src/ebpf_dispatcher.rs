@@ -1072,7 +1072,10 @@ impl EbpfCollector {
         }
 
         ebpf::set_hooked_socket_syscalls(
-            HookedSocketSyscallBitmap::from(config.ebpf.socket.tunning.hooked_socket_syscalls.as_slice()).0,
+            HookedSocketSyscallBitmap::from(
+                config.ebpf.socket.tunning.hooked_socket_syscalls.as_slice(),
+            )
+            .0,
         );
 
         ebpf::set_bpf_map_prealloc(!config.ebpf.socket.tunning.map_prealloc_disabled);
