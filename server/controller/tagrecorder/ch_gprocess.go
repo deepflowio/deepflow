@@ -81,6 +81,7 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *metadbmodel.Pr
 		Name:        sourceName,
 		CHostID:     source.VMID,
 		L3EPCID:     source.VPCID,
+		BizType:     source.BizType,
 		IconID:      iconID,
 		TeamID:      md.GetTeamID(),
 		DomainID:    md.GetDomainID(),
@@ -95,10 +96,27 @@ func (c *ChGProcess) onResourceUpdated(md *message.Metadata, updateMessage *mess
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChGProcess) softDeletedTargetsUpdated(targets []metadbmodel.ChGProcess, db *metadb.DB) {
+	targets = deduplicateChGProcessTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
 	}).Create(&targets)
+}
+
+// deduplicateChGProcessTargets removes duplicate entries from targets, keeping the
+// last occurrence of each ID. This prevents PostgreSQL from raising
+// "ON CONFLICT DO UPDATE command cannot affect row a second time" when multiple
+// rows in the same INSERT share the same conflict target.
+func deduplicateChGProcessTargets(targets []metadbmodel.ChGProcess) []metadbmodel.ChGProcess {
+	seen := make(map[int]int, len(targets))
+	for i, t := range targets {
+		seen[t.ID] = i
+	}
+	deduped := make([]metadbmodel.ChGProcess, 0, len(seen))
+	for _, idx := range seen {
+		deduped = append(deduped, targets[idx])
+	}
+	return deduped
 }
 
 func (c *ChGProcess) beforeDeletePage(dbData []*metadbmodel.Process, msg *message.DeletedProcesses) []*metadbmodel.Process {

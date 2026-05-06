@@ -603,6 +603,28 @@ pub struct SymbolTable {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
+pub struct AiAgentConfig {
+    pub http_endpoints: Vec<String>,
+    pub max_payload_size: usize,
+    pub file_io_enabled: bool,
+}
+
+impl Default for AiAgentConfig {
+    fn default() -> Self {
+        Self {
+            http_endpoints: vec![
+                "/v1/chat/completions".to_string(),
+                "/v1/embeddings".to_string(),
+                "/v1/responses".to_string(),
+            ],
+            max_payload_size: 0, // 0 means unlimited
+            file_io_enabled: true,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct Proc {
     pub enabled: bool,
     pub proc_dir_path: String,
@@ -615,6 +637,7 @@ pub struct Proc {
     pub process_blacklist: Vec<String>,
     pub process_matcher: Vec<ProcessMatcher>,
     pub symbol_table: SymbolTable,
+    pub ai_agent: AiAgentConfig,
 }
 
 impl Default for Proc {
@@ -715,6 +738,7 @@ impl Default for Proc {
                 },
             ],
             symbol_table: SymbolTable::default(),
+            ai_agent: AiAgentConfig::default(),
         };
         p.process_blacklist.sort_unstable();
         p.process_blacklist.dedup();
@@ -2116,6 +2140,7 @@ impl Default for Filters {
                 ("MySQL".to_string(), "1-65535".to_string()),
                 ("PostgreSQL".to_string(), "1-65535".to_string()),
                 ("Oracle".to_string(), "1521".to_string()),
+                ("Dameng".to_string(), "5236".to_string()),
                 ("Redis".to_string(), "1-65535".to_string()),
                 ("MongoDB".to_string(), "1-65535".to_string()),
                 ("Memcached".to_string(), "11211".to_string()),
@@ -2149,6 +2174,7 @@ impl Default for Filters {
                 ("MySQL".to_string(), vec![]),
                 ("PostgreSQL".to_string(), vec![]),
                 ("Oracle".to_string(), vec![]),
+                ("Dameng".to_string(), vec![]),
                 ("Redis".to_string(), vec![]),
                 ("MongoDB".to_string(), vec![]),
                 ("Memcached".to_string(), vec![]),
@@ -3197,6 +3223,7 @@ impl UserConfig {
     const DEFAULT_DNS_PORTS: &'static str = "53,5353";
     const DEFAULT_TLS_PORTS: &'static str = "443,6443";
     const DEFAULT_ORACLE_PORTS: &'static str = "1521";
+    const DEFAULT_DAMENG_PORTS: &'static str = "5236";
     const DEFAULT_MEMCACHED_PORTS: &'static str = "11211";
     const PACKET_FANOUT_MODE_MAX: u32 = 7;
 
@@ -3275,6 +3302,23 @@ impl UserConfig {
                 new.insert(
                     oracle_str.to_string(),
                     Self::DEFAULT_ORACLE_PORTS.to_string(),
+                );
+            }
+            let dameng_str = L7ProtocolParser::Dameng(
+                crate::flow_generator::protocol_logs::DamengLog::default(),
+            )
+            .as_str();
+            // dameng default only parse 5236 port. when l7_protocol_ports config without DAMENG, need to reserve the dameng default config.
+            if !self
+                .processors
+                .request_log
+                .filters
+                .port_number_prefilters
+                .contains_key(dameng_str)
+            {
+                new.insert(
+                    dameng_str.to_string(),
+                    Self::DEFAULT_DAMENG_PORTS.to_string(),
                 );
             }
         }
@@ -4055,6 +4099,7 @@ mod tests {
             os_app_tags: vec![],
             netns_id: 0,
             container_id: "".to_string(),
+            biz_type: 0,
         }
     }
 

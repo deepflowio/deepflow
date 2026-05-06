@@ -40,6 +40,10 @@ pub const GO_HTTP2_UPROBE_DATA: u8 = 5;
 pub const SOCKET_CLOSE_EVENT: u8 = 6;
 // unix socket
 pub const UNIX_SOCKET: u8 = 8;
+// AI Agent governance event types
+pub const FILE_OP_EVENT: u8 = 9;
+pub const PERM_OP_EVENT: u8 = 10;
+pub const PROC_LIFECYCLE_EVENT: u8 = 11;
 
 const EBPF_TYPE_TRACEPOINT: u8 = 0;
 const EBPF_TYPE_TLS_UPROBE: u8 = 1;

@@ -170,7 +170,7 @@ impl FlowMeterWithFlow {
 pub struct AppMeterWithFlow {
     pub flow: MiniFlow,
     pub l7_protocol: L7Protocol,
-    pub endpoint_hash: u32,
+    pub endpoint_hash: u64,
     pub endpoint: Option<String>,
     pub biz_type: u8,
     pub is_active_host0: bool,

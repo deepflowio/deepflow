@@ -59,8 +59,6 @@ pub struct QgCounter {
     pub stash_total_capacity: AtomicU64,
 }
 
-impl AppMeterWithFlow {}
-
 struct QuadrupleStash {
     meters: HashMap<u64, Vec<Box<AppMeterWithFlow>>>,
 }
@@ -260,7 +258,7 @@ impl SubQuadGen {
         app_meter: &AppMeter,
         time_in_second: Duration,
         time_span: u32,
-        endpoint_hash: u32,
+        endpoint_hash: u64,
         is_active_host0: bool,
         is_active_host1: bool,
     ) -> AppMeterWithFlow {
@@ -284,7 +282,7 @@ impl SubQuadGen {
         &mut self,
         l7_stats: &L7Stats,
         app_meter: &AppMeter,
-        endpoint_hash: u32,
+        endpoint_hash: u64,
         time_in_second: Duration,
         possible_host: &mut Option<PossibleHost>,
     ) {
@@ -638,7 +636,7 @@ impl L7QuadrupleGenerator {
         let l7_stats = l7_stats.unwrap();
 
         let endpoint_hash = match &l7_stats.endpoint {
-            Some(e) => hash_to_u64(e) as u32,
+            Some(e) => hash_to_u64(e),
             None => 0,
         };
 

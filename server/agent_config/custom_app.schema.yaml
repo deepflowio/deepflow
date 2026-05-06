@@ -501,6 +501,36 @@ $defs:
                   default: false
                   description@en: 'Whether to ignore case, default value: false, only effective when `Type` (`type`) is `String` (`string`).'
                   description@ch: 是否忽略大小写，默认值：false，仅当 `匹配类型`（`type`）为 `字符串`（`string`）时有效。
+                xml_attribute:
+                  type: object
+                  title@en: XML Attribute Match
+                  title@ch: XML 属性匹配
+                  description@en: |-
+                    Optional XML attribute matcher, only effective for `Payload XML Value` (`payload_xml_value`).
+
+                    Default values are empty for all fields, meaning attribute matching is skipped.
+                    When `Name` (`name`) and `Value` (`value`) are both non-empty, this matcher is enabled and combined with `Match` (`match`) using AND semantics.
+                  description@ch: |-
+                    可选的 XML 属性匹配，仅对 `XML 内容提取` (`payload_xml_value`) 生效。
+
+                    三个字段默认均为空，表示跳过属性匹配。
+                    仅当 `属性名`（`name`）和 `属性值`（`value`）都为非空时启用，并与 `匹配`（`match`）按 AND 关系同时生效。
+                  properties:
+                    name:
+                      type: string
+                      default: ""
+                      title@en: Attribute Name
+                      title@ch: 属性名
+                    value:
+                      type: string
+                      default: ""
+                      title@en: Attribute Value
+                      title@ch: 属性值
+                    ignore_case:
+                      type: boolean
+                      default: false
+                      title@en: Ignore Case
+                      title@ch: 忽略大小写
                 all_leaves:
                   type: boolean
                   title@en: All Leaves
@@ -904,6 +934,7 @@ $defs:
         - key_value_separator: Separator between key and value, default is "=".
         - keyword: Field(s) to search for.
         - ignore_case: Whether to ignore case.
+        - trim: Trims the extracted result by removing matching leading and trailing characters. This works as a character set rather than a whole substring. For example, when `trim` is `abc`, `acdbddb` becomes `dbdd`.
       - `Parse Dict Value` (`parse_dict_value`): Parses the value as a dictionary, and outputs the value corresponding to the specified key. Supported configuration:
         - keyword: Field to search for.
         - type: Can only be string.
@@ -948,6 +979,7 @@ $defs:
         - key_value_separator：键值分隔符，默认为"="。
         - keyword：要查找的字段。
         - ignore_case：是否忽略大小写。
+        - trim：对提取结果做首尾裁剪，去掉两端与该配置中任一字符相同的字符。这里按“字符集合”生效，而不是按整段子串生效。例如 `trim` 为 `abc` 时，`acdbddb` 会变成 `dbdd`。
       - `字典提取` (`parse_dict_value`)：将值作为字典解析，并输出指定 key 对应的 value。支持配置为：
         - keyword：要查找的字段。
         - type：类型，只能为 string。

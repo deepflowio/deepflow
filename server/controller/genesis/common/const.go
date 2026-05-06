@@ -31,6 +31,13 @@ const (
 )
 
 const (
+	DEFAULT_VPC_NAME         = "default-public-vpc"
+	DEFAULT_IGNORE_NIC_REGEX = "^(kube-ipvs)"
+	DEFAULT_MULTI_NS_MODE    = false
+	DEFAULT_SINGLE_VPC_MODE  = false
+)
+
+const (
 	CONFIG_DB_MYSQL = "mysql"
 	CONFIG_DB_REDIS = "redis"
 )

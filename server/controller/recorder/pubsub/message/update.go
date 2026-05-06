@@ -665,6 +665,7 @@ type UpdatedProcessFields struct {
 	ProcessName fieldDetail[string]
 	ContainerID fieldDetail[string]
 	OSAPPTags   fieldDetail[string]
+	BizType     fieldDetail[int]
 	VMID        fieldDetail[int]
 	VPCID       fieldDetail[int]
 	GID         fieldDetail[uint32]

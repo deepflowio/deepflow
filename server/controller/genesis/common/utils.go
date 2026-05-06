@@ -30,6 +30,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
@@ -558,4 +559,65 @@ func IsAgentInterestedHost(aType agent.AgentType) bool {
 		}
 	}
 	return false
+}
+
+func IPsToPrefixes(orgID int, ips []string) []netaddr.IPPrefix {
+	var prefixes []netaddr.IPPrefix
+	for _, ip := range ips {
+		net, err := netaddr.ParseIP(ip)
+		if err == nil {
+			var bit uint8
+			switch {
+			case net.Is4():
+				bit = 32
+			case net.Is6():
+				bit = 128
+			}
+			ipPrefix, err := net.Prefix(bit)
+			if err != nil {
+				log.Warningf("ip convert to ip prefix error: %s", err.Error(), logger.NewORGPrefix(orgID))
+				continue
+			}
+			prefixes = append(prefixes, ipPrefix)
+		} else {
+			ipRange, err := netaddr.ParseIPPrefix(ip)
+			if err != nil {
+				ipRangeSlice, err := netaddr.ParseIPRange(ip)
+				if err != nil {
+					log.Errorf("parse ip ranges error: %s", err.Error(), logger.NewORGPrefix(orgID))
+					continue
+				}
+				prefixes = append(prefixes, ipRangeSlice.Prefixes()...)
+			} else {
+				prefixes = append(prefixes, ipRange)
+			}
+		}
+	}
+	return prefixes
+}
+
+type CoolDownFunc struct {
+	mu          sync.Mutex
+	lastExecMap map[int]time.Time
+	cooldown    time.Duration
+}
+
+func NewCoolDownFunc(cooldown time.Duration) *CoolDownFunc {
+	return &CoolDownFunc{
+		lastExecMap: make(map[int]time.Time),
+		cooldown:    cooldown,
+	}
+}
+
+func (c *CoolDownFunc) Call(orgID int, f func()) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	now := time.Now()
+	if time.Since(c.lastExecMap[orgID]) < c.cooldown {
+		return false
+	}
+	c.lastExecMap[orgID] = now
+	f()
+	return true
 }

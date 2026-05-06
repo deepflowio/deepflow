@@ -20,6 +20,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	logging "github.com/op/go-logging"
@@ -56,15 +57,163 @@ type Counter struct {
 	ErrorCount int64 `statsd:"err-count"`
 }
 
+const (
+	aiAgentRootPidCacheTTL           = 10 * time.Minute
+	aiAgentRootPidCachePruneInterval = time.Minute
+)
+
+type aiAgentRootPidEntry struct {
+	rootPid    uint32
+	insertedAt time.Time
+}
+
+type AiAgentRootPidCache struct {
+	mu           sync.RWMutex
+	rootPidByKey map[uint64]aiAgentRootPidEntry
+	ttl          time.Duration
+	now          func() time.Time
+	stopCh       chan struct{}
+	doneCh       chan struct{}
+	closeOnce    sync.Once
+}
+
+func NewAiAgentRootPidCache() *AiAgentRootPidCache {
+	return newAiAgentRootPidCacheWithOptions(aiAgentRootPidCacheTTL, aiAgentRootPidCachePruneInterval, time.Now)
+}
+
+func newAiAgentRootPidCacheWithOptions(ttl, pruneInterval time.Duration, now func() time.Time) *AiAgentRootPidCache {
+	if now == nil {
+		now = time.Now
+	}
+	cache := &AiAgentRootPidCache{
+		rootPidByKey: make(map[uint64]aiAgentRootPidEntry),
+		ttl:          ttl,
+		now:          now,
+		stopCh:       make(chan struct{}),
+		doneCh:       make(chan struct{}),
+	}
+	if pruneInterval > 0 {
+		go cache.runPrune(pruneInterval)
+	} else {
+		close(cache.doneCh)
+	}
+	return cache
+}
+
+func aiAgentRootPidKey(orgId, vtapId uint16, pid uint32) uint64 {
+	return uint64(orgId)<<48 | uint64(vtapId)<<32 | uint64(pid)
+}
+
+func (c *AiAgentRootPidCache) Get(orgId, vtapId uint16, pid uint32) (uint32, bool) {
+	if c == nil || pid == 0 {
+		return 0, false
+	}
+	key := aiAgentRootPidKey(orgId, vtapId, pid)
+	c.mu.RLock()
+	entry, ok := c.rootPidByKey[key]
+	c.mu.RUnlock()
+	if !ok {
+		return 0, false
+	}
+	if c.ttl > 0 && c.now().Sub(entry.insertedAt) > c.ttl {
+		c.Delete(orgId, vtapId, pid)
+		return 0, false
+	}
+	return entry.rootPid, true
+}
+
+func (c *AiAgentRootPidCache) Set(orgId, vtapId uint16, pid, rootPid uint32) {
+	if c == nil || pid == 0 {
+		return
+	}
+	key := aiAgentRootPidKey(orgId, vtapId, pid)
+	c.mu.Lock()
+	c.rootPidByKey[key] = aiAgentRootPidEntry{rootPid: rootPid, insertedAt: c.now()}
+	c.mu.Unlock()
+}
+
+func (c *AiAgentRootPidCache) Delete(orgId, vtapId uint16, pid uint32) {
+	if c == nil || pid == 0 {
+		return
+	}
+	key := aiAgentRootPidKey(orgId, vtapId, pid)
+	c.mu.Lock()
+	delete(c.rootPidByKey, key)
+	c.mu.Unlock()
+}
+
+func (c *AiAgentRootPidCache) ResolveRootPid(orgId, vtapId uint16, pid, parentPid uint32) uint32 {
+	if c == nil || pid == 0 {
+		return 0
+	}
+	if rootPid, ok := c.Get(orgId, vtapId, pid); ok && rootPid != 0 {
+		return rootPid
+	}
+	if parentPid != 0 && parentPid != pid {
+		if rootPid, ok := c.Get(orgId, vtapId, parentPid); ok && rootPid != 0 {
+			c.Set(orgId, vtapId, pid, rootPid)
+			return rootPid
+		}
+		c.Set(orgId, vtapId, pid, parentPid)
+		return parentPid
+	}
+	c.Set(orgId, vtapId, pid, pid)
+	return pid
+}
+
+func (c *AiAgentRootPidCache) pruneExpired() {
+	if c == nil || c.ttl <= 0 {
+		return
+	}
+	now := c.now()
+	c.mu.Lock()
+	for key, entry := range c.rootPidByKey {
+		if now.Sub(entry.insertedAt) > c.ttl {
+			delete(c.rootPidByKey, key)
+		}
+	}
+	c.mu.Unlock()
+}
+
+func (c *AiAgentRootPidCache) runPrune(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer func() {
+		ticker.Stop()
+		close(c.doneCh)
+	}()
+	for {
+		select {
+		case <-ticker.C:
+			c.pruneExpired()
+		case <-c.stopCh:
+			return
+		}
+	}
+}
+
+func (c *AiAgentRootPidCache) Close() {
+	if c == nil {
+		return
+	}
+	c.closeOnce.Do(func() {
+		close(c.stopCh)
+		<-c.doneCh
+	})
+}
+
 type Decoder struct {
-	index        int
-	eventType    common.EventType
-	platformData *grpc.PlatformInfoTable
-	inQueue      queue.QueueReader
-	eventWriter  *dbwriter.EventWriter
-	exporters    *exporters.Exporters
-	debugEnabled bool
-	config       *config.Config
+	index               int
+	eventType           common.EventType
+	platformData        *grpc.PlatformInfoTable
+	inQueue             queue.QueueReader
+	eventWriter         *dbwriter.EventWriter
+	procEventWriters    *ProcEventWriters
+	fileAggReducer      *FileAggReducer
+	fileMgmtReducer     *FileMgmtReducer
+	exporters           *exporters.Exporters
+	debugEnabled        bool
+	config              *config.Config
+	aiAgentRootPidCache *AiAgentRootPidCache
 
 	orgId, teamId uint16
 
@@ -72,14 +221,24 @@ type Decoder struct {
 	utils.Closable
 }
 
+type ProcEventWriters struct {
+	FileWriter     *dbwriter.EventWriter
+	FileAggWriter  *dbwriter.EventWriter
+	FileMgmtWriter *dbwriter.EventWriter
+	ProcPermWriter *dbwriter.EventWriter
+	ProcOpsWriter  *dbwriter.EventWriter
+}
+
 func NewDecoder(
 	index int,
 	eventType common.EventType,
 	inQueue queue.QueueReader,
 	eventWriter *dbwriter.EventWriter,
+	procEventWriters *ProcEventWriters,
 	platformData *grpc.PlatformInfoTable,
 	exporters *exporters.Exporters,
 	config *config.Config,
+	aiAgentRootPidCache *AiAgentRootPidCache,
 ) *Decoder {
 	controllers := make([]net.IP, len(config.Base.ControllerIPs))
 	for i, ipString := range config.Base.ControllerIPs {
@@ -89,15 +248,19 @@ func NewDecoder(
 		}
 	}
 	return &Decoder{
-		index:        index,
-		eventType:    eventType,
-		platformData: platformData,
-		inQueue:      inQueue,
-		debugEnabled: log.IsEnabledFor(logging.DEBUG),
-		eventWriter:  eventWriter,
-		exporters:    exporters,
-		config:       config,
-		counter:      &Counter{},
+		index:               index,
+		eventType:           eventType,
+		platformData:        platformData,
+		inQueue:             inQueue,
+		debugEnabled:        log.IsEnabledFor(logging.DEBUG),
+		eventWriter:         eventWriter,
+		procEventWriters:    procEventWriters,
+		fileAggReducer:      NewFileAggReducer(),
+		fileMgmtReducer:     NewFileMgmtReducer(),
+		exporters:           exporters,
+		config:              config,
+		aiAgentRootPidCache: aiAgentRootPidCache,
+		counter:             &Counter{},
 	}
 }
 
@@ -117,6 +280,9 @@ func (d *Decoder) Run() {
 		n := d.inQueue.Gets(buffer)
 		for i := 0; i < n; i++ {
 			if buffer[i] == nil {
+				if d.eventType == common.FILE_EVENT {
+					d.flushFileAggEvent()
+				}
 				d.export(nil)
 				continue
 			}
@@ -173,9 +339,44 @@ func (d *Decoder) Run() {
 	}
 }
 
-func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
-	s := dbwriter.AcquireEventStore()
-	s.IsFileEvent = true
+func routeProcEventType(e *pb.ProcEvent) common.EventType {
+	if e == nil {
+		return common.FILE_EVENT
+	}
+	switch {
+	case e.FileOpEventData != nil:
+		return common.FILE_MGMT_EVENT
+	case e.PermOpEventData != nil:
+		return common.PROC_PERM_EVENT
+	case e.ProcLifecycleEventData != nil:
+		return common.PROC_OPS_EVENT
+	default:
+		return common.FILE_EVENT
+	}
+}
+
+func extractProcOpsCommandData(e *pb.ProcEvent) (string, string) {
+	if e == nil || e.ProcLifecycleEventData == nil {
+		return "", ""
+	}
+	return string(e.ProcLifecycleEventData.Cmdline), string(e.ProcLifecycleEventData.ExecPath)
+}
+
+func extractFileMgmtTargets(d *pb.FileOpEventData) (uint32, uint32, uint32) {
+	if d == nil {
+		return 0, 0, 0
+	}
+	switch d.OpType {
+	case pb.FileOpType_FileOpChown:
+		return d.Uid, d.Gid, 0
+	case pb.FileOpType_FileOpChmod:
+		return 0, 0, d.Mode
+	default:
+		return 0, 0, 0
+	}
+}
+
+func (d *Decoder) initEventStoreCommon(s *dbwriter.EventStore, vtapId uint16, e *pb.ProcEvent) {
 	s.Time = uint32(time.Duration(e.StartTime) / time.Second)
 	s.SetId(s.Time, d.platformData.QueryAnalyzerID())
 	s.StartTime = int64(time.Duration(e.StartTime) / time.Microsecond)
@@ -190,22 +391,18 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.SignalSource = uint8(e.EventType)
 	}
 
-	s.GProcessID = d.platformData.QueryProcessInfo(s.OrgId, vtapId, e.Pid)
-	if e.IoEventData != nil {
-		ioData := e.IoEventData
-		s.EventType = strings.ToLower(ioData.Operation.String())
-		s.ProcessKName = string(e.ProcessKname)
-		s.FileName = string(ioData.Filename)
-		s.Offset = ioData.OffBytes
-		s.SyscallThread = e.ThreadId
-		s.SyscallCoroutine = e.CoroutineId
-		s.FileType = uint8(ioData.FileType)
-		s.FileDir = string(ioData.FileDir)
-		s.MountSource = string(ioData.MountSource)
-		s.MountPoint = string(ioData.MountPoint)
-		s.Bytes = ioData.BytesCount
-		s.Duration = uint64(s.EndTime - s.StartTime)
-	}
+	s.GProcessID = resolveGProcessID(
+		func(pid uint32) uint32 {
+			// Event-side gprocess_id follows the same platform-cache timing as L7 logs,
+			// so early AI events may transiently remain 0 before the cache catches up.
+			return d.platformData.QueryProcessInfo(s.OrgId, vtapId, pid)
+		},
+		d.aiAgentRootPidCache,
+		s.OrgId,
+		vtapId,
+		e,
+	)
+
 	s.VTAPID = vtapId
 	s.L3EpcID = d.platformData.QueryVtapEpc0(s.OrgId, vtapId)
 
@@ -214,7 +411,6 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		info = d.platformData.QueryPodIdInfo(s.OrgId, e.PodId)
 	}
 
-	// if platformInfo cannot be obtained from PodId, finally fill with Vtap's platformInfo
 	if info == nil {
 		vtapInfo := d.platformData.QueryVtapInfo(s.OrgId, vtapId)
 		if vtapInfo != nil {
@@ -252,7 +448,6 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		s.IsIPv4 = info.IsIPv4
 		s.IP4 = info.IP4
 		s.IP6 = info.IP6
-		// if it is just Pod Node, there is no need to match the service
 		if ingestercommon.IsPodServiceIP(flow_metrics.DeviceType(s.L3DeviceType), s.PodID, 0) {
 			s.ServiceID = d.platformData.QueryPodService(s.OrgId,
 				s.PodID, s.PodNodeID, uint32(s.PodClusterID), s.PodGroupID, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, 0)
@@ -264,11 +459,294 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 	s.AutoInstanceID, s.AutoInstanceType = ingestercommon.GetAutoInstance(s.PodID, s.GProcessID, s.PodNodeID, s.L3DeviceID, uint32(s.SubnetID), uint8(s.L3DeviceType), s.L3EpcID)
 	customServiceID := d.platformData.QueryCustomService(s.OrgId, s.L3EpcID, !s.IsIPv4, s.IP4, s.IP6, 0, s.PodClusterID, s.ServiceID, s.PodGroupID, s.L3DeviceID, s.PodID, uint8(s.L3DeviceType), 0)
 	s.AutoServiceID, s.AutoServiceType = ingestercommon.GetAutoService(customServiceID, s.ServiceID, s.PodGroupID, s.GProcessID, uint32(s.PodClusterID), s.L3DeviceID, uint32(s.SubnetID), uint8(s.L3DeviceType), podGroupType, s.L3EpcID)
-
 	s.AppInstance = strconv.Itoa(int(e.Pid))
+}
+
+func (d *Decoder) rawFileWriter() *dbwriter.EventWriter {
+	if d.procEventWriters != nil && d.procEventWriters.FileWriter != nil {
+		return d.procEventWriters.FileWriter
+	}
+	return d.eventWriter
+}
+
+func (d *Decoder) fileAggWriter() *dbwriter.EventWriter {
+	if d.procEventWriters != nil && d.procEventWriters.FileAggWriter != nil {
+		return d.procEventWriters.FileAggWriter
+	}
+	return nil
+}
+
+func splitFilePath(fullPath string) (string, string) {
+	if idx := strings.LastIndex(fullPath, "/"); idx >= 0 {
+		return fullPath[:idx+1], fullPath[idx+1:]
+	}
+	return "", fullPath
+}
+
+func shouldAggregateFileAggEvent(rootPID uint32) bool {
+	return rootPID != 0
+}
+
+func (d *Decoder) emitFileAggItems(items []*dbwriter.FileAggEventStore) {
+	if len(items) == 0 {
+		return
+	}
+	if writer := d.fileAggWriter(); writer != nil {
+		for _, item := range items {
+			writer.WriteCKItem(item)
+		}
+		return
+	}
+	for _, item := range items {
+		item.Release()
+	}
+}
+
+func (d *Decoder) flushFileAggEvent() {
+	if d.fileAggReducer == nil {
+		return
+	}
+	d.emitFileAggItems(d.fileAggReducer.Flush())
+}
+
+func (d *Decoder) flushFileAggEventByFile(vtapId uint16, rootPID uint32, fullPath string) {
+	if d.fileAggReducer == nil || fullPath == "" {
+		return
+	}
+	fileDir, fileName := splitFilePath(fullPath)
+	d.emitFileAggItems(d.fileAggReducer.FlushFile(vtapId, rootPID, fileDir, fileName))
+}
+
+func (d *Decoder) writeRawFileEvent(vtapId uint16, e *pb.ProcEvent) {
+	s := dbwriter.AcquireEventStore()
+	s.IsFileEvent = true
+	s.StoreEventType = common.FILE_EVENT
+	d.initEventStoreCommon(s, vtapId, e)
+
+	ioData := e.IoEventData
+	s.EventType = strings.ToLower(ioData.Operation.String())
+	s.ProcessKName = string(e.ProcessKname)
+	s.FileName = string(ioData.Filename)
+	s.Offset = ioData.OffBytes
+	s.SyscallThread = e.ThreadId
+	s.SyscallCoroutine = e.CoroutineId
+	s.FileType = uint8(ioData.FileType)
+	s.FileDir = string(ioData.FileDir)
+	s.MountSource = string(ioData.MountSource)
+	s.MountPoint = string(ioData.MountPoint)
+	s.Bytes = ioData.BytesCount
+	s.AccessPermission = ioData.AccessPermission
+	s.Duration = uint64(s.EndTime - s.StartTime)
+	s.RootPID = e.AiAgentRootPid
 
 	d.export(s)
-	d.eventWriter.Write(s)
+	d.rawFileWriter().Write(s)
+	if d.fileAggReducer != nil && shouldAggregateFileAggEvent(s.RootPID) {
+		d.emitFileAggItems(d.fileAggReducer.Add(s))
+	}
+}
+
+func (d *Decoder) writeFileMgmtEvent(vtapId uint16, e *pb.ProcEvent) {
+	s := dbwriter.AcquireFileMgmtEventStore()
+	d.initEventStoreCommon(&s.EventStore, vtapId, e)
+
+	data := e.FileOpEventData
+	opStr := data.OpType.String()
+	if strings.HasPrefix(opStr, "FileOp") {
+		opStr = opStr[len("FileOp"):]
+	}
+	s.EventType = strings.ToLower(opStr)
+	s.ProcessKName = string(e.ProcessKname)
+	fullPath := string(data.Filename)
+	s.FileDir, s.FileName = splitFilePath(fullPath)
+	s.TargetUID, s.TargetGID, s.TargetMode = extractFileMgmtTargets(data)
+	if data.OpType == pb.FileOpType_FileOpChmod {
+		s.AccessPermission = data.Mode
+	}
+	s.RootPID = e.AiAgentRootPid
+	s.SyscallThread = e.ThreadId
+	s.SyscallCoroutine = e.CoroutineId
+
+	if d.fileMgmtReducer != nil {
+		if reduced := d.fileMgmtReducer.Add(s); reduced == nil {
+			s.Release()
+			return
+		}
+	}
+
+	if d.procEventWriters != nil && d.procEventWriters.FileMgmtWriter != nil {
+		d.procEventWriters.FileMgmtWriter.WriteCKItem(s)
+		return
+	}
+	s.Release()
+}
+
+func (d *Decoder) writeProcPermEvent(vtapId uint16, e *pb.ProcEvent) {
+	s := dbwriter.AcquireProcPermEventStore()
+	d.initEventStoreCommon(&s.EventStore, vtapId, e)
+
+	data := e.PermOpEventData
+	s.EventType = strings.ToLower(data.OpType.String())
+	s.ProcessKName = string(e.ProcessKname)
+	s.Pid = e.Pid
+	s.RootPID = e.AiAgentRootPid
+	s.OldUID = data.OldUid
+	s.OldGID = data.OldGid
+	s.NewUID = data.NewUid
+	s.NewGID = data.NewGid
+	s.SyscallThread = e.ThreadId
+	s.SyscallCoroutine = e.CoroutineId
+
+	if d.procEventWriters != nil && d.procEventWriters.ProcPermWriter != nil {
+		d.procEventWriters.ProcPermWriter.WriteCKItem(s)
+		return
+	}
+	s.Release()
+}
+
+func (d *Decoder) writeProcOpsEvent(vtapId uint16, e *pb.ProcEvent) {
+	s := dbwriter.AcquireProcOpsEventStore()
+	d.initEventStoreCommon(&s.EventStore, vtapId, e)
+
+	data := e.ProcLifecycleEventData
+	s.EventType = strings.ToLower(data.LifecycleType.String())
+	s.ProcessKName = string(data.Comm)
+	s.Pid = data.Pid
+	s.ParentPid = data.ParentPid
+	s.RootPID = e.AiAgentRootPid
+	s.UID = data.Uid
+	s.GID = data.Gid
+	s.Cmdline, s.ExecPath = extractProcOpsCommandData(e)
+	s.SyscallThread = e.ThreadId
+	s.SyscallCoroutine = e.CoroutineId
+
+	if d.procEventWriters != nil && d.procEventWriters.ProcOpsWriter != nil {
+		d.procEventWriters.ProcOpsWriter.WriteCKItem(s)
+		return
+	}
+	s.Release()
+}
+
+func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
+	switch routeProcEventType(e) {
+	case common.FILE_EVENT:
+		if e.IoEventData != nil {
+			d.writeRawFileEvent(vtapId, e)
+		}
+	case common.FILE_MGMT_EVENT:
+		if e.FileOpEventData != nil {
+			d.flushFileAggEventByFile(vtapId, e.AiAgentRootPid, string(e.FileOpEventData.Filename))
+		}
+		d.writeFileMgmtEvent(vtapId, e)
+	case common.PROC_PERM_EVENT:
+		d.writeProcPermEvent(vtapId, e)
+	case common.PROC_OPS_EVENT:
+		d.writeProcOpsEvent(vtapId, e)
+	}
+}
+
+func resolveGProcessID(queryProcessInfo func(pid uint32) uint32, rootPidCache *AiAgentRootPidCache, orgId, vtapId uint16, e *pb.ProcEvent) uint32 {
+	if e == nil {
+		return 0
+	}
+
+	pid := e.Pid
+	if pid == 0 {
+		return 0
+	}
+
+	rootPid := pid
+	if rootPidCache != nil {
+		if e.EventType == pb.EventType_ProcLifecycleEvent && e.ProcLifecycleEventData != nil {
+			lifecyclePid := e.ProcLifecycleEventData.Pid
+			if lifecyclePid != 0 {
+				pid = lifecyclePid
+			}
+			parentPid := e.ProcLifecycleEventData.ParentPid
+			if e.ProcLifecycleEventData.LifecycleType == pb.ProcLifecycleType_ProcLifecycleExec {
+				if cachedRoot, ok := rootPidCache.Get(orgId, vtapId, pid); ok && cachedRoot != 0 {
+					rootPid = cachedRoot
+				} else if parentPid != 0 {
+					if parentRoot, ok := rootPidCache.Get(orgId, vtapId, parentPid); ok && parentRoot != 0 {
+						rootPidCache.Set(orgId, vtapId, pid, parentRoot)
+						rootPid = parentRoot
+					} else {
+						rootPidCache.Set(orgId, vtapId, pid, pid)
+						rootPid = pid
+					}
+				} else {
+					rootPidCache.Set(orgId, vtapId, pid, pid)
+					rootPid = pid
+				}
+			} else {
+				rootPid = rootPidCache.ResolveRootPid(orgId, vtapId, pid, parentPid)
+			}
+		} else if cachedRoot, ok := rootPidCache.Get(orgId, vtapId, pid); ok && cachedRoot != 0 {
+			rootPid = cachedRoot
+		}
+	}
+
+	cleanupOnExit := func() {
+		if rootPidCache != nil &&
+			e.EventType == pb.EventType_ProcLifecycleEvent && e.ProcLifecycleEventData != nil &&
+			e.ProcLifecycleEventData.LifecycleType == pb.ProcLifecycleType_ProcLifecycleExit {
+			rootPidCache.Delete(orgId, vtapId, pid)
+		}
+	}
+
+	if rootPid != 0 {
+		gprocessID := queryProcessInfo(rootPid)
+		if gprocessID != 0 {
+			cleanupOnExit()
+			return gprocessID
+		}
+	}
+
+	if rootPid != pid {
+		gprocessID := queryProcessInfo(pid)
+		if gprocessID != 0 {
+			cleanupOnExit()
+			return gprocessID
+		}
+	}
+
+	// Fallback: use ai_agent_root_pid sent by the agent.
+	// The agent tracks root AI Agent PIDs in its registry and attaches
+	// the root PID to every event from AI Agent processes. This resolves
+	// gprocess_id for child/grandchild processes that haven't been
+	// synchronized to the process table yet.
+	if e.AiAgentRootPid != 0 && e.AiAgentRootPid != pid && e.AiAgentRootPid != rootPid {
+		gprocessID := queryProcessInfo(e.AiAgentRootPid)
+		if gprocessID != 0 {
+			if rootPidCache != nil {
+				rootPidCache.Set(orgId, vtapId, pid, e.AiAgentRootPid)
+			}
+			cleanupOnExit()
+			return gprocessID
+		}
+	}
+
+	// Proc lifecycle (fork/exec/exit) events may arrive before the controller
+	// has synchronized the child process into the `process` table. In that
+	// window, QueryProcessInfo(child_pid) returns 0 even though the parent is
+	// already mapped. Falling back to the parent_pid keeps the lifecycle event
+	// attached to the correct AI Agent gprocess_id until the child entry is
+	// eventually synced.
+	if e.EventType != pb.EventType_ProcLifecycleEvent || e.ProcLifecycleEventData == nil {
+		return 0
+	}
+	parentPid := e.ProcLifecycleEventData.ParentPid
+	if parentPid == 0 || parentPid == e.Pid {
+		cleanupOnExit()
+		return 0
+	}
+	gprocessID := queryProcessInfo(parentPid)
+	if gprocessID == 0 {
+		cleanupOnExit()
+		return 0
+	}
+	cleanupOnExit()
+	return gprocessID
 }
 
 func (d *Decoder) export(item exporterscommon.ExportItem) {
