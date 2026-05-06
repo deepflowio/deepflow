@@ -299,6 +299,7 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 		// append metricName `value`
 		metricsArray = append(metricsArray, metricAlias)
 		// append `tag` only for prometheus & ext_metrics & deepflow_admin / deepflow_tenant
+		metricsArray = append(metricsArray, fmt.Sprintf("FastTrans(%s) as %s", PROMETHEUS_NATIVE_TAG_NAME, model.PROMETHEUS_LABELS_INDEX))
 		if !common.IsValueInSliceString(q.Hints.Func, model.RelabelFunctions) {
 			// `tag` should be append into `Select` with:
 			// 1. not any aggregations, try get all `tag`
@@ -306,7 +307,6 @@ func (p *prometheusReader) promReaderTransToSQL(ctx context.Context, req *prompb
 			// 3. when argTypes == Matrix, get all `tag`. i.e.: irate/rate/x_over_time
 			metricsArray = append(metricsArray, fmt.Sprintf("`%s`", PROMETHEUS_NATIVE_TAG_NAME))
 		} else {
-			metricsArray = append(metricsArray, fmt.Sprintf("FastTrans(%s) as %s", PROMETHEUS_NATIVE_TAG_NAME, model.PROMETHEUS_LABELS_INDEX))
 			for _, g := range q.Hints.Grouping {
 				queryableTag, _ := p.parsePromQLTag(prefixType, db, g)
 
@@ -696,6 +696,14 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 		return &prompb.ReadResponse{Results: []*prompb.QueryResult{{}}}, nil
 	}
 	cacheEnabled := config.Cfg.Prometheus.Cache.RemoteReadCache && !strings.Contains(metricsName, "__")
+	// build replica-label set once: list lookup is O(n) per row otherwise
+	var replicaLabelSet map[string]struct{}
+	if rl := config.Cfg.Prometheus.ThanosReplicaLabels; len(rl) > 0 {
+		replicaLabelSet = make(map[string]struct{}, len(rl))
+		for _, k := range rl {
+			replicaLabelSet[k] = struct{}{}
+		}
+	}
 	log.Debugf("resTransToProm: result length: %d", len(result.Values))
 	columnIndexes := []int{-1, -1, -1, -1, -1, -1, -1}
 	otherTagCount := 0
@@ -727,6 +735,22 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 	}
 	metricsType := result.Schemas[columnIndexes[METRICS_INDEX]].ValueType
 	allowParseType := []string{"Int", "Float64", "UInt64"}
+	// pre-resolve nested types so the second loop doesn't re-parse strings per row;
+	// schemas are constant across rows in a single result.
+	metricsNestedType := findNestedType(metricsType)
+	if !slices.Contains(allowParseType, metricsNestedType) {
+		return nil, fmt.Errorf("unknown metrics type %s", metricsType)
+	}
+	var windowFirstValueNestedType, windowFirstTimeNestedType, windowLastTimeNestedType string
+	if columnIndexes[WINDOW_FIRST_VALUE_INDEX] > -1 {
+		windowFirstValueNestedType = findNestedType(result.Schemas[columnIndexes[WINDOW_FIRST_VALUE_INDEX]].ValueType)
+	}
+	if columnIndexes[WINDOW_FIRST_TIME_INDEX] > -1 {
+		windowFirstTimeNestedType = findNestedType(result.Schemas[columnIndexes[WINDOW_FIRST_TIME_INDEX]].ValueType)
+	}
+	if columnIndexes[WINDOW_LAST_TIME_INDEX] > -1 {
+		windowLastTimeNestedType = findNestedType(result.Schemas[columnIndexes[WINDOW_LAST_TIME_INDEX]].ValueType)
+	}
 
 	// append other deepflow native tag into results
 	allDeepFlowNativeTags := make([]int, 0, otherTagCount)
@@ -749,7 +773,14 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 	sampleSeriesIndex := make([]int32, len(result.Values))          // the index in seriesArray, for each sample
 	seriesSampleCount := make([]int32, maxPossibleSeries)           // number of samples of each series
 	initialSeriesIndex := int32(0)
-	promJsonMap := make(map[string]map[string]string)
+	// promJsonMap caches both the parsed filterTagMap AND the pre-sorted
+	// "k:v" concatenation per unique promTagJson string, so duplicate rows in
+	// the same series skip Unmarshal + map range + sort + StringBuilder.
+	type promTagCacheEntry struct {
+		filterTagMap map[string]string
+		sortedKey    string
+	}
+	promJsonMap := make(map[string]*promTagCacheEntry)
 	tagsStrList := make([]string, 0, len(allDeepFlowNativeTags))
 	promTagStrList := make([]string, 0)
 	promTagWriter := strings.Builder{}
@@ -768,37 +799,44 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 		// merge prometheus tags
 		if columnIndexes[TAG_INDEX] > -1 {
 			promTagJson = values[columnIndexes[TAG_INDEX]].(string)
-			var ok bool
-			if filterTagMap, ok = promJsonMap[promTagJson]; !ok {
+			if entry, ok := promJsonMap[promTagJson]; ok {
+				// fast path: same promTagJson appears for every sample of the same series.
+				filterTagMap = entry.filterTagMap
+				deepflowNativeTagString = entry.sortedKey
+			} else {
 				filterTagMap = make(map[string]string)
 				json.Unmarshal([]byte(promTagJson), &filterTagMap)
-			}
-			if cap(promTagStrList) < len(filterTagMap) {
-				promTagStrList = make([]string, 0, len(filterTagMap))
-			}
-			for k, v := range filterTagMap {
-				if k == "" || v == "" {
-					continue
+				if cap(promTagStrList) < len(filterTagMap) {
+					promTagStrList = make([]string, 0, len(filterTagMap))
 				}
-				// ignore replica labels if passed
-				if config.Cfg.Prometheus.ThanosReplicaLabels != nil && common.IsValueInSliceString(k, config.Cfg.Prometheus.ThanosReplicaLabels) {
-					filterTagMap[k] = ""
-					continue
+				for k, v := range filterTagMap {
+					if k == "" || v == "" {
+						continue
+					}
+					// ignore replica labels if passed
+					if replicaLabelSet != nil {
+						if _, isReplica := replicaLabelSet[k]; isReplica {
+							filterTagMap[k] = ""
+							continue
+						}
+					}
+					promTagStrList = append(promTagStrList, k)
 				}
-				filterTagMap[k] = v
-				promTagStrList = append(promTagStrList, k)
+				// IMPORTANT: tags needed to be sorted, it will be compare both in cache and seriesIndexMap
+				slices.Sort(promTagStrList)
+				for i := 0; i < len(promTagStrList); i++ {
+					promTagWriter.WriteString(promTagStrList[i])
+					promTagWriter.WriteByte(':')
+					promTagWriter.WriteString(filterTagMap[promTagStrList[i]])
+				}
+				deepflowNativeTagString = promTagWriter.String()
+				promTagWriter.Reset()
+				promTagStrList = promTagStrList[:0]
+				promJsonMap[promTagJson] = &promTagCacheEntry{
+					filterTagMap: filterTagMap,
+					sortedKey:    deepflowNativeTagString,
+				}
 			}
-			promJsonMap[promTagJson] = filterTagMap
-			// IMPORTANT: tags needed to be sorted, it will be compare both in cache and seriesIndexMap
-			slices.Sort(promTagStrList)
-			for i := 0; i < len(promTagStrList); i++ {
-				promTagWriter.WriteString(promTagStrList[i])
-				promTagWriter.WriteByte(':')
-				promTagWriter.WriteString(filterTagMap[promTagStrList[i]])
-			}
-			deepflowNativeTagString = promTagWriter.String()
-			promTagWriter.Reset()
-			promTagStrList = promTagStrList[:0]
 		} else if columnIndexes[LABELS_INDEX] > -1 {
 			labelsArray, ok := values[columnIndexes[LABELS_INDEX]].([]uint32)
 			if !ok {
@@ -822,8 +860,10 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 					continue
 				}
 				// ignore replica labels if passed
-				if config.Cfg.Prometheus.ThanosReplicaLabels != nil && common.IsValueInSliceString(name, config.Cfg.Prometheus.ThanosReplicaLabels) {
-					continue
+				if replicaLabelSet != nil {
+					if _, isReplica := replicaLabelSet[name]; isReplica {
+						continue
+					}
 				}
 				filterTagMap[name] = val
 			}
@@ -945,12 +985,7 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			continue
 		}
 
-		nestedType := findNestedType(metricsType)
-		if !slices.Contains(allowParseType, nestedType) {
-			return nil, fmt.Errorf("unknown metrics type %s, value = %v ", metricsType, values[columnIndexes[METRICS_INDEX]])
-		}
-
-		metricsValue, ok = parseValue(metricsType, values[columnIndexes[METRICS_INDEX]])
+		metricsValue, ok = parseValueByNested(metricsNestedType, values[columnIndexes[METRICS_INDEX]])
 		if !ok {
 			continue
 		}
@@ -960,20 +995,17 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 		var firstTimestamp, lastTimestamp int64
 		if columnIndexes[WINDOW_FIRST_VALUE_INDEX] > -1 {
 			// get minvalue, igonre ok
-			valueType := result.Schemas[columnIndexes[WINDOW_FIRST_VALUE_INDEX]].ValueType
-			firstValueInTimeWindow, _ = parseValue(valueType, values[columnIndexes[WINDOW_FIRST_VALUE_INDEX]])
+			firstValueInTimeWindow, _ = parseValueByNested(windowFirstValueNestedType, values[columnIndexes[WINDOW_FIRST_VALUE_INDEX]])
 		}
 
 		if columnIndexes[WINDOW_FIRST_TIME_INDEX] > -1 {
 			// get min timestamp
-			valueType := result.Schemas[columnIndexes[WINDOW_FIRST_TIME_INDEX]].ValueType
-			firstTimeSeconds, _ := parseValue(valueType, values[columnIndexes[WINDOW_FIRST_TIME_INDEX]])
+			firstTimeSeconds, _ := parseValueByNested(windowFirstTimeNestedType, values[columnIndexes[WINDOW_FIRST_TIME_INDEX]])
 			firstTimestamp = int64(firstTimeSeconds * 1000)
 		}
 
 		if columnIndexes[WINDOW_LAST_TIME_INDEX] > -1 {
-			valueType := result.Schemas[columnIndexes[WINDOW_LAST_TIME_INDEX]].ValueType
-			lastTimeSeconds, _ := parseValue(valueType, values[columnIndexes[WINDOW_LAST_TIME_INDEX]])
+			lastTimeSeconds, _ := parseValueByNested(windowLastTimeNestedType, values[columnIndexes[WINDOW_LAST_TIME_INDEX]])
 			lastTimestamp = int64(lastTimeSeconds * 1000)
 		}
 
@@ -1055,7 +1087,15 @@ func parseValue(valueType string, val interface{}) (v float64, b bool) {
 		return 0, true
 	}
 	// NOTE: don't use reflect/type assert here for performance issue
-	nestedType := findNestedType(valueType)
+	return parseValueByNested(findNestedType(valueType), val)
+}
+
+// parseValueByNested skips findNestedType when the caller has already resolved
+// the nested type once outside the hot loop.
+func parseValueByNested(nestedType string, val interface{}) (v float64, b bool) {
+	if val == nil {
+		return 0, true
+	}
 	switch nestedType {
 	case "Int":
 		metricsValueInt, ok := convertTo[int](val)
@@ -1310,56 +1350,64 @@ func appendRegexRules(v string) string {
 
 func getValue(value interface{}) string {
 	switch val := value.(type) {
-	case int8, int16, int32, int64, uint8, uint16, uint32, uint64, time.Time, net.IP:
+	case int8:
+		return strconv.FormatInt(int64(val), 10)
+	case int16:
+		return strconv.FormatInt(int64(val), 10)
+	case int32:
+		return strconv.FormatInt(int64(val), 10)
+	case int64:
+		return strconv.FormatInt(val, 10)
+	case uint8:
+		return strconv.FormatUint(uint64(val), 10)
+	case uint16:
+		return strconv.FormatUint(uint64(val), 10)
+	case uint32:
+		return strconv.FormatUint(uint64(val), 10)
+	case uint64:
+		return strconv.FormatUint(val, 10)
+	case time.Time, net.IP:
 		return fmt.Sprintf("%v", val)
 	case *int8:
 		if val == nil {
 			return ""
-		} else {
-			return fmt.Sprintf("%v", *val)
 		}
+		return strconv.FormatInt(int64(*val), 10)
 	case *int16:
 		if val == nil {
 			return ""
-		} else {
-			return fmt.Sprintf("%v", *val)
 		}
+		return strconv.FormatInt(int64(*val), 10)
 	case *int32:
 		if val == nil {
 			return ""
-		} else {
-			return fmt.Sprintf("%v", *val)
 		}
+		return strconv.FormatInt(int64(*val), 10)
 	case *int64:
 		if val == nil {
 			return ""
-		} else {
-			return fmt.Sprintf("%v", *val)
 		}
+		return strconv.FormatInt(*val, 10)
 	case *uint8:
 		if val == nil {
 			return ""
-		} else {
-			return fmt.Sprintf("%v", *val)
 		}
+		return strconv.FormatUint(uint64(*val), 10)
 	case *uint16:
 		if val == nil {
 			return ""
-		} else {
-			return fmt.Sprintf("%v", *val)
 		}
+		return strconv.FormatUint(uint64(*val), 10)
 	case *uint32:
 		if val == nil {
 			return ""
-		} else {
-			return fmt.Sprintf("%v", *val)
 		}
+		return strconv.FormatUint(uint64(*val), 10)
 	case *uint64:
 		if val == nil {
 			return ""
-		} else {
-			return fmt.Sprintf("%v", *val)
 		}
+		return strconv.FormatUint(*val, 10)
 	case float32:
 		return strconv.FormatFloat(float64(val), 'f', -1, 64)
 	case float64:
@@ -1367,15 +1415,13 @@ func getValue(value interface{}) string {
 	case *float32:
 		if val == nil {
 			return ""
-		} else {
-			return strconv.FormatFloat(float64(*val), 'f', -1, 64)
 		}
+		return strconv.FormatFloat(float64(*val), 'f', -1, 64)
 	case *float64:
 		if val == nil {
 			return ""
-		} else {
-			return strconv.FormatFloat(*val, 'f', -1, 64)
 		}
+		return strconv.FormatFloat(*val, 'f', -1, 64)
 	case string:
 		return val
 	case *string:
