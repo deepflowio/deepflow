@@ -36,4 +36,9 @@ void insert_prog_to_map(struct bpf_tracer *tracer, const char *map_name,
 					const char *prog_name, int key);
 
 int bpf_table_get_fd(struct bpf_tracer *tracer, const char *tb_name);
+
+int bpf_table_get_map_fd(const char *tracer_name, const char *map_name);
+int bpf_table_update_u32_key(int map_fd, uint32_t key, void *val_buf,
+			     int val_size);
+int bpf_table_delete_u32_key(int map_fd, uint32_t key);
 #endif /* DF_BPF_TABLE_H */

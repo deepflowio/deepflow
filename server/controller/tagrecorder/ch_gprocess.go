@@ -81,6 +81,7 @@ func (c *ChGProcess) sourceToTarget(md *message.Metadata, source *metadbmodel.Pr
 		Name:        sourceName,
 		CHostID:     source.VMID,
 		L3EPCID:     source.VPCID,
+		BizType:     source.BizType,
 		IconID:      iconID,
 		TeamID:      md.GetTeamID(),
 		DomainID:    md.GetDomainID(),

@@ -94,6 +94,7 @@ type Process struct {
 	VMID           int       `gorm:"column:vm_id;type:int;default:null" json:"VM_ID" mapstructure:"VM_ID"`
 	VPCID          int       `gorm:"column:epc_id;type:int;default:null" json:"EPC_ID" mapstructure:"EPC_ID"`
 	ProcessName    string    `gorm:"column:process_name;type:varchar(256);default:''" json:"PROCESS_NAME" mapstructure:"PROCESS_NAME"`
+	BizType        int       `gorm:"column:biz_type;type:int;default:0" json:"BIZ_TYPE" mapstructure:"BIZ_TYPE"`
 	CommandLine    string    `gorm:"column:command_line;type:text" json:"COMMAND_LINE" mapstructure:"CMD_LINE"`
 	UserName       string    `gorm:"column:user_name;type:varchar(256);default:''" json:"USER_NAME" mapstructure:"USER_NAME"`
 	StartTime      time.Time `gorm:"autoCreateTime;column:start_time;type:datetime" json:"START_TIME" mapstructure:"START_TIME"`

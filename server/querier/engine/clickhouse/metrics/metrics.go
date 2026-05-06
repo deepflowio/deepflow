@@ -370,6 +370,14 @@ func GetMetricsByDBTableStatic(db string, table string, customMetrics map[string
 			return GetResourceEventMetrics()
 		case "file_event":
 			return GetResourceFileEventMetrics()
+		case ckcommon.TABLE_NAME_FILE_AGG_EVENT:
+			return FILE_AGG_EVENT_METRICS
+		case ckcommon.TABLE_NAME_FILE_MGMT_EVENT:
+			return FILE_MGMT_EVENT_METRICS
+		case ckcommon.TABLE_NAME_PROC_PERM_EVENT:
+			return PROC_PERM_EVENT_METRICS
+		case ckcommon.TABLE_NAME_PROC_OPS_EVENT:
+			return PROC_OPS_EVENT_METRICS
 		case ckcommon.TABLE_NAME_ALERT_EVENT, ckcommon.TABLE_NAME_ALERT_RECORD:
 			return GetAlarmEventMetrics()
 		case ckcommon.TABLE_NAME_FILE_EVENT_METRICS:
@@ -734,6 +742,18 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "file_event":
 			metrics = RESOURCE_FILE_EVENT_METRICS
 			replaceMetrics = RESOURCE_FILE_EVENT_METRICS_REPLACE
+		case ckcommon.TABLE_NAME_FILE_AGG_EVENT:
+			metrics = FILE_AGG_EVENT_METRICS
+			replaceMetrics = FILE_AGG_EVENT_METRICS_REPLACE
+		case ckcommon.TABLE_NAME_FILE_MGMT_EVENT:
+			metrics = FILE_MGMT_EVENT_METRICS
+			replaceMetrics = FILE_MGMT_EVENT_METRICS_REPLACE
+		case ckcommon.TABLE_NAME_PROC_PERM_EVENT:
+			metrics = PROC_PERM_EVENT_METRICS
+			replaceMetrics = PROC_PERM_EVENT_METRICS_REPLACE
+		case ckcommon.TABLE_NAME_PROC_OPS_EVENT:
+			metrics = PROC_OPS_EVENT_METRICS
+			replaceMetrics = PROC_OPS_EVENT_METRICS_REPLACE
 		case ckcommon.TABLE_NAME_ALERT_EVENT, ckcommon.TABLE_NAME_ALERT_RECORD:
 			metrics = ALARM_EVENT_METRICS
 			replaceMetrics = ALARM_EVENT_METRICS_REPLACE

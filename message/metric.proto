@@ -257,11 +257,75 @@ message IoEventData {
     bytes mount_point= 7;
     bytes file_dir = 8;
     FileType file_type = 9;
+    uint32 access_permission = 10; // File permission bits (inode->i_mode & 0xFFF)
 }
 
 enum EventType {
     OtherEvent = 0;
     IoEvent = 1;
+    FileOpEvent = 2;    // File creation/deletion/chmod/chown
+    PermOpEvent = 3;    // setuid/setgid/setreuid/setregid
+    ProcLifecycleEvent = 4; // fork/exec/exit
+}
+
+enum FileOpType {
+    FileOpUnknown = 0;
+    FileOpCreate = 1;
+    FileOpDelete = 2;
+    FileOpChmod = 3;
+    FileOpChown = 4;
+}
+
+message FileOpEventData {
+    FileOpType op_type = 1;
+    uint32 pid = 2;
+    uint32 uid = 3;
+    uint32 gid = 4;
+    uint32 mode = 5;
+    uint64 timestamp = 6;
+    bytes filename = 7;
+}
+
+enum PermOpType {
+    PermOpUnknown = 0;
+    PermOpSetuid = 1;
+    PermOpSetgid = 2;
+    PermOpSetreuid = 3;
+    PermOpSetregid = 4;
+}
+
+message PermOpEventData {
+    PermOpType op_type = 1;
+    uint32 pid = 2;
+    uint32 old_uid = 3;
+    uint32 old_gid = 4;
+    // Event-specific target arguments:
+    //   setuid   : new_uid = uid,  new_gid = 0
+    //   setgid   : new_uid = 0,    new_gid = gid
+    //   setreuid : new_uid = ruid, new_gid = euid
+    //   setregid : new_uid = rgid, new_gid = egid
+    uint32 new_uid = 5;
+    uint32 new_gid = 6;
+    uint64 timestamp = 7;
+}
+
+enum ProcLifecycleType {
+    ProcLifecycleUnknown = 0;
+    ProcLifecycleFork = 1;
+    ProcLifecycleExec = 2;
+    ProcLifecycleExit = 3;
+}
+
+message ProcLifecycleEventData {
+    ProcLifecycleType lifecycle_type = 1;
+    uint32 pid = 2;
+    uint32 parent_pid = 3;
+    uint32 uid = 4;
+    uint32 gid = 5;
+    uint64 timestamp = 6;
+    bytes comm = 7;
+    bytes cmdline = 8;
+    bytes exec_path = 9;
 }
 
 message ProcEvent {
@@ -275,6 +339,10 @@ message ProcEvent {
     IoEventData io_event_data = 8;
     // Deprecated in v6.4.1: uint32 netns_id = 9;
     uint32 pod_id = 10;
+    FileOpEventData file_op_event_data = 11;
+    PermOpEventData perm_op_event_data = 12;
+    ProcLifecycleEventData proc_lifecycle_event_data = 13;
+    uint32 ai_agent_root_pid = 14;
 }
 
 message PrometheusMetric {
