@@ -37,7 +37,8 @@ const TRACE_TREE_VERSION_0x19 = 0x19 // before 20260127
 const TRACE_TREE_VERSION_0x20 = 0x20 // before 20260129
 const TRACE_TREE_VERSION_0x21 = 0x21 // before 20260202
 const TRACE_TREE_VERSION_0x22 = 0x22 // before 20260317
-const TRACE_TREE_VERSION = 0x23
+const TRACE_TREE_VERSION_0x23 = 0x23 // before 20260507
+const TRACE_TREE_VERSION = 0x24
 
 func HashSearchIndex(key string) uint64 {
 	return utils.DJBHash(17, key)
@@ -56,6 +57,14 @@ type TraceTree struct {
 	encodedTreeNodes []byte
 }
 
+type EndpointStats struct {
+	BizResponseCode   string
+	ResponseException string
+	ResponseCode      uint32
+	Total             uint32
+	ResponseStatus    uint8
+}
+
 type SpanInfo struct {
 	SignalSource     uint8
 	AutoServiceType0 uint8
@@ -66,6 +75,7 @@ type SpanInfo struct {
 	AppService1      string
 	ObservationPoint string
 	Endpoints        []string
+	EndpointStat     []EndpointStats
 
 	IsIPv4 bool
 	IP40   uint32
@@ -82,6 +92,8 @@ type NodeInfo struct {
 	ObservationPoint string
 	Endpoints0       []string
 	Endpoints1       []string
+	EndpointStat0    []EndpointStats
+	EndpointStat1    []EndpointStats
 
 	IsIPv4 bool
 	IP4    uint32
@@ -102,6 +114,7 @@ type TreeNode struct {
 	Topic         string
 	QuerierRegion string
 
+	BizResponseCode                string
 	ResponseException              string
 	ResponseDurationSum            uint64
 	ResponseCode                   uint32
@@ -176,6 +189,14 @@ func (t *TraceTree) Encode() {
 			for _, e := range s.Endpoints {
 				encoder.WriteString255(e)
 			}
+			encoder.WriteU16(uint16(len(s.EndpointStat)))
+			for _, e := range s.EndpointStat {
+				encoder.WriteString255(e.BizResponseCode)
+				encoder.WriteString255(e.ResponseException)
+				encoder.WriteVarintU32(e.ResponseCode)
+				encoder.WriteVarintU32(e.Total)
+				encoder.WriteU8(e.ResponseStatus)
+			}
 
 			encoder.WriteBool(s.IsIPv4)
 			if s.IsIPv4 {
@@ -209,6 +230,22 @@ func (t *TraceTree) Encode() {
 		for _, e := range nodeInfo.Endpoints1 {
 			encoder.WriteString255(e)
 		}
+		encoder.WriteU16(uint16(len(nodeInfo.EndpointStat0)))
+		for _, e := range nodeInfo.EndpointStat0 {
+			encoder.WriteString255(e.BizResponseCode)
+			encoder.WriteString255(e.ResponseException)
+			encoder.WriteVarintU32(e.ResponseCode)
+			encoder.WriteVarintU32(e.Total)
+			encoder.WriteU8(e.ResponseStatus)
+		}
+		encoder.WriteU16(uint16(len(nodeInfo.EndpointStat1)))
+		for _, e := range nodeInfo.EndpointStat1 {
+			encoder.WriteString255(e.BizResponseCode)
+			encoder.WriteString255(e.ResponseException)
+			encoder.WriteVarintU32(e.ResponseCode)
+			encoder.WriteVarintU32(e.Total)
+			encoder.WriteU8(e.ResponseStatus)
+		}
 
 		encoder.WriteBool(nodeInfo.IsIPv4)
 		if nodeInfo.IsIPv4 {
@@ -223,6 +260,7 @@ func (t *TraceTree) Encode() {
 		encoder.WriteU8(node.PseudoLink)
 		encoder.WriteString255(node.Topic)
 		encoder.WriteString255(node.QuerierRegion)
+		encoder.WriteString255(node.BizResponseCode)
 		encoder.WriteString255(node.ResponseException)
 		encoder.WriteVarintU64(node.ResponseDurationSum)
 		encoder.WriteVarintU32(node.ResponseCode)
@@ -237,7 +275,7 @@ func (t *TraceTree) Encode() {
 
 func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 	version := decoder.ReadU8()
-	if version != TRACE_TREE_VERSION && version != TRACE_TREE_VERSION_0X12 && version != TRACE_TREE_VERSION_0X13 {
+	if version != TRACE_TREE_VERSION {
 		return fmt.Errorf("trace tree data version is %d expect version is %d", version, TRACE_TREE_VERSION)
 	}
 	t.UID = decoder.ReadU64()
@@ -267,6 +305,16 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 			s.Endpoints = make([]string, endpointCount)
 			for k := 0; k < endpointCount; k++ {
 				s.Endpoints[k] = decoder.ReadString255()
+			}
+			endpointStatCount := int(decoder.ReadU16())
+			s.EndpointStat = make([]EndpointStats, endpointStatCount)
+			for k := 0; k < endpointStatCount; k++ {
+				e := &s.EndpointStat[k]
+				e.BizResponseCode = decoder.ReadString255()
+				e.ResponseException = decoder.ReadString255()
+				e.ResponseCode = decoder.ReadVarintU32()
+				e.Total = decoder.ReadVarintU32()
+				e.ResponseStatus = decoder.ReadU8()
 			}
 
 			s.IsIPv4 = decoder.ReadBool()
@@ -298,6 +346,27 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		for j := 0; j < endpointCount; j++ {
 			nodeInfo.Endpoints1[j] = decoder.ReadString255()
 		}
+		endpointStatCount := int(decoder.ReadU16())
+		nodeInfo.EndpointStat0 = make([]EndpointStats, endpointStatCount)
+		for j := 0; j < endpointStatCount; j++ {
+			e := &nodeInfo.EndpointStat0[j]
+			e.BizResponseCode = decoder.ReadString255()
+			e.ResponseException = decoder.ReadString255()
+			e.ResponseCode = decoder.ReadVarintU32()
+			e.Total = decoder.ReadVarintU32()
+			e.ResponseStatus = decoder.ReadU8()
+		}
+		endpointStatCount = int(decoder.ReadU16())
+		nodeInfo.EndpointStat1 = make([]EndpointStats, endpointStatCount)
+		for j := 0; j < endpointStatCount; j++ {
+			e := &nodeInfo.EndpointStat1[j]
+			e.BizResponseCode = decoder.ReadString255()
+			e.ResponseException = decoder.ReadString255()
+			e.ResponseCode = decoder.ReadVarintU32()
+			e.Total = decoder.ReadVarintU32()
+			e.ResponseStatus = decoder.ReadU8()
+		}
+
 		nodeInfo.IsIPv4 = decoder.ReadBool()
 		if nodeInfo.IsIPv4 {
 			nodeInfo.IP4 = decoder.ReadU32()
@@ -307,15 +376,12 @@ func (t *TraceTree) Decode(decoder *codec.SimpleDecoder) error {
 		}
 		n.ChildIndices = n.ChildIndices[:0]
 		n.Level = 0
-		if version == TRACE_TREE_VERSION_0X12 {
-			n.PseudoLink = 0
-		} else {
-			n.PseudoLink = decoder.ReadU8()
-		}
+		n.PseudoLink = decoder.ReadU8()
 		n.UID = ""
 		n.Topic = decoder.ReadString255()
+		n.QuerierRegion = decoder.ReadString255()
 		if version >= TRACE_TREE_VERSION {
-			n.QuerierRegion = decoder.ReadString255()
+			n.BizResponseCode = decoder.ReadString255()
 		}
 		n.ResponseException = decoder.ReadString255()
 		n.ResponseDurationSum = decoder.ReadVarintU64()
