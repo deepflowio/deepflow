@@ -3534,6 +3534,14 @@ impl ConfigHandler {
             tunning.fentry_enabled = new_tunning.fentry_enabled;
             restart_agent = !first_run;
         }
+        if tunning.hooked_socket_syscalls != new_tunning.hooked_socket_syscalls {
+            info!(
+                "Update inputs.ebpf.socket.tunning.hooked_socket_syscalls from {:?} to {:?}.",
+                tunning.hooked_socket_syscalls, new_tunning.hooked_socket_syscalls
+            );
+            tunning.hooked_socket_syscalls = new_tunning.hooked_socket_syscalls.clone();
+            restart_agent = !first_run;
+        }
         if tunning.map_prealloc_disabled != new_tunning.map_prealloc_disabled {
             info!(
                 "Update inputs.ebpf.socket.tunning.map_prealloc_disabled from {:?} to {:?}.",
