@@ -112,6 +112,7 @@ func (c *ORGCaches) NewCacheAndInitIfNotExist(orgID int) (*Cache, error) {
 	if err != nil {
 		return nil, err
 	}
+	cache.refreshInterval = c.refreshInterval
 	err = cache.Refresh()
 	if err != nil {
 		return nil, err

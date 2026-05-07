@@ -25,6 +25,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/deepflowio/deepflow/message/controller"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -42,6 +43,7 @@ type Cache struct {
 
 	canRefresh      chan bool
 	refreshInterval time.Duration
+	lastRefresh     time.Time
 
 	MetricName              *metricName
 	LabelName               *labelName
@@ -75,33 +77,156 @@ func (c *Cache) GetORG() *common.ORG {
 	return c.org
 }
 
-func (c *Cache) Refresh() (err error) {
-LOOP:
-	for {
-		select {
-		case <-c.canRefresh:
-			err = c.refresh()
-			c.canRefresh <- true
-			break LOOP
-		default:
-			time.Sleep(time.Second)
-			log.Infof("last refresh cache not completed now", c.org.LogPrefix)
+func (c *Cache) GetMetricNameID(name string) (int, bool) {
+	return c.MetricName.GetID(name)
+}
+
+func (c *Cache) SetMetricNameID(name string, id int) {
+	c.MetricName.setID(name, id)
+}
+
+func (c *Cache) GetLabelNameID(name string) (int, bool) {
+	return c.LabelName.GetID(name)
+}
+
+func (c *Cache) GetLabelValueID(value string) (int, bool) {
+	return c.LabelValue.GetID(value)
+}
+
+func (c *Cache) GetLabelID(name, value string) (int, bool) {
+	nameID, ok1 := c.LabelName.GetID(name)
+	if !ok1 {
+		return 0, false
+	}
+	valueID, ok2 := c.LabelValue.GetID(value)
+	if !ok2 {
+		return 0, false
+	}
+	return c.Label.GetIDByKey(NewLabelKey(nameID, valueID))
+}
+
+func (c *Cache) GetLabelKeyToID() map[LabelKey]int {
+	return c.Label.GetKeyToID()
+}
+
+func (c *Cache) GetLabelNameByID(id int) (string, bool) {
+	return c.LabelName.GetNameByID(id)
+}
+
+func (c *Cache) GetLabelValueByID(id int) (string, bool) {
+	return c.LabelValue.GetValueByID(id)
+}
+
+func (c *Cache) GetMetricNameToID() map[string]int {
+	return c.MetricName.GetNameToID()
+}
+
+func (c *Cache) GetMetricAndAPPLabelLayout() map[LayoutKey]uint8 {
+	return c.MetricAndAPPLabelLayout.GetLayoutKeyToIndex()
+}
+
+func (c *Cache) GetMetricAndAPPLabelLayoutIndex(key LayoutKey) (uint8, bool) {
+	return c.MetricAndAPPLabelLayout.GetIndexByKey(key)
+}
+
+func (c *Cache) AddMetricAndAPPLabelLayoutsFromGrpc(batch []*controller.PrometheusMetricAPPLabelLayout) {
+	c.MetricAndAPPLabelLayout.AddFromGrpc(batch)
+}
+
+func (c *Cache) SetLabelNameID(name string, id int) {
+	c.LabelName.setID(name, id)
+}
+
+func (c *Cache) SetLabelValueID(value string, id int) {
+	c.LabelValue.setID(value, id)
+}
+
+func (c *Cache) AddMetricNames(batch []*metadbmodel.PrometheusMetricName) {
+	c.MetricName.Add(batch)
+}
+
+func (c *Cache) AddMetricNamesFromGrpc(batch []*controller.PrometheusMetricName) {
+	c.MetricName.AddFromGrpc(batch)
+}
+
+func (c *Cache) AddLabelNames(batch []*metadbmodel.PrometheusLabelName) {
+	c.LabelName.Add(batch)
+}
+
+func (c *Cache) AddLabelNamesFromGrpc(batch []*controller.PrometheusLabelName) {
+	c.LabelName.AddFromGrpc(batch)
+}
+
+func (c *Cache) AddLabelValues(batch []*metadbmodel.PrometheusLabelValue) {
+	c.LabelValue.Add(batch)
+}
+
+func (c *Cache) AddLabelValuesFromGrpc(batch []*controller.PrometheusLabelValue) {
+	c.LabelValue.AddFromGrpc(batch)
+}
+
+func (c *Cache) AddLabels(batch []*metadbmodel.PrometheusLabel) {
+	entries := make([]LabelCacheEntry, 0, len(batch))
+	for _, item := range batch {
+		entries = append(entries, LabelCacheEntry{
+			NameID:  item.NameID,
+			ValueID: item.ValueID,
+			LabelID: item.ID,
+		})
+	}
+	c.Label.Add(entries)
+}
+
+func (c *Cache) AddLabelsFromGrpc(batch []*controller.PrometheusLabel) {
+	entries := make([]LabelCacheEntry, 0, len(batch))
+	for _, item := range batch {
+		nameID, ok1 := c.LabelName.GetID(item.GetName())
+		valueID, ok2 := c.LabelValue.GetID(item.GetValue())
+		if ok1 && ok2 {
+			entries = append(entries, LabelCacheEntry{
+				NameID:  nameID,
+				ValueID: valueID,
+				LabelID: int(item.GetId()),
+			})
 		}
+	}
+	c.Label.Add(entries)
+}
+
+func (c *Cache) Refresh() (err error) {
+	now := time.Now()
+	select {
+	case <-c.canRefresh:
+		defer func() {
+			c.canRefresh <- true
+		}()
+	default:
+		return nil
+	}
+
+	if c.refreshInterval > 0 && !c.lastRefresh.IsZero() && now.Sub(c.lastRefresh) < c.refreshInterval {
+		return nil
+	}
+
+	err = c.refresh()
+	if err == nil {
+		c.lastRefresh = now
 	}
 	return
 }
 
 func (c *Cache) refresh() error {
 	log.Infof("refresh cache started", c.org.LogPrefix)
-	egRunAhead := &errgroup.Group{}
-	common.AppendErrGroup(egRunAhead, c.MetricName.refresh)
-	common.AppendErrGroup(egRunAhead, c.Label.refresh)
-	egRunAhead.Wait()
 	eg := &errgroup.Group{}
+	common.AppendErrGroup(eg, c.MetricName.refresh)
 	common.AppendErrGroup(eg, c.LabelName.refresh)
 	common.AppendErrGroup(eg, c.LabelValue.refresh)
 	common.AppendErrGroup(eg, c.MetricAndAPPLabelLayout.refresh)
 	err := eg.Wait()
+	if err != nil {
+		return err
+	}
+	err = c.Label.refresh()
 	log.Infof("refresh cache completed", c.org.LogPrefix)
 	return err
 

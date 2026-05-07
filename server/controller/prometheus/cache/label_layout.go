@@ -94,7 +94,15 @@ func (mll *metricAndAPPLabelLayout) GetLayoutKeyToIndex() map[LayoutKey]uint8 {
 	return snapshot
 }
 
-func (mll *metricAndAPPLabelLayout) Add(batch []*controller.PrometheusMetricAPPLabelLayout) {
+func (mll *metricAndAPPLabelLayout) Add(batch []*metadbmodel.PrometheusMetricAPPLabelLayout) {
+	mll.mu.Lock()
+	defer mll.mu.Unlock()
+	for _, m := range batch {
+		mll.pending[NewLayoutKey(m.MetricName, m.APPLabelName)] = uint8(m.APPLabelColumnIndex)
+	}
+}
+
+func (mll *metricAndAPPLabelLayout) AddFromGrpc(batch []*controller.PrometheusMetricAPPLabelLayout) {
 	mll.mu.Lock()
 	defer mll.mu.Unlock()
 	for _, m := range batch {

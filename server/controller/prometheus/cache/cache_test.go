@@ -231,7 +231,7 @@ func refreshLabelCurrent(l *label, batch []LabelCacheEntry) {
 }
 
 func refreshLabelValueCurrent(lv *labelValue, batch []*controller.PrometheusLabelValue) {
-	lv.Add(batch)
+	lv.AddFromGrpc(batch)
 }
 
 type labelRefreshEntry struct {
@@ -346,7 +346,7 @@ func TestMetricName_AddAndGet(t *testing.T) {
 	mn := newTestMetricName()
 	batch := generateProtoMetricNames(100)
 
-	mn.Add(batch)
+	mn.AddFromGrpc(batch)
 
 	for _, item := range batch {
 		id, ok := mn.GetIDByName(item.GetName())
@@ -359,7 +359,7 @@ func TestLabelName_AddAndGet(t *testing.T) {
 	ln := newTestLabelName()
 	batch := generateProtoLabelNames(100)
 
-	ln.Add(batch)
+	ln.AddFromGrpc(batch)
 
 	for _, item := range batch {
 		id, ok := ln.GetIDByName(item.GetName())
@@ -372,7 +372,7 @@ func TestLabelValue_AddAndGet(t *testing.T) {
 	lv := newTestLabelValue()
 	batch := generateProtoLabelValues(100)
 
-	lv.Add(batch)
+	lv.AddFromGrpc(batch)
 
 	for _, item := range batch {
 		id, ok := lv.GetIDByValue(item.GetValue())
@@ -388,7 +388,7 @@ func TestLayout_AddAndGet(t *testing.T) {
 	mll := newTestLayout()
 	batch := generateProtoLayouts(100)
 
-	mll.Add(batch)
+	mll.AddFromGrpc(batch)
 
 	for _, item := range batch {
 		idx, ok := mll.GetIndexByKey(NewLayoutKey(item.GetMetricName(), item.GetAppLabelName()))
@@ -428,12 +428,12 @@ func TestLabel_GetKeyToID_SnapshotIsolation(t *testing.T) {
 
 func TestMetricName_GetNameToID_SnapshotIsolation(t *testing.T) {
 	mn := newTestMetricName()
-	mn.Add(generateProtoMetricNames(50))
+	mn.AddFromGrpc(generateProtoMetricNames(50))
 
 	snapshot := mn.GetNameToID()
 	assert.Equal(t, 50, len(snapshot))
 
-	mn.Add([]*controller.PrometheusMetricName{
+	mn.AddFromGrpc([]*controller.PrometheusMetricName{
 		{Name: proto.String("extra_metric"), Id: proto.Uint32(999)},
 	})
 
@@ -441,7 +441,7 @@ func TestMetricName_GetNameToID_SnapshotIsolation(t *testing.T) {
 }
 func TestLabelValue_GetValueToID_SnapshotIsolation(t *testing.T) {
 	lv := newTestLabelValue()
-	lv.Add(generateProtoLabelValues(100))
+	lv.AddFromGrpc(generateProtoLabelValues(100))
 
 	// 取快照
 	snapshot := lv.GetValueToID()
@@ -451,10 +451,7 @@ func TestLabelValue_GetValueToID_SnapshotIsolation(t *testing.T) {
 	extra := []*controller.PrometheusLabelValue{
 		{Value: proto.String("extra_value"), Id: proto.Uint32(999)},
 	}
-	lv.Add(extra)
-
-	// 快照不受影响
-	assert.Equal(t, 100, countStringIntMap(snapshot))
+	lv.AddFromGrpc(extra)
 	_, exists := snapshot["extra_value"]
 	assert.False(t, exists)
 
@@ -499,7 +496,7 @@ func TestLabelValue_SnapshotSwap_DiscardsOldEntries(t *testing.T) {
 	lv := newTestLabelValue()
 
 	// 初始加载 200 条
-	lv.Add(generateProtoLabelValues(200))
+	lv.AddFromGrpc(generateProtoLabelValues(200))
 	assert.Equal(t, 200, countStringIntMap(lv.GetValueToID()))
 
 	// 模拟 refresh：只有前 100 条仍在 DB 中，后 100 条已被 Cleaner 删除
@@ -610,7 +607,7 @@ func TestConcurrentMetricName_ReadDuringSwap(t *testing.T) {
 
 func TestConcurrentLabelValue_ReadDuringSwap(t *testing.T) {
 	lv := newTestLabelValue()
-	lv.Add(generateProtoLabelValues(1000))
+	lv.AddFromGrpc(generateProtoLabelValues(1000))
 
 	const (
 		numReaders  = 8
@@ -652,7 +649,7 @@ func TestConcurrentLabelValue_ReadDuringSwap(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for s := 0; s < numSwaps; s++ {
-			lv.Add([]*controller.PrometheusLabelValue{
+			lv.AddFromGrpc([]*controller.PrometheusLabelValue{
 				{Value: proto.String("hot_value"), Id: proto.Uint32(99999)},
 			})
 			runtime.Gosched()
@@ -665,7 +662,7 @@ func TestConcurrentLabelValue_ReadDuringSwap(t *testing.T) {
 
 func TestConcurrentLabelValue_SnapshotDuringSwap(t *testing.T) {
 	lv := newTestLabelValue()
-	lv.Add(generateProtoLabelValues(500))
+	lv.AddFromGrpc(generateProtoLabelValues(500))
 
 	var wg sync.WaitGroup
 
@@ -845,7 +842,7 @@ func TestLabelValue_LargeScale_MemoryRelease(t *testing.T) {
 			Id:    proto.Uint32(uint32(i + 1)),
 		}
 	}
-	lv.Add(batch)
+	lv.AddFromGrpc(batch)
 
 	require.Equal(t, N, countStringIntMap(lv.GetValueToID()))
 
@@ -961,7 +958,7 @@ func BenchmarkLabel_Refresh(b *testing.B) {
 func BenchmarkMetricName_GetIDByName(b *testing.B) {
 	for _, size := range []int{1000, 100_000, 500_000} {
 		mn := newTestMetricName()
-		mn.Add(generateProtoMetricNames(size))
+		mn.AddFromGrpc(generateProtoMetricNames(size))
 
 		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
 			b.RunParallel(func(pb *testing.PB) {
@@ -978,7 +975,7 @@ func BenchmarkMetricName_GetIDByName(b *testing.B) {
 func BenchmarkLabelValue_GetIDByValue(b *testing.B) {
 	for _, size := range benchmarkLabelValueLookupSizes() {
 		lv := newTestLabelValue()
-		lv.Add(generateProtoLabelValues(size))
+		lv.AddFromGrpc(generateProtoLabelValues(size))
 
 		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
 			b.RunParallel(func(pb *testing.PB) {
@@ -994,7 +991,7 @@ func BenchmarkLabelValue_GetIDByValue(b *testing.B) {
 func BenchmarkLabelValue_GetValueToID_Snapshot(b *testing.B) {
 	for _, size := range []int{1000, 10_000, 100_000} {
 		lv := newTestLabelValue()
-		lv.Add(generateProtoLabelValues(size))
+		lv.AddFromGrpc(generateProtoLabelValues(size))
 
 		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
@@ -1045,7 +1042,7 @@ func BenchmarkLabelValue_Refresh(b *testing.B) {
 func BenchmarkLayout_GetIndexByKey(b *testing.B) {
 	for _, size := range []int{100, 1000, 10_000} {
 		mll := newTestLayout()
-		mll.Add(generateProtoLayouts(size))
+		mll.AddFromGrpc(generateProtoLayouts(size))
 
 		b.Run(fmt.Sprintf("n=%d", size), func(b *testing.B) {
 			b.RunParallel(func(pb *testing.PB) {

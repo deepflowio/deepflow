@@ -74,6 +74,32 @@ func (ln *labelName) GetIDByName(n string) (int, bool) {
 	return id, ok
 }
 
+func (ln *labelName) GetID(str string) (int, bool) {
+	return ln.GetIDByName(str)
+}
+
+func (ln *labelName) setID(str string, id int) {
+	ln.mu.Lock()
+	defer ln.mu.Unlock()
+	ln.pendingNameToID[str] = id
+}
+
+func (ln *labelName) Add(batch []*metadbmodel.PrometheusLabelName) {
+	ln.mu.Lock()
+	defer ln.mu.Unlock()
+	for _, item := range batch {
+		ln.pendingNameToID[item.Name] = item.ID
+	}
+}
+
+func (ln *labelName) AddFromGrpc(batch []*controller.PrometheusLabelName) {
+	ln.mu.Lock()
+	defer ln.mu.Unlock()
+	for _, item := range batch {
+		ln.pendingNameToID[item.GetName()] = int(item.GetId())
+	}
+}
+
 func (ln *labelName) GetNameToID() map[string]int {
 	active := ln.getActive()
 	ln.mu.RLock()
@@ -86,14 +112,6 @@ func (ln *labelName) GetNameToID() map[string]int {
 	}
 	ln.mu.RUnlock()
 	return snapshot
-}
-
-func (ln *labelName) Add(batch []*controller.PrometheusLabelName) {
-	ln.mu.Lock()
-	defer ln.mu.Unlock()
-	for _, item := range batch {
-		ln.pendingNameToID[item.GetName()] = int(item.GetId())
-	}
 }
 
 func (ln *labelName) refresh(args ...interface{}) error {

@@ -23,7 +23,6 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	cmap "github.com/orcaman/concurrent-map/v2"
 
-	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
@@ -94,14 +93,14 @@ func (ml *metricLabelName) GetIDByKey(key metricLabelNameKey) (int, bool) {
 	return 0, false
 }
 
-func (ml *metricLabelName) Add(batch []*controller.PrometheusMetricLabelName) {
+func (ml *metricLabelName) Add(batch []*metadbmodel.PrometheusMetricLabelName) {
 	for _, item := range batch {
-		for _, li := range item.GetLabelNameIds() {
-			mni := int(item.GetMetricNameId())
+		if mni, ok := ml.metricNameCache.GetIDByName(item.MetricName); ok {
 			ml.metricNameIDToLabelNameIDs.GetOrInsert(mni, mapset.NewSet[int]())
 			if lids, ok := ml.metricNameIDToLabelNameIDs.Get(mni); ok {
-				lids.Add(int(li))
+				lids.Add(item.LabelNameID)
 			}
+			ml.keyToID.Set(NewMetricLabelNameKey(mni, item.LabelNameID), item.ID)
 		}
 	}
 }

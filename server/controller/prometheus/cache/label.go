@@ -121,6 +121,23 @@ func (l *label) Add(entries []LabelCacheEntry) {
 	}
 }
 
+func (l *label) processLoadedData(items []*metadbmodel.PrometheusLabel) {
+	newActive := make(map[LabelKey]int, len(items))
+	for _, item := range items {
+		newActive[NewLabelKey(item.NameID, item.ValueID)] = item.ID
+	}
+
+	l.mu.Lock()
+	pending := l.pending
+	l.pending = make(map[LabelKey]int)
+	l.mu.Unlock()
+
+	for key, value := range pending {
+		newActive[key] = value
+	}
+	l.replaceActive(newActive)
+}
+
 func (l *label) refresh(args ...interface{}) error {
 	var count int64
 	if err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Count(&count).Error; err != nil {

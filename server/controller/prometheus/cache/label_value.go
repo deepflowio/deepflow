@@ -86,6 +86,32 @@ func (lv *labelValue) GetIDByValue(v string) (int, bool) {
 	return 0, false
 }
 
+func (lv *labelValue) GetID(str string) (int, bool) {
+	return lv.GetIDByValue(str)
+}
+
+func (lv *labelValue) setID(str string, id int) {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
+	lv.pending[str] = id
+}
+
+func (lv *labelValue) Add(batch []*metadbmodel.PrometheusLabelValue) {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
+	for _, item := range batch {
+		lv.pending[item.Value] = item.ID
+	}
+}
+
+func (lv *labelValue) AddFromGrpc(batch []*controller.PrometheusLabelValue) {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
+	for _, item := range batch {
+		lv.pending[item.GetValue()] = int(item.GetId())
+	}
+}
+
 func (lv *labelValue) GetValueToID() map[string]int {
 	active := lv.getActive()
 
@@ -98,14 +124,6 @@ func (lv *labelValue) GetValueToID() map[string]int {
 	lv.mu.RUnlock()
 
 	return snapshot
-}
-
-func (lv *labelValue) Add(batch []*controller.PrometheusLabelValue) {
-	lv.mu.Lock()
-	defer lv.mu.Unlock()
-	for _, item := range batch {
-		lv.pending[item.GetValue()] = int(item.GetId())
-	}
 }
 
 func (lv *labelValue) refresh(args ...interface{}) error {

@@ -23,6 +23,7 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -30,76 +31,22 @@ type labelValue struct {
 	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
-	strToID      map[string]int
-
-	isRefreshing bool
-	pendingKeys  map[string]int
+	cache        cache.PrometheusCache
 }
 
 func newLabelValue(org *common.ORG) *labelValue {
+	c, _ := cache.GetCache(org.ID)
 	return &labelValue{
 		org:          org,
 		resourceType: "label_value",
-		strToID:      make(map[string]int),
+		cache:        c,
 	}
-}
-
-func (lv *labelValue) MarkRefresh() {
-	lv.lock.Lock()
-	defer lv.lock.Unlock()
-	lv.isRefreshing = true
-	lv.pendingKeys = make(map[string]int)
-}
-
-func (lv *labelValue) MarkRefreshDone() {
-	lv.lock.Lock()
-	defer lv.lock.Unlock()
-	lv.isRefreshing = false
-	lv.pendingKeys = nil
 }
 
 func (lv *labelValue) refresh(args ...interface{}) error {
-	lv.MarkRefresh()
-	defer lv.MarkRefreshDone()
-
-	log.Info("TODO start")
-
-	var count int64
-	if err := lv.org.DB.Model(&metadbmodel.PrometheusLabelValue{}).Count(&count).Error; err != nil {
-		log.Errorf("db query %s failed: %v", lv.resourceType, err, lv.org.LogPrefix)
-		return err
-	}
-
-	rows, err := lv.org.DB.Model(&metadbmodel.PrometheusLabelValue{}).Select("id", "value").Rows()
-	if err != nil {
-		log.Errorf("db query %s failed: %v", lv.resourceType, err, lv.org.LogPrefix)
-		return err
-	}
-	defer rows.Close()
-
-	newMap := make(map[string]int, count)
-	for rows.Next() {
-		var id int
-		var value string
-		if scanErr := rows.Scan(&id, &value); scanErr != nil {
-			log.Errorf("db stream scan %s interrupted: %v", lv.resourceType, scanErr, lv.org.LogPrefix)
-			return scanErr
-		}
-		newMap[value] = id
-	}
-	if err := rows.Err(); err != nil {
-		log.Errorf("db stream %s error: %v", lv.resourceType, err, lv.org.LogPrefix)
-		return err
-	}
-
 	lv.lock.Lock()
-	for k, v := range lv.pendingKeys {
-		newMap[k] = v
-	}
-	lv.strToID = newMap
-	lv.lock.Unlock()
-
-	return nil
+	defer lv.lock.Unlock()
+	return lv.cache.Refresh()
 }
 
 func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue, error) {
@@ -107,10 +54,10 @@ func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue,
 	defer lv.lock.Unlock()
 
 	resp := make([]*controller.PrometheusLabelValue, 0)
-	dbToAdd := make([]*metadbmodel.PrometheusLabelValue, 0)
+	var dbToAdd []*metadbmodel.PrometheusLabelValue
 	for i := range strs {
 		str := strs[i]
-		if id, ok := lv.getIDLocked(str); ok {
+		if id, ok := lv.cache.GetLabelValueID(str); ok {
 			resp = append(resp, &controller.PrometheusLabelValue{Value: &str, Id: proto.Uint32(uint32(id))})
 			continue
 		}
@@ -125,30 +72,9 @@ func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue,
 		log.Errorf("add %s error: %s", lv.resourceType, err.Error(), lv.org.LogPrefix)
 		return nil, err
 	}
+	lv.cache.AddLabelValues(dbToAdd)
 	for i := range dbToAdd {
-		lv.store(dbToAdd[i])
 		resp = append(resp, &controller.PrometheusLabelValue{Value: &dbToAdd[i].Value, Id: proto.Uint32(uint32(dbToAdd[i].ID))})
 	}
 	return resp, nil
-}
-
-// getIDLocked reads strToID without acquiring lv.lock. Caller must hold lv.lock.
-func (lv *labelValue) getIDLocked(str string) (int, bool) {
-	id, ok := lv.strToID[str]
-	return id, ok
-}
-
-// getID is safe for concurrent callers; it acquires lv.lock internally.
-func (lv *labelValue) getID(str string) (int, bool) {
-	lv.lock.Lock()
-	defer lv.lock.Unlock()
-	return lv.getIDLocked(str)
-}
-
-func (lv *labelValue) store(item *metadbmodel.PrometheusLabelValue) {
-	lv.strToID[item.Value] = item.ID
-
-	if lv.isRefreshing {
-		lv.pendingKeys[item.Value] = item.ID
-	}
 }

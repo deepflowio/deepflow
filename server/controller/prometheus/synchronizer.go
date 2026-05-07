@@ -61,11 +61,11 @@ type counter struct {
 
 type Synchronizer struct {
 	org     *common.ORG
-	cache   *cache.Cache
+	cache   cache.PrometheusCache
 	counter *counter
 }
 
-func newSynchronizer(c *cache.Cache) Synchronizer {
+func newSynchronizer(c cache.PrometheusCache) Synchronizer {
 	return Synchronizer{
 		org:     c.GetORG(),
 		cache:   c,
@@ -76,8 +76,8 @@ func newSynchronizer(c *cache.Cache) Synchronizer {
 func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelResponse, error) {
 	nonLabelNames := mapset.NewSet[string]()
 	metricNameToAPPLabelNames := make(map[string][]*trident.LabelResponse, 0)
-	for k, v := range s.cache.MetricAndAPPLabelLayout.GetLayoutKeyToIndex() {
-		labelNameID, ok := s.cache.LabelName.GetIDByName(k.LabelName)
+	for k, v := range s.cache.GetMetricAndAPPLabelLayout() {
+		labelNameID, ok := s.cache.GetLabelNameID(k.LabelName)
 		if !ok {
 			nonLabelNames.Add(k.LabelName)
 			continue
@@ -92,7 +92,7 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 	}
 
 	mLabels := make([]*trident.MetricLabelResponse, 0)
-	for k, v := range s.cache.MetricName.GetNameToID() {
+	for k, v := range s.cache.GetMetricNameToID() {
 		metricName := k
 		metricID := v
 		mLabels = append(
@@ -115,13 +115,13 @@ func (s *Synchronizer) assembleLabelFully() ([]*trident.LabelResponse, error) {
 	ls := make([]*trident.LabelResponse, 0)
 	nonNameIDs := mapset.NewSet[int]()
 	nonValueIDs := mapset.NewSet[int]()
-	for k := range s.cache.Label.GetKeyToID() {
-		name, okN := s.cache.LabelName.GetNameByID(k.NameID)
+	for k := range s.cache.GetLabelKeyToID() {
+		name, okN := s.cache.GetLabelNameByID(k.NameID)
 		if !okN {
 			nonNameIDs.Add(k.NameID)
 			continue
 		}
-		value, okV := s.cache.LabelValue.GetValueByID(k.ValueID)
+		value, okV := s.cache.GetLabelValueByID(k.ValueID)
 		if !okV {
 			nonValueIDs.Add(k.ValueID)
 			continue

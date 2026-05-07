@@ -31,91 +31,29 @@ type label struct {
 	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
-	labelKeyToID map[cache.LabelKey]int
-	labelName    *labelName
-	labelValue   *labelValue
-
-	isRefreshing bool
-	pendingKeys  map[cache.LabelKey]int
+	cache        cache.PrometheusCache
 }
 
-func newLabel(org *common.ORG, ln *labelName, lv *labelValue) *label {
+func newLabel(org *common.ORG) *label {
+	c, _ := cache.GetCache(org.ID)
 	return &label{
 		org:          org,
 		resourceType: "label",
-		labelKeyToID: make(map[cache.LabelKey]int),
-		labelName:    ln,
-		labelValue:   lv,
+		cache:        c,
 	}
 }
 
 func (l *label) store(item *metadbmodel.PrometheusLabel) {
-	key := cache.NewLabelKey(item.NameID, item.ValueID)
-	l.labelKeyToID[key] = item.ID
-
-	if l.isRefreshing {
-		l.pendingKeys[key] = item.ID
-	}
+	l.cache.AddLabels([]*metadbmodel.PrometheusLabel{item})
 }
 
 func (l *label) getID(key cache.LabelKey) (int, bool) {
-	id, ok := l.labelKeyToID[key]
+	id, ok := l.cache.GetLabelKeyToID()[key]
 	return id, ok
 }
 
-func (l *label) MarkRefresh() {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	l.isRefreshing = true
-	l.pendingKeys = make(map[cache.LabelKey]int)
-}
-
-func (l *label) MarkRefreshDone() {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	l.isRefreshing = false
-	l.pendingKeys = nil
-}
-
 func (l *label) refresh(args ...interface{}) error {
-	l.MarkRefresh()
-	defer l.MarkRefreshDone()
-
-	log.Info("TODO start")
-
-	var count int64
-	if err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Count(&count).Error; err != nil {
-		return err
-	}
-
-	rows, err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Select("id", "name_id", "value_id").Rows()
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	newMap := make(map[cache.LabelKey]int, count)
-	for rows.Next() {
-		var id, nameID, valueID int
-		if scanErr := rows.Scan(&id, &nameID, &valueID); scanErr != nil {
-			return scanErr
-		}
-		newMap[cache.NewLabelKey(nameID, valueID)] = id
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-
-	log.Info("TODO end")
-
-	l.lock.Lock()
-	for k, v := range l.pendingKeys {
-		newMap[k] = v
-	}
-	l.labelKeyToID = newMap
-	l.lock.Unlock()
-
-	return nil
+	return l.cache.Refresh()
 }
 
 func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controller.PrometheusLabel, error) {
@@ -123,7 +61,9 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 	defer l.lock.Unlock()
 
 	type pendingLabel struct {
-		item *metadbmodel.PrometheusLabel
+		item  *metadbmodel.PrometheusLabel
+		name  string
+		value string
 	}
 
 	resp := make([]*controller.PrometheusLabel, 0)
@@ -131,8 +71,8 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 	for _, item := range toAdd {
 		n := item.GetName()
 		v := item.GetValue()
-		nameID, okN := l.labelName.getID(n)
-		valueID, okV := l.labelValue.getID(v)
+		nameID, okN := l.cache.GetLabelNameID(n)
+		valueID, okV := l.cache.GetLabelValueID(v)
 		if !okN || !okV {
 			// Name or value not yet encoded — skip; the next encode round
 			// (after the caller retries) will succeed once they are present.
@@ -141,14 +81,16 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 		}
 		if id, ok := l.getID(cache.NewLabelKey(nameID, valueID)); ok {
 			resp = append(resp, &controller.PrometheusLabel{
-				Id:      proto.Uint32(uint32(id)),
-				NameId:  proto.Uint32(uint32(nameID)),
-				ValueId: proto.Uint32(uint32(valueID)),
+				Id:    proto.Uint32(uint32(id)),
+				Name:  proto.String(n),
+				Value: proto.String(v),
 			})
 			continue
 		}
 		pending = append(pending, pendingLabel{
-			item: &metadbmodel.PrometheusLabel{NameID: nameID, ValueID: valueID},
+			item:  &metadbmodel.PrometheusLabel{NameID: nameID, ValueID: valueID},
+			name:  n,
+			value: v,
 		})
 	}
 
@@ -163,9 +105,9 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 	for i, p := range pending {
 		l.store(dbToAdd[i])
 		resp = append(resp, &controller.PrometheusLabel{
-			Id:      proto.Uint32(uint32(dbToAdd[i].ID)),
-			NameId:  proto.Uint32(uint32(p.item.NameID)),
-			ValueId: proto.Uint32(uint32(p.item.ValueID)),
+			Id:    proto.Uint32(uint32(dbToAdd[i].ID)),
+			Name:  proto.String(p.name),
+			Value: proto.String(p.value),
 		})
 	}
 	return resp, nil

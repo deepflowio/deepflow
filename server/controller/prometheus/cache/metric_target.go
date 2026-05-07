@@ -21,7 +21,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
@@ -111,10 +110,10 @@ func (mt *metricTarget) GetMetricIDsByTargetID(id int) []uint32 {
 	return mt.targetIDToMetricIDs[id]
 }
 
-func (mt *metricTarget) Add(batch []*controller.PrometheusMetricTarget) {
+func (mt *metricTarget) Add(batch []*metadbmodel.PrometheusMetricTarget) {
 	for _, item := range batch {
-		mt.metricTargetKeys.Add(NewMetricTargetKey(item.GetMetricName(), int(item.GetTargetId())))
-		mt.metricNameToTargetIDs.Append(item.GetMetricName(), int(item.GetTargetId()))
+		mt.metricTargetKeys.Add(NewMetricTargetKey(item.MetricName, item.TargetID))
+		mt.metricNameToTargetIDs.Append(item.MetricName, item.TargetID)
 	}
 }
 
