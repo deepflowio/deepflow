@@ -31,100 +31,20 @@ type label struct {
 	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
-	labelKeyToID map[cache.IDLabelKey]int
-
-	labelName  *labelName
-	labelValue *labelValue
-
-	isRefreshing bool
-	pendingKeys  map[cache.IDLabelKey]int
+	cache        cache.PrometheusCache
 }
 
-func newLabel(org *common.ORG, ln *labelName, lv *labelValue) *label {
+func newLabel(org *common.ORG) *label {
+	c, _ := cache.GetCache(org.ID)
 	return &label{
 		org:          org,
 		resourceType: "label",
-		labelKeyToID: make(map[cache.IDLabelKey]int),
-		labelName:    ln,
-		labelValue:   lv,
+		cache:        c,
 	}
-}
-
-func (l *label) store(item *metadbmodel.PrometheusLabel) {
-	nameID, ok1 := l.labelName.getID(item.Name)
-	valueID, ok2 := l.labelValue.getID(item.Value)
-	if !ok1 || !ok2 {
-		return
-	}
-	key := cache.IDLabelKey{NameID: nameID, ValueID: valueID}
-	l.labelKeyToID[key] = item.ID
-
-	if l.isRefreshing {
-		l.pendingKeys[key] = item.ID
-	}
-}
-
-func (l *label) getID(key cache.IDLabelKey) (int, bool) {
-	id, ok := l.labelKeyToID[key]
-	return id, ok
-}
-
-func (l *label) MarkRefresh() {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	l.isRefreshing = true
-	l.pendingKeys = make(map[cache.IDLabelKey]int)
-}
-
-func (l *label) MarkRefreshDone() {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	l.isRefreshing = false
-	l.pendingKeys = nil
 }
 
 func (l *label) refresh(args ...interface{}) error {
-	l.MarkRefresh()
-	defer l.MarkRefreshDone()
-
-	var count int64
-	if err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Count(&count).Error; err != nil {
-		return err
-	}
-
-	rows, err := l.org.DB.Model(&metadbmodel.PrometheusLabel{}).Select("id", "name", "value").Rows()
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	newMap := make(map[cache.IDLabelKey]int, count)
-	for rows.Next() {
-		var id int
-		var name, value string
-		if scanErr := rows.Scan(&id, &name, &value); scanErr != nil {
-			log.Errorf("db stream scan %s interrupted: %v", l.resourceType, scanErr, l.org.LogPrefix)
-			return scanErr
-		}
-		nameID, ok1 := l.labelName.getID(name)
-		valueID, ok2 := l.labelValue.getID(value)
-		if ok1 && ok2 {
-			newMap[cache.IDLabelKey{NameID: nameID, ValueID: valueID}] = id
-		}
-	}
-	if err := rows.Err(); err != nil {
-		log.Errorf("db stream %s error: %v", l.resourceType, err, l.org.LogPrefix)
-		return err
-	}
-
-	l.lock.Lock()
-	for k, v := range l.pendingKeys {
-		newMap[k] = v
-	}
-	l.labelKeyToID = newMap
-	l.lock.Unlock()
-
-	return nil
+	return l.cache.Refresh()
 }
 
 func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controller.PrometheusLabel, error) {
@@ -136,18 +56,15 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 	for _, item := range toAdd {
 		n := item.GetName()
 		v := item.GetValue()
-		nameID, ok1 := l.labelName.getID(n)
-		valueID, ok2 := l.labelValue.getID(v)
-		if ok1 && ok2 {
-			if id, ok := l.getID(cache.IDLabelKey{NameID: nameID, ValueID: valueID}); ok {
-				resp = append(resp, &controller.PrometheusLabel{
-					Name:  &n,
-					Value: &v,
-					Id:    proto.Uint32(uint32(id)),
-				})
-				continue
-			}
+		if id, ok := l.cache.GetLabelID(n, v); ok {
+			resp = append(resp, &controller.PrometheusLabel{
+				Id:    proto.Uint32(uint32(id)),
+				Name:  proto.String(n),
+				Value: proto.String(v),
+			})
+			continue
 		}
+
 		dbToAdd = append(dbToAdd, &metadbmodel.PrometheusLabel{
 			Name:  n,
 			Value: v,
@@ -159,14 +76,13 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 		log.Errorf("add %s error: %s", l.resourceType, err.Error(), l.org.LogPrefix)
 		return nil, err
 	}
-	for _, item := range dbToAdd {
-		l.store(item)
+	l.cache.AddLabels(dbToAdd)
+	for i, item := range dbToAdd {
 		resp = append(resp, &controller.PrometheusLabel{
-			Name:  &item.Name,
-			Value: &item.Value,
-			Id:    proto.Uint32(uint32(item.ID)),
+			Id:    proto.Uint32(uint32(dbToAdd[i].ID)),
+			Name:  proto.String(item.Name),
+			Value: proto.String(item.Value),
 		})
-
 	}
 	return resp, nil
 }
