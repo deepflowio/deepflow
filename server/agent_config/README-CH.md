@@ -4114,6 +4114,67 @@ inputs:
 但这可能会导致一些性能下降。此配置仅适用于 `BPF_MAP_TYPE_HASH` 类型的 bpf map。
 目前适用于 socket trace 和 uprobe Golang/OpenSSL trace 功能。禁用内存预分配大约会减少45M的内存占用。
 
+##### Socket Hook Syscall 列表 {#inputs.ebpf.socket.tunning.hooked_socket_syscalls}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.hooked_socket_syscalls`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        hooked_socket_syscalls:
+        - read
+        - readv
+        - recvfrom
+        - recvmsg
+        - recvmmsg
+        - sendmsg
+        - sendmmsg
+        - sendto
+        - write
+        - writev
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| read | |
+| readv | |
+| recvfrom | |
+| recvmsg | |
+| recvmmsg | |
+| sendmsg | |
+| sendmmsg | |
+| sendto | |
+| write | |
+| writev | |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+控制为哪些受支持的 socket syscall 安装 eBPF hook。
+
+该列表只控制是否 hook 某个 syscall，不控制具体使用哪种 backend。每个启用的
+syscall 仍然遵循当前运行模式下既有的 backend 选择逻辑。例如 mixed 模式继续保留
+现有的 hybrid 与 tracepoint-only 分工，pure-kprobe 模式继续保留既有的 kprobe
+行为，kfunc 模式继续保留既有的 kfunc 行为，以及 `recvfrom` 和 `recvmmsg`
+的 tracepoint fallback。
+
+支持的配置值：`read`、`readv`、`recvfrom`、`recvmsg`、`recvmmsg`、`sendmsg`、
+`sendmmsg`、`sendto`、`write`、`writev`。
+
 ##### 启用fentry/fexit特性 {#inputs.ebpf.socket.tunning.fentry_enabled}
 
 **标签**:

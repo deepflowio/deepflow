@@ -4202,6 +4202,67 @@ degradation. This configuration only applies to maps of type 'BPF_MAP_TYPE_HASH'
 Currently applicable to socket trace and uprobe Golang/OpenSSL trace functionalities.
 Disabling memory preallocation will approximately reduce memory usage by 45MB.
 
+##### Hooked Socket Syscalls {#inputs.ebpf.socket.tunning.hooked_socket_syscalls}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.hooked_socket_syscalls`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        hooked_socket_syscalls:
+        - read
+        - readv
+        - recvfrom
+        - recvmsg
+        - recvmmsg
+        - sendmsg
+        - sendmmsg
+        - sendto
+        - write
+        - writev
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| read | |
+| readv | |
+| recvfrom | |
+| recvmsg | |
+| recvmmsg | |
+| sendmsg | |
+| sendmmsg | |
+| sendto | |
+| write | |
+| writev | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Controls which supported socket syscalls will have eBPF hooks installed.
+
+This list only controls whether a syscall is hooked. The backend type used for each
+enabled syscall still follows the current runtime mode selection logic. For example,
+the mixed mode keeps its existing hybrid and tracepoint-only split, the pure-kprobe
+mode keeps its existing kprobe behavior, and the kfunc mode keeps its existing kfunc
+behavior plus the tracepoint fallback for `recvfrom` and `recvmmsg`.
+
+Supported values: `read`, `readv`, `recvfrom`, `recvmsg`, `recvmmsg`, `sendmsg`,
+`sendmmsg`, `sendto`, `write`, `writev`.
+
 ##### Enable the fentry/fexit feature {#inputs.ebpf.socket.tunning.fentry_enabled}
 
 **Tags**:
