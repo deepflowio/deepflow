@@ -33,6 +33,7 @@ type MonitorConfig struct {
 	VTapAutoDelete              VTapAutoDelete                `yaml:"vtap_auto_delete"`
 	Warrant                     configs.Warrant               `yaml:"warrant"`
 	Manager                     configs.Manager               `yaml:"manager"`
+	WebService                  configs.DFWebService          `yaml:"df-web-service"`
 	IngesterLoadBalancingConfig IngesterLoadBalancingStrategy `yaml:"ingester-load-balancing-strategy"`
 	SyncDefaultORGDataInterval  int                           `default:"10" yaml:"sync_default_org_data_interval"`
 }

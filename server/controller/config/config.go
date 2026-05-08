@@ -77,13 +77,6 @@ type FUser struct {
 	Timeout int    `default:"30" yaml:"timeout"`
 }
 
-type DFWebService struct {
-	Enabled bool   `default:"false" yaml:"enabled"`
-	Host    string `default:"df-web" yaml:"host"`
-	Port    int    `default:"20825" yaml:"port"`
-	Timeout int    `default:"30" yaml:"timeout"`
-}
-
 type QuerierJSService struct {
 	Enabled bool   `default:"false" yaml:"enabled"`
 	Host    string `default:"querier-js" yaml:"host"`
@@ -114,12 +107,12 @@ type ControllerConfig struct {
 	NoIPOverlapping                bool   `default:"false" yaml:"no-ip-overlapping"`
 	AgentCommandTimeout            int    `default:"30" yaml:"agent-cmd-timeout"`
 
-	ACLController    ACLController      `yaml:"acl-controller"`
-	FUser            FUser              `yaml:"fuser"`
-	DFWebService     DFWebService       `yaml:"df-web-service"`
-	QuerierJSService QuerierJSService   `yaml:"querier-js-service"`
-	FPermit          common.FPermit     `yaml:"fpermit"`
-	IngesterApi      common.IngesterApi `yaml:"ingester-api"`
+	ACLController    ACLController        `yaml:"acl-controller"`
+	FUser            FUser                `yaml:"fuser"`
+	DFWebService     configs.DFWebService `yaml:"df-web-service"`
+	QuerierJSService QuerierJSService     `yaml:"querier-js-service"`
+	FPermit          common.FPermit       `yaml:"fpermit"`
+	IngesterApi      common.IngesterApi   `yaml:"ingester-api"`
 
 	MetadbCfg     metadb.Config
 	PostgreSQLCfg metadb.PostgreSQLConfig     `yaml:"postgresql"`

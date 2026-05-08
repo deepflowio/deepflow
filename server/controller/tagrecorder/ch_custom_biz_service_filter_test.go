@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/deepflowio/deepflow/server/controller/config"
+	"github.com/deepflowio/deepflow/server/controller/config/common"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 )
@@ -171,7 +172,7 @@ func TestChCustomBizServiceFilter_generateNewData(t *testing.T) {
 
 			// Setup config
 			cfg := config.ControllerConfig{
-				DFWebService: config.DFWebService{
+				DFWebService: common.DFWebService{
 					Enabled: tt.dfWebServiceEnabled,
 					Host:    "localhost",
 					Port:    dfPort,

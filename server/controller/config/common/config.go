@@ -58,3 +58,10 @@ type Pcap struct {
 	MaxPacketSize  int     `default:"128" yaml:"max-packet-size"`  // in KB
 	Querier        Querier `yaml:"querier"`
 }
+
+type DFWebService struct {
+	Enabled bool   `default:"false" yaml:"enabled"`
+	Host    string `default:"df-web" yaml:"host"`
+	Port    int    `default:"20825" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
+}
