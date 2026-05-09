@@ -68,6 +68,8 @@ biz_service.group         , 服务组                   ,
 user                       , 创建人                   ,
 alert_policy               , 告警策略                 ,
 policy_type                , 策略类型                 ,
+biz_feature_type           , 业务功能类型              , 该业务是 系统（系统拓扑）还是 场景（场景拓扑）
+biz_name                   , 业务名称                 , 该告警所属的业务名称
 event_level                , 事件等级                 ,
 target_tags                , 告警对象                 , 
 _target_uid                ,                          , 

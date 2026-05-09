@@ -30,9 +30,12 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/http/service/rebalance"
 	mconfig "github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
+	"github.com/deepflowio/deepflow/server/libs/stats"
 )
 
 type AnalyzerCheck struct {
+	stateCounter *SysStateCounter[metadbmodel.Analyzer]
+
 	cCtx                  context.Context
 	cCancel               context.CancelFunc
 	cfg                   mconfig.MonitorConfig
@@ -45,9 +48,15 @@ type AnalyzerCheck struct {
 
 func NewAnalyzerCheck(cfg *config.ControllerConfig, ctx context.Context) *AnalyzerCheck {
 	cCtx, cCancel := context.WithCancel(ctx)
+	stateCounter := NewSysStateCounter[metadbmodel.Analyzer]()
+	err := stats.RegisterCountableWithModulePrefix("controller_", "analyzer", stateCounter, stats.OptionStatTags{"type": "analyzer"})
+	if err != nil {
+		log.Error(err)
+	}
 	return &AnalyzerCheck{
 		cCtx:                  cCtx,
 		cCancel:               cCancel,
+		stateCounter:          stateCounter,
 		cfg:                   cfg.MonitorCfg,
 		healthCheckPort:       cfg.ListenPort,
 		healthCheckNodePort:   cfg.ListenNodePort,
@@ -231,6 +240,14 @@ func (c *AnalyzerCheck) healthCheck(orgDB *metadb.DB) {
 			}
 		}
 	}
+
+	analyzers = []metadbmodel.Analyzer{}
+	if err := metadb.DefaultDB.Find(&analyzers).Error; err != nil {
+		log.Errorf("get analyzer state from db error: %s", err.Error())
+	} else {
+		c.stateCounter.AddSysStateCounters(analyzers)
+	}
+
 	log.Info("analyzer health check end")
 }
 

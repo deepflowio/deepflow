@@ -680,6 +680,7 @@ type Process struct {
 	VTapID          uint32    `json:"vtap_id" binding:"required"`
 	PID             uint64    `json:"pid" binding:"required"`
 	ProcessName     string    `json:"process_name" binding:"required"`
+	BizType         int       `json:"biz_type"`
 	CommandLine     string    `json:"command_line"`
 	UserName        string    `json:"user_name"`
 	StartTime       time.Time `json:"start_time" binding:"required"`

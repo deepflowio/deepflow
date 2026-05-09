@@ -173,11 +173,13 @@ impl L7ProtocolParserInterface for SoLog {
 
                                 if param.parse_perf {
                                     let mut perf_stat = L7PerfStats::default();
-                                    if info.msg_type == LogMessageType::Response {
+                                    if info.msg_type == LogMessageType::Response
+                                        && info.resp.endpoint.is_empty()
+                                    {
                                         if let Some(endpoint) =
                                             info.load_endpoint_from_cache(param, info.is_reversed())
                                         {
-                                            info.req.endpoint = endpoint.to_string();
+                                            info.resp.endpoint = endpoint.to_string();
                                         }
                                     }
                                     if let Some(stats) = info.perf_stats(param) {

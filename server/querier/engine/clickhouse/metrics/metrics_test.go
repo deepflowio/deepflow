@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/deepflowio/deepflow/server/querier/common"
+	"github.com/deepflowio/deepflow/server/querier/config"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
 )
 
@@ -88,6 +89,18 @@ func TestCheckDBField(t *testing.T) {
 					case "file_event":
 						metrics = RESOURCE_FILE_EVENT_METRICS
 						replaceMetrics = RESOURCE_FILE_EVENT_METRICS_REPLACE
+					case chCommon.TABLE_NAME_FILE_AGG_EVENT:
+						metrics = FILE_AGG_EVENT_METRICS
+						replaceMetrics = FILE_AGG_EVENT_METRICS_REPLACE
+					case chCommon.TABLE_NAME_FILE_MGMT_EVENT:
+						metrics = FILE_MGMT_EVENT_METRICS
+						replaceMetrics = FILE_MGMT_EVENT_METRICS_REPLACE
+					case chCommon.TABLE_NAME_PROC_PERM_EVENT:
+						metrics = PROC_PERM_EVENT_METRICS
+						replaceMetrics = PROC_PERM_EVENT_METRICS_REPLACE
+					case chCommon.TABLE_NAME_PROC_OPS_EVENT:
+						metrics = PROC_OPS_EVENT_METRICS
+						replaceMetrics = PROC_OPS_EVENT_METRICS_REPLACE
 					}
 				}
 				if metrics == nil {
@@ -115,5 +128,38 @@ func TestCheckDBField(t *testing.T) {
 		}
 	} else {
 		t.Errorf("clickhouse not has metrics")
+	}
+}
+
+func TestLoadMetricsForNewAiAgentTables(t *testing.T) {
+	config.Cfg = &config.QuerierConfig{Language: "en"}
+	dir := "../../../db_descriptions"
+	dbDescriptions, err := common.LoadDbDescriptions(dir)
+	if err != nil {
+		t.Fatalf("load db descriptions failed: %v", err)
+	}
+	dbData, ok := dbDescriptions["clickhouse"]
+	if !ok {
+		t.Fatalf("clickhouse not in dbDescription")
+	}
+	metricData, ok := dbData.(map[string]interface{})["metrics"]
+	if !ok {
+		t.Fatalf("clickhouse not has metrics")
+	}
+
+	tables := []string{
+		chCommon.TABLE_NAME_FILE_AGG_EVENT,
+		chCommon.TABLE_NAME_FILE_MGMT_EVENT,
+		chCommon.TABLE_NAME_PROC_PERM_EVENT,
+		chCommon.TABLE_NAME_PROC_OPS_EVENT,
+	}
+	for _, table := range tables {
+		loadMetrics, err := LoadMetrics("event", table, metricData.(map[string]interface{}))
+		if err != nil {
+			t.Fatalf("LoadMetrics(event, %s) failed: %v", table, err)
+		}
+		if _, ok := loadMetrics["log_count"]; !ok {
+			t.Fatalf("%s missing log_count metric", table)
+		}
 	}
 }

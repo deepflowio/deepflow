@@ -34,6 +34,10 @@ const TABLE_NAME_SPAN_WITH_TRACE_ID = "span_with_trace_id"
 const TABLE_NAME_L7_FLOW_LOG = "l7_flow_log"
 const TABLE_NAME_EVENT = "event"
 const TABLE_NAME_FILE_EVENT = "file_event"
+const TABLE_NAME_FILE_AGG_EVENT = "file_agg_event"
+const TABLE_NAME_FILE_MGMT_EVENT = "file_mgmt_event"
+const TABLE_NAME_PROC_PERM_EVENT = "proc_perm_event"
+const TABLE_NAME_PROC_OPS_EVENT = "proc_ops_event"
 const TABLE_NAME_IN_PROCESS = "in_process"
 const TABLE_NAME_IN_PROCESS_METRICS = "in_process_metrics"
 const TABLE_NAME_FILE_EVENT_METRICS = "file_event_metrics"
@@ -59,13 +63,17 @@ const (
 	NATIVE_FIELD_STATE_NORMAL        = 1
 )
 
+const (
+	API_CUSTOM_METRICS_FORMAT = "http://localhost:%d/v1/custom-metrics"
+)
+
 var DB_TABLE_MAP = map[string][]string{
 	DB_NAME_FLOW_LOG:        []string{"l4_flow_log", "l7_flow_log", "l4_packet", "l7_packet"},
 	DB_NAME_FLOW_METRICS:    []string{"network", "network_map", "application", "application_map", "traffic_policy"},
 	DB_NAME_EXT_METRICS:     []string{"ext_common"},
 	DB_NAME_DEEPFLOW_ADMIN:  []string{"deepflow_server"},
 	DB_NAME_DEEPFLOW_TENANT: []string{"deepflow_collector"},
-	DB_NAME_EVENT:           []string{"event", "file_event", TABLE_NAME_ALERT_EVENT, TABLE_NAME_ALERT_RECORD, TABLE_NAME_FILE_EVENT_METRICS},
+	DB_NAME_EVENT:           []string{"event", "file_event", TABLE_NAME_FILE_AGG_EVENT, TABLE_NAME_FILE_MGMT_EVENT, TABLE_NAME_PROC_PERM_EVENT, TABLE_NAME_PROC_OPS_EVENT, TABLE_NAME_ALERT_EVENT, TABLE_NAME_ALERT_RECORD, TABLE_NAME_FILE_EVENT_METRICS},
 	DB_NAME_PROFILE:         []string{"in_process", TABLE_NAME_IN_PROCESS_METRICS},
 	DB_NAME_PROMETHEUS:      []string{"samples"},
 	DB_NAME_APPLICATION_LOG: []string{"log"},

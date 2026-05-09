@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/model"
 	mconfig "github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/refresh"
+	"github.com/deepflowio/deepflow/server/libs/stats"
 )
 
 type dbAndIP struct {
@@ -38,6 +39,8 @@ type dbAndIP struct {
 }
 
 type ControllerCheck struct {
+	stateCounter *SysStateCounter[metadbmodel.Controller]
+
 	cCtx                    context.Context
 	cCancel                 context.CancelFunc
 	cfg                     mconfig.MonitorConfig
@@ -50,9 +53,15 @@ type ControllerCheck struct {
 
 func NewControllerCheck(cfg *config.ControllerConfig, ctx context.Context) *ControllerCheck {
 	cCtx, cCancel := context.WithCancel(ctx)
+	stateCounter := NewSysStateCounter[metadbmodel.Controller]()
+	err := stats.RegisterCountableWithModulePrefix("controller_", "controller", stateCounter, stats.OptionStatTags{"type": "controller"})
+	if err != nil {
+		log.Error(err)
+	}
 	return &ControllerCheck{
 		cCtx:                    cCtx,
 		cCancel:                 cCancel,
+		stateCounter:            stateCounter,
 		cfg:                     cfg.MonitorCfg,
 		healthCheckPort:         cfg.ListenPort,
 		healthCheckNodePort:     cfg.ListenNodePort,
@@ -240,6 +249,14 @@ func (c *ControllerCheck) healthCheck(orgDB *metadb.DB) {
 		}
 	}
 	c.cleanExceptionControllerData(orgDB, controllerIPs)
+
+	controllers = []metadbmodel.Controller{}
+	if err := metadb.DefaultDB.Find(&controllers).Error; err != nil {
+		log.Errorf("get controller state from db error: %s", err.Error())
+	} else {
+		c.stateCounter.AddSysStateCounters(controllers)
+	}
+
 	log.Info("controller health check end")
 }
 

@@ -68,6 +68,8 @@ biz_service.group         , biz_service.group_0       , biz_service.group_1     
 user                       , user                      , user                      , resource       ,                       , Universal Tag     , 111          , 0             , 
 alert_policy               , alert_policy              , alert_policy              , resource       ,                       , Universal Tag     , 110          , 0             , 
 policy_type                , policy_type               , policy_type               , int_enum       , policy_app_type       , Alarm Info        , 111          , 0             , 
+biz_feature_type           , biz_feature_type          , biz_feature_type          , int_enum       , biz_feature_type      , Alarm Info        , 111          , 0             , 
+biz_name                   , biz_name                  , biz_name                  , string         ,                       , Alarm Info        , 111          , 0             ,
 event_level                , event_level               , event_level               , int_enum       , event_level           , Alarm Info        , 111          , 0             , 
 target_tags                , target_tags               , target_tags               , string         ,                       , Event Info        , 111          , 0             , 
 _target_uid                , _target_uid               , _target_uid               , string         ,                       , Event Info        , 111          , 0             , 111

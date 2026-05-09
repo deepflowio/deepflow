@@ -18,6 +18,7 @@ package cache
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
@@ -25,55 +26,93 @@ import (
 )
 
 type metricName struct {
-	org *common.ORG
+	org    *common.ORG
+	active atomic.Value // map[string]int
 
-	nameToID sync.Map
-	idToName sync.Map
+	mu              sync.RWMutex
+	pendingNameToID map[string]int
 }
 
 func newMetricName(org *common.ORG) *metricName {
-	return &metricName{org: org}
+	mn := &metricName{
+		org:             org,
+		pendingNameToID: make(map[string]int),
+	}
+	mn.active.Store(make(map[string]int))
+	return mn
 }
 
-func (mn *metricName) Get() *sync.Map {
-	return &mn.nameToID
+func (mn *metricName) getActive() map[string]int {
+	if active := mn.active.Load(); active != nil {
+		return active.(map[string]int)
+	}
+	return map[string]int{}
+}
+
+func (mn *metricName) replaceActive(newActive map[string]int) {
+	mn.active.Store(newActive)
 }
 
 func (mn *metricName) GetIDByName(n string) (int, bool) {
-	if id, ok := mn.nameToID.Load(n); ok {
-		return id.(int), true
+	if id, ok := mn.getActive()[n]; ok {
+		return id, true
 	}
-	return 0, false
+	mn.mu.RLock()
+	defer mn.mu.RUnlock()
+	id, ok := mn.pendingNameToID[n]
+	return id, ok
 }
 
-func (mn *metricName) GetNameByID(id int) (string, bool) {
-	if name, ok := mn.idToName.Load(id); ok {
-		return name.(string), true
+func (mn *metricName) GetNameToID() map[string]int {
+	active := mn.getActive()
+	mn.mu.RLock()
+	snapshot := make(map[string]int, len(active)+len(mn.pendingNameToID))
+	for k, v := range active {
+		snapshot[k] = v
 	}
-	return "", false
+	for k, v := range mn.pendingNameToID {
+		snapshot[k] = v
+	}
+	mn.mu.RUnlock()
+	return snapshot
 }
 
 func (mn *metricName) Add(batch []*controller.PrometheusMetricName) {
+	mn.mu.Lock()
+	defer mn.mu.Unlock()
 	for _, item := range batch {
-		mn.nameToID.Store(item.GetName(), int(item.GetId()))
-		mn.idToName.Store(int(item.GetId()), item.GetName())
+		mn.pendingNameToID[item.GetName()] = int(item.GetId())
 	}
 }
 
 func (mn *metricName) refresh(args ...interface{}) error {
-	metricNames, err := mn.load()
+	items, err := mn.load()
 	if err != nil {
 		return err
 	}
-	for _, item := range metricNames {
-		mn.nameToID.Store(item.Name, item.ID)
-		mn.idToName.Store(item.ID, item.Name)
-	}
+	mn.processLoadedData(items)
 	return nil
+}
+
+func (mn *metricName) processLoadedData(items []*metadbmodel.PrometheusMetricName) {
+	newActive := make(map[string]int, len(items))
+	for _, item := range items {
+		newActive[item.Name] = item.ID
+	}
+
+	mn.mu.Lock()
+	pending := mn.pendingNameToID
+	mn.pendingNameToID = make(map[string]int)
+	mn.mu.Unlock()
+
+	for k, v := range pending {
+		newActive[k] = v
+	}
+	mn.replaceActive(newActive)
 }
 
 func (mn *metricName) load() ([]*metadbmodel.PrometheusMetricName, error) {
 	var metricNames []*metadbmodel.PrometheusMetricName
-	err := mn.org.DB.Find(&metricNames).Error
+	err := mn.org.DB.Select("id", "name").Find(&metricNames).Error
 	return metricNames, err
 }

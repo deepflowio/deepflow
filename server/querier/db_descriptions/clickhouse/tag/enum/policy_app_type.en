@@ -1,3 +1,5 @@
-# Value , DisplayName     , Description
-1       , System          ,
-3       , Custom          ,
+# Value , DisplayName                       , Description
+1       , System - Threshold Alert          ,
+3       , Custom - Threshold Alert          ,
+4       , Business - Threshold Alert        ,
+5       , Business - Combined Alert         ,

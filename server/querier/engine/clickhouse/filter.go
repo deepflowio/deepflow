@@ -72,6 +72,16 @@ func GetWhere(name, value string) WhereStatement {
 	}
 }
 
+func getGProcessBizTypeFilterExpr(tagName string) (processIDSuffix, rawBizTypeExpr string, ok bool) {
+	if !strings.HasPrefix(tagName, "gprocess.biz_type") {
+		return "", "", false
+	}
+	suffix := strings.TrimPrefix(tagName, "gprocess.biz_type")
+	processIDSuffix = "gprocess_id" + suffix
+	rawBizTypeExpr = "dictGet('flow_tag.gprocess_map', 'biz_type', (toUInt64(" + processIDSuffix + ")))"
+	return processIDSuffix, rawBizTypeExpr, true
+}
+
 func TransWhereTagFunction(db, table string, name string, args []string) (filter string) {
 	funcName := strings.ToLower(name)
 	switch funcName {
@@ -923,7 +933,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.Node,
 					}
 				} else {
 					switch strings.Trim(t.Tag, "`") {
-					case "policy_type", "metric_value", "event_level", "team_id", "user_id", "target_tags", "_query_region", "_target_uid", "1", "_id", "event_id", "alert_time", "duration", "state":
+					case "policy_type", "metric_value", "event_level", "team_id", "user_id", "target_tags", "_query_region", "_target_uid", "1", "_id", "event_id", "alert_time", "duration", "state", "start_time", "end_time":
 						if strings.Contains(op, "match") {
 							filter = fmt.Sprintf("%s(%s,%s)", op, t.Tag, t.Value)
 						} else {
@@ -1564,6 +1574,10 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.
 						if strings.Contains(tagName, "pod_group_type") {
 							podGroupTag := strings.Replace(tagName, "pod_group_type", "pod_group_id", -1)
 							whereFilter = "(" + fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "=", f.Value, enumFileName) + ") OR " + "dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64(" + podGroupTag + ")))" + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						} else if strings.Contains(tagName, "biz_feature_type") {
+							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "=", f.Value, enumFileName) + " OR " + "tag_int_values[indexOf(tag_int_names,'biz_feature_type')] = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						} else if processIDSuffix, rawBizTypeExpr, ok := getGProcessBizTypeFilterExpr(tagName); ok {
+							whereFilter = "(" + fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "=", f.Value, enumFileName) + ") OR (" + processIDSuffix + "!=0 AND " + rawBizTypeExpr + " = toUInt64(" + strconv.Itoa(intValue) + "))"
 						} else {
 							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "=", f.Value, enumFileName) + " OR " + tagName + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 						}
@@ -1582,6 +1596,10 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, e *CHEngine) (view.
 						if strings.Contains(tagName, "pod_group_type") {
 							podGroupTag := strings.Replace(tagName, "pod_group_type", "pod_group_id", -1)
 							whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameColumn, "=", f.Value, enumFileName) + ") AND " + "dictGet('flow_tag.pod_group_map', 'pod_group_type', (toUInt64(" + podGroupTag + ")))" + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						} else if strings.Contains(tagName, "biz_feature_type") {
+							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, opName, f.Value, enumFileName) + " AND " + "tag_int_values[indexOf(tag_int_names,'biz_feature_type')] != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						} else if processIDSuffix, rawBizTypeExpr, ok := getGProcessBizTypeFilterExpr(tagName); ok {
+							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, opName, f.Value, enumFileName) + " AND " + processIDSuffix + "!=0 AND " + rawBizTypeExpr + " != toUInt64(" + strconv.Itoa(intValue) + ")"
 						} else {
 							whereFilter = fmt.Sprintf(tagItem.WhereTranslator, nameColumn, opName, f.Value, enumFileName) + " AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 						}

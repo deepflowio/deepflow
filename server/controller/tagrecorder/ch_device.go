@@ -98,6 +98,7 @@ func (c *ChVMDevice) onResourceUpdated(md *message.Metadata, updateMessage *mess
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChVMDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -174,6 +175,7 @@ func (c *ChHostDevice) onResourceUpdated(md *message.Metadata, updateMessage *me
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChHostDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
 
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -246,6 +248,7 @@ func (c *ChVRouterDevice) onResourceUpdated(md *message.Metadata, updateMessage 
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChVRouterDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -318,6 +321,7 @@ func (c *ChDHCPPortDevice) onResourceUpdated(md *message.Metadata, updateMessage
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChDHCPPortDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -391,6 +395,7 @@ func (c *ChNATGatewayDevice) onResourceUpdated(md *message.Metadata, updateMessa
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChNATGatewayDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -464,6 +469,7 @@ func (c *ChLBDevice) onResourceUpdated(md *message.Metadata, updateMessage *mess
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChLBDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -535,6 +541,7 @@ func (c *ChRDSInstanceDevice) onResourceUpdated(md *message.Metadata, updateMess
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChRDSInstanceDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -606,6 +613,7 @@ func (c *ChRedisInstanceDevice) onResourceUpdated(md *message.Metadata, updateMe
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChRedisInstanceDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -690,6 +698,7 @@ func (c *ChPodServiceDevice) onResourceUpdated(md *message.Metadata, updateMessa
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChPodServiceDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -761,6 +770,7 @@ func (c *ChPodDevice) onResourceUpdated(md *message.Metadata, updateMessage *mes
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChPodDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -832,6 +842,7 @@ func (c *ChPodGroupDevice) onResourceUpdated(md *message.Metadata, updateMessage
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChPodGroupDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -905,6 +916,7 @@ func (c *ChPodNodeDevice) onResourceUpdated(md *message.Metadata, updateMessage 
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChPodNodeDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -978,6 +990,7 @@ func (c *ChPodClusterDevice) onResourceUpdated(md *message.Metadata, updateMessa
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChPodClusterDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -1052,6 +1065,7 @@ func (c *ChProcessDevice) onResourceUpdated(md *message.Metadata, updateMessage 
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChProcessDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+	targets = deduplicateChDeviceTargets(targets)
 	db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "deviceid"}, {Name: "devicetype"}},
 		DoUpdates: clause.AssignmentColumns([]string{"name"}),
@@ -1131,4 +1145,21 @@ func (c *ChCustomServiceDevice) onResourceUpdated(md *message.Metadata, updateMe
 
 // softDeletedTargetsUpdated implements SubscriberDataGenerator
 func (c *ChCustomServiceDevice) softDeletedTargetsUpdated(targets []metadbmodel.ChDevice, db *metadb.DB) {
+}
+
+// deduplicateChDeviceTargets removes duplicate entries from targets, keeping the
+// last occurrence of each (DeviceType, DeviceID) pair. This prevents PostgreSQL from
+// raising "ON CONFLICT DO UPDATE command cannot affect row a second time" when
+// multiple rows in the same INSERT share the same conflict target.
+func deduplicateChDeviceTargets(targets []metadbmodel.ChDevice) []metadbmodel.ChDevice {
+	type deviceKey struct{ DeviceType, DeviceID int }
+	seen := make(map[deviceKey]int, len(targets))
+	for i, t := range targets {
+		seen[deviceKey{t.DeviceType, t.DeviceID}] = i
+	}
+	deduped := make([]metadbmodel.ChDevice, 0, len(seen))
+	for _, idx := range seen {
+		deduped = append(deduped, targets[idx])
+	}
+	return deduped
 }

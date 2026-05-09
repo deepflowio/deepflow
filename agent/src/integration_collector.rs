@@ -48,6 +48,7 @@ use tokio::{
 use zstd::bulk::compress;
 
 use crate::{
+    collector::types::MiniFlow,
     common::{
         flow::{Flow, FlowPerfStats, L7PerfStats, L7Stats, SignalSource},
         lookup_key::LookupKey,
@@ -561,10 +562,9 @@ fn fill_l7_stats(
     let flow_stat_time = flow.flow_stat_time;
     let mut tagged_flow = TaggedFlow::default();
     tagged_flow.flow = flow;
-    let mut allocator = Allocator::new(1);
     L7Stats {
         stats,
-        flow: Some(Arc::new(allocator.allocate_one_with(tagged_flow))),
+        mini_flow: MiniFlow::from(&tagged_flow.flow),
         endpoint: last_endpoint,
         flow_id,
         l7_protocol,

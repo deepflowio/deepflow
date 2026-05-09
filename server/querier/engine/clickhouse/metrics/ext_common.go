@@ -22,6 +22,7 @@ import (
 	"slices"
 	"strings"
 
+	simplejson "github.com/bitly/go-simplejson"
 	ctlcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
@@ -32,7 +33,7 @@ var EXT_METRICS = map[string]*Metrics{}
 
 func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache bool, ctx context.Context) (map[string]*Metrics, error) {
 	loadMetrics := make(map[string]*Metrics)
-	if slices.Contains([]string{common.DB_NAME_DEEPFLOW_ADMIN, common.DB_NAME_DEEPFLOW_TENANT, common.DB_NAME_APPLICATION_LOG, common.DB_NAME_EXT_METRICS}, db) || slices.Contains([]string{common.TABLE_NAME_L7_FLOW_LOG, common.TABLE_NAME_EVENT, common.TABLE_NAME_FILE_EVENT}, table) {
+	if slices.Contains([]string{common.DB_NAME_DEEPFLOW_ADMIN, common.DB_NAME_DEEPFLOW_TENANT, common.DB_NAME_APPLICATION_LOG, common.DB_NAME_EXT_METRICS}, db) || slices.Contains([]string{common.TABLE_NAME_L7_FLOW_LOG}, table) {
 		externalChClient := client.Client{
 			Host:     config.Cfg.Clickhouse.Host,
 			Port:     config.Cfg.Clickhouse.Port,
@@ -59,27 +60,42 @@ func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache 
 			log.Error(err)
 			return nil, err
 		}
+		var customMetrics map[string]*simplejson.Json
+		if config.ControllerCfg.DFWebService.Enabled {
+			customMetrics, err = common.GetCustomMetrics(orgID)
+			if err != nil {
+				log.Error(err.Error())
+			}
+		}
 		for i, value := range externalMetricFloatRst.Values {
 			tagName := value.([]interface{})[0]
 			tableName := value.([]interface{})[1].(string)
 			externalTag := tagName.(string)
 			metrics_names_field, metrics_values_field := METRICS_ARRAY_NAME_MAP[db][0], METRICS_ARRAY_NAME_MAP[db][1]
 			dbField := fmt.Sprintf("if(indexOf(%s, '%s')=0, null, %s[indexOf(%s, '%s')])", metrics_names_field, externalTag, metrics_values_field, metrics_names_field, externalTag)
+			var mUnit, description string
+			mType := METRICS_TYPE_COUNTER
 			metricName := fmt.Sprintf("metrics.%s", externalTag)
+			displayName := metricName
+			customMetric, ok := customMetrics[fmt.Sprintf("%s.%s.%s", db, tableName, metricName)]
+			if ok {
+				mType = customMetric.Get("TYPE").MustInt()
+				mUnit = customMetric.Get("UNIT").MustString()
+				displayName = customMetric.Get("DISPLAY_NAME").MustString()
+				description = customMetric.Get("DESCRIPTION").MustString()
+			}
 			lm := NewMetrics(
-				i, dbField, metricName, metricName, metricName, "", "", "", METRICS_TYPE_COUNTER,
-				common.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", tableName, "", "", "", "", "",
+				i, dbField, displayName, displayName, displayName, mUnit, mUnit, mUnit, mType,
+				common.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", tableName, description, description, description, "", "",
 			)
 			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
 		}
-		if !slices.Contains([]string{common.TABLE_NAME_EVENT, common.TABLE_NAME_FILE_EVENT}, table) {
-			lm := NewMetrics(
-				len(loadMetrics), "metrics",
-				"metrics", "metrics", "metrics", "", "", "", METRICS_TYPE_ARRAY,
-				common.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", table, "", "", "", "", "",
-			)
-			loadMetrics[fmt.Sprintf("%s-%s", "metrics", table)] = lm
-		}
+		lm := NewMetrics(
+			len(loadMetrics), "metrics",
+			"metrics", "metrics", "metrics", "", "", "", METRICS_TYPE_ARRAY,
+			common.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", table, "", "", "", "", "",
+		)
+		loadMetrics[fmt.Sprintf("%s-%s", "metrics", table)] = lm
 
 		// native metrics
 		if config.ControllerCfg.DFWebService.Enabled {
@@ -101,8 +117,17 @@ func GetExtMetrics(db, table, where, queryCacheTTL, orgID string, useQueryCache 
 					if fieldType != common.NATIVE_FIELD_TYPE_METRIC {
 						continue
 					}
+					var mUnit string
+					mType := METRICS_TYPE_COUNTER
+					customMetric, ok := customMetrics[fmt.Sprintf("%s.%s.%s", db, table, nativeMetric)]
+					if ok {
+						mType = customMetric.Get("TYPE").MustInt()
+						mUnit = customMetric.Get("UNIT").MustString()
+						displayName = customMetric.Get("DISPLAY_NAME").MustString()
+						description = customMetric.Get("DESCRIPTION").MustString()
+					}
 					lm := NewMetrics(
-						len(loadMetrics), nativeMetric, displayName, displayName, displayName, "", "", "", METRICS_TYPE_COUNTER,
+						len(loadMetrics), nativeMetric, displayName, displayName, displayName, mUnit, mUnit, mUnit, mType,
 						common.NATIVE_FIELD_CATEGORY_METRICS, []bool{true, true, true}, "", table, description, description, description, "", "",
 					)
 					loadMetrics[fmt.Sprintf("%s-%s", nativeMetric, table)] = lm

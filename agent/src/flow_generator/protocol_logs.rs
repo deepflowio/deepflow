@@ -52,7 +52,7 @@ cfg_if::cfg_if! {
 
         pub use mq::{WebSphereMqInfo, WebSphereMqLog};
         pub use rpc::{Iso8583Info, Iso8583Log, NetSignInfo, NetSignLog, SomeIpInfo, SomeIpLog};
-        pub use sql::{OracleInfo, OracleLog};
+        pub use sql::{DamengInfo, DamengLog, OracleInfo, OracleLog};
         pub use tls::{TlsInfo, TlsLog};
     }
 }
@@ -570,16 +570,12 @@ macro_rules! swap_if {
 macro_rules! set_captured_byte {
     ($this:expr, $param:expr) => {
         match $this.msg_type {
-            LogMessageType::Request => $this.captured_request_byte = $param.captured_byte as u32,
-            LogMessageType::Response => $this.captured_response_byte = $param.captured_byte as u32,
+            LogMessageType::Request => $this.captured_request_byte = $param.captured_byte,
+            LogMessageType::Response => $this.captured_response_byte = $param.captured_byte,
             _ => {
                 match LogMessageType::from($param.direction) {
-                    LogMessageType::Request => {
-                        $this.captured_request_byte = $param.captured_byte as u32
-                    }
-                    LogMessageType::Response => {
-                        $this.captured_response_byte = $param.captured_byte as u32
-                    }
+                    LogMessageType::Request => $this.captured_request_byte = $param.captured_byte,
+                    LogMessageType::Response => $this.captured_response_byte = $param.captured_byte,
                     _ => unimplemented!(),
                 };
             }

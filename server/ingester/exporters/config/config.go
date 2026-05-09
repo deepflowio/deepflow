@@ -67,6 +67,10 @@ const (
 )
 const (
 	FILE_EVENT = DataSourceID(flow_metrics.METRICS_TABLE_ID_MAX) + 1 + iota
+	FILE_AGG_EVENT
+	FILE_MGMT_EVENT
+	PROC_PERM_EVENT
+	PROC_OPS_EVENT
 	L4_FLOW_LOG
 	L7_FLOW_LOG
 
@@ -83,6 +87,10 @@ var dataSourceStrings = []string{
 	APPLICATION_1S:     "flow_metrics.application.1s",
 	APPLICATION_MAP_1S: "flow_metrics.application_map.1s",
 	FILE_EVENT:         "event.file_event",
+	FILE_AGG_EVENT:     "event.file_agg_event",
+	FILE_MGMT_EVENT:    "event.file_mgmt_event",
+	PROC_PERM_EVENT:    "event.proc_perm_event",
+	PROC_OPS_EVENT:     "event.proc_ops_event",
 	L4_FLOW_LOG:        "flow_log.l4_flow_log",
 	L7_FLOW_LOG:        "flow_log.l7_flow_log",
 	MAX_DATASOURCE_ID:  "invalid_datasource",
@@ -98,6 +106,10 @@ var dataSourceTopicStrings = []string{
 	APPLICATION_1S:     TOPIC_PREFIX + dataSourceStrings[APPLICATION_1S],
 	APPLICATION_MAP_1S: TOPIC_PREFIX + dataSourceStrings[APPLICATION_MAP_1S],
 	FILE_EVENT:         TOPIC_PREFIX + dataSourceStrings[FILE_EVENT],
+	FILE_AGG_EVENT:     TOPIC_PREFIX + dataSourceStrings[FILE_AGG_EVENT],
+	FILE_MGMT_EVENT:    TOPIC_PREFIX + dataSourceStrings[FILE_MGMT_EVENT],
+	PROC_PERM_EVENT:    TOPIC_PREFIX + dataSourceStrings[PROC_PERM_EVENT],
+	PROC_OPS_EVENT:     TOPIC_PREFIX + dataSourceStrings[PROC_OPS_EVENT],
 	L4_FLOW_LOG:        TOPIC_PREFIX + dataSourceStrings[L4_FLOW_LOG],
 	L7_FLOW_LOG:        TOPIC_PREFIX + dataSourceStrings[L7_FLOW_LOG],
 	MAX_DATASOURCE_ID:  TOPIC_PREFIX + dataSourceStrings[MAX_DATASOURCE_ID],
@@ -145,7 +157,7 @@ func (d DataSourceID) TopicString() string {
 
 func (d DataSourceID) IsMap() bool {
 	switch d {
-	case NETWORK_1M, APPLICATION_1M, NETWORK_1S, APPLICATION_1S, FILE_EVENT:
+	case NETWORK_1M, APPLICATION_1M, NETWORK_1S, APPLICATION_1S, FILE_EVENT, FILE_AGG_EVENT, FILE_MGMT_EVENT, PROC_PERM_EVENT, PROC_OPS_EVENT:
 		return false
 	default:
 		return true

@@ -22,6 +22,7 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include <limits.h>
 #include <bcc/perf_reader.h>
 #include <linux/version.h>
 #include "clib.h"
@@ -117,12 +118,14 @@ static pthread_mutex_t datadump_mutex;
  * Set by set_data_limit_max()
  */
 static uint32_t socket_data_limit_max;
+static uint32_t ai_agent_data_limit_max;
 
 static uint32_t go_tracing_timeout = GO_TRACING_TIMEOUT_DEFAULT;
 
 // 0: disable 1: during request 2: all
 static uint32_t io_event_collect_mode = 1;
 static uint64_t io_event_minimal_duration = 1000000;
+static uint64_t hooked_socket_syscalls_bitmap = HOOKED_SOCKET_SYSCALL_ALL;
 
 /*
  * The maximum threshold for socket map reclamation, with map
@@ -228,6 +231,29 @@ kfunc_set_sym_for_entry_and_exit(struct tracer_probes_conf *tps, const char *fn)
 	kfunc_set_symbol(tps, fn, true);
 }
 
+static inline bool hooked_socket_syscall_enabled(uint64_t flag)
+{
+	return (hooked_socket_syscalls_bitmap & flag) != 0;
+}
+
+static inline void
+config_tracepoint_enter_and_exit(struct tracer_probes_conf *tps,
+				 const char *enter_tp,
+				 const char *exit_tp)
+{
+	tps_set_symbol(tps, enter_tp);
+	tps_set_symbol(tps, exit_tp);
+}
+
+static inline void
+config_mixed_probe_and_tracepoint_exit(struct tracer_probes_conf *tps,
+				       const char *enter_probe,
+				       const char *exit_tp)
+{
+	probes_set_enter_symbol(tps, enter_probe);
+	tps_set_symbol(tps, exit_tp);
+}
+
 static inline void config_probes_for_proc_event(struct tracer_probes_conf *tps)
 {
 	if (access(SYSCALL_FORK_TP_PATH, F_OK)) {
@@ -272,16 +298,49 @@ static inline void config_probes_for_proc_event(struct tracer_probes_conf *tps)
 	}
 }
 
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+static inline void config_probes_for_ai_agent(struct tracer_probes_conf *tps)
+{
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_openat");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_unlinkat");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_unlink");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_fchmodat");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_chmod");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_fchownat");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_chown");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setuid");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setgid");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setreuid");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setregid");
+	/* fork propagation is AI-agent-specific; exec/exit are already covered by
+	 * config_probes_for_proc_event(). */
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_fork");
+}
+#else
+static inline void config_probes_for_ai_agent(struct tracer_probes_conf *tps)
+{
+	(void)tps;
+}
+#endif
+
 static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 {
-	kfunc_set_sym_for_entry_and_exit(tps, "ksys_write");
-	kfunc_set_sym_for_entry_and_exit(tps, "ksys_read");
-	kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendto");
-	kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendmsg");
-	kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendmmsg");
-	kfunc_set_sym_for_entry_and_exit(tps, "__sys_recvmsg");
-	kfunc_set_sym_for_entry_and_exit(tps, "do_writev");
-	kfunc_set_sym_for_entry_and_exit(tps, "do_readv");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_WRITE))
+		kfunc_set_sym_for_entry_and_exit(tps, "ksys_write");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_READ))
+		kfunc_set_sym_for_entry_and_exit(tps, "ksys_read");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_SENDTO))
+		kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendto");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_SENDMSG))
+		kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendmsg");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_SENDMMSG))
+		kfunc_set_sym_for_entry_and_exit(tps, "__sys_sendmmsg");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_RECVMSG))
+		kfunc_set_sym_for_entry_and_exit(tps, "__sys_recvmsg");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_WRITEV))
+		kfunc_set_sym_for_entry_and_exit(tps, "do_writev");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_READV))
+		kfunc_set_sym_for_entry_and_exit(tps, "do_readv");
 
 #if defined(__x86_64__)
 	kfunc_set_symbol(tps, "__x64_sys_close", false);
@@ -292,16 +351,21 @@ static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 	kfunc_set_symbol(tps, "__sys_accept4", true);
 	kfunc_set_symbol(tps, "__sys_connect", false);
 	config_probes_for_proc_event(tps);
+	config_probes_for_ai_agent(tps);
 
 	/*
 	 * On certain kernels, such as 5.15.0-127-generic and 5.10.134-18.al8.x86_64,
 	 * `recvmmsg()/recvfrom()` probes of type `kprobe`/`kfunc` may not work properly. To address
 	 * this, we use the more stable `tracepoint`-based probe instead.
 	 */
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvfrom");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvfrom");	
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvmmsg");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvmmsg");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_RECVFROM))
+		config_tracepoint_enter_and_exit(tps,
+					      "tracepoint/syscalls/sys_enter_recvfrom",
+					      "tracepoint/syscalls/sys_exit_recvfrom");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_RECVMMSG))
+		config_tracepoint_enter_and_exit(tps,
+					      "tracepoint/syscalls/sys_enter_recvmmsg",
+					      "tracepoint/syscalls/sys_exit_recvmmsg");
 
 	// Periodic trigger for timeout checks on cached data
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
@@ -330,20 +394,34 @@ static void config_probes_for_kfunc(struct tracer_probes_conf *tps)
 static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 						    *tps)
 {
-	probes_set_enter_symbol(tps, "__sys_sendmsg");
-	probes_set_enter_symbol(tps, "__sys_sendmmsg");
-	probes_set_enter_symbol(tps, "__sys_recvmsg");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_SENDMSG))
+		config_mixed_probe_and_tracepoint_exit(tps, "__sys_sendmsg",
+					      "tracepoint/syscalls/sys_exit_sendmsg");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_SENDMMSG))
+		config_mixed_probe_and_tracepoint_exit(tps, "__sys_sendmmsg",
+					      "tracepoint/syscalls/sys_exit_sendmmsg");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_RECVMSG))
+		config_mixed_probe_and_tracepoint_exit(tps, "__sys_recvmsg",
+					      "tracepoint/syscalls/sys_exit_recvmsg");
 
 	if (k_version == KERNEL_VERSION(3, 10, 0)) {
 		/*
 		 * The Linux 3.10 kernel interface for Redhat7 and
 		 * Centos7 is sys_writev() and sys_readv()
 		 */
-		probes_set_enter_symbol(tps, "sys_writev");
-		probes_set_enter_symbol(tps, "sys_readv");
+		if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_WRITEV))
+			config_mixed_probe_and_tracepoint_exit(tps, "sys_writev",
+						      "tracepoint/syscalls/sys_exit_writev");
+		if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_READV))
+			config_mixed_probe_and_tracepoint_exit(tps, "sys_readv",
+						      "tracepoint/syscalls/sys_exit_readv");
 	} else {
-		probes_set_enter_symbol(tps, "do_writev");
-		probes_set_enter_symbol(tps, "do_readv");
+		if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_WRITEV))
+			config_mixed_probe_and_tracepoint_exit(tps, "do_writev",
+						      "tracepoint/syscalls/sys_exit_writev");
+		if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_READV))
+			config_mixed_probe_and_tracepoint_exit(tps, "do_readv",
+						      "tracepoint/syscalls/sys_exit_readv");
 	}
 
 	config_probes_for_proc_event(tps);
@@ -354,12 +432,27 @@ static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 	 * 由于在Linux 4.17+ sys_write, sys_read, sys_sendto, sys_recvfrom
 	 * 接口会发生变化为了避免对内核的依赖采用tracepoints方式
 	 */
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_write");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_read");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_sendto");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvfrom");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_WRITE))
+		config_tracepoint_enter_and_exit(tps,
+					      "tracepoint/syscalls/sys_enter_write",
+					      "tracepoint/syscalls/sys_exit_write");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_READ))
+		config_tracepoint_enter_and_exit(tps,
+					      "tracepoint/syscalls/sys_enter_read",
+					      "tracepoint/syscalls/sys_exit_read");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_SENDTO))
+		config_tracepoint_enter_and_exit(tps,
+					      "tracepoint/syscalls/sys_enter_sendto",
+					      "tracepoint/syscalls/sys_exit_sendto");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_RECVFROM))
+		config_tracepoint_enter_and_exit(tps,
+					      "tracepoint/syscalls/sys_enter_recvfrom",
+					      "tracepoint/syscalls/sys_exit_recvfrom");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_RECVMMSG))
+		config_tracepoint_enter_and_exit(tps,
+					      "tracepoint/syscalls/sys_enter_recvmmsg",
+					      "tracepoint/syscalls/sys_exit_recvmmsg");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_connect");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvmmsg");
 
 	// exit tracepoints
 	/*
@@ -373,16 +466,6 @@ static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 		ebpf_info("Due to the tracing feature being disabled, the"
 			  " syscall socket() will not be attached.\n");
 
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_read");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_write");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_sendto");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvfrom");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_sendmsg");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_sendmmsg");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvmsg");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvmmsg");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_writev");
-	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_readv");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_accept4");
 	// clear trace connection & fetch close info
@@ -410,6 +493,7 @@ static void config_probes_for_kprobe_and_tracepoint(struct tracer_probes_conf
 		tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_pwritev2");
 		tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_pwritev2");
 	}
+	config_probes_for_ai_agent(tps);
 }
 
 static inline void __config_kprobe(struct tracer_probes_conf *tps,
@@ -433,14 +517,22 @@ static inline void __config_kprobe(struct tracer_probes_conf *tps,
 
 static void config_probes_for_kprobe(struct tracer_probes_conf *tps)
 {
-	__config_kprobe(tps, "ksys_write", "sys_write", "write");
-	__config_kprobe(tps, "ksys_read", "sys_read", "read");
-	__config_kprobe(tps, "__sys_sendto", "sys_sendto", "sendto");
-	__config_kprobe(tps, "__sys_recvfrom", "sys_recvfrom", "recvfrom");
-	probes_set_symbol(tps, "__sys_sendmsg");
-	probes_set_symbol(tps, "__sys_sendmmsg");
-	probes_set_symbol(tps, "__sys_recvmsg");
-	probes_set_symbol(tps, "__sys_recvmmsg");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_WRITE))
+		__config_kprobe(tps, "ksys_write", "sys_write", "write");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_READ))
+		__config_kprobe(tps, "ksys_read", "sys_read", "read");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_SENDTO))
+		__config_kprobe(tps, "__sys_sendto", "sys_sendto", "sendto");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_RECVFROM))
+		__config_kprobe(tps, "__sys_recvfrom", "sys_recvfrom", "recvfrom");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_SENDMSG))
+		probes_set_symbol(tps, "__sys_sendmsg");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_SENDMMSG))
+		probes_set_symbol(tps, "__sys_sendmmsg");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_RECVMSG))
+		probes_set_symbol(tps, "__sys_recvmsg");
+	if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_RECVMMSG))
+		probes_set_symbol(tps, "__sys_recvmmsg");
 	if (io_event_collect_mode != IO_EVENT_COLLECT_DISABLE) {
 		probes_set_symbol(tps, "ksys_pread64");
 		probes_set_symbol(tps, "do_preadv");
@@ -453,11 +545,15 @@ static void config_probes_for_kprobe(struct tracer_probes_conf *tps)
 		 * The Linux 3.10 kernel interface for Redhat7 and
 		 * Centos7 is sys_writev() and sys_readv()
 		 */
-		probes_set_symbol(tps, "sys_writev");
-		probes_set_symbol(tps, "sys_readv");
+		if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_WRITEV))
+			probes_set_symbol(tps, "sys_writev");
+		if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_READV))
+			probes_set_symbol(tps, "sys_readv");
 	} else {
-		probes_set_symbol(tps, "do_writev");
-		probes_set_symbol(tps, "do_readv");
+		if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_WRITEV))
+			probes_set_symbol(tps, "do_writev");
+		if (hooked_socket_syscall_enabled(HOOKED_SOCKET_SYSCALL_READV))
+			probes_set_symbol(tps, "do_readv");
 	}
 
 	config_probes_for_proc_event(tps);
@@ -475,6 +571,7 @@ static void config_probes_for_kprobe(struct tracer_probes_conf *tps)
 	probes_set_enter_symbol(tps, "__close_fd");
 	probes_set_exit_symbol(tps, "__sys_socket");
 	probes_set_enter_symbol(tps, "__sys_connect");
+	config_probes_for_ai_agent(tps);
 }
 
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
@@ -1382,6 +1479,7 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 		}
 		submit_data->syscall_len += offset;
 		submit_data->cap_len = len + offset;
+		submit_data->reasm_bytes = sd->reasm_bytes;
 		burst_data[i] = submit_data;
 
 		start +=
@@ -2305,6 +2403,22 @@ static inline int __set_data_limit_max(int limit_size)
 	return socket_data_limit_max;
 }
 
+static inline int __set_ai_agent_data_limit_max(unsigned int limit_size)
+{
+	if (limit_size == 0) {
+		ai_agent_data_limit_max = 0;
+	} else if (limit_size > INT_MAX) {
+		ai_agent_data_limit_max = INT_MAX;
+	} else {
+		ai_agent_data_limit_max = limit_size;
+	}
+
+	ebpf_info("Received ai_agent limit_size (%u), the final value is set to '%u'\n",
+		  limit_size, ai_agent_data_limit_max);
+
+	return ai_agent_data_limit_max;
+}
+
 /**
  * Set maximum amount of data passed to the agent by eBPF programe.
  * @limit_size : The maximum length of data. If @limit_size exceeds 16384,
@@ -2349,6 +2463,46 @@ int set_data_limit_max(int limit_size)
 	}
 
 	tracer->data_limit_max = set_val;
+
+	return set_val;
+}
+
+int set_ai_agent_data_limit_max(int limit_size)
+{
+	if (limit_size < 0) {
+		ebpf_warning("set_ai_agent_data_limit_max: invalid negative value %d\n",
+			     limit_size);
+		return -1;
+	}
+
+	int set_val = __set_ai_agent_data_limit_max((unsigned int) limit_size);
+
+	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
+	if (tracer == NULL) {
+		/*
+		 * Called before running_socket_tracer(),
+		 * no need to update config map
+		 */
+		return set_val;
+	}
+
+	int cpu;
+	int nr_cpus = get_num_possible_cpus();
+	struct tracer_ctx_s values[nr_cpus];
+	memset(values, 0, sizeof(values));
+
+	if (!bpf_table_get_value(tracer, MAP_TRACER_CTX_NAME, 0, values)) {
+		return ETR_NOTEXIST;
+	}
+
+	for (cpu = 0; cpu < nr_cpus; cpu++) {
+		values[cpu].ai_agent_data_limit_max = set_val;
+	}
+
+	if (!bpf_table_set_value
+	    (tracer, MAP_TRACER_CTX_NAME, 0, (void *)&values)) {
+		return ETR_UPDATE_MAP_FAILD;
+	}
 
 	return set_val;
 }
@@ -3039,6 +3193,8 @@ int running_socket_tracer(tracer_callback_t handle,
 	// Set default maximum amount of data passed to the agent by eBPF.
 	if (socket_data_limit_max == 0)
 		__set_data_limit_max(0);
+	if (ai_agent_data_limit_max == 0)
+		__set_ai_agent_data_limit_max(0);
 
 	uint64_t uid_base = (gettime(CLOCK_REALTIME, TIME_TYPE_NAN) / 100) &
 	    0xffffffffffffffULL;
@@ -3053,6 +3209,7 @@ int running_socket_tracer(tracer_callback_t handle,
 		t_conf[cpu].coroutine_trace_id = t_conf[cpu].socket_id;
 		t_conf[cpu].thread_trace_id = t_conf[cpu].socket_id;
 		t_conf[cpu].data_limit_max = socket_data_limit_max;
+		t_conf[cpu].ai_agent_data_limit_max = ai_agent_data_limit_max;
 		t_conf[cpu].io_event_collect_mode = io_event_collect_mode;
 		t_conf[cpu].io_event_minimal_duration =
 		    io_event_minimal_duration;
@@ -3067,6 +3224,7 @@ int running_socket_tracer(tracer_callback_t handle,
 		return -EINVAL;
 
 	ebpf_info("Config socket_data_limit_max: %d\n", socket_data_limit_max);
+	ebpf_info("Config ai_agent_data_limit_max: %u\n", ai_agent_data_limit_max);
 	ebpf_info("Config io_event_collect_mode: %d\n", io_event_collect_mode);
 	ebpf_info("Config io_event_minimal_duration: %llu ns\n", io_event_minimal_duration);
 	ebpf_info("Config virtual_file_collect_enable: %d\n", virtual_file_collect_enable);
@@ -4048,6 +4206,13 @@ void enable_fentry(void)
 {
 	use_kfunc_bin = true;
 	ebpf_info("Enabled the fentry/fexit feature\n");
+}
+
+void set_hooked_socket_syscalls(uint64_t bitmap)
+{
+	hooked_socket_syscalls_bitmap = bitmap & HOOKED_SOCKET_SYSCALL_ALL;
+	ebpf_info("Set hooked_socket_syscalls bitmap 0x%llx\n",
+		  hooked_socket_syscalls_bitmap);
 }
 
 void disable_fentry(void)

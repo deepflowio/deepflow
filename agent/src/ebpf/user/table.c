@@ -154,3 +154,41 @@ int bpf_table_get_fd(struct bpf_tracer *tracer, const char *tb_name)
 
 	return map->fd;
 }
+
+int bpf_table_get_map_fd(const char *tracer_name, const char *map_name)
+{
+	struct bpf_tracer *tracer = find_bpf_tracer(tracer_name);
+	if (tracer == NULL) {
+		ebpf_warning("[%s] tracer \"%s\" not found.\n", __func__,
+			     tracer_name);
+		return -1;
+	}
+
+	return bpf_table_get_fd(tracer, map_name);
+}
+
+int bpf_table_update_u32_key(int map_fd, uint32_t key, void *val_buf,
+			     int val_size)
+{
+	(void)val_size;
+	if (bpf_update_elem(map_fd, &key, val_buf, BPF_ANY) != 0) {
+		ebpf_warning("[%s] bpf_map_update_elem failed, fd: %d, "
+			     "key: %u, err: %s\n", __func__, map_fd,
+			     key, strerror(errno));
+		return -1;
+	}
+
+	return 0;
+}
+
+int bpf_table_delete_u32_key(int map_fd, uint32_t key)
+{
+	if (bpf_delete_elem(map_fd, &key) != 0) {
+		ebpf_debug("[%s] bpf_map_delete_elem failed, fd: %d, "
+			   "key: %u, err: %s\n", __func__, map_fd,
+			   key, strerror(errno));
+		return -1;
+	}
+
+	return 0;
+}

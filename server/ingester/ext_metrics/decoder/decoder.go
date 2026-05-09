@@ -247,7 +247,7 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 	var universalTag *flow_metrics.UniversalTag
 
 	// fast path
-	platformDataVersion := d.platformData.Version(m.OrgId)
+	platformDataVersion := d.platformData.PlatformAndGroupsCombineVersion(m.OrgId)
 	if platformDataVersion != d.platformDataVersion[m.OrgId] {
 		if d.platformDataVersion[m.OrgId] != 0 {
 			log.Infof("platform data version in ext-metrics-decoder %s-#%d changed from %d to %d",
