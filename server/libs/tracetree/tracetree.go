@@ -58,11 +58,11 @@ type TraceTree struct {
 }
 
 type EndpointStats struct {
-	BizResponseCode   string
-	ResponseException string
-	ResponseCode      uint32
-	Total             uint32
-	ResponseStatus    uint8
+	BizResponseCode   string `json:"biz_response_code"`
+	ResponseException string `json:"response_exception"`
+	ResponseCode      uint32 `json:"response_code"`
+	Total             uint32 `json:"total"`
+	ResponseStatus    uint8  `json:"response_status"`
 }
 
 type SpanInfo struct {
