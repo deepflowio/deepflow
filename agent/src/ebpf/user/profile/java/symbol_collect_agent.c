@@ -377,9 +377,30 @@ void generate_single_entry(enum event_type type, jvmtiEnv * jvmti,
 		} else {
 			memcpy(class_name, csig, sizeof(class_name) - 1);
 		}
-		snprintf(output, noutput, "%s::%s%s", class_name,
-			 method_name, method_signature);
 
+		char *source_file = NULL;
+		jvmtiError err =
+		    (*jvmti)->GetSourceFileName(jvmti, class, &source_file);
+		if (err != JVMTI_ERROR_NONE) {
+			source_file = NULL;
+		}
+
+		jint entry_count = 0;
+		jvmtiLineNumberEntry *table = NULL;
+		int line_number = -1;
+		err =
+		    (*jvmti)->GetLineNumberTable(jvmti, method, &entry_count,
+						 &table);
+		if (err == JVMTI_ERROR_NONE && entry_count > 0 && table != NULL) {
+			line_number = table[0].line_number;
+		}
+
+		snprintf(output, noutput, "%s::%s%s[%s:%d]", class_name,
+			 method_name, method_signature,
+			 source_file == NULL ? "" : source_file, line_number);
+
+		deallocate(jvmti, (unsigned char *)table);
+		deallocate(jvmti, (unsigned char *)source_file);
 		deallocate(jvmti, (unsigned char *)csig);
 	}
 
