@@ -30,26 +30,73 @@ type labelValue struct {
 	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
-	strToID      sync.Map
+	strToID      map[string]int
+
+	isRefreshing bool
+	pendingKeys  map[string]int
 }
 
 func newLabelValue(org *common.ORG) *labelValue {
 	return &labelValue{
 		org:          org,
 		resourceType: "label_value",
+		strToID:      make(map[string]int),
 	}
 }
 
+func (lv *labelValue) MarkRefresh() {
+	lv.lock.Lock()
+	defer lv.lock.Unlock()
+	lv.isRefreshing = true
+	lv.pendingKeys = make(map[string]int)
+}
+
+func (lv *labelValue) MarkRefreshDone() {
+	lv.lock.Lock()
+	defer lv.lock.Unlock()
+	lv.isRefreshing = false
+	lv.pendingKeys = nil
+}
+
 func (lv *labelValue) refresh(args ...interface{}) error {
-	var items []*metadbmodel.PrometheusLabelValue
-	err := lv.org.DB.Unscoped().Find(&items).Error
+	lv.MarkRefresh()
+	defer lv.MarkRefreshDone()
+
+	var count int64
+	if err := lv.org.DB.Model(&metadbmodel.PrometheusLabelValue{}).Count(&count).Error; err != nil {
+		log.Errorf("db query %s failed: %v", lv.resourceType, err, lv.org.LogPrefix)
+		return err
+	}
+
+	rows, err := lv.org.DB.Model(&metadbmodel.PrometheusLabelValue{}).Select("id", "value").Rows()
 	if err != nil {
 		log.Errorf("db query %s failed: %v", lv.resourceType, err, lv.org.LogPrefix)
 		return err
 	}
-	for _, item := range items {
-		lv.store(item)
+	defer rows.Close()
+
+	newMap := make(map[string]int, count)
+	for rows.Next() {
+		var id int
+		var value string
+		if scanErr := rows.Scan(&id, &value); scanErr != nil {
+			log.Errorf("db stream scan %s interrupted: %v", lv.resourceType, scanErr, lv.org.LogPrefix)
+			return scanErr
+		}
+		newMap[value] = id
 	}
+	if err := rows.Err(); err != nil {
+		log.Errorf("db stream %s error: %v", lv.resourceType, err, lv.org.LogPrefix)
+		return err
+	}
+
+	lv.lock.Lock()
+	for k, v := range lv.pendingKeys {
+		newMap[k] = v
+	}
+	lv.strToID = newMap
+	lv.lock.Unlock()
+
 	return nil
 }
 
@@ -84,12 +131,14 @@ func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue,
 }
 
 func (lv *labelValue) getID(str string) (int, bool) {
-	if item, ok := lv.strToID.Load(str); ok {
-		return item.(int), true
-	}
-	return 0, false
+	id, ok := lv.strToID[str]
+	return id, ok
 }
 
 func (lv *labelValue) store(item *metadbmodel.PrometheusLabelValue) {
-	lv.strToID.Store(item.Value, item.ID)
+	lv.strToID[item.Value] = item.ID
+
+	if lv.isRefreshing {
+		lv.pendingKeys[item.Value] = item.ID
+	}
 }

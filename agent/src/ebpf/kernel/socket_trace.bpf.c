@@ -2930,12 +2930,22 @@ static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 
 	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, 1);
 	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
-	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v))) {
+	/*
+	 * Linux 4.19 verifier cannot always infer the range of v_buff->len
+	 * when it is used directly in map-value pointer arithmetic.
+	 */
+	__u32 buf_len = v_buff->len;
+	if (buf_len > (sizeof(v_buff->data) - sizeof(*v))) {
+		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
+		return;
+	}
+	buf_len &= (sizeof(*v_buff) - 1);
+	if (buf_len > (sizeof(v_buff->data) - sizeof(*v))) {
 		__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
 		return;
 	}
 
-	v = (struct __socket_data *)(v_buff->data + v_buff->len);
+	v = (struct __socket_data *)(v_buff->data + buf_len);
 	__builtin_memset(v, 0, offsetof(typeof(struct __socket_data), data));
 	v->socket_id = uid;
 	v->tgid = (__u32) (pid_tgid >> 32);
@@ -3014,14 +3024,25 @@ KFUNC_PROG(__arm64_sys_close, const struct pt_regs *regs)
 		return 0;
 	}
 
-	if (socket_info_ptr->uid) {
+	/*
+	 * Snapshot map-value fields before deletion. This avoids reading
+	 * socket_info_ptr after socket_info_map deletion and keeps Linux 4.19
+	 * verifier range tracking stable after the close-event helper is inlined.
+	 */
+	__u64 close_uid = socket_info_ptr->uid;
+	__u64 close_seq = socket_info_ptr->seq;
+	__u16 close_l7_proto = socket_info_ptr->l7_proto;
+	enum process_data_extra_source close_source = source;
+
+	if (close_uid) {
 		__sync_fetch_and_add(&socket_info_ptr->seq, 1);
-		source = socket_info_ptr->data_source;
+		close_seq = socket_info_ptr->seq;
+		close_source = socket_info_ptr->data_source;
 	}
 
 	delete_socket_info(conn_key, socket_info_ptr);
-	__push_close_event(id, socket_info_ptr->uid, socket_info_ptr->seq,
-			   socket_info_ptr->l7_proto, fd, source,
+	__push_close_event(id, close_uid, close_seq,
+			   close_l7_proto, fd, close_source,
 			   offset, (void *)ctx);
 	return 0;
 }

@@ -18,6 +18,7 @@ package cache
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
@@ -42,47 +43,93 @@ func NewLayoutKey(metricName, labelName string) LayoutKey {
 
 type appLabelNameToValue map[string]string
 type metricAndAPPLabelLayout struct {
-	org *common.ORG
+	org    *common.ORG
+	active atomic.Value // map[LayoutKey]uint8
 
-	layoutKeyToIndex sync.Map
+	mu      sync.RWMutex
+	pending map[LayoutKey]uint8
 }
 
 func newMetricAndAPPLabelLayout(org *common.ORG) *metricAndAPPLabelLayout {
-	return &metricAndAPPLabelLayout{
-		org: org,
+	mll := &metricAndAPPLabelLayout{
+		org:     org,
+		pending: make(map[LayoutKey]uint8),
 	}
+	mll.active.Store(make(map[LayoutKey]uint8))
+	return mll
 }
 
-func (mll *metricAndAPPLabelLayout) Get() *sync.Map {
-	return &mll.layoutKeyToIndex
+func (mll *metricAndAPPLabelLayout) getActive() map[LayoutKey]uint8 {
+	if active := mll.active.Load(); active != nil {
+		return active.(map[LayoutKey]uint8)
+	}
+	return map[LayoutKey]uint8{}
+}
+
+func (mll *metricAndAPPLabelLayout) replaceActive(newActive map[LayoutKey]uint8) {
+	mll.active.Store(newActive)
 }
 
 func (mll *metricAndAPPLabelLayout) GetIndexByKey(key LayoutKey) (uint8, bool) {
-	if index, ok := mll.layoutKeyToIndex.Load(key); ok {
-		return index.(uint8), true
+	if index, ok := mll.getActive()[key]; ok {
+		return index, true
 	}
-	return 0, false
+	mll.mu.RLock()
+	defer mll.mu.RUnlock()
+	index, ok := mll.pending[key]
+	return index, ok
+}
+
+func (mll *metricAndAPPLabelLayout) GetLayoutKeyToIndex() map[LayoutKey]uint8 {
+	active := mll.getActive()
+	mll.mu.RLock()
+	snapshot := make(map[LayoutKey]uint8, len(active)+len(mll.pending))
+	for k, v := range active {
+		snapshot[k] = v
+	}
+	for k, v := range mll.pending {
+		snapshot[k] = v
+	}
+	mll.mu.RUnlock()
+	return snapshot
 }
 
 func (mll *metricAndAPPLabelLayout) Add(batch []*controller.PrometheusMetricAPPLabelLayout) {
+	mll.mu.Lock()
+	defer mll.mu.Unlock()
 	for _, m := range batch {
-		mll.layoutKeyToIndex.Store(NewLayoutKey(m.GetMetricName(), m.GetAppLabelName()), uint8(m.GetAppLabelColumnIndex()))
+		mll.pending[NewLayoutKey(m.GetMetricName(), m.GetAppLabelName())] = uint8(m.GetAppLabelColumnIndex())
 	}
 }
 
 func (mll *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
-	metricAPPLabelLayouts, err := mll.load()
+	items, err := mll.load()
 	if err != nil {
 		return err
 	}
-	for _, l := range metricAPPLabelLayouts {
-		mll.layoutKeyToIndex.Store(NewLayoutKey(l.MetricName, l.APPLabelName), uint8(l.APPLabelColumnIndex))
-	}
+	mll.processLoadedData(items)
 	return nil
+}
+
+func (mll *metricAndAPPLabelLayout) processLoadedData(items []*metadbmodel.PrometheusMetricAPPLabelLayout) {
+	newActive := make(map[LayoutKey]uint8, len(items))
+	for _, item := range items {
+		newActive[NewLayoutKey(item.MetricName, item.APPLabelName)] = uint8(item.APPLabelColumnIndex)
+	}
+
+	mll.mu.Lock()
+	pending := mll.pending
+	mll.pending = make(map[LayoutKey]uint8)
+	mll.mu.Unlock()
+
+	for k, v := range pending {
+		newActive[k] = v
+	}
+	mll.replaceActive(newActive)
 }
 
 func (mml *metricAndAPPLabelLayout) load() ([]*metadbmodel.PrometheusMetricAPPLabelLayout, error) {
 	var metricAPPLabelLayouts []*metadbmodel.PrometheusMetricAPPLabelLayout
-	err := mml.org.DB.Find(&metricAPPLabelLayouts).Error
+	err := mml.org.DB.Select("metric_name", "app_label_name", "app_label_column_index").Find(&metricAPPLabelLayouts).Error
 	return metricAPPLabelLayouts, err
 }

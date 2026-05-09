@@ -25,6 +25,16 @@
 #define FILE_TYPE_REGULAR   0    /* Regular VFS-backed file */
 #define FILE_TYPE_VIRTUAL   1    /* Non-VFS / virtual / special file */
 
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+/*
+ * The common BPF object is still limited to 4096 instructions on 4.x kernels.
+ * Keep the extra AI Agent io_event logic only in variants with a larger budget.
+ */
+#define EXTENDED_AI_AGENT_FILE_IO_FULL 1
+#endif
+#endif
+
 static __inline int check_file_type(void *file, struct member_fields_offset *offset)
 {
 	if (!file || !offset)
@@ -334,12 +344,12 @@ static __inline int trace_io_event_common(void *ctx,
 		return -1;
 	}
 
-#ifdef EXTENDED_AI_AGENT_FILE_IO
+#ifdef EXTENDED_AI_AGENT_FILE_IO_FULL
 	int __ai_agent = is_ai_agent_process(pid_tgid);
 #endif
 
 	if (tracer_ctx->io_event_collect_mode == 0) {
-#ifdef EXTENDED_AI_AGENT_FILE_IO
+#ifdef EXTENDED_AI_AGENT_FILE_IO_FULL
 		if (!__ai_agent)
 #endif
 		return -1;
@@ -353,7 +363,7 @@ static __inline int trace_io_event_common(void *ctx,
 	}
 
 	if (trace_id == 0 && tracer_ctx->io_event_collect_mode == 1) {
-#ifdef EXTENDED_AI_AGENT_FILE_IO
+#ifdef EXTENDED_AI_AGENT_FILE_IO_FULL
 		if (!__ai_agent)
 #endif
 		return -1;
@@ -381,7 +391,7 @@ static __inline int trace_io_event_common(void *ctx,
 	}
 
 	if (latency < tracer_ctx->io_event_minimal_duration) {
-#ifdef EXTENDED_AI_AGENT_FILE_IO
+#ifdef EXTENDED_AI_AGENT_FILE_IO_FULL
 		if (!__ai_agent)
 #endif
 		return -1;
@@ -395,7 +405,7 @@ static __inline int trace_io_event_common(void *ctx,
 	buffer->bytes_count = data_args->bytes_count;
 	buffer->latency = latency;
 	buffer->operation = direction;
-#ifdef EXTENDED_AI_AGENT_FILE_IO
+#ifdef EXTENDED_AI_AGENT_FILE_IO_FULL
 	buffer->access_permission =
 	    ai_agent_get_access_permission(data_args->fd, offset);
 #else
