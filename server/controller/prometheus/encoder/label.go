@@ -52,7 +52,7 @@ func newLabel(org *common.ORG, ln *labelName, lv *labelValue) *label {
 
 func (l *label) store(item *metadbmodel.PrometheusLabel) {
 	nameID, ok1 := l.labelName.getID(item.Name)
-	valueID, ok2 := l.labelValue.getID(item.Value)
+	valueID, ok2 := l.labelValue.getIDSafe(item.Value)
 	if !ok1 || !ok2 {
 		return
 	}
@@ -107,7 +107,7 @@ func (l *label) refresh(args ...interface{}) error {
 			return scanErr
 		}
 		nameID, ok1 := l.labelName.getID(name)
-		valueID, ok2 := l.labelValue.getID(value)
+		valueID, ok2 := l.labelValue.getIDSafe(value)
 		if ok1 && ok2 {
 			newMap[cache.IDLabelKey{NameID: nameID, ValueID: valueID}] = id
 		}
@@ -129,15 +129,13 @@ func (l *label) refresh(args ...interface{}) error {
 
 func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controller.PrometheusLabel, error) {
 	l.lock.Lock()
-	defer l.lock.Unlock()
-
 	resp := make([]*controller.PrometheusLabel, 0)
 	var dbToAdd []*metadbmodel.PrometheusLabel
 	for _, item := range toAdd {
 		n := item.GetName()
 		v := item.GetValue()
 		nameID, ok1 := l.labelName.getID(n)
-		valueID, ok2 := l.labelValue.getID(v)
+		valueID, ok2 := l.labelValue.getIDSafe(v)
 		if ok1 && ok2 {
 			if id, ok := l.getID(cache.IDLabelKey{NameID: nameID, ValueID: valueID}); ok {
 				resp = append(resp, &controller.PrometheusLabel{
@@ -153,12 +151,19 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 			Value: v,
 		})
 	}
+	l.lock.Unlock()
+
+	if len(dbToAdd) == 0 {
+		return resp, nil
+	}
 
 	err := addBatch(l.org.DB, dbToAdd, l.resourceType)
 	if err != nil {
 		log.Errorf("add %s error: %s", l.resourceType, err.Error(), l.org.LogPrefix)
 		return nil, err
 	}
+
+	l.lock.Lock()
 	for _, item := range dbToAdd {
 		l.store(item)
 		resp = append(resp, &controller.PrometheusLabel{
@@ -166,7 +171,7 @@ func (l *label) encode(toAdd []*controller.PrometheusLabelRequest) ([]*controlle
 			Value: &item.Value,
 			Id:    proto.Uint32(uint32(item.ID)),
 		})
-
 	}
+	l.lock.Unlock()
 	return resp, nil
 }
