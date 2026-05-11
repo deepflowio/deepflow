@@ -144,6 +144,7 @@ pub struct MysqlInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
+    #[serde(skip)]
     endpoint_disabled: bool,
 
     // Server Greeting
@@ -470,9 +471,7 @@ impl MysqlInfo {
         if (self.command == COM_QUERY || self.command == COM_STMT_PREPARE) && !is_mysql(payload) {
             return Err(Error::InvalidSqlStatement);
         };
-        let Ok(sql_string) = str::from_utf8(payload) else {
-            return Err(Error::InvalidSqlStatement);
-        };
+        let sql_string = String::from_utf8_lossy(payload);
 
         #[cfg(feature = "enterprise")]
         if let Some(policies) = custom_policies {
@@ -480,17 +479,17 @@ impl MysqlInfo {
                 &mut _parser.custom_field_store,
                 self,
                 TrafficDirection::REQUEST,
-                Source::Sql(sql_string, None),
+                Source::Sql(&sql_string, None),
             );
         }
 
         if let Some(c) = config {
-            self.extract_trace_and_span_id(&c.l7_log_dynamic, sql_string);
+            self.extract_trace_and_span_id(&c.l7_log_dynamic, &sql_string);
         }
         let obfuscator = CachedObfuscator::new(param.obfuscate_cache.clone());
-        self.context = match obfuscator.apply(sql_string) {
+        self.context = match obfuscator.apply(&sql_string) {
             Ok(obfuscated) => obfuscated.into_owned(),
-            _ => sql_string.to_string(),
+            _ => sql_string.into_owned(),
         };
         self.generate_endpoint();
         Ok(())
@@ -1713,7 +1712,10 @@ mod tests {
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
         let mut previous_command = 0u8;
-        let log_config = LogParserConfig::default();
+        let log_config = LogParserConfig {
+            mysql_endpoint_disabled: false,
+            ..Default::default()
+        };
         for packet in packets.iter_mut() {
             packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -1818,6 +1820,7 @@ mod tests {
                 "partial-packet-compressed.pcap",
                 "partial-packet-compressed.result",
             ),
+            ("binary-in-sql.pcap", "binary-in-sql.result"),
         ];
 
         for item in files.iter() {
