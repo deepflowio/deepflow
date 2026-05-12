@@ -75,5 +75,6 @@
 
 
 #### Refactoring
+* refactor: Extract MySQL endpoint from default configuration [#11727](https://github.com/deepflowio/deepflow/pull/11727) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
 * refactor: Remove legacy agent config [#8656](https://github.com/deepflowio/deepflow/pull/8656) by [rvql](https://github.com/rvql)
