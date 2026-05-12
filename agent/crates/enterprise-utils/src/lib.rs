@@ -511,6 +511,16 @@ pub mod ai_agent_enforcement {
     }
 
     #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct ExecRuleInput {
+        pub id: String,
+        pub mode: EnforcementMode,
+        pub exact: Vec<String>,
+        pub prefix: Vec<String>,
+        pub suffix: Vec<String>,
+        pub argv_contains_any: Vec<String>,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct PolicyHit {
         pub rule_index: u32,
         pub rule_id: String,
@@ -526,7 +536,22 @@ pub mod ai_agent_enforcement {
         pub fn match_exec(&self, _exec_path: &str, _cmdline: &str) -> Option<PolicyHit> {
             None
         }
+
+        pub fn sync_to_bpf_maps(
+            &self,
+            _exec_rules_fd: i32,
+            _policy_epoch_fd: i32,
+            _max_records: usize,
+        ) -> Result<(), String> {
+            Ok(())
+        }
     }
+
+    pub fn compile_exec_rules(_rules: &[ExecRuleInput]) -> Result<CompiledExecPolicy, String> {
+        Ok(CompiledExecPolicy { epoch: 0 })
+    }
+
+    pub fn set_global_exec_policy(_policy: Option<CompiledExecPolicy>) {}
 
     pub fn global_exec_policy() -> Option<Arc<CompiledExecPolicy>> {
         None

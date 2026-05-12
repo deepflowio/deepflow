@@ -43,7 +43,7 @@ pub mod memory_profile;
 use std::ffi::{CStr, CString};
 use std::ptr::{self, null_mut};
 use std::slice;
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -679,6 +679,65 @@ static mut ON_CPU_PROFILE_FREQUENCY: u32 = 0;
 static mut PROFILE_STACK_COMPRESSION: bool = true;
 #[allow(static_mut_refs)]
 static mut TIME_DIFF: Option<Arc<AtomicI64>> = None;
+#[cfg(feature = "enterprise")]
+static AI_AGENT_EXEC_RULES_MAP_FD: AtomicI32 = AtomicI32::new(-1);
+#[cfg(feature = "enterprise")]
+static AI_AGENT_POLICY_EPOCH_MAP_FD: AtomicI32 = AtomicI32::new(-1);
+#[cfg(feature = "enterprise")]
+const AI_AGENT_EXEC_RULES_BPF_MAX: usize = 256;
+
+#[cfg(feature = "enterprise")]
+fn ai_agent_enforcement_mode_eq(value: &str, expected: &str) -> bool {
+    value.trim().eq_ignore_ascii_case(expected)
+}
+
+#[cfg(feature = "enterprise")]
+fn ai_agent_enforcement_lsm_allowed(
+    config: &crate::config::config::AiAgentEnforcementConfig,
+) -> bool {
+    let mechanism_allowed = config
+        .allowed_mechanisms
+        .iter()
+        .any(|m| ai_agent_enforcement_mode_eq(m, "lsm"));
+    let strategy_allows_lsm = matches!(
+        config.strategy.trim().to_ascii_lowercase().as_str(),
+        "auto" | "lsm_only"
+    );
+    mechanism_allowed && strategy_allows_lsm
+}
+
+#[cfg(feature = "enterprise")]
+fn ai_agent_enforcement_inputs(
+    config: &crate::config::config::AiAgentEnforcementConfig,
+    mode: enterprise_utils::ai_agent_enforcement::EnforcementMode,
+) -> Vec<enterprise_utils::ai_agent_enforcement::ExecRuleInput> {
+    config
+        .rules
+        .iter()
+        .filter(|rule| {
+            ai_agent_enforcement_mode_eq(&rule.scope, "ai_agent_tree")
+                && ai_agent_enforcement_mode_eq(&rule.target_type, "exec")
+        })
+        .map(|rule| {
+            let rule_mode = if mode
+                == enterprise_utils::ai_agent_enforcement::EnforcementMode::Block
+                && ai_agent_enforcement_mode_eq(&rule.action.action_type, "deny")
+            {
+                enterprise_utils::ai_agent_enforcement::EnforcementMode::Block
+            } else {
+                enterprise_utils::ai_agent_enforcement::EnforcementMode::AuditOnly
+            };
+            enterprise_utils::ai_agent_enforcement::ExecRuleInput {
+                id: rule.id.clone(),
+                mode: rule_mode,
+                exact: rule.exec.exact.clone(),
+                prefix: rule.exec.prefix.clone(),
+                suffix: rule.exec.suffix.clone(),
+                argv_contains_any: rule.exec.argv_contains_any.clone(),
+            }
+        })
+        .collect()
+}
 
 pub unsafe fn string_from_null_terminated_c_str(ptr: *const u8) -> String {
     CStr::from_ptr(ptr as *const libc::c_char)
@@ -1444,6 +1503,28 @@ impl EbpfCollector {
             } else {
                 warn!("AI Agent: could not find __ai_agent_pids BPF map (fd={}), file I/O monitoring will not work", fd);
             }
+
+            let exec_rules_fd = unsafe {
+                ebpf::bpf_table_get_map_fd(
+                    c"socket-trace".as_ptr(),
+                    c"__ai_agent_exec_rules".as_ptr(),
+                )
+            };
+            AI_AGENT_EXEC_RULES_MAP_FD.store(exec_rules_fd, Ordering::Relaxed);
+            let policy_epoch_fd = unsafe {
+                ebpf::bpf_table_get_map_fd(
+                    c"socket-trace".as_ptr(),
+                    c"__ai_agent_policy_epoch".as_ptr(),
+                )
+            };
+            AI_AGENT_POLICY_EPOCH_MAP_FD.store(policy_epoch_fd, Ordering::Relaxed);
+            if exec_rules_fd < 0 || policy_epoch_fd < 0 {
+                warn!(
+                    "AI Agent enforcement: BPF maps unavailable (__ai_agent_exec_rules={}, __ai_agent_policy_epoch={}), block mode will downgrade to audit-only",
+                    exec_rules_fd, policy_epoch_fd
+                );
+            }
+            Self::sync_ai_agent_enforcement_policy(&config.ai_agent_enforcement);
         }
 
         Ok(handle)
@@ -1482,6 +1563,92 @@ impl EbpfCollector {
                 );
             }
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn clear_ai_agent_enforcement_bpf_maps(max_records: usize) {
+        let exec_rules_fd = AI_AGENT_EXEC_RULES_MAP_FD.load(Ordering::Relaxed);
+        let policy_epoch_fd = AI_AGENT_POLICY_EPOCH_MAP_FD.load(Ordering::Relaxed);
+        if exec_rules_fd < 0 || policy_epoch_fd < 0 {
+            return;
+        }
+        match enterprise_utils::ai_agent_enforcement::compile_exec_rules(&[]) {
+            Ok(policy) => {
+                if let Err(e) = policy.sync_to_bpf_maps(exec_rules_fd, policy_epoch_fd, max_records)
+                {
+                    warn!("AI Agent enforcement: failed to clear BPF maps: {}", e);
+                }
+            }
+            Err(e) => warn!("AI Agent enforcement: failed to build empty policy: {}", e),
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn sync_ai_agent_enforcement_policy(config: &crate::config::config::AiAgentEnforcementConfig) {
+        use enterprise_utils::ai_agent_enforcement::{
+            compile_exec_rules, set_global_exec_policy, EnforcementMode,
+        };
+
+        let max_records = config.max_rules.min(AI_AGENT_EXEC_RULES_BPF_MAX);
+        if !config.enabled {
+            set_global_exec_policy(None);
+            Self::clear_ai_agent_enforcement_bpf_maps(max_records);
+            return;
+        }
+
+        let exec_rules_fd = AI_AGENT_EXEC_RULES_MAP_FD.load(Ordering::Relaxed);
+        let policy_epoch_fd = AI_AGENT_POLICY_EPOCH_MAP_FD.load(Ordering::Relaxed);
+        let bpf_maps_available = exec_rules_fd >= 0 && policy_epoch_fd >= 0;
+        let lsm_allowed = ai_agent_enforcement_lsm_allowed(config);
+        let requested_block = ai_agent_enforcement_mode_eq(&config.mode, "block");
+        let effective_mode = if requested_block && bpf_maps_available && lsm_allowed {
+            EnforcementMode::Block
+        } else {
+            if requested_block {
+                warn!(
+                    "AI Agent enforcement: block mode requested but BPF LSM is unavailable or disallowed; downgrade to audit-only (maps_available={}, lsm_allowed={})",
+                    bpf_maps_available, lsm_allowed
+                );
+            }
+            EnforcementMode::AuditOnly
+        };
+
+        let inputs = ai_agent_enforcement_inputs(config, effective_mode);
+        let policy = match compile_exec_rules(&inputs) {
+            Ok(policy) => policy,
+            Err(e) => {
+                warn!("AI Agent enforcement: failed to compile policy: {}", e);
+                set_global_exec_policy(None);
+                Self::clear_ai_agent_enforcement_bpf_maps(max_records);
+                return;
+            }
+        };
+
+        if effective_mode == EnforcementMode::Block {
+            if let Err(e) = policy.sync_to_bpf_maps(exec_rules_fd, policy_epoch_fd, max_records) {
+                warn!(
+                    "AI Agent enforcement: failed to sync BPF policy, downgrade to audit-only: {}",
+                    e
+                );
+                let audit_inputs = ai_agent_enforcement_inputs(config, EnforcementMode::AuditOnly);
+                match compile_exec_rules(&audit_inputs) {
+                    Ok(audit_policy) => set_global_exec_policy(Some(audit_policy)),
+                    Err(e) => {
+                        warn!(
+                            "AI Agent enforcement: failed to compile audit policy: {}",
+                            e
+                        );
+                        set_global_exec_policy(None);
+                    }
+                }
+                Self::clear_ai_agent_enforcement_bpf_maps(max_records);
+                return;
+            }
+        } else {
+            Self::clear_ai_agent_enforcement_bpf_maps(max_records);
+        }
+
+        set_global_exec_policy(Some(policy));
     }
 
     fn ebpf_start() {
@@ -1693,6 +1860,8 @@ impl EbpfCollector {
                 config.l7_log_packet_size,
                 config.ai_agent_max_payload_size,
             );
+            #[cfg(feature = "enterprise")]
+            Self::sync_ai_agent_enforcement_policy(&config.ai_agent_enforcement);
 
             #[cfg(feature = "extended_observability")]
             {
