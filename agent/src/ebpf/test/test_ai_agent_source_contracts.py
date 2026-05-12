@@ -12,6 +12,10 @@ LOAD_C = ROOT / "user" / "load.c"
 PROBE_C = ROOT / "user" / "probe.c"
 TRACER_H = ROOT / "user" / "tracer.h"
 TRACER_C = ROOT / "user" / "tracer.c"
+WORKSPACE_ROOT = ROOT.parents[3]
+ENTERPRISE_AGENT = WORKSPACE_ROOT / "deepflow-core" / "agent"
+ENTERPRISE_BPF = ENTERPRISE_AGENT / "src" / "ebpf" / "user" / "extended" / "bpf"
+ENTERPRISE_SUPPORT = ENTERPRISE_AGENT / "scripts" / "support_extended_observability"
 
 
 def require(condition: bool, message: str) -> None:
@@ -159,5 +163,36 @@ require(
     and "skip unloaded lsm program" in tracer_c_text,
     "tracer.c must skip unloaded optional LSM programs during attach",
 )
+
+if ENTERPRISE_AGENT.exists():
+    exec_enforce_bpf = ENTERPRISE_BPF / "ai_agent_exec_enforce.bpf.c"
+    require(
+        exec_enforce_bpf.exists(),
+        f"missing enterprise AI Agent exec enforcement BPF: {exec_enforce_bpf}",
+    )
+    exec_enforce_text = read_source(exec_enforce_bpf)
+    support_text = read_source(ENTERPRISE_SUPPORT)
+
+    require(
+        'SEC("lsm/bprm_check_security")' in exec_enforce_text,
+        "AI Agent exec enforcement must attach to lsm/bprm_check_security",
+    )
+    require(
+        "is_ai_agent_process" in exec_enforce_text
+        or "ai_agent_pids" in exec_enforce_text,
+        "AI Agent exec enforcement must scope matching to AI Agent processes",
+    )
+    require(
+        "DATA_SOURCE_PROC_BLOCK_EVENT" in exec_enforce_text,
+        "AI Agent exec enforcement must emit proc block events",
+    )
+    require(
+        "ai_agent_submit_event" in exec_enforce_text,
+        "AI Agent exec enforcement must submit events through the AI Agent pipeline",
+    )
+    require(
+        "ai_agent_exec_enforce.bpf.c" in support_text,
+        "support_extended_observability must include ai_agent_exec_enforce.bpf.c",
+    )
 
 print("[OK]")
