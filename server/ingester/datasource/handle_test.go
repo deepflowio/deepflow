@@ -33,6 +33,12 @@ func TestNewAiAgentEventDatasourcesRegistered(t *testing.T) {
 			wantDB:     "event",
 			wantTable:  "proc_ops_event",
 		},
+		{
+			name:       "proc block event",
+			datasource: EVENT_PROC_BLOCK_EVENT,
+			wantDB:     "event",
+			wantTable:  "proc_block_event",
+		},
 	}
 
 	for _, tt := range tests {

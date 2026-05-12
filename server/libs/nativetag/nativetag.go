@@ -45,6 +45,7 @@ const (
 	DEEPFLOW_TENANT
 	EXT_METRICS
 	PROFILE
+	EVENT_PROC_BLOCK_EVENT
 
 	MAX_NATIVE_TAG_TABLE
 )
@@ -62,6 +63,7 @@ var NativeTagDatabaseNames = [MAX_NATIVE_TAG_TABLE]string{
 	DEEPFLOW_TENANT:       "deepflow_tenant",
 	EXT_METRICS:           "ext_metrics",
 	PROFILE:               "profile",
+	EVENT_PROC_BLOCK_EVENT: "event",
 }
 
 var NativeTagTableNames = [MAX_NATIVE_TAG_TABLE]string{
@@ -77,6 +79,7 @@ var NativeTagTableNames = [MAX_NATIVE_TAG_TABLE]string{
 	DEEPFLOW_TENANT:       "deepflow_collector",
 	EXT_METRICS:           "metrics",
 	PROFILE:               "in_process",
+	EVENT_PROC_BLOCK_EVENT: "proc_block_event",
 }
 
 func (t NativeTagTable) Database() string {
