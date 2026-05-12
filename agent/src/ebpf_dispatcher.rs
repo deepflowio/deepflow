@@ -185,6 +185,47 @@ fn fill_ai_agent_root_pid(event: &mut BoxedProcEvents) {
     }
 }
 
+#[cfg(feature = "enterprise")]
+#[allow(static_mut_refs)]
+fn emit_ai_agent_enforcement_audit_event(event: &BoxedProcEvents) {
+    use enterprise_utils::ai_agent_enforcement::EnforcementMode;
+
+    if event.0.ai_agent_root_pid == 0 {
+        return;
+    }
+    let Some(exec_info) = event.0.proc_lifecycle_exec_info() else {
+        return;
+    };
+    if exec_info.exec_path.is_empty() {
+        return;
+    }
+    let Some(policy) = enterprise_utils::ai_agent_enforcement::global_exec_policy() else {
+        return;
+    };
+    let exec_path = String::from_utf8_lossy(exec_info.exec_path);
+    let cmdline = String::from_utf8_lossy(exec_info.cmdline);
+    let Some(hit) = policy.match_exec(&exec_path, &cmdline) else {
+        return;
+    };
+    if hit.mode != EnforcementMode::AuditOnly {
+        return;
+    }
+    let Some(audit_event) = event
+        .0
+        .new_proc_block_event_for_audit(&hit.rule_id, policy.epoch)
+    else {
+        return;
+    };
+
+    unsafe {
+        if let Some(sender) = PROC_EVENT_SENDER.as_mut() {
+            if let Err(e) = sender.send(audit_event) {
+                warn!("ai agent enforcement audit event send error: {:?}", e);
+            }
+        }
+    }
+}
+
 impl OwnedCountable for SyncEbpfCounter {
     fn get_counters(&self) -> Vec<Counter> {
         let rx = self.counter.rx.swap(0, Ordering::Relaxed);
@@ -715,6 +756,8 @@ impl EbpfCollector {
                 register_ai_agent_child(&event);
                 #[cfg(feature = "enterprise")]
                 fill_ai_agent_root_pid(&mut event);
+                #[cfg(feature = "enterprise")]
+                emit_ai_agent_enforcement_audit_event(&event);
                 if let Err(e) = PROC_EVENT_SENDER.as_mut().unwrap().send(event) {
                     warn!("event send ebpf error: {:?}", e);
                 }

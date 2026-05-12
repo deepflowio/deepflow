@@ -501,6 +501,38 @@ pub mod kernel_version {
     }
 }
 
+pub mod ai_agent_enforcement {
+    use std::sync::Arc;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum EnforcementMode {
+        AuditOnly,
+        Block,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct PolicyHit {
+        pub rule_index: u32,
+        pub rule_id: String,
+        pub mode: EnforcementMode,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct CompiledExecPolicy {
+        pub epoch: u64,
+    }
+
+    impl CompiledExecPolicy {
+        pub fn match_exec(&self, _exec_path: &str, _cmdline: &str) -> Option<PolicyHit> {
+            None
+        }
+    }
+
+    pub fn global_exec_policy() -> Option<Arc<CompiledExecPolicy>> {
+        None
+    }
+}
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod rpc {
     pub mod remote_exec {
