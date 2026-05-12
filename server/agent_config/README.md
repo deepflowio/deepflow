@@ -2451,6 +2451,119 @@ inputs:
 | ---- | ---------------------------- |
 | Type | string |
 
+##### Strategy {#inputs.proc.ai_agent.enforcement.strategy}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.strategy`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        strategy: auto
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| auto | |
+| lsm_only | |
+| override_only | |
+| sigkill_only | |
+| audit_only | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Enforcement mechanism selection for exec command blocking. The first implementation uses BPF LSM when available; kprobe override is reserved for future syscall blocking when capability probing succeeds.
+
+##### Syscall Strategy {#inputs.proc.ai_agent.enforcement.syscall_strategy}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.syscall_strategy`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        syscall_strategy: auto
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| auto | |
+| lsm_only | |
+| override_only | |
+| sigkill_only | |
+| audit_only | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Reserved mechanism selection for future direct syscall blocking. kprobe override requires CONFIG_BPF_KPROBE_OVERRIDE and an error-injectable kernel function.
+
+##### Allowed Mechanisms {#inputs.proc.ai_agent.enforcement.allowed_mechanisms}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.allowed_mechanisms`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        allowed_mechanisms: [lsm, kprobe_override, sigkill, seccomp]
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| lsm | |
+| kprobe_override | |
+| sigkill | |
+| seccomp | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Mechanisms allowed by configuration. kprobe_override is only attempted when this list contains it and runtime capability probing confirms support.
+
 ##### Default Fallback {#inputs.proc.ai_agent.enforcement.default_fallback}
 
 **Tags**:

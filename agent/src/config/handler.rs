@@ -6186,6 +6186,15 @@ mod tests {
         let config = LogParserConfig::default();
         assert!(!config.ai_agent_enforcement.enabled);
         assert_eq!(config.ai_agent_enforcement.mode.as_str(), "audit_only");
+        assert_eq!(config.ai_agent_enforcement.strategy.as_str(), "auto");
+        assert_eq!(
+            config.ai_agent_enforcement.syscall_strategy.as_str(),
+            "auto"
+        );
+        assert_eq!(
+            config.ai_agent_enforcement.allowed_mechanisms,
+            vec!["lsm", "kprobe_override", "sigkill", "seccomp"]
+        );
         assert!(config.ai_agent_enforcement.rules.is_empty());
     }
 

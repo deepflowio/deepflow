@@ -630,6 +630,9 @@ impl Default for AiAgentConfig {
 pub struct AiAgentEnforcementConfig {
     pub enabled: bool,
     pub mode: String,
+    pub strategy: String,
+    pub syscall_strategy: String,
+    pub allowed_mechanisms: Vec<String>,
     pub default_fallback: String,
     pub max_rules: usize,
     pub rules: Vec<AiAgentEnforcementRule>,
@@ -640,6 +643,14 @@ impl Default for AiAgentEnforcementConfig {
         Self {
             enabled: false,
             mode: "audit_only".to_string(),
+            strategy: "auto".to_string(),
+            syscall_strategy: "auto".to_string(),
+            allowed_mechanisms: vec![
+                "lsm".to_string(),
+                "kprobe_override".to_string(),
+                "sigkill".to_string(),
+                "seccomp".to_string(),
+            ],
             default_fallback: "sigkill".to_string(),
             max_rules: 256,
             rules: Vec::new(),

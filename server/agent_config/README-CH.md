@@ -2420,6 +2420,119 @@ inputs:
 | ---- | ---------------------------- |
 | Type | string |
 
+##### Exec 阻断策略 {#inputs.proc.ai_agent.enforcement.strategy}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.strategy`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        strategy: auto
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| auto | |
+| lsm_only | |
+| override_only | |
+| sigkill_only | |
+| audit_only | |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+exec 命令阻断的机制选择。第一版在可用时使用 BPF LSM；kprobe override 预留给后续 syscall 阻断，并且仅在能力探测通过时使用。
+
+##### Syscall 阻断策略 {#inputs.proc.ai_agent.enforcement.syscall_strategy}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.syscall_strategy`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        syscall_strategy: auto
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| auto | |
+| lsm_only | |
+| override_only | |
+| sigkill_only | |
+| audit_only | |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+预留给后续直接 syscall 阻断的机制选择。kprobe override 需要 CONFIG_BPF_KPROBE_OVERRIDE，并且目标内核函数必须支持 error injection。
+
+##### 允许的阻断机制 {#inputs.proc.ai_agent.enforcement.allowed_mechanisms}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.allowed_mechanisms`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        allowed_mechanisms: [lsm, kprobe_override, sigkill, seccomp]
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| lsm | |
+| kprobe_override | |
+| sigkill | |
+| seccomp | |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+配置允许使用的阻断机制。只有列表包含 kprobe_override 且运行时能力探测确认支持时，才会尝试使用 bpf_override_return。
+
 ##### 默认降级动作 {#inputs.proc.ai_agent.enforcement.default_fallback}
 
 **标签**:
