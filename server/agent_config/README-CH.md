@@ -2269,6 +2269,97 @@ inputs:
 - ebpf.profile.off_cpu（注意确认 `inputs.ebpf.profile.off_cpu.disabled` 已配置为 **false**）
 - ebpf.profile.memory（注意确认 `inputs.ebpf.profile.memory.disabled` 已配置为 **false**）
 
+### 智能体治理 {#inputs.proc.ai_agent}
+
+#### HTTP 端点 {#inputs.proc.ai_agent.http_endpoints}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.http_endpoints`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      http_endpoints:
+      - /v1/chat/completions
+      - /v1/embeddings
+      - /v1/responses
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+用于识别智能体的 HTTP 端点前缀，命中后会标记进程为 AI Agent。
+
+#### 最大载荷大小 {#inputs.proc.ai_agent.max_payload_size}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.max_payload_size`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      max_payload_size: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | byte |
+| Range | [0, 2147483647] |
+
+**详细描述**:
+
+AI Agent 流重组最大载荷大小，0 表示不限。
+
+#### 文件 IO 事件 {#inputs.proc.ai_agent.file_io_enabled}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.file_io_enabled`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      file_io_enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否开启 AI Agent 文件 IO 事件采集。
+
 ### 符号表 {#inputs.proc.symbol_table}
 
 #### Golang 特有 {#inputs.proc.symbol_table.golang_specific}
@@ -8414,7 +8505,7 @@ processors:
     application_protocol_inference:
       protocol_special_config:
         mysql:
-          endpoint_disabled: true
+          endpoint_disabled: false
 ```
 
 **模式**:
@@ -8424,7 +8515,15 @@ processors:
 
 **详细描述**:
 
-关闭后不会提取 SQL 语句中的动作和表名放入 endpoint 中
+关闭后不会提取 SQL 语句中的动作和表名放入 endpoint 中，目前支持从如下 SQL 语句中提取：
+- SELECT * FROM users;
+- INSERT INTO users VALUES (DEFAULT, '张三', 'zhang@example.com', 25);
+- UPDATE users SET age = 18;
+- DELETE FROM users WHERE id = 5;
+- CREATE TABLE users ( id INT PRIMARY KEY AUTO_INCREMENT, age INT,);
+- DROP TABLE users;
+- ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+- MySQL 登陆用户名
 
 ##### Grpc {#processors.request_log.application_protocol_inference.protocol_special_config.grpc}
 

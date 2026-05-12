@@ -6179,9 +6179,26 @@ processors:
           # description:
           #   en: |-
           #     After turning it off, the actions and table names in the SQL statement will not be extracted into the endpoint.
+          #     Currently supports extraction from the following SQL statements:
+          #     - SELECT * FROM users;
+          #     - INSERT INTO users VALUES (DEFAULT, '张三', 'zhang@example.com', 25);
+          #     - UPDATE users SET age = 18;
+          #     - DELETE FROM users WHERE id = 5;
+          #     - CREATE TABLE users ( id INT PRIMARY KEY AUTO_INCREMENT, age INT,);
+          #     - DROP TABLE users;
+          #     - ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+          #     - MySQL Login username 
           #   ch: |-
-          #     关闭后不会提取 SQL 语句中的动作和表名放入 endpoint 中
-          endpoint_disabled: true
+          #     关闭后不会提取 SQL 语句中的动作和表名放入 endpoint 中，目前支持从如下 SQL 语句中提取：
+          #     - SELECT * FROM users;
+          #     - INSERT INTO users VALUES (DEFAULT, '张三', 'zhang@example.com', 25);
+          #     - UPDATE users SET age = 18;
+          #     - DELETE FROM users WHERE id = 5;
+          #     - CREATE TABLE users ( id INT PRIMARY KEY AUTO_INCREMENT, age INT,);
+          #     - DROP TABLE users;
+          #     - ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+          #     - MySQL 登陆用户名
+          endpoint_disabled: false 
         # type: section
         # name: Grpc
         # description:

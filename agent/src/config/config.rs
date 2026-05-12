@@ -1997,7 +1997,7 @@ impl Default for MysqlConfig {
     fn default() -> Self {
         Self {
             decompress_payload: true,
-            endpoint_disabled: true,
+            endpoint_disabled: false,
         }
     }
 }
