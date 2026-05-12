@@ -2391,6 +2391,151 @@ inputs:
 
 Whether to enable AI Agent file IO event collection.
 
+#### Enforcement {#inputs.proc.ai_agent.enforcement}
+
+AI Agent command execution enforcement. The first implementation only supports exec command audit/block.
+
+##### Enabled {#inputs.proc.ai_agent.enforcement.enabled}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.enabled`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+##### Mode {#inputs.proc.ai_agent.enforcement.mode}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.mode`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        mode: audit_only
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| audit_only | |
+| block | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+##### Default Fallback {#inputs.proc.ai_agent.enforcement.default_fallback}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.default_fallback`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        default_fallback: sigkill
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| sigkill | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+##### Max Rules {#inputs.proc.ai_agent.enforcement.max_rules}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.max_rules`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        max_rules: 256
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 1024] |
+
+##### Rules {#inputs.proc.ai_agent.enforcement.rules}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.rules`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        rules: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**Description**:
+
+AI Agent command enforcement rules. The first implementation supports exec command exact/prefix/suffix matching.
+
 ### Symbol Table {#inputs.proc.symbol_table}
 
 #### Golang-specific {#inputs.proc.symbol_table.golang_specific}
@@ -11970,4 +12115,3 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
-

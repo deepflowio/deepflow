@@ -1724,6 +1724,69 @@ inputs:
       #   ch: |-
       #     是否开启 AI Agent 文件 IO 事件采集。
       file_io_enabled: true
+      # type: section
+      # name:
+      #   en: Enforcement
+      #   ch: 执行阻断
+      # description:
+      #   en: AI Agent command execution enforcement. The first implementation only supports exec command audit/block.
+      #   ch: AI Agent 命令执行阻断。第一版仅支持 exec 命令审计/阻断。
+      enforcement:
+        # type: bool
+        # name:
+        #   en: Enabled
+        #   ch: 开启执行阻断
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: true
+        enabled: false
+        # type: string
+        # name:
+        #   en: Mode
+        #   ch: 模式
+        # unit:
+        # range: []
+        # enum_options: [audit_only, block]
+        # modification: hot_update
+        # ee_feature: true
+        mode: audit_only
+        # type: string
+        # name:
+        #   en: Default Fallback
+        #   ch: 默认降级动作
+        # unit:
+        # range: []
+        # enum_options: [sigkill]
+        # modification: hot_update
+        # ee_feature: true
+        default_fallback: sigkill
+        # type: int
+        # name:
+        #   en: Max Rules
+        #   ch: 最大规则数
+        # unit:
+        # range: [0, 1024]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: true
+        max_rules: 256
+        # type: dict
+        # name:
+        #   en: Rules
+        #   ch: 规则
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     AI Agent command enforcement rules. The first implementation supports exec command exact/prefix/suffix matching.
+        #   ch: |-
+        #     AI Agent 命令执行阻断规则。第一版支持 exec 命令 exact/prefix/suffix 匹配。
+        rules: []
     # type: section
     # name:
     #   en: Symbol Table

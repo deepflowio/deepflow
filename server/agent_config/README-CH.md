@@ -2360,6 +2360,151 @@ inputs:
 
 是否开启 AI Agent 文件 IO 事件采集。
 
+#### 执行阻断 {#inputs.proc.ai_agent.enforcement}
+
+AI Agent 命令执行阻断。第一版仅支持 exec 命令审计/阻断。
+
+##### 开启执行阻断 {#inputs.proc.ai_agent.enforcement.enabled}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.enabled`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+##### 模式 {#inputs.proc.ai_agent.enforcement.mode}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.mode`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        mode: audit_only
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| audit_only | |
+| block | |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+##### 默认降级动作 {#inputs.proc.ai_agent.enforcement.default_fallback}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.default_fallback`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        default_fallback: sigkill
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| sigkill | |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+##### 最大规则数 {#inputs.proc.ai_agent.enforcement.max_rules}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.max_rules`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        max_rules: 256
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 1024] |
+
+##### 规则 {#inputs.proc.ai_agent.enforcement.rules}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.rules`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        rules: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**详细描述**:
+
+AI Agent 命令执行阻断规则。第一版支持 exec 命令 exact/prefix/suffix 匹配。
+
 ### 符号表 {#inputs.proc.symbol_table}
 
 #### Golang 特有 {#inputs.proc.symbol_table.golang_specific}
@@ -11698,4 +11843,3 @@ dev:
 **详细描述**:
 
 未发布的采集器特性可以通过该选项开启。
-

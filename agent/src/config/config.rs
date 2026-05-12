@@ -607,6 +607,7 @@ pub struct AiAgentConfig {
     pub http_endpoints: Vec<String>,
     pub max_payload_size: usize,
     pub file_io_enabled: bool,
+    pub enforcement: AiAgentEnforcementConfig,
 }
 
 impl Default for AiAgentConfig {
@@ -619,8 +620,83 @@ impl Default for AiAgentConfig {
             ],
             max_payload_size: 0, // 0 means unlimited
             file_io_enabled: true,
+            enforcement: AiAgentEnforcementConfig::default(),
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AiAgentEnforcementConfig {
+    pub enabled: bool,
+    pub mode: String,
+    pub default_fallback: String,
+    pub max_rules: usize,
+    pub rules: Vec<AiAgentEnforcementRule>,
+}
+
+impl Default for AiAgentEnforcementConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            mode: "audit_only".to_string(),
+            default_fallback: "sigkill".to_string(),
+            max_rules: 256,
+            rules: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AiAgentEnforcementRule {
+    pub id: String,
+    pub description: String,
+    pub scope: String,
+    pub target_type: String,
+    pub action: AiAgentEnforcementAction,
+    pub audit: bool,
+    pub exec: AiAgentExecMatch,
+}
+
+impl Default for AiAgentEnforcementRule {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            description: String::new(),
+            scope: "ai_agent_tree".to_string(),
+            target_type: "exec".to_string(),
+            action: AiAgentEnforcementAction::default(),
+            audit: true,
+            exec: AiAgentExecMatch::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AiAgentEnforcementAction {
+    #[serde(rename = "type")]
+    pub action_type: String,
+    pub errno: String,
+}
+
+impl Default for AiAgentEnforcementAction {
+    fn default() -> Self {
+        Self {
+            action_type: "deny".to_string(),
+            errno: "EPERM".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AiAgentExecMatch {
+    pub exact: Vec<String>,
+    pub prefix: Vec<String>,
+    pub suffix: Vec<String>,
+    pub argv_contains_any: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]

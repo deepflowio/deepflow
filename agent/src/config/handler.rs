@@ -58,10 +58,11 @@ use tokio::runtime::Runtime;
 use super::config::{Ebpf, EbpfFileIoEvent, ProcessMatcher, SymbolTable};
 use super::{
     config::{
-        ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
-        HttpEndpointMatchRule, Iso8583ParseConfig, NetSignParseConfig, OracleConfig, PcapStream,
-        PortConfig, ProcessorsFlowLogTunning, RequestLogTunning, SessionTimeout, TagFilterOperator,
-        Timeouts, UserConfig, WebSphereMqParseConfig, GRPC_BUFFER_SIZE_MIN,
+        AiAgentEnforcementConfig, ApiResources, Config, DpdkSource, ExtraLogFields,
+        ExtraLogFieldsInfo, HttpEndpoint, HttpEndpointMatchRule, Iso8583ParseConfig,
+        NetSignParseConfig, OracleConfig, PcapStream, PortConfig, ProcessorsFlowLogTunning,
+        RequestLogTunning, SessionTimeout, TagFilterOperator, Timeouts, UserConfig,
+        WebSphereMqParseConfig, GRPC_BUFFER_SIZE_MIN,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -1213,6 +1214,7 @@ pub struct LogParserConfig {
     pub ai_agent_endpoints: Vec<String>,
     pub ai_agent_max_payload_size: usize,
     pub ai_agent_file_io_enabled: bool,
+    pub ai_agent_enforcement: AiAgentEnforcementConfig,
 }
 
 impl Default for LogParserConfig {
@@ -1240,6 +1242,7 @@ impl Default for LogParserConfig {
             ],
             ai_agent_max_payload_size: usize::MAX, // default: unlimited (config 0 → usize::MAX)
             ai_agent_file_io_enabled: true,
+            ai_agent_enforcement: AiAgentEnforcementConfig::default(),
         }
     }
 }
@@ -1290,6 +1293,7 @@ impl fmt::Debug for LogParserConfig {
             .field("ai_agent_endpoints", &self.ai_agent_endpoints)
             .field("ai_agent_max_payload_size", &self.ai_agent_max_payload_size)
             .field("ai_agent_file_io_enabled", &self.ai_agent_file_io_enabled)
+            .field("ai_agent_enforcement", &self.ai_agent_enforcement)
             .finish()
     }
 }
@@ -2426,6 +2430,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     conf.inputs.proc.ai_agent.max_payload_size
                 },
                 ai_agent_file_io_enabled: conf.inputs.proc.ai_agent.file_io_enabled,
+                ai_agent_enforcement: conf.inputs.proc.ai_agent.enforcement.clone(),
             },
             debug: DebugConfig {
                 agent_id: conf.global.common.agent_id as u16,
@@ -6173,6 +6178,31 @@ mod tests {
         assert!(
             debug.contains("ai_agent_file_io_enabled: false"),
             "debug output missing ai_agent_file_io_enabled: {debug}"
+        );
+    }
+
+    #[test]
+    fn test_ai_agent_enforcement_defaults_disabled() {
+        let config = LogParserConfig::default();
+        assert!(!config.ai_agent_enforcement.enabled);
+        assert_eq!(config.ai_agent_enforcement.mode.as_str(), "audit_only");
+        assert!(config.ai_agent_enforcement.rules.is_empty());
+    }
+
+    #[test]
+    fn test_log_parser_debug_includes_ai_agent_enforcement() {
+        let mut config = LogParserConfig::default();
+        config.ai_agent_enforcement.enabled = true;
+        config.ai_agent_enforcement.mode = "block".to_string();
+
+        let debug = format!("{config:?}");
+        assert!(
+            debug.contains("ai_agent_enforcement"),
+            "debug output missing ai_agent_enforcement: {debug}"
+        );
+        assert!(
+            debug.contains("block"),
+            "debug output missing ai_agent enforcement mode: {debug}"
         );
     }
 
