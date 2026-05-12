@@ -25,13 +25,13 @@ use std::{
 
 use prost::Message;
 use public::{
-    bytes::{read_u16_le, read_u32_le, read_u64_le},
+    bytes::{read_i32_le, read_u16_le, read_u32_le, read_u64_le},
     proto::metric,
     sender::{SendMessageType, Sendable},
 };
 
 use crate::common::{
-    ebpf::{FILE_OP_EVENT, IO_EVENT, PERM_OP_EVENT, PROC_LIFECYCLE_EVENT},
+    ebpf::{FILE_OP_EVENT, IO_EVENT, PERM_OP_EVENT, PROC_BLOCK_EVENT, PROC_LIFECYCLE_EVENT},
     error::Error::{self, ParseEventData},
 };
 use crate::ebpf::SK_BPF_DATA;
@@ -49,6 +49,13 @@ const IO_MNT_ID_OFFSET: usize = 1564;
 const IO_MNTNS_ID_OFFSET: usize = 1568;
 const IO_ACCESS_PERMISSION_OFFSET: usize = 1572;
 const IO_EVENT_BUFF_SIZE: usize = 1574;
+
+fn parse_cstring_slice(slice: &[u8]) -> Vec<u8> {
+    match slice.iter().position(|&b| b == b'\0') {
+        Some(index) => slice[..index].to_vec(),
+        None => slice.to_vec(),
+    }
+}
 
 struct IoEventData {
     bytes_count: u32, // Number of bytes read and written
@@ -358,6 +365,157 @@ impl From<ProcLifecycleEventData> for metric::ProcLifecycleEventData {
     }
 }
 
+// ── ProcBlockEventData offsets (packed __ai_agent_proc_block_event) ─────
+// Layout:
+// target_type(1) + action(1) + mechanism(1) + guarantee(1) + errno(4)
+// + pid(4) + parent_pid(4) + ai_agent_root_pid(4) + uid(4) + gid(4)
+// + syscall_id(4) + timestamp(8) + policy_epoch(8) + rule_id(64)
+// + comm(16) + cmdline(256) + exec_path(256) + syscall_name(32)
+const PROC_BLOCK_TARGET_TYPE_OFF: usize = 0;
+const PROC_BLOCK_ACTION_OFF: usize = 1;
+const PROC_BLOCK_MECHANISM_OFF: usize = 2;
+const PROC_BLOCK_GUARANTEE_OFF: usize = 3;
+const PROC_BLOCK_ERRNO_OFF: usize = 4;
+const PROC_BLOCK_PID_OFF: usize = 8;
+const PROC_BLOCK_PPID_OFF: usize = 12;
+const PROC_BLOCK_ROOT_PID_OFF: usize = 16;
+const PROC_BLOCK_UID_OFF: usize = 20;
+const PROC_BLOCK_GID_OFF: usize = 24;
+const PROC_BLOCK_SYSCALL_ID_OFF: usize = 28;
+const PROC_BLOCK_TS_OFF: usize = 32;
+const PROC_BLOCK_POLICY_EPOCH_OFF: usize = 40;
+const PROC_BLOCK_RULE_ID_OFF: usize = 48;
+const PROC_BLOCK_COMM_OFF: usize = 112;
+const PROC_BLOCK_CMDLINE_OFF: usize = 128;
+const PROC_BLOCK_EXEC_PATH_OFF: usize = 384;
+const PROC_BLOCK_SYSCALL_NAME_OFF: usize = 640;
+const PROC_BLOCK_EVENT_SIZE: usize = 672;
+
+struct ProcBlockEventData {
+    rule_id: String,
+    target_type: u8,
+    action: u8,
+    mechanism: String,
+    guarantee: String,
+    errno: i32,
+    pid: u32,
+    parent_pid: u32,
+    ai_agent_root_pid: u32,
+    uid: u32,
+    gid: u32,
+    comm: Vec<u8>,
+    cmdline: Vec<u8>,
+    exec_path: Vec<u8>,
+    syscall_name: String,
+    syscall_id: u32,
+    timestamp: u64,
+    policy_epoch: u64,
+}
+
+impl TryFrom<&[u8]> for ProcBlockEventData {
+    type Error = Error;
+
+    fn try_from(raw: &[u8]) -> Result<Self, Self::Error> {
+        if raw.len() < PROC_BLOCK_EVENT_SIZE {
+            return Err(ParseEventData(format!(
+                "proc_block event too short: {} < {PROC_BLOCK_EVENT_SIZE}",
+                raw.len()
+            )));
+        }
+
+        Ok(Self {
+            rule_id: String::from_utf8_lossy(&parse_cstring_slice(
+                &raw[PROC_BLOCK_RULE_ID_OFF..PROC_BLOCK_COMM_OFF],
+            ))
+            .into_owned(),
+            target_type: raw[PROC_BLOCK_TARGET_TYPE_OFF],
+            action: raw[PROC_BLOCK_ACTION_OFF],
+            mechanism: enforcement_mechanism_name(raw[PROC_BLOCK_MECHANISM_OFF]).to_string(),
+            guarantee: enforcement_guarantee_name(raw[PROC_BLOCK_GUARANTEE_OFF]).to_string(),
+            errno: read_i32_le(&raw[PROC_BLOCK_ERRNO_OFF..]),
+            pid: read_u32_le(&raw[PROC_BLOCK_PID_OFF..]),
+            parent_pid: read_u32_le(&raw[PROC_BLOCK_PPID_OFF..]),
+            ai_agent_root_pid: read_u32_le(&raw[PROC_BLOCK_ROOT_PID_OFF..]),
+            uid: read_u32_le(&raw[PROC_BLOCK_UID_OFF..]),
+            gid: read_u32_le(&raw[PROC_BLOCK_GID_OFF..]),
+            comm: parse_cstring_slice(&raw[PROC_BLOCK_COMM_OFF..PROC_BLOCK_CMDLINE_OFF]),
+            cmdline: parse_cstring_slice(&raw[PROC_BLOCK_CMDLINE_OFF..PROC_BLOCK_EXEC_PATH_OFF]),
+            exec_path: parse_cstring_slice(
+                &raw[PROC_BLOCK_EXEC_PATH_OFF..PROC_BLOCK_SYSCALL_NAME_OFF],
+            ),
+            syscall_name: String::from_utf8_lossy(&parse_cstring_slice(
+                &raw[PROC_BLOCK_SYSCALL_NAME_OFF..PROC_BLOCK_EVENT_SIZE],
+            ))
+            .into_owned(),
+            syscall_id: read_u32_le(&raw[PROC_BLOCK_SYSCALL_ID_OFF..]),
+            timestamp: read_u64_le(&raw[PROC_BLOCK_TS_OFF..]),
+            policy_epoch: read_u64_le(&raw[PROC_BLOCK_POLICY_EPOCH_OFF..]),
+        })
+    }
+}
+
+impl From<ProcBlockEventData> for metric::ProcBlockEventData {
+    fn from(d: ProcBlockEventData) -> Self {
+        Self {
+            rule_id: d.rule_id,
+            target_type: enforcement_target_type(d.target_type) as i32,
+            action: enforcement_action(d.action) as i32,
+            mechanism: d.mechanism,
+            guarantee: d.guarantee,
+            errno: d.errno,
+            pid: d.pid,
+            parent_pid: d.parent_pid,
+            ai_agent_root_pid: d.ai_agent_root_pid,
+            uid: d.uid,
+            gid: d.gid,
+            comm: d.comm,
+            cmdline: d.cmdline,
+            exec_path: d.exec_path,
+            syscall_name: d.syscall_name,
+            syscall_id: d.syscall_id,
+            timestamp: d.timestamp,
+            policy_epoch: d.policy_epoch,
+        }
+    }
+}
+
+fn enforcement_target_type(code: u8) -> metric::EnforcementTargetType {
+    match code {
+        1 => metric::EnforcementTargetType::EnforcementTargetExec,
+        2 => metric::EnforcementTargetType::EnforcementTargetSyscall,
+        _ => metric::EnforcementTargetType::EnforcementTargetUnknown,
+    }
+}
+
+fn enforcement_action(code: u8) -> metric::EnforcementAction {
+    match code {
+        1 => metric::EnforcementAction::Audit,
+        2 => metric::EnforcementAction::Deny,
+        3 => metric::EnforcementAction::Sigkill,
+        _ => metric::EnforcementAction::Unknown,
+    }
+}
+
+fn enforcement_mechanism_name(code: u8) -> &'static str {
+    match code {
+        1 => "lsm",
+        2 => "kprobe_override",
+        3 => "sigkill",
+        4 => "seccomp",
+        5 => "user_space_audit",
+        _ => "unknown",
+    }
+}
+
+fn enforcement_guarantee_name(code: u8) -> &'static str {
+    match code {
+        1 => "prevented",
+        2 => "best_effort",
+        3 => "audit_only",
+        _ => "unknown",
+    }
+}
+
 // ── EventData ──────────────────────────────────────────────────────────
 enum EventData {
     OtherEvent,
@@ -365,6 +523,7 @@ enum EventData {
     FileOpEvent(FileOpEventData),
     PermOpEvent(PermOpEventData),
     ProcLifecycleEvent(ProcLifecycleEventData),
+    ProcBlockEvent(ProcBlockEventData),
 }
 
 impl Debug for EventData {
@@ -392,6 +551,14 @@ impl Debug for EventData {
                 "ProcLifecycleEventData {{ type: {}, pid: {}, parent_pid: {} }}",
                 d.lifecycle_type, d.pid, d.parent_pid
             )),
+            EventData::ProcBlockEvent(d) => f.write_fmt(format_args!(
+                "ProcBlockEventData {{ rule_id: {}, action: {}, mechanism: {}, pid: {}, exec_path: {} }}",
+                d.rule_id,
+                d.action,
+                d.mechanism,
+                d.pid,
+                str::from_utf8(&d.exec_path).unwrap_or("")
+            )),
             _ => f.write_str("other event"),
         }
     }
@@ -405,6 +572,7 @@ pub enum EventType {
     FileOpEvent = 2,
     PermOpEvent = 3,
     ProcLifecycleEvent = 4,
+    ProcBlockEvent = 5,
 }
 
 impl From<u8> for EventType {
@@ -414,6 +582,7 @@ impl From<u8> for EventType {
             FILE_OP_EVENT => Self::FileOpEvent,
             PERM_OP_EVENT => Self::PermOpEvent,
             PROC_LIFECYCLE_EVENT => Self::ProcLifecycleEvent,
+            PROC_BLOCK_EVENT => Self::ProcBlockEvent,
             _ => Self::OtherEvent,
         }
     }
@@ -433,6 +602,7 @@ impl fmt::Display for EventType {
             Self::FileOpEvent => write!(f, "file_op_event"),
             Self::PermOpEvent => write!(f, "perm_op_event"),
             Self::ProcLifecycleEvent => write!(f, "proc_lifecycle_event"),
+            Self::ProcBlockEvent => write!(f, "proc_block_event"),
         }
     }
 }
@@ -461,6 +631,7 @@ impl ProcEvent {
         let mut event_data: EventData = EventData::OtherEvent;
         let start_time = data.timestamp; // The unit of start_time is nanosecond
         let mut end_time = 0;
+        let mut ai_agent_root_pid = 0;
         match event_type {
             EventType::IoEvent => {
                 let io_event_data = IoEventData::try_from(raw_data)?;
@@ -482,6 +653,12 @@ impl ProcEvent {
                 end_time = start_time;
                 event_data = EventData::ProcLifecycleEvent(d);
             }
+            EventType::ProcBlockEvent => {
+                let d = ProcBlockEventData::try_from(raw_data)?;
+                end_time = start_time;
+                ai_agent_root_pid = d.ai_agent_root_pid;
+                event_data = EventData::ProcBlockEvent(d);
+            }
             _ => {}
         }
 
@@ -501,7 +678,7 @@ impl ProcEvent {
             event_type,
             event_data,
             pod_id: 0,
-            ai_agent_root_pid: 0,
+            ai_agent_root_pid,
         };
 
         Ok(BoxedProcEvents(Box::new(proc_event)))
@@ -561,6 +738,9 @@ impl Sendable for BoxedProcEvents {
             }
             EventData::ProcLifecycleEvent(d) => {
                 pb_proc_event.proc_lifecycle_event_data = Some(d.into());
+            }
+            EventData::ProcBlockEvent(d) => {
+                pb_proc_event.proc_block_event_data = Some(d.into());
             }
             _ => {}
         }
@@ -650,5 +830,93 @@ mod tests {
         let path = PathBuf::from(OsString::from_vec(raw.clone()));
 
         assert_eq!(path_to_bytes(&path), raw);
+    }
+
+    #[test]
+    fn test_proc_block_event_into_metric_carries_rule_and_command() {
+        let raw = make_proc_block_raw(
+            1,
+            2,
+            1,
+            1,
+            1,
+            13,
+            100,
+            10,
+            100,
+            1000,
+            1000,
+            42,
+            b"block-reboot",
+            b"reboot now",
+            b"/sbin/reboot",
+            b"lsm",
+        );
+        let event = ProcBlockEventData::try_from(raw.as_slice()).unwrap();
+        let pb: metric::ProcBlockEventData = event.into();
+        assert_eq!(pb.rule_id, "block-reboot");
+        assert_eq!(pb.exec_path, b"/sbin/reboot");
+        assert_eq!(pb.cmdline, b"reboot now");
+        assert_eq!(pb.mechanism, "lsm");
+    }
+
+    fn make_proc_block_raw(
+        target_type: u8,
+        action: u8,
+        mechanism: u8,
+        guarantee: u8,
+        errno: i32,
+        pid: u32,
+        parent_pid: u32,
+        ai_agent_root_pid: u32,
+        uid: u32,
+        gid: u32,
+        syscall_id: u32,
+        timestamp: u64,
+        rule_id: &[u8],
+        cmdline: &[u8],
+        exec_path: &[u8],
+        syscall_name: &[u8],
+    ) -> Vec<u8> {
+        let mut raw = vec![0; PROC_BLOCK_EVENT_SIZE];
+        raw[PROC_BLOCK_TARGET_TYPE_OFF] = target_type;
+        raw[PROC_BLOCK_ACTION_OFF] = action;
+        raw[PROC_BLOCK_MECHANISM_OFF] = mechanism;
+        raw[PROC_BLOCK_GUARANTEE_OFF] = guarantee;
+        raw[PROC_BLOCK_ERRNO_OFF..PROC_BLOCK_ERRNO_OFF + 4].copy_from_slice(&errno.to_le_bytes());
+        raw[PROC_BLOCK_PID_OFF..PROC_BLOCK_PID_OFF + 4].copy_from_slice(&pid.to_le_bytes());
+        raw[PROC_BLOCK_PPID_OFF..PROC_BLOCK_PPID_OFF + 4]
+            .copy_from_slice(&parent_pid.to_le_bytes());
+        raw[PROC_BLOCK_ROOT_PID_OFF..PROC_BLOCK_ROOT_PID_OFF + 4]
+            .copy_from_slice(&ai_agent_root_pid.to_le_bytes());
+        raw[PROC_BLOCK_UID_OFF..PROC_BLOCK_UID_OFF + 4].copy_from_slice(&uid.to_le_bytes());
+        raw[PROC_BLOCK_GID_OFF..PROC_BLOCK_GID_OFF + 4].copy_from_slice(&gid.to_le_bytes());
+        raw[PROC_BLOCK_SYSCALL_ID_OFF..PROC_BLOCK_SYSCALL_ID_OFF + 4]
+            .copy_from_slice(&syscall_id.to_le_bytes());
+        raw[PROC_BLOCK_TS_OFF..PROC_BLOCK_TS_OFF + 8].copy_from_slice(&timestamp.to_le_bytes());
+        raw[PROC_BLOCK_POLICY_EPOCH_OFF..PROC_BLOCK_POLICY_EPOCH_OFF + 8]
+            .copy_from_slice(&42_u64.to_le_bytes());
+        write_cstr(
+            &mut raw[PROC_BLOCK_RULE_ID_OFF..PROC_BLOCK_RULE_ID_OFF + 64],
+            rule_id,
+        );
+        write_cstr(
+            &mut raw[PROC_BLOCK_CMDLINE_OFF..PROC_BLOCK_CMDLINE_OFF + 256],
+            cmdline,
+        );
+        write_cstr(
+            &mut raw[PROC_BLOCK_EXEC_PATH_OFF..PROC_BLOCK_EXEC_PATH_OFF + 256],
+            exec_path,
+        );
+        write_cstr(
+            &mut raw[PROC_BLOCK_SYSCALL_NAME_OFF..PROC_BLOCK_SYSCALL_NAME_OFF + 32],
+            syscall_name,
+        );
+        raw
+    }
+
+    fn write_cstr(dst: &mut [u8], src: &[u8]) {
+        let len = src.len().min(dst.len().saturating_sub(1));
+        dst[..len].copy_from_slice(&src[..len]);
     }
 }
