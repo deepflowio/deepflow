@@ -64,6 +64,7 @@ CALL InsertDataSourceIfNotExists('事件-文件读写聚合事件', 'event.file_
 CALL InsertDataSourceIfNotExists('事件-文件管理事件', 'event.file_mgmt_event', 0, 7*24);
 CALL InsertDataSourceIfNotExists('事件-进程权限事件', 'event.proc_perm_event', 0, 7*24);
 CALL InsertDataSourceIfNotExists('事件-进程操作事件', 'event.proc_ops_event', 0, 7*24);
+CALL InsertDataSourceIfNotExists('事件-进程阻断事件', 'event.proc_block_event', 0, 7*24);
 
 DROP PROCEDURE AddColumnIfNotExists;
 DROP PROCEDURE InsertDataSourceIfNotExists;
