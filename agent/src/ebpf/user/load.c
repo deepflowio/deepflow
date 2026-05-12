@@ -988,6 +988,19 @@ static int load_obj__progs(struct ebpf_object *obj)
 				     new_prog->insns_cnt, BPF_MAXINSNS);
 			}
 
+			/*
+			 * BPF LSM is an optional enforcement mechanism. Kernels
+			 * without CONFIG_BPF_LSM or an active bpf LSM can reject
+			 * the program before attach, so keep the rest of the
+			 * socket tracer available and let userspace fall back.
+			 */
+			if (new_prog->type == BPF_PROG_TYPE_LSM) {
+				ebpf_warning
+				    ("Skip optional BPF LSM program '%s'; enforcement disabled for this hook.\n",
+				     new_prog->name);
+				continue;
+			}
+
 			if (memcmp(desc->name, "uprobe/", 7) &&
 			    memcmp(desc->name, "uretprobe/", 10)) {
 				return ETR_INVAL;

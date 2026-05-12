@@ -149,5 +149,15 @@ require(
     "lsm_programs_handle" in tracer_c_text,
     "tracer.c must include LSM programs in the attach lifecycle",
 )
+require(
+    "new_prog->type == BPF_PROG_TYPE_LSM" in load_text
+    and "Skip optional BPF LSM program" in load_text,
+    "load.c must keep unsupported BPF LSM programs non-fatal",
+)
+require(
+    "p->prog->prog_fd < 0" in tracer_c_text
+    and "skip unloaded lsm program" in tracer_c_text,
+    "tracer.c must skip unloaded optional LSM programs during attach",
+)
 
 print("[OK]")

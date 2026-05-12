@@ -1143,8 +1143,19 @@ static int lsm_attach(struct lsm_prog *p)
 		return ETR_EXIST;
 	}
 
-	if (p->prog->prog_fd == 0)
+	if (p->prog->prog_fd < 0) {
+		ebpf_warning("skip unloaded lsm program, name:%s.\n", p->name);
+		return ETR_INVAL;
+	}
+
+	if (p->prog->prog_fd == 0) {
 		p->prog->prog_fd = load_ebpf_prog(p->prog);
+		if (p->prog->prog_fd < 0) {
+			ebpf_warning("load lsm program failed, name:%s.\n",
+				     p->name);
+			return ETR_INVAL;
+		}
+	}
 
 	struct ebpf_link *bl = program__attach_lsm(p->prog);
 	p->link = bl;
