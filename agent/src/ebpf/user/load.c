@@ -47,6 +47,10 @@
 #include "profile/perf_profiler.h"
 #include "unwind_tracer.h"
 
+#ifndef BPF_PROG_TYPE_LSM
+#define BPF_PROG_TYPE_LSM 29
+#endif
+
 /*
  * When full map preallocation is too expensive, the 'BPF_F_NO_PREALLOC'
  * flag can be used to define a map without preallocated memory. By
@@ -621,6 +625,8 @@ static enum bpf_prog_type get_prog_type(struct sec_desc *desc)
 		prog_type = BPF_PROG_TYPE_KPROBE;
 	} else if (!memcmp(desc->name, "tracepoint/", 11)) {
 		prog_type = BPF_PROG_TYPE_TRACEPOINT;
+	} else if (!memcmp(desc->name, "lsm/", 4)) {
+		prog_type = BPF_PROG_TYPE_LSM;
 	} else if (!memcmp(desc->name, "perf_event", 10)) {
 		prog_type = BPF_PROG_TYPE_PERF_EVENT;
 	} else if (!memcmp(desc->name, "fentry/", 7) ||

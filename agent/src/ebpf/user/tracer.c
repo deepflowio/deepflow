@@ -49,6 +49,10 @@
 
 #include "deepflow_ebpfctl_bin.c"
 
+#ifndef BPF_PROG_TYPE_LSM
+#define BPF_PROG_TYPE_LSM 29
+#endif
+
 /*
  * Sleep duration (in seconds) before retrying CPU binding if it fails.
  * This is used when binding fails and no event-based wakeup is implemented.
@@ -695,6 +699,20 @@ static struct kfunc *find_kfunc_from_name(struct bpf_tracer *tracer,
 	return NULL;
 }
 
+static struct lsm_prog *find_lsm_from_name(struct bpf_tracer *tracer,
+					   const char *name)
+{
+	struct lsm_prog *p;
+	int i;
+	for (i = 0; i < PROBES_NUM_MAX; i++) {
+		p = &tracer->lsms[i];
+		if (!strcmp(p->name, name))
+			return p;
+	}
+
+	return NULL;
+}
+
 static struct tracepoint *get_tracepoint_from_tracer(struct bpf_tracer *tracer,
 						     const char *tp_name)
 {
@@ -743,6 +761,29 @@ static struct kfunc *get_kfunc_from_tracer(struct bpf_tracer *tracer,
 	p->prog = prog;
 
 	snprintf(p->name, sizeof(p->name), "%s", name);
+
+	return p;
+}
+
+static struct lsm_prog *get_lsm_from_tracer(struct bpf_tracer *tracer,
+					    struct ebpf_prog *prog)
+{
+	struct lsm_prog *p = find_lsm_from_name(tracer, prog->name);
+	if (p && p->prog)
+		return p;
+
+	if (tracer->lsms_count >= PROBES_NUM_MAX) {
+		ebpf_warning("lsm programs count too many. The maximum is %d\n",
+			     PROBES_NUM_MAX);
+		return NULL;
+	}
+
+	int idx = tracer->lsms_count++;
+	p = &tracer->lsms[idx];
+	p->prog_fd = prog->prog_fd;
+	p->prog = prog;
+
+	snprintf(p->name, sizeof(p->name), "%s", prog->name);
 
 	return p;
 }
@@ -1096,6 +1137,86 @@ static int kfunc_detach(struct kfunc *p)
 	return ETR_OK;
 }
 
+static int lsm_attach(struct lsm_prog *p)
+{
+	if (p->link) {
+		return ETR_EXIST;
+	}
+
+	if (p->prog->prog_fd == 0)
+		p->prog->prog_fd = load_ebpf_prog(p->prog);
+
+	struct ebpf_link *bl = program__attach_lsm(p->prog);
+	p->link = bl;
+
+	if (bl == NULL) {
+		ebpf_warning("program__attach_lsm() failed, name:%s.\n",
+			     p->name);
+		__sync_fetch_and_add(&attach_failed_count, 1);
+		return ETR_INVAL;
+	}
+
+	return ETR_OK;
+}
+
+static int lsm_detach(struct lsm_prog *p)
+{
+	if (p->link == NULL) {
+		return ETR_NOTEXIST;
+	}
+
+	if (p->link->detach) {
+		p->link->detach(p->link);
+	}
+
+	free(p->link);
+	p->link = NULL;
+	return ETR_OK;
+}
+
+static int lsm_programs_handle(struct bpf_tracer *tracer, int type)
+{
+	int (*lsm_handle) (struct lsm_prog * p) = NULL;
+	struct lsm_prog *lsm;
+	struct ebpf_object *obj = tracer->obj;
+	int i, error;
+
+	if (type == HOOK_ATTACH)
+		lsm_handle = lsm_attach;
+	else if (type == HOOK_DETACH)
+		lsm_handle = lsm_detach;
+	else
+		return ETR_INVAL;
+
+	for (i = 0; i < obj->progs_cnt; i++) {
+		if (obj->progs[i].type != BPF_PROG_TYPE_LSM)
+			continue;
+
+		lsm = get_lsm_from_tracer(tracer, &obj->progs[i]);
+		if (!lsm)
+			continue;
+
+		error = lsm_handle(lsm);
+		if (type == HOOK_ATTACH && error == ETR_EXIST)
+			continue;
+
+		if (type == HOOK_DETACH && error == ETR_NOTEXIST)
+			continue;
+
+		if (error) {
+			ebpf_warning
+			    ("%s lsm: '%s', failed; enforcement disabled for this hook.",
+			     type == HOOK_ATTACH ? "attach" : "detach", lsm->name);
+			continue;
+		}
+
+		ebpf_info("%s lsm: '%s', succeed!",
+			  type == HOOK_ATTACH ? "attach" : "detach", lsm->name);
+	}
+
+	return ETR_OK;
+}
+
 int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			 int *probes_count)
 {
@@ -1165,7 +1286,7 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 	int i;
 	struct tracer_probes_conf *tps = tracer->tps;
 	if (tps == NULL)
-		goto perf_event;
+		goto lsm_programs;
 
 	for (i = 0; i < tps->tps_nr; i++) {
 		tp = get_tracepoint_from_tracer(tracer, tps->tps[i].name);
@@ -1213,6 +1334,9 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 				  type == HOOK_ATTACH ? "attach" : "detach",
 				  kf->name);
 	}
+
+lsm_programs:
+	lsm_programs_handle(tracer, type);
 
 perf_event:
 

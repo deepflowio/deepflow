@@ -8,6 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 SOCKET_TRACE = ROOT / "kernel" / "socket_trace.bpf.c"
 FILES_RW = ROOT / "kernel" / "files_rw.bpf.c"
 SOCKET_C = ROOT / "user" / "socket.c"
+LOAD_C = ROOT / "user" / "load.c"
+PROBE_C = ROOT / "user" / "probe.c"
+TRACER_H = ROOT / "user" / "tracer.h"
+TRACER_C = ROOT / "user" / "tracer.c"
 
 
 def require(condition: bool, message: str) -> None:
@@ -16,9 +20,17 @@ def require(condition: bool, message: str) -> None:
         sys.exit(1)
 
 
-socket_trace_text = SOCKET_TRACE.read_text()
-files_rw_text = FILES_RW.read_text()
-socket_c_text = SOCKET_C.read_text()
+def read_source(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+socket_trace_text = read_source(SOCKET_TRACE)
+files_rw_text = read_source(FILES_RW)
+socket_c_text = read_source(SOCKET_C)
+load_text = read_source(LOAD_C)
+probe_text = read_source(PROBE_C)
+tracer_h_text = read_source(TRACER_H)
+tracer_c_text = read_source(TRACER_C)
 
 reasm_idx = socket_trace_text.find("socket_info_ptr->reasm_bytes = 0;")
 finish_idx = socket_trace_text.find("socket_info_ptr->finish_reasm = false;")
@@ -114,6 +126,28 @@ require(
     "#ifdef EXTENDED_AI_AGENT_FILE_IO_FULL\n\tbuffer->access_permission =\n"
     "\t    ai_agent_get_access_permission" in trace_io_text,
     "AI Agent access_permission extraction must be guarded by EXTENDED_AI_AGENT_FILE_IO_FULL",
+)
+
+require('"lsm/"' in load_text, "load.c must recognize lsm/ section prefix")
+require(
+    "BPF_PROG_TYPE_LSM" in load_text,
+    "load.c must map lsm/ programs to BPF_PROG_TYPE_LSM",
+)
+require(
+    "program__attach_lsm" in probe_text,
+    "probe.c must provide an LSM attach helper",
+)
+require(
+    "bpf_raw_tracepoint_open" in probe_text,
+    "LSM attach helper must use the raw tracepoint attach syscall path",
+)
+require(
+    "struct lsm_prog" in tracer_h_text and "lsms_count" in tracer_h_text,
+    "tracer.h must keep LSM program attach state",
+)
+require(
+    "lsm_programs_handle" in tracer_c_text,
+    "tracer.c must include LSM programs in the attach lifecycle",
 )
 
 print("[OK]")
