@@ -145,6 +145,7 @@ pub struct MysqlInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
     is_tls: bool,
+    #[serde(skip)]
     endpoint_disabled: bool,
 
     // Server Greeting
@@ -332,7 +333,6 @@ impl MysqlInfo {
         }
         match self.endpoint.as_deref() {
             Some(endpoint) => Field::Str(Cow::Borrowed(endpoint)),
-            None if !self.context.is_empty() => Field::Str(Cow::Borrowed(&self.context)),
             None => Field::None,
         }
     }
@@ -386,9 +386,27 @@ impl MysqlInfo {
         }
 
         let mut words = self.context.split_whitespace();
-        let Some(action) = words.next() else {
+        let Some(mut action) = words.next() else {
             return;
         };
+
+        // skip comment like /* comment */ SELECT ... or /* comment */ INSERT ...
+        if action.starts_with("/*") {
+            let mut word = words.next();
+            let mut flags = true;
+            while flags {
+                match word {
+                    Some(w) if w.ends_with("*/") => flags = false,
+                    Some(_) => word = words.next(),
+                    None => return,
+                }
+            }
+
+            let Some(w) = words.next() else {
+                return;
+            };
+            action = w;
+        }
 
         match action.to_ascii_uppercase().as_str() {
             // select * from table_name
@@ -452,6 +470,7 @@ impl MysqlInfo {
                     return;
                 }
             }
+            "LOGIN" => self.endpoint = Some(self.context.clone()),
             _ => {}
         }
     }
@@ -1247,7 +1266,6 @@ impl MysqlLog {
                 } else {
                     format!("Login username: {}", username)
                 };
-
                 info.generate_endpoint();
             }
         }
@@ -1718,7 +1736,10 @@ mod tests {
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
         let mut previous_command = 0u8;
-        let log_config = LogParserConfig::default();
+        let log_config = LogParserConfig {
+            mysql_endpoint_disabled: false,
+            ..Default::default()
+        };
         for packet in packets.iter_mut() {
             packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -2163,5 +2184,25 @@ mod tests {
                 "failed in case {input}",
             );
         }
+    }
+
+    #[test]
+    fn test_generate_endpoint() {
+        let mut info = MysqlInfo::default();
+
+        info.context =
+            "/* this is commment */ select * from table where id = 1 and name = 'test'".to_string();
+        info.generate_endpoint();
+        assert_eq!(info.endpoint.as_ref().unwrap(), "SELECT table");
+
+        info.context =
+            "/***this is commment***/ select * from table where id = 1 and name = 'test'"
+                .to_string();
+        info.generate_endpoint();
+        assert_eq!(info.endpoint.as_ref().unwrap(), "SELECT table");
+
+        info.context = "/***this is co".to_string();
+        info.generate_endpoint();
+        assert_eq!(info.endpoint, None);
     }
 }
