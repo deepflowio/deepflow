@@ -138,12 +138,22 @@ require(
     "load.c must map lsm/ programs to BPF_PROG_TYPE_LSM",
 )
 require(
+    "prog_load_name" in load_text
+    and "prog->type == BPF_PROG_TYPE_LSM" in load_text
+    and '"lsm__%s"' in load_text,
+    "load.c must pass lsm__<hook> to BCC so it sets BPF_LSM_MAC and lets libbpf find bpf_lsm_<hook>",
+)
+require(
     "program__attach_lsm" in probe_text,
     "probe.c must provide an LSM attach helper",
 )
 require(
     "bpf_raw_tracepoint_open" in probe_text,
     "LSM attach helper must use the raw tracepoint attach syscall path",
+)
+require(
+    "bpf_raw_tracepoint_open(NULL, ebpf_prog->prog_fd)" in probe_text,
+    "LSM attach helper must attach by loaded attach_btf_id, not by raw tracepoint hook name",
 )
 require(
     "struct lsm_prog" in tracer_h_text and "lsms_count" in tracer_h_text,
@@ -178,6 +188,10 @@ if ENTERPRISE_AGENT.exists():
         "AI Agent exec enforcement must attach to lsm/bprm_check_security",
     )
     require(
+        "BPF_PROG(bpf_lsm_bprm_check_security," in exec_enforce_text,
+        "AI Agent exec enforcement BPF function name must match the bpf_lsm_<hook> BTF name for BCC/libbpf lookup",
+    )
+    require(
         "is_ai_agent_process" in exec_enforce_text
         or "ai_agent_pids" in exec_enforce_text,
         "AI Agent exec enforcement must scope matching to AI Agent processes",
@@ -185,6 +199,23 @@ if ENTERPRISE_AGENT.exists():
     require(
         "DATA_SOURCE_PROC_BLOCK_EVENT" in exec_enforce_text,
         "AI Agent exec enforcement must emit proc block events",
+    )
+    require(
+        "#define AI_AGENT_EXEC_MAX_RULES      8" in exec_enforce_text,
+        "AI Agent exec enforcement must cap BPF-side rule scan to 8 records to stay under old verifier complexity limits",
+    )
+    require(
+        "ai_agent_match_contains" not in exec_enforce_text
+        and "AI_AGENT_EXEC_MATCH_ARGV_CONTAINS" not in exec_enforce_text,
+        "AI Agent exec enforcement BPF must not include argv_contains nested scans on old verifier kernels",
+    )
+    require(
+        "pattern_hash" in exec_enforce_text
+        and "ai_agent_hash_exec_path" in exec_enforce_text
+        and "ai_agent_match_exact" not in exec_enforce_text
+        and "ai_agent_match_prefix" not in exec_enforce_text
+        and "ai_agent_match_suffix" not in exec_enforce_text,
+        "AI Agent exec enforcement BPF must use precomputed exact path hashes instead of verifier-expensive string scans",
     )
     require(
         "ai_agent_submit_event" in exec_enforce_text,

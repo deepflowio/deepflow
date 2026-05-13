@@ -43,7 +43,9 @@ pub mod memory_profile;
 use std::ffi::{CStr, CString};
 use std::ptr::{self, null_mut};
 use std::slice;
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicU64, Ordering};
+#[cfg(feature = "enterprise")]
+use std::sync::atomic::AtomicI32;
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -684,7 +686,7 @@ static AI_AGENT_EXEC_RULES_MAP_FD: AtomicI32 = AtomicI32::new(-1);
 #[cfg(feature = "enterprise")]
 static AI_AGENT_POLICY_EPOCH_MAP_FD: AtomicI32 = AtomicI32::new(-1);
 #[cfg(feature = "enterprise")]
-const AI_AGENT_EXEC_RULES_BPF_MAX: usize = 256;
+const AI_AGENT_EXEC_RULES_BPF_MAX: usize = 8;
 
 #[cfg(feature = "enterprise")]
 fn ai_agent_enforcement_mode_eq(value: &str, expected: &str) -> bool {

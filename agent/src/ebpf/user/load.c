@@ -74,6 +74,23 @@ extern int btf__set_pointer_size(struct btf *btf, size_t ptr_sz);
 
 static int probe_read_kernel_feat;
 
+static const char *prog_load_name(const struct ebpf_prog *prog, char *buf,
+				  size_t buf_len)
+{
+	if (prog->type == BPF_PROG_TYPE_LSM && prog->sec_name != NULL &&
+	    !strncmp(prog->sec_name, "lsm/", 4) && prog->sec_name[4] != '\0') {
+		/*
+		 * BCC uses the lsm__ prefix to set expected_attach_type to
+		 * BPF_LSM_MAC. libbpf then adds the kernel BTF bpf_lsm_
+		 * prefix while resolving attach_btf_id.
+		 */
+		snprintf(buf, buf_len, "lsm__%s", prog->sec_name + 4);
+		return buf;
+	}
+
+	return prog->name;
+}
+
 int suspend_stderr()
 {
 	fflush(stderr);
@@ -261,7 +278,10 @@ static void log_verifier_tail(const char *buf, size_t len)
 
 int load_ebpf_prog(struct ebpf_prog *prog)
 {
-	return bcc_prog_load(prog->type, prog->name,
+	char name_buf[128];
+	const char *name = prog_load_name(prog, name_buf, sizeof(name_buf));
+
+	return bcc_prog_load(prog->type, name,
 			     prog->insns, prog->insns_size, prog->obj->license,
 			     prog->obj->kern_version, 0, NULL,
 			     0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
@@ -776,12 +796,15 @@ static int load_obj__progs(struct ebpf_object *obj)
 		// Modify eBPF instructions based on BTF relocation information.
 		obj_relocate_core(new_prog);
 
+		char name_buf[128];
+		const char *name =
+		    prog_load_name(new_prog, name_buf, sizeof(name_buf));
 		int stderr_fd = suspend_stderr();
 		if (stderr_fd < 0) {
 			ebpf_warning("Failed to suspend stderr\n");
 		}
 		new_prog->prog_fd =
-		    bcc_prog_load(new_prog->type, new_prog->name,
+		    bcc_prog_load(new_prog->type, name,
 				  new_prog->insns, new_prog->insns_size,
 				  obj->license, obj->kern_version, 0, NULL,
 				  0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
@@ -792,7 +815,7 @@ static int load_obj__progs(struct ebpf_object *obj)
 			bool save_full_log = env_flag_enabled(VERIFIER_LOG_ENV);
 			ebpf_warning
 			    ("bcc_prog_load() failed. name: %s, %s errno: %d\n",
-			     new_prog->name, strerror(errno), errno);
+			     name, strerror(errno), errno);
 			char log_path[] = "/tmp/df_verifier_XXXXXX.log";
 			int tmp_fd = -1;
 			char tail_buf[VERIFIER_LOG_TAIL_BYTES + 1] = { 0 };
@@ -858,7 +881,7 @@ static int load_obj__progs(struct ebpf_object *obj)
 					log_pipe[1] = -1;
 
 					fd2 = bcc_prog_load(new_prog->type,
-							    new_prog->name,
+							    name,
 							    new_prog->insns,
 							    new_prog->insns_size,
 							    obj->license,
@@ -912,7 +935,7 @@ static int load_obj__progs(struct ebpf_object *obj)
 				}
 
 				fd2 = bcc_prog_load(new_prog->type,
-						    new_prog->name,
+						    name,
 						    new_prog->insns,
 						    new_prog->insns_size,
 						    obj->license,
@@ -936,7 +959,7 @@ static int load_obj__progs(struct ebpf_object *obj)
 
 			if (!load_attempted) {
 				fd2 = bcc_prog_load(new_prog->type,
-						    new_prog->name,
+						    name,
 						    new_prog->insns,
 						    new_prog->insns_size,
 						    obj->license,
@@ -972,7 +995,7 @@ static int load_obj__progs(struct ebpf_object *obj)
 				// Preserve errno from the latest attempt for better diagnostics.
 				ebpf_warning
 				    ("bcc_prog_load() still failed. name: %s, errno after retry: %d (orig %d)\n",
-				     new_prog->name, retry_errno, saved_errno);
+				     name, retry_errno, saved_errno);
 				errno = retry_errno;
 			}
 

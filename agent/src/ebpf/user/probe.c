@@ -511,7 +511,11 @@ struct ebpf_link *program__attach_lsm(void *prog)
 		return NULL;
 	}
 
-	pfd = bpf_raw_tracepoint_open(hook, ebpf_prog->prog_fd);
+	/*
+	 * BPF LSM programs are loaded with attach_btf_id. The raw tracepoint
+	 * attach syscall should use a NULL name and attach by that BTF id.
+	 */
+	pfd = bpf_raw_tracepoint_open(NULL, ebpf_prog->prog_fd);
 	if (pfd < 0) {
 		if (errno == EOPNOTSUPP || errno == EINVAL) {
 			ebpf_warning("BPF LSM attach unsupported for %s: %s(%d)\n",
