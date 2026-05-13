@@ -953,6 +953,37 @@ mod tests {
     }
 
     #[test]
+    fn test_proc_block_event_into_metric_carries_syscall_override() {
+        let raw = make_proc_block_raw(
+            2,
+            2,
+            2,
+            1,
+            1,
+            13,
+            100,
+            10,
+            1000,
+            1000,
+            169,
+            42,
+            b"block-direct-reboot",
+            b"reboot",
+            b"",
+            b"reboot",
+        );
+        let event = ProcBlockEventData::try_from(raw.as_slice()).unwrap();
+        let pb: metric::ProcBlockEventData = event.into();
+        assert_eq!(
+            pb.target_type,
+            metric::EnforcementTargetType::EnforcementTargetSyscall as i32
+        );
+        assert_eq!(pb.mechanism, "kprobe_override");
+        assert_eq!(pb.syscall_name, "reboot");
+        assert_eq!(pb.syscall_id, 169);
+    }
+
+    #[test]
     fn test_new_proc_block_event_for_audit_encodes_proc_block_event() {
         let proc_event = ProcEvent {
             pid: 13,

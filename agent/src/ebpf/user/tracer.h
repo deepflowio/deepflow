@@ -335,6 +335,14 @@ struct lsm_prog {
 	int prog_fd;
 };
 
+struct optional_kprobe_prog {
+	char name[PROBE_NAME_SZ];
+	struct ebpf_link *link;
+	struct ebpf_prog *prog;
+	int prog_fd;
+	bool isret;
+};
+
 struct queue {
 	int id; // Queue Identifier
 	struct bpf_tracer *t;
@@ -419,6 +427,8 @@ struct bpf_tracer {
 	int kfuncs_count;
 	struct lsm_prog lsms[PROBES_NUM_MAX];
 	int lsms_count;
+	struct optional_kprobe_prog optional_kprobes[PROBES_NUM_MAX];
+	int optional_kprobes_count;
 	pthread_mutex_t mutex_probes_lock;	// Protect the probes operation in multiple threads
 
 	/*

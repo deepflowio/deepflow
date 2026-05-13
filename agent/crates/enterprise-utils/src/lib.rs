@@ -521,6 +521,14 @@ pub mod ai_agent_enforcement {
     }
 
     #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct SyscallRuleInput {
+        pub id: String,
+        pub mode: EnforcementMode,
+        pub names: Vec<String>,
+        pub symbols: Vec<String>,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct PolicyHit {
         pub rule_index: u32,
         pub rule_id: String,
@@ -529,6 +537,11 @@ pub mod ai_agent_enforcement {
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct CompiledExecPolicy {
+        pub epoch: u64,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct CompiledSyscallPolicy {
         pub epoch: u64,
     }
 
@@ -547,8 +560,61 @@ pub mod ai_agent_enforcement {
         }
     }
 
+    impl CompiledSyscallPolicy {
+        pub fn to_bpf_records(&self) -> Vec<BpfSyscallRuleRecord> {
+            vec![]
+        }
+
+        pub fn sync_to_bpf_maps(
+            &self,
+            _syscall_rules_fd: i32,
+            _policy_epoch_fd: i32,
+            _max_records: usize,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct BpfSyscallRuleRecord {
+        pub rule_index: u32,
+        pub mode: u8,
+        pub syscall_key: u8,
+        pub reserved: u16,
+        pub syscall_id: u32,
+        pub errno_code: i32,
+        pub rule_id: [u8; 64],
+        pub syscall_name: [u8; 32],
+    }
+
+    impl Default for BpfSyscallRuleRecord {
+        fn default() -> Self {
+            Self {
+                rule_index: 0,
+                mode: 0,
+                syscall_key: 0,
+                reserved: 0,
+                syscall_id: 0,
+                errno_code: 0,
+                rule_id: [0; 64],
+                syscall_name: [0; 32],
+            }
+        }
+    }
+
     pub fn compile_exec_rules(_rules: &[ExecRuleInput]) -> Result<CompiledExecPolicy, String> {
         Ok(CompiledExecPolicy { epoch: 0 })
+    }
+
+    pub fn compile_syscall_rules(
+        _rules: &[SyscallRuleInput],
+    ) -> Result<CompiledSyscallPolicy, String> {
+        Ok(CompiledSyscallPolicy { epoch: 0 })
+    }
+
+    pub fn syscall_override_symbols(_syscall_key: u8) -> &'static [&'static str] {
+        &[]
     }
 
     pub fn set_global_exec_policy(_policy: Option<CompiledExecPolicy>) {}

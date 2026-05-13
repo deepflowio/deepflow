@@ -668,6 +668,7 @@ pub struct AiAgentEnforcementRule {
     pub action: AiAgentEnforcementAction,
     pub audit: bool,
     pub exec: AiAgentExecMatch,
+    pub syscall: AiAgentSyscallMatch,
 }
 
 impl Default for AiAgentEnforcementRule {
@@ -680,6 +681,7 @@ impl Default for AiAgentEnforcementRule {
             action: AiAgentEnforcementAction::default(),
             audit: true,
             exec: AiAgentExecMatch::default(),
+            syscall: AiAgentSyscallMatch::default(),
         }
     }
 }
@@ -708,6 +710,13 @@ pub struct AiAgentExecMatch {
     pub prefix: Vec<String>,
     pub suffix: Vec<String>,
     pub argv_contains_any: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AiAgentSyscallMatch {
+    pub names: Vec<String>,
+    pub symbols: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]

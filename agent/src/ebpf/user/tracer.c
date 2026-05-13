@@ -713,6 +713,29 @@ static struct lsm_prog *find_lsm_from_name(struct bpf_tracer *tracer,
 	return NULL;
 }
 
+static bool is_optional_ai_agent_kprobe_prog(struct ebpf_prog *prog)
+{
+	return prog != NULL && prog->type == BPF_PROG_TYPE_KPROBE &&
+	    prog->name != NULL &&
+	    strstr(prog->name, "df_K_ai_agent_syscall_override_") == prog->name &&
+	    prog->sec_name != NULL &&
+	    !strncmp(prog->sec_name, "kprobe/", 7);
+}
+
+static struct optional_kprobe_prog *
+find_optional_kprobe_from_name(struct bpf_tracer *tracer, const char *name)
+{
+	struct optional_kprobe_prog *p;
+	int i;
+	for (i = 0; i < PROBES_NUM_MAX; i++) {
+		p = &tracer->optional_kprobes[i];
+		if (!strcmp(p->name, name))
+			return p;
+	}
+
+	return NULL;
+}
+
 static struct tracepoint *get_tracepoint_from_tracer(struct bpf_tracer *tracer,
 						     const char *tp_name)
 {
@@ -782,6 +805,32 @@ static struct lsm_prog *get_lsm_from_tracer(struct bpf_tracer *tracer,
 	p = &tracer->lsms[idx];
 	p->prog_fd = prog->prog_fd;
 	p->prog = prog;
+
+	snprintf(p->name, sizeof(p->name), "%s", prog->name);
+
+	return p;
+}
+
+static struct optional_kprobe_prog *
+get_optional_kprobe_from_tracer(struct bpf_tracer *tracer,
+				 struct ebpf_prog *prog)
+{
+	struct optional_kprobe_prog *p =
+		find_optional_kprobe_from_name(tracer, prog->name);
+	if (p && p->prog)
+		return p;
+
+	if (tracer->optional_kprobes_count >= PROBES_NUM_MAX) {
+		ebpf_warning("optional kprobe programs count too many. The maximum is %d\n",
+			     PROBES_NUM_MAX);
+		return NULL;
+	}
+
+	int idx = tracer->optional_kprobes_count++;
+	p = &tracer->optional_kprobes[idx];
+	p->prog_fd = prog->prog_fd;
+	p->prog = prog;
+	p->isret = !strncmp(prog->sec_name, "kretprobe/", 10);
 
 	snprintf(p->name, sizeof(p->name), "%s", prog->name);
 
@@ -1185,6 +1234,93 @@ static int lsm_detach(struct lsm_prog *p)
 	return ETR_OK;
 }
 
+static int optional_kprobe_attach(struct optional_kprobe_prog *p)
+{
+	if (p->link) {
+		return ETR_EXIST;
+	}
+
+	if (p->prog->prog_fd < 0) {
+		ebpf_warning("skip unloaded optional kprobe program, name:%s.\n",
+			     p->name);
+		return ETR_INVAL;
+	}
+
+	if (p->prog->prog_fd == 0) {
+		p->prog->prog_fd = load_ebpf_prog(p->prog);
+		if (p->prog->prog_fd < 0) {
+			ebpf_warning("load optional kprobe program failed, name:%s.\n",
+				     p->name);
+			return ETR_INVAL;
+		}
+	}
+
+	p->link = exec_attach_kprobe(p->prog, p->prog->sec_name, p->isret, -1);
+	if (p->link == NULL) {
+		__sync_fetch_and_add(&attach_failed_count, 1);
+		return ETR_INVAL;
+	}
+
+	return ETR_OK;
+}
+
+static int optional_kprobe_detach(struct optional_kprobe_prog *p)
+{
+	if (p->link == NULL)
+		return ETR_NOTEXIST;
+
+	if (p->link->detach)
+		p->link->detach(p->link);
+
+	free(p->link);
+	p->link = NULL;
+	return ETR_OK;
+}
+
+static int optional_kprobe_programs_handle(struct bpf_tracer *tracer, int type)
+{
+	int (*kprobe_handle) (struct optional_kprobe_prog * p) = NULL;
+	struct optional_kprobe_prog *kprobe;
+	struct ebpf_object *obj = tracer->obj;
+	int i, error;
+
+	if (type == HOOK_ATTACH)
+		kprobe_handle = optional_kprobe_attach;
+	else if (type == HOOK_DETACH)
+		kprobe_handle = optional_kprobe_detach;
+	else
+		return ETR_INVAL;
+
+	for (i = 0; i < obj->progs_cnt; i++) {
+		if (!is_optional_ai_agent_kprobe_prog(&obj->progs[i]))
+			continue;
+
+		kprobe = get_optional_kprobe_from_tracer(tracer, &obj->progs[i]);
+		if (!kprobe)
+			continue;
+
+		error = kprobe_handle(kprobe);
+		if (type == HOOK_ATTACH && error == ETR_EXIST)
+			continue;
+		if (type == HOOK_DETACH && error == ETR_NOTEXIST)
+			continue;
+
+		if (error) {
+			ebpf_warning(
+			    "%s optional kprobe: '%s', failed; syscall enforcement disabled for this hook.",
+			    type == HOOK_ATTACH ? "attach" : "detach",
+			    kprobe->prog->sec_name);
+			continue;
+		}
+
+		ebpf_info("%s optional kprobe: '%s', succeed!",
+			  type == HOOK_ATTACH ? "attach" : "detach",
+			  kprobe->prog->sec_name);
+	}
+
+	return ETR_OK;
+}
+
 static int lsm_programs_handle(struct bpf_tracer *tracer, int type)
 {
 	int (*lsm_handle) (struct lsm_prog * p) = NULL;
@@ -1347,6 +1483,7 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 	}
 
 lsm_programs:
+	optional_kprobe_programs_handle(tracer, type);
 	lsm_programs_handle(tracer, type);
 
 perf_event:

@@ -2393,7 +2393,7 @@ Whether to enable AI Agent file IO event collection.
 
 #### Enforcement {#inputs.proc.ai_agent.enforcement}
 
-AI Agent command execution enforcement. The first implementation only supports exec command audit/block.
+AI Agent command and selected direct syscall execution enforcement.
 
 ##### Enabled {#inputs.proc.ai_agent.enforcement.enabled}
 
@@ -2487,7 +2487,7 @@ inputs:
 
 **Description**:
 
-Enforcement mechanism selection for exec command blocking. The first implementation uses BPF LSM when available; kprobe override is reserved for future syscall blocking when capability probing succeeds.
+Enforcement mechanism selection for exec command blocking. Exec blocking uses BPF LSM when available.
 
 ##### Syscall Strategy {#inputs.proc.ai_agent.enforcement.syscall_strategy}
 
@@ -2525,7 +2525,7 @@ inputs:
 
 **Description**:
 
-Reserved mechanism selection for future direct syscall blocking. kprobe override requires CONFIG_BPF_KPROBE_OVERRIDE and an error-injectable kernel function.
+Mechanism selection for direct syscall blocking. kprobe override requires CONFIG_BPF_KPROBE_OVERRIDE and an error-injectable kernel function.
 
 ##### Allowed Mechanisms {#inputs.proc.ai_agent.enforcement.allowed_mechanisms}
 
@@ -2647,7 +2647,7 @@ inputs:
 
 **Description**:
 
-AI Agent command enforcement rules. The first implementation supports exec command exact/prefix/suffix matching.
+AI Agent enforcement rules. Exec rules support exact/prefix/suffix matching; syscall rules support selected dangerous syscall names or kernel symbols such as reboot, init_module, finit_module, delete_module and kexec_load.
 
 ### Symbol Table {#inputs.proc.symbol_table}
 

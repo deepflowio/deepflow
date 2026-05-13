@@ -164,6 +164,10 @@ require(
     "tracer.c must include LSM programs in the attach lifecycle",
 )
 require(
+    "optional_kprobe_programs_handle" in tracer_c_text,
+    "tracer.c must include optional AI Agent kprobe programs in the attach lifecycle",
+)
+require(
     "new_prog->type == BPF_PROG_TYPE_LSM" in load_text
     and "Skip optional BPF LSM program" in load_text,
     "load.c must keep unsupported BPF LSM programs non-fatal",
@@ -224,6 +228,34 @@ if ENTERPRISE_AGENT.exists():
     require(
         "ai_agent_exec_enforce.bpf.c" in support_text,
         "support_extended_observability must include ai_agent_exec_enforce.bpf.c",
+    )
+    syscall_override_bpf = ENTERPRISE_BPF / "ai_agent_syscall_override.bpf.c"
+    require(
+        syscall_override_bpf.exists(),
+        f"missing enterprise AI Agent syscall override BPF: {syscall_override_bpf}",
+    )
+    syscall_override_text = read_source(syscall_override_bpf)
+    require(
+        "bpf_override_return(ctx," in syscall_override_text,
+        "AI Agent syscall enforcement must use bpf_override_return for blocking",
+    )
+    require(
+        'SEC("kprobe/__x64_sys_reboot")' in syscall_override_text,
+        "AI Agent syscall enforcement must hook direct reboot syscall with kprobe override",
+    )
+    require(
+        "df_K_ai_agent_syscall_override_" in tracer_c_text
+        or "optional kprobe: 'kprobe/__x64_sys_reboot'" in tracer_c_text,
+        "tracer.c must explicitly attach AI Agent syscall override kprobes",
+    )
+    require(
+        "ai_agent_syscall_override.bpf.c" in support_text,
+        "support_extended_observability must include ai_agent_syscall_override.bpf.c",
+    )
+    require(
+        "df_K_ai_agent_syscall_override_" in load_text
+        and "Skip optional AI Agent kprobe override program" in load_text,
+        "load.c must keep unsupported AI Agent kprobe override programs non-fatal",
     )
 
 print("[OK]")

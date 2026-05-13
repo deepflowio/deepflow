@@ -665,6 +665,13 @@ static enum bpf_prog_type get_prog_type(struct sec_desc *desc)
 	return prog_type;
 }
 
+static bool is_optional_ai_agent_kprobe_override_prog(struct ebpf_prog *prog)
+{
+	return prog != NULL && prog->type == BPF_PROG_TYPE_KPROBE &&
+	    prog->name != NULL &&
+	    strstr(prog->name, "df_K_ai_agent_syscall_override_") == prog->name;
+}
+
 static int load_obj__progs(struct ebpf_object *obj)
 {
 	int i;
@@ -1020,6 +1027,13 @@ static int load_obj__progs(struct ebpf_object *obj)
 			if (new_prog->type == BPF_PROG_TYPE_LSM) {
 				ebpf_warning
 				    ("Skip optional BPF LSM program '%s'; enforcement disabled for this hook.\n",
+				     new_prog->name);
+				continue;
+			}
+
+			if (is_optional_ai_agent_kprobe_override_prog(new_prog)) {
+				ebpf_warning
+				    ("Skip optional AI Agent kprobe override program '%s'; syscall enforcement disabled for this hook.\n",
 				     new_prog->name);
 				continue;
 			}

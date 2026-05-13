@@ -11,6 +11,8 @@ pub struct KernelCapability {
     pub bpf_lsm_configured: bool,
     pub bpf_lsm_active: bool,
     pub bpf_kprobe_override_configured: bool,
+    pub bpf_kprobe_override_available: bool,
+    pub bpf_kprobe_override_symbols: Vec<String>,
     pub seccomp_filter_configured: bool,
     pub btf_vmlinux_available: bool,
 }
@@ -29,14 +31,18 @@ impl KernelCapability {
         let lsm_text = fs::read_to_string(sys_root.join("kernel/security/lsm")).unwrap_or_default();
         let config_text = read_kernel_config_from_roots(proc_root, boot_root).unwrap_or_default();
         let bpf_lsm_active = lsm_has_bpf(&lsm_text);
+        let bpf_kprobe_override_symbols = read_kprobe_override_symbols(sys_root);
+        let bpf_kprobe_override_configured =
+            config_enabled(&config_text, "CONFIG_BPF_KPROBE_OVERRIDE")
+                || !bpf_kprobe_override_symbols.is_empty();
 
         Self {
             bpf_lsm_configured: config_enabled(&config_text, "CONFIG_BPF_LSM") || bpf_lsm_active,
             bpf_lsm_active,
-            bpf_kprobe_override_configured: config_enabled(
-                &config_text,
-                "CONFIG_BPF_KPROBE_OVERRIDE",
-            ),
+            bpf_kprobe_override_configured,
+            bpf_kprobe_override_available: bpf_kprobe_override_configured
+                && !bpf_kprobe_override_symbols.is_empty(),
+            bpf_kprobe_override_symbols,
             seccomp_filter_configured: config_enabled(&config_text, "CONFIG_SECCOMP_FILTER"),
             btf_vmlinux_available: sys_root.join("kernel/btf/vmlinux").exists(),
         }
@@ -44,6 +50,14 @@ impl KernelCapability {
 
     pub fn supports_exec_lsm_enforcement(&self) -> bool {
         self.bpf_lsm_configured && self.bpf_lsm_active
+    }
+
+    pub fn supports_kprobe_override_symbol(&self, symbol: &str) -> bool {
+        self.bpf_kprobe_override_available
+            && self
+                .bpf_kprobe_override_symbols
+                .iter()
+                .any(|allowed| allowed == symbol)
     }
 }
 
@@ -97,6 +111,37 @@ fn read_proc_kernel_config(proc_root: &Path) -> Option<String> {
     decode_gzip(&compressed).ok()
 }
 
+fn read_kprobe_override_symbols(sys_root: &Path) -> Vec<String> {
+    const REL_PATHS: [&str; 2] = [
+        "kernel/debug/error_injection/list",
+        "kernel/debug/fail_function/injectable",
+    ];
+
+    let mut symbols = Vec::new();
+    for rel_path in REL_PATHS {
+        let Ok(text) = fs::read_to_string(sys_root.join(rel_path)) else {
+            continue;
+        };
+        symbols.extend(parse_error_injection_symbols(&text));
+    }
+    symbols.sort();
+    symbols.dedup();
+    symbols
+}
+
+fn parse_error_injection_symbols(text: &str) -> Vec<String> {
+    text.lines()
+        .filter_map(|line| {
+            let token = line.split_whitespace().next().unwrap_or_default().trim();
+            if token.is_empty() || token.starts_with('#') {
+                None
+            } else {
+                Some(token.to_string())
+            }
+        })
+        .collect()
+}
+
 fn decode_gzip(bytes: &[u8]) -> Result<String, std::io::Error> {
     let mut decoder = GzDecoder::new(Cursor::new(bytes));
     let mut output = String::new();
@@ -121,6 +166,14 @@ mod tests {
             "# CONFIG_BPF_LSM is not set\n",
             "CONFIG_BPF_LSM"
         ));
+    }
+
+    #[test]
+    fn parse_error_injection_list_takes_first_column() {
+        assert_eq!(
+            parse_error_injection_symbols("__x64_sys_reboot\tEI_ETYPE_ERRNO\n# ignored\n"),
+            vec!["__x64_sys_reboot".to_string()]
+        );
     }
 
     #[test]
@@ -162,6 +215,31 @@ mod tests {
         assert!(capability.bpf_lsm_active);
         assert!(capability.bpf_lsm_configured);
         assert!(capability.btf_vmlinux_available);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn detect_from_roots_uses_error_injection_allowlist_for_kprobe_override() {
+        let root = make_temp_root("kprobe-override-allowlist");
+        let proc_root = root.join("host-proc");
+        let sys_root = root.join("host-sys");
+        let boot_root = root.join("boot");
+        fs::create_dir_all(proc_root.join("sys/kernel")).unwrap();
+        fs::create_dir_all(sys_root.join("kernel/debug/error_injection")).unwrap();
+        fs::write(proc_root.join("sys/kernel/osrelease"), "4.18.0-test\n").unwrap();
+        fs::write(
+            sys_root.join("kernel/debug/error_injection/list"),
+            "__x64_sys_reboot\n__x64_sys_init_module\n",
+        )
+        .unwrap();
+
+        let capability = KernelCapability::detect_from_roots(&proc_root, &sys_root, &boot_root);
+
+        assert!(capability.bpf_kprobe_override_configured);
+        assert!(capability.bpf_kprobe_override_available);
+        assert!(capability.supports_kprobe_override_symbol("__x64_sys_reboot"));
+        assert!(!capability.supports_kprobe_override_symbol("__x64_sys_mount"));
 
         let _ = fs::remove_dir_all(root);
     }

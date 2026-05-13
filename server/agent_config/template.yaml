@@ -1729,8 +1729,8 @@ inputs:
       #   en: Enforcement
       #   ch: 执行阻断
       # description:
-      #   en: AI Agent command execution enforcement. The first implementation only supports exec command audit/block.
-      #   ch: AI Agent 命令执行阻断。第一版仅支持 exec 命令审计/阻断。
+      #   en: AI Agent command and selected direct syscall execution enforcement.
+      #   ch: AI Agent 命令和部分直接 syscall 执行阻断。
       enforcement:
         # type: bool
         # name:
@@ -1763,9 +1763,9 @@ inputs:
         # ee_feature: true
         # description:
         #   en: |-
-        #     Enforcement mechanism selection for exec command blocking. The first implementation uses BPF LSM when available; kprobe override is reserved for future syscall blocking when capability probing succeeds.
+        #     Enforcement mechanism selection for exec command blocking. Exec blocking uses BPF LSM when available.
         #   ch: |-
-        #     exec 命令阻断的机制选择。第一版在可用时使用 BPF LSM；kprobe override 预留给后续 syscall 阻断，并且仅在能力探测通过时使用。
+        #     exec 命令阻断的机制选择。exec 阻断在可用时使用 BPF LSM。
         strategy: auto
         # type: string
         # name:
@@ -1778,9 +1778,9 @@ inputs:
         # ee_feature: true
         # description:
         #   en: |-
-        #     Reserved mechanism selection for future direct syscall blocking. kprobe override requires CONFIG_BPF_KPROBE_OVERRIDE and an error-injectable kernel function.
+        #     Mechanism selection for direct syscall blocking. kprobe override requires CONFIG_BPF_KPROBE_OVERRIDE and an error-injectable kernel function.
         #   ch: |-
-        #     预留给后续直接 syscall 阻断的机制选择。kprobe override 需要 CONFIG_BPF_KPROBE_OVERRIDE，并且目标内核函数必须支持 error injection。
+        #     直接 syscall 阻断的机制选择。kprobe override 需要 CONFIG_BPF_KPROBE_OVERRIDE，并且目标内核函数必须支持 error injection。
         syscall_strategy: auto
         # type: string
         # name:
@@ -1828,9 +1828,9 @@ inputs:
         # ee_feature: true
         # description:
         #   en: |-
-        #     AI Agent command enforcement rules. The first implementation supports exec command exact/prefix/suffix matching.
+        #     AI Agent enforcement rules. Exec rules support exact/prefix/suffix matching; syscall rules support selected dangerous syscall names or kernel symbols such as reboot, init_module, finit_module, delete_module and kexec_load.
         #   ch: |-
-        #     AI Agent 命令执行阻断规则。第一版支持 exec 命令 exact/prefix/suffix 匹配。
+        #     AI Agent 执行阻断规则。exec 规则支持 exact/prefix/suffix 匹配；syscall 规则支持部分危险 syscall 名称或内核符号，例如 reboot、init_module、finit_module、delete_module、kexec_load。
         rules: []
     # type: section
     # name:

@@ -2362,7 +2362,7 @@ inputs:
 
 #### 执行阻断 {#inputs.proc.ai_agent.enforcement}
 
-AI Agent 命令执行阻断。第一版仅支持 exec 命令审计/阻断。
+AI Agent 命令和部分直接 syscall 执行阻断。
 
 ##### 开启执行阻断 {#inputs.proc.ai_agent.enforcement.enabled}
 
@@ -2456,7 +2456,7 @@ inputs:
 
 **详细描述**:
 
-exec 命令阻断的机制选择。第一版在可用时使用 BPF LSM；kprobe override 预留给后续 syscall 阻断，并且仅在能力探测通过时使用。
+exec 命令阻断的机制选择。exec 阻断在可用时使用 BPF LSM。
 
 ##### Syscall 阻断策略 {#inputs.proc.ai_agent.enforcement.syscall_strategy}
 
@@ -2494,7 +2494,7 @@ inputs:
 
 **详细描述**:
 
-预留给后续直接 syscall 阻断的机制选择。kprobe override 需要 CONFIG_BPF_KPROBE_OVERRIDE，并且目标内核函数必须支持 error injection。
+直接 syscall 阻断的机制选择。kprobe override 需要 CONFIG_BPF_KPROBE_OVERRIDE，并且目标内核函数必须支持 error injection。
 
 ##### 允许的阻断机制 {#inputs.proc.ai_agent.enforcement.allowed_mechanisms}
 
@@ -2616,7 +2616,7 @@ inputs:
 
 **详细描述**:
 
-AI Agent 命令执行阻断规则。第一版支持 exec 命令 exact/prefix/suffix 匹配。
+AI Agent 执行阻断规则。exec 规则支持 exact/prefix/suffix 匹配；syscall 规则支持部分危险 syscall 名称或内核符号，例如 reboot、init_module、finit_module、delete_module、kexec_load。
 
 ### 符号表 {#inputs.proc.symbol_table}
 
