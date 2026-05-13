@@ -70,7 +70,10 @@ impl EpcNetIpKey {
     fn clone_by_masklen(&self, masklen: usize, is_ipv4: bool) -> Self {
         let max_prefix = if is_ipv4 { IPV4_BITS } else { IPV6_BITS };
         Self {
-            ip: self.ip & u128::MAX.checked_shl(max_prefix.saturating_sub(masklen) as u32).unwrap_or(0),
+            ip: self.ip
+            & u128::MAX
+                .checked_shl(max_prefix.saturating_sub(masklen) as u32)
+                .unwrap_or(0),
             epc_id: self.epc_id,
             masklen: masklen as u8,
         }
@@ -1376,9 +1379,9 @@ mod tests {
     /// The fix uses `checked_shl` so the shift is saturated to 0 instead.
     #[test]
     fn test_ipv6_zero_masklen_no_panic() {
-        use std::str::FromStr;
-        use ipnet::IpNet;
         use crate::common::policy::{Cidr, CidrType};
+        use ipnet::IpNet;
+        use std::str::FromStr;
 
         let mut labeler: Labeler = Default::default();
 
@@ -1393,11 +1396,7 @@ mod tests {
 
         // A lookup for any IPv6 address must not panic.
         let mut endpoint: EndpointInfo = Default::default();
-        labeler.set_epc_by_cidr(
-            "2001:db8::1".parse().unwrap(),
-            42,
-            &mut endpoint,
-        );
+        labeler.set_epc_by_cidr("2001:db8::1".parse().unwrap(), 42, &mut endpoint);
         assert_eq!(endpoint.l3_epc_id, 42);
     }
 
