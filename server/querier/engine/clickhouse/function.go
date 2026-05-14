@@ -199,15 +199,16 @@ func TransMultiTag(isMulti bool, field string, dbFields []string, withs []view.N
 
 func processEnumField(field, db, table string, e *CHEngine) string {
 	transField := field
-	tagEnum := strings.TrimSuffix(field, "_0")
+	tagField := strings.Trim(field, "`")
+	tagEnum := strings.TrimSuffix(tagField, "_0")
 	tagEnum = strings.TrimSuffix(tagEnum, "_1")
-	tagDes, getTagOK := tag.GetTag(field, db, table, "enum")
+	tagDes, getTagOK := tag.GetTag(tagField, db, table, "enum")
 	enumTable := table
 	if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_DEEPFLOW_TENANT, chCommon.DB_NAME_PROMETHEUS, chCommon.DB_NAME_EXT_METRICS}, db) {
 		enumTable = chCommon.DB_TABLE_MAP[db][0]
 	}
 	tagDescription, tagOK := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
-		DB: db, Table: enumTable, TagName: field,
+		DB: db, Table: enumTable, TagName: tagEnum,
 	}]
 	if getTagOK {
 		nameColumn := ""
@@ -1070,15 +1071,16 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		return f.getViewNode()
 	case TAG_FUNCTION_ENUM:
 		var tagTranslator string
-		tagEnum := strings.TrimSuffix(f.Args[0], "_0")
+		tagField := strings.Trim(f.Args[0], "`")
+		tagEnum := strings.TrimSuffix(tagField, "_0")
 		tagEnum = strings.TrimSuffix(tagEnum, "_1")
-		tagDes, getTagOK := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
+		tagDes, getTagOK := tag.GetTag(tagField, f.DB, f.Table, f.Name)
 		enumTable := f.Table
 		if slices.Contains([]string{chCommon.DB_NAME_DEEPFLOW_ADMIN, chCommon.DB_NAME_DEEPFLOW_TENANT, chCommon.DB_NAME_PROMETHEUS, chCommon.DB_NAME_EXT_METRICS}, f.DB) {
 			enumTable = chCommon.DB_TABLE_MAP[f.DB][0]
 		}
 		tagDescription, tagOK := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
-			DB: f.DB, Table: enumTable, TagName: f.Args[0],
+			DB: f.DB, Table: enumTable, TagName: tagEnum,
 		}]
 		language := f.Engine.Language
 		nameColumn := ""

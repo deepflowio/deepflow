@@ -1672,6 +1672,60 @@ inputs:
         enabled_features: [proc.gprocess_info]
     # type: section
     # name:
+    #   en: AI Agent
+    #   ch: 智能体治理
+    # description:
+    ai_agent:
+      # type: string
+      # name:
+      #   en: HTTP Endpoints
+      #   ch: HTTP 端点
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     HTTP endpoints for AI agent recognition. Requests that match any prefix will mark the process as AI Agent.
+      #   ch: |-
+      #     用于识别智能体的 HTTP 端点前缀，命中后会标记进程为 AI Agent。
+      http_endpoints:
+        - /v1/chat/completions
+        - /v1/embeddings
+        - /v1/responses
+      # type: int
+      # name:
+      #   en: Max Payload Size
+      #   ch: 最大载荷大小
+      # unit: byte
+      # range: [0, 2147483647]
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Maximum payload size for AI agent reassembly. 0 means unlimited.
+      #   ch: |-
+      #     AI Agent 流重组最大载荷大小，0 表示不限。
+      max_payload_size: 0
+      # type: bool
+      # name:
+      #   en: File IO Enabled
+      #   ch: 文件 IO 事件
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: true
+      # description:
+      #   en: |-
+      #     Whether to enable AI Agent file IO event collection.
+      #   ch: |-
+      #     是否开启 AI Agent 文件 IO 事件采集。
+      file_io_enabled: true
+    # type: section
+    # name:
     #   en: Symbol Table
     #   ch: 符号表
     # description:
@@ -3187,6 +3241,50 @@ inputs:
         #     目前适用于 socket trace 和 uprobe Golang/OpenSSL trace 功能。禁用内存预分配大约会减少45M的内存占用。
         # upgrade_from: static_config.ebpf.map-prealloc-disabled
         map_prealloc_disabled: false
+        # type: string
+        # name:
+        #   en: Hooked Socket Syscalls
+        #   ch: Socket Hook Syscall 列表
+        # unit:
+        # range: []
+        # enum_options: [read, readv, recvfrom, recvmsg, recvmmsg, sendmsg, sendmmsg, sendto, write, writev]
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Controls which supported socket syscalls will have eBPF hooks installed.
+        #
+        #     This list only controls whether a syscall is hooked. The backend type used for each
+        #     enabled syscall still follows the current runtime mode selection logic. For example,
+        #     the mixed mode keeps its existing hybrid and tracepoint-only split, the pure-kprobe
+        #     mode keeps its existing kprobe behavior, and the kfunc mode keeps its existing kfunc
+        #     behavior plus the tracepoint fallback for `recvfrom` and `recvmmsg`.
+        #
+        #     Supported values: `read`, `readv`, `recvfrom`, `recvmsg`, `recvmmsg`, `sendmsg`,
+        #     `sendmmsg`, `sendto`, `write`, `writev`.
+        #   ch: |-
+        #     控制为哪些受支持的 socket syscall 安装 eBPF hook。
+        #
+        #     该列表只控制是否 hook 某个 syscall，不控制具体使用哪种 backend。每个启用的
+        #     syscall 仍然遵循当前运行模式下既有的 backend 选择逻辑。例如 mixed 模式继续保留
+        #     现有的 hybrid 与 tracepoint-only 分工，pure-kprobe 模式继续保留既有的 kprobe
+        #     行为，kfunc 模式继续保留既有的 kfunc 行为，以及 `recvfrom` 和 `recvmmsg`
+        #     的 tracepoint fallback。
+        #
+        #     支持的配置值：`read`、`readv`、`recvfrom`、`recvmsg`、`recvmmsg`、`sendmsg`、
+        #     `sendmmsg`、`sendto`、`write`、`writev`。
+        # upgrade_from:
+        hooked_socket_syscalls:
+          - read
+          - readv
+          - recvfrom
+          - recvmsg
+          - recvmmsg
+          - sendmsg
+          - sendmmsg
+          - sendto
+          - write
+          - writev
         # type: bool
         # name:
         #   en: Enable the fentry/fexit feature
@@ -6081,9 +6179,26 @@ processors:
           # description:
           #   en: |-
           #     After turning it off, the actions and table names in the SQL statement will not be extracted into the endpoint.
+          #     Currently supports extraction from the following SQL statements:
+          #     - SELECT * FROM users;
+          #     - INSERT INTO users VALUES (DEFAULT, '张三', 'zhang@example.com', 25);
+          #     - UPDATE users SET age = 18;
+          #     - DELETE FROM users WHERE id = 5;
+          #     - CREATE TABLE users ( id INT PRIMARY KEY AUTO_INCREMENT, age INT,);
+          #     - DROP TABLE users;
+          #     - ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+          #     - MySQL Login username 
           #   ch: |-
-          #     关闭后不会提取 SQL 语句中的动作和表名放入 endpoint 中
-          endpoint_disabled: true
+          #     关闭后不会提取 SQL 语句中的动作和表名放入 endpoint 中，目前支持从如下 SQL 语句中提取：
+          #     - SELECT * FROM users;
+          #     - INSERT INTO users VALUES (DEFAULT, '张三', 'zhang@example.com', 25);
+          #     - UPDATE users SET age = 18;
+          #     - DELETE FROM users WHERE id = 5;
+          #     - CREATE TABLE users ( id INT PRIMARY KEY AUTO_INCREMENT, age INT,);
+          #     - DROP TABLE users;
+          #     - ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+          #     - MySQL 登陆用户名
+          endpoint_disabled: false 
         # type: section
         # name: Grpc
         # description:

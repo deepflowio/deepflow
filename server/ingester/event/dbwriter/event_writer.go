@@ -46,6 +46,11 @@ type tableInfo struct {
 	ckwriter  *ckwriter.CKWriter
 }
 
+type FlowTagCKItem interface {
+	ckwriter.CKItem
+	GenerateNewFlowTags(*flow_tag.FlowTagCache)
+}
+
 type EventWriter struct {
 	msgType           datatype.MessageType
 	ckdbAddrs         *[]string
@@ -62,15 +67,24 @@ type EventWriter struct {
 }
 
 func (w *EventWriter) Write(e *EventStore) {
-	e.GenerateNewFlowTags(w.flowTagWriter.Cache)
+	w.WriteItem(e)
+}
+
+func (w *EventWriter) WriteItem(item FlowTagCKItem) {
+	if item == nil {
+		return
+	}
+	item.GenerateNewFlowTags(w.flowTagWriter.Cache)
 	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
-	w.ckWriter.Put(e)
+	w.ckWriter.Put(item)
+}
+
+func (w *EventWriter) WriteCKItem(item FlowTagCKItem) {
+	w.WriteItem(item)
 }
 
 func (w *EventWriter) WriteAlertEvent(e *AlertEventStore) {
-	e.GenerateNewFlowTags(w.flowTagWriter.Cache)
-	w.flowTagWriter.WriteFieldsAndFieldValuesInCache()
-	w.ckWriter.Put(e)
+	w.WriteItem(e)
 }
 
 func (w *EventWriter) WriteAlertRecord(e *AlertRecordStore) {
@@ -92,7 +106,7 @@ func NewEventWriter(eventType common.EventType, decoderIndex int, config *config
 	case common.RESOURCE_EVENT:
 		w.ttl = config.EventTTL
 		w.writerConfig = config.CKWriterConfig
-	case common.FILE_EVENT:
+	case common.FILE_EVENT, common.FILE_AGG_EVENT, common.FILE_MGMT_EVENT, common.PROC_PERM_EVENT, common.PROC_OPS_EVENT:
 		w.ttl = config.FileEventTTL
 		w.writerConfig = config.FileEventCKWriterConfig
 	case common.K8S_EVENT:

@@ -56,6 +56,7 @@ type Monitor struct {
 	tablePartsName     string
 	storagePolicy      string
 	exit               bool
+	diskFlushMonitor   *DailyDiskFlushMonitor
 
 	statsClient  *stats.UDPClient
 	statsEncoder *codec.SimpleEncoder
@@ -70,6 +71,32 @@ type Partition struct {
 	partition, database, table string
 	minTime, maxTime           time.Time
 	rows, bytesOnDisk          uint64
+}
+
+type DailyDiskFlushSnapshot struct {
+	host, db, table   string
+	bytesOnDisk, rows uint64
+}
+
+type DailyDiskFlushCounter struct {
+	Host        string `statsd:"host"`
+	DB          string `statsd:"db"`
+	Table       string `statsd:"table"`
+	BytesOnDisk uint64 `statsd:"bytes-on-disk"`
+	Rows        uint64 `statsd:"rows"`
+}
+
+type SnapshotKey struct {
+	host, db, table string
+}
+
+type DailyDiskFlushMonitor struct {
+	monitor        *Monitor
+	tablePartsName string
+	lastDate       string
+	lastSnapshots  map[SnapshotKey]DailyDiskFlushSnapshot
+
+	utils.Closable
 }
 
 func NewCKMonitor(cfg *config.Config) (*Monitor, error) {
@@ -99,6 +126,10 @@ func NewCKMonitor(cfg *config.Config) (*Monitor, error) {
 		return nil, err
 	}
 	m.statsClient = statsClient
+	m.diskFlushMonitor = newDailyDiskFlushMonitor(m, tablePartsName)
+	if err := common.RegisterCountableForIngester("clickhouse_disk_flush", m.diskFlushMonitor); err != nil {
+		log.Errorf("register countable clickhouse_disk_flush failed: %s", err)
+	}
 
 	return m, nil
 }
@@ -130,13 +161,106 @@ func (m *Monitor) sendStats(name, db, table, partition string, bytesOnDisk, rows
 	m.statsClient.Write(m.statsEncoder.Bytes())
 }
 
+func newDailyDiskFlushMonitor(monitor *Monitor, tablePartsName string) *DailyDiskFlushMonitor {
+	return &DailyDiskFlushMonitor{
+		monitor:        monitor,
+		tablePartsName: tablePartsName,
+		lastSnapshots:  make(map[SnapshotKey]DailyDiskFlushSnapshot),
+	}
+}
+
+func (m *DailyDiskFlushMonitor) getSnapshots(connect *sql.DB, currentDate string) (map[SnapshotKey]DailyDiskFlushSnapshot, error) {
+	sql := fmt.Sprintf("SELECT hostname(), database, table, sum(bytes_on_disk), sum(rows) FROM system.%s WHERE active = 1 and partition like '%s%%' GROUP BY database, table", m.tablePartsName, currentDate)
+	rows, err := connect.Query(sql)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	snapshots := make(map[SnapshotKey]DailyDiskFlushSnapshot)
+	for rows.Next() {
+		var snapshot DailyDiskFlushSnapshot
+		if err := rows.Scan(&snapshot.host, &snapshot.db, &snapshot.table, &snapshot.bytesOnDisk, &snapshot.rows); err != nil {
+			return nil, err
+		}
+		key := SnapshotKey{snapshot.host, snapshot.db, snapshot.table}
+		snapshots[key] = snapshot
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return snapshots, nil
+}
+
+func (m *DailyDiskFlushMonitor) GetCounter() interface{} {
+	m.monitor.updateConnections()
+	currentDate := time.Now().Format("2006-01-02")
+	if m.lastDate == "" {
+		m.lastDate = currentDate
+	}
+	mergedSnapshots := make(map[SnapshotKey]DailyDiskFlushSnapshot)
+	for _, connect := range m.monitor.Conns {
+		if connect == nil {
+			continue
+		}
+		snapshots, err := m.getSnapshots(connect, currentDate)
+		if err != nil {
+			log.Warning(err)
+			continue
+		}
+		if len(mergedSnapshots) == 0 {
+			mergedSnapshots = snapshots
+		} else {
+			for key, snapshot := range snapshots {
+				mergedSnapshots[key] = snapshot
+			}
+		}
+	}
+	if len(mergedSnapshots) == 0 {
+		if currentDate != m.lastDate {
+			m.lastDate = currentDate
+			m.lastSnapshots = make(map[SnapshotKey]DailyDiskFlushSnapshot)
+		}
+		return nil
+	}
+
+	counters := make([]DailyDiskFlushCounter, 0, len(mergedSnapshots))
+	for key, snapshot := range mergedSnapshots {
+		counter := DailyDiskFlushCounter{
+			Host:  snapshot.host,
+			DB:    snapshot.db,
+			Table: snapshot.table,
+		}
+		if currentDate == m.lastDate {
+			if previous, ok := m.lastSnapshots[key]; ok {
+				if snapshot.bytesOnDisk >= previous.bytesOnDisk {
+					counter.BytesOnDisk = snapshot.bytesOnDisk - previous.bytesOnDisk
+				}
+				if snapshot.rows >= previous.rows {
+					counter.Rows = snapshot.rows - previous.rows
+				}
+			} else {
+				counter.BytesOnDisk = 0
+				counter.Rows = 0
+			}
+		} else {
+			counter.BytesOnDisk = snapshot.bytesOnDisk
+			counter.Rows = snapshot.rows
+		}
+		counters = append(counters, counter)
+	}
+	m.lastDate = currentDate
+	m.lastSnapshots = mergedSnapshots
+	return counters
+}
+
 // 如果clickhouse重启等，需要自动更新连接
 func (m *Monitor) updateConnections() {
 	if len(*m.Addrs) == 0 {
 		return
 	}
 	if len(m.Conns) == 0 || !reflect.DeepEqual(m.CurrentAddrs, *m.Addrs) {
-		log.Infof("clickhouse endponts change from %v to %v", m.CurrentAddrs, *m.Addrs)
+		log.Infof("clickhouse endpoints change from %v to %v", m.CurrentAddrs, *m.Addrs)
 		m.CurrentAddrs = utils.CloneStringSlice(*m.Addrs)
 		for _, connect := range m.Conns {
 			if connect != nil {
@@ -266,6 +390,7 @@ func (m *Monitor) getMinPartitions(connect *sql.DB, diskInfo *DiskInfo) ([]Parti
 		sql = fmt.Sprintf("SELECT min(partition),count(distinct partition),database,table,argMin(rows,partition),argMin(bytes_on_disk,partition) FROM system.%s WHERE active=1 GROUP BY database,table ORDER BY database,table ASC",
 			m.tablePartsName)
 	}
+
 	rows, err := connect.Query(sql)
 	if err != nil {
 		return nil, err
@@ -317,7 +442,7 @@ func (m *Monitor) dropMinPartitions(connect *sql.DB, diskInfo *DiskInfo) error {
 		log.Warningf("drop partition: %s, database: %s, table: %s, minTime: %s, maxTime: %s, rows: %d, bytesOnDisk: %d", p.partition, p.database, p.table, p.minTime, p.maxTime, p.rows, p.bytesOnDisk)
 		_, err := connect.Exec(sql)
 		if err != nil {
-			log.Warningf("drop partiton: %s, database: %s, table: %s failed: %s", p.partition, p.database, p.table, err)
+			log.Warningf("drop partition: %s, database: %s, table: %s failed: %s", p.partition, p.database, p.table, err)
 			continue
 		}
 		m.sendStatsForceDeleteData(p.database, p.table, p.partition, p.bytesOnDisk, p.rows)
@@ -384,5 +509,8 @@ func (m *Monitor) start() {
 
 func (m *Monitor) Close() error {
 	m.exit = true
+	if m.diskFlushMonitor != nil {
+		m.diskFlushMonitor.Close()
+	}
 	return nil
 }

@@ -51,7 +51,7 @@ func newEncoder(cfg prometheuscfg.Config, orgID int) (*Encoder, error) {
 	e.metricName = newMetricName(org, cfg.ResourceMaxID1)
 	e.labelName = newLabelName(org, cfg.ResourceMaxID0)
 	e.labelValue = newLabelValue(org)
-	e.label = newLabel(org)
+	e.label = newLabel(org, e.labelName, e.labelValue)
 	e.LabelLayout = newLabelLayout(org, cfg)
 	return e, nil
 }
@@ -61,13 +61,17 @@ func (e *Encoder) Refresh() error {
 	defer e.mux.Unlock()
 
 	log.Infof("prometheus encoder refresh started", e.org.LogPrefix)
-	e.label.refresh()
+	// LabelName and LabelValue must be refreshed before Label,
+	// because Label.refresh() converts name/value strings to IDs.
 	eg := &errgroup.Group{}
 	common.AppendErrGroup(eg, e.metricName.refresh)
 	common.AppendErrGroup(eg, e.labelName.refresh)
 	common.AppendErrGroup(eg, e.labelValue.refresh)
 	common.AppendErrGroup(eg, e.LabelLayout.refresh)
-	err := eg.Wait()
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	err := e.label.refresh()
 	log.Infof("prometheus encoder refresh completed", e.org.LogPrefix)
 	return err
 }

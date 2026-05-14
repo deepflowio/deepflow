@@ -81,6 +81,18 @@ INSERT INTO data_source (id, display_name, data_table_collection, interval_time,
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, summable_metrics_operator, unsummable_metrics_operator, lcuuid)
                  VALUES (26, '事件-文件读写指标', 'event.file_event_metrics', 1, 7*24, 'Sum', 'Avg', @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
+                 VALUES (27, '事件-文件读写聚合事件', 'event.file_agg_event', 0, 7*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
+                 VALUES (28, '事件-文件管理事件', 'event.file_mgmt_event', 0, 7*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
+                 VALUES (29, '事件-进程权限事件', 'event.proc_perm_event', 0, 7*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
+                 VALUES (30, '事件-进程操作事件', 'event.proc_ops_event', 0, 7*24, @lcuuid);
 
 INSERT INTO region (id, name, lcuuid) values(1, '系统默认', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
 INSERT INTO az (id, name, lcuuid, region, domain) values(1, '系统默认', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'ffffffff-ffff-ffff-ffff-ffffffffffff');

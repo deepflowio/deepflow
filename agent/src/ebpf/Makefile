@@ -117,6 +117,7 @@ ifeq ($(GCC_VER_GTE71),1)
   CFLAGS += -Wformat-truncation=0
 endif
 CFLAGS += $(JAVA_AGENT_MACROS)
+CFLAGS += $(EXTRA_CFLAGS)
 
 CTLSRC := user/utils.c user/ctrl_tracer.c user/ctrl.c user/log.c
 CTLBIN := deepflow-ebpfctl

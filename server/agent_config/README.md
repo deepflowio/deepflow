@@ -2300,6 +2300,97 @@ Also ensure the global configuration parameters for related features are enabled
 - ebpf.profile.off_cpu (Ensure `inputs.ebpf.profile.off_cpu.disabled` is configured to **false**)
 - ebpf.profile.memory (Ensure `inputs.ebpf.profile.memory.disabled` is configured to **false**)
 
+### AI Agent {#inputs.proc.ai_agent}
+
+#### HTTP Endpoints {#inputs.proc.ai_agent.http_endpoints}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.http_endpoints`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      http_endpoints:
+      - /v1/chat/completions
+      - /v1/embeddings
+      - /v1/responses
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+HTTP endpoints for AI agent recognition. Requests that match any prefix will mark the process as AI Agent.
+
+#### Max Payload Size {#inputs.proc.ai_agent.max_payload_size}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.max_payload_size`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      max_payload_size: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | byte |
+| Range | [0, 2147483647] |
+
+**Description**:
+
+Maximum payload size for AI agent reassembly. 0 means unlimited.
+
+#### File IO Enabled {#inputs.proc.ai_agent.file_io_enabled}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.file_io_enabled`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      file_io_enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to enable AI Agent file IO event collection.
+
 ### Symbol Table {#inputs.proc.symbol_table}
 
 #### Golang-specific {#inputs.proc.symbol_table.golang_specific}
@@ -4313,6 +4404,67 @@ degradation. This configuration only applies to maps of type 'BPF_MAP_TYPE_HASH'
 Currently applicable to socket trace and uprobe Golang/OpenSSL trace functionalities.
 Disabling memory preallocation will approximately reduce memory usage by 45MB.
 
+##### Hooked Socket Syscalls {#inputs.ebpf.socket.tunning.hooked_socket_syscalls}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.hooked_socket_syscalls`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        hooked_socket_syscalls:
+        - read
+        - readv
+        - recvfrom
+        - recvmsg
+        - recvmmsg
+        - sendmsg
+        - sendmmsg
+        - sendto
+        - write
+        - writev
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| read | |
+| readv | |
+| recvfrom | |
+| recvmsg | |
+| recvmmsg | |
+| sendmsg | |
+| sendmmsg | |
+| sendto | |
+| write | |
+| writev | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Controls which supported socket syscalls will have eBPF hooks installed.
+
+This list only controls whether a syscall is hooked. The backend type used for each
+enabled syscall still follows the current runtime mode selection logic. For example,
+the mixed mode keeps its existing hybrid and tracepoint-only split, the pure-kprobe
+mode keeps its existing kprobe behavior, and the kfunc mode keeps its existing kfunc
+behavior plus the tracepoint fallback for `recvfrom` and `recvmmsg`.
+
+Supported values: `read`, `readv`, `recvfrom`, `recvmsg`, `recvmmsg`, `sendmsg`,
+`sendmmsg`, `sendto`, `write`, `writev`.
+
 ##### Enable the fentry/fexit feature {#inputs.ebpf.socket.tunning.fentry_enabled}
 
 **Tags**:
@@ -5339,7 +5491,12 @@ inputs:
 **Description**:
 
 Disable Lua interpreter profiling. When disabled, Lua process stack traces will not be collected,
-saving approximately 13 MB of kernel memory (lua_tstate_map, lua_lang_flags_map, lua_unwind_info_map, lua_offsets_map, luajit_offsets_map).
+saving approximately 13 MB of kernel memory.
+This controls the following eBPF maps:
+- lua_tstate_map: Per-thread lua_State cache (~7 MB)
+- lua_lang_flags_map: Per-process Lua/LuaJIT type flags (~2.5 MB)
+- lua_unwind_info_map: Per-process unwinding metadata (~3 MB)
+- lua_offsets_map, luajit_offsets_map: Lua/LuaJIT struct offset tables (< 2 KB total)
 
 ### Network {#inputs.ebpf.network}
 
@@ -8537,7 +8694,7 @@ processors:
     application_protocol_inference:
       protocol_special_config:
         mysql:
-          endpoint_disabled: true
+          endpoint_disabled: false
 ```
 
 **Schema**:
@@ -8548,6 +8705,15 @@ processors:
 **Description**:
 
 After turning it off, the actions and table names in the SQL statement will not be extracted into the endpoint.
+Currently supports extraction from the following SQL statements:
+- SELECT * FROM users;
+- INSERT INTO users VALUES (DEFAULT, '张三', 'zhang@example.com', 25);
+- UPDATE users SET age = 18;
+- DELETE FROM users WHERE id = 5;
+- CREATE TABLE users ( id INT PRIMARY KEY AUTO_INCREMENT, age INT,);
+- DROP TABLE users;
+- ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+- MySQL Login username 
 
 ##### Grpc {#processors.request_log.application_protocol_inference.protocol_special_config.grpc}
 

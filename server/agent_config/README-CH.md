@@ -2269,6 +2269,97 @@ inputs:
 - ebpf.profile.off_cpu（注意确认 `inputs.ebpf.profile.off_cpu.disabled` 已配置为 **false**）
 - ebpf.profile.memory（注意确认 `inputs.ebpf.profile.memory.disabled` 已配置为 **false**）
 
+### 智能体治理 {#inputs.proc.ai_agent}
+
+#### HTTP 端点 {#inputs.proc.ai_agent.http_endpoints}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.http_endpoints`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      http_endpoints:
+      - /v1/chat/completions
+      - /v1/embeddings
+      - /v1/responses
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+用于识别智能体的 HTTP 端点前缀，命中后会标记进程为 AI Agent。
+
+#### 最大载荷大小 {#inputs.proc.ai_agent.max_payload_size}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.max_payload_size`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      max_payload_size: 0
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | byte |
+| Range | [0, 2147483647] |
+
+**详细描述**:
+
+AI Agent 流重组最大载荷大小，0 表示不限。
+
+#### 文件 IO 事件 {#inputs.proc.ai_agent.file_io_enabled}
+
+**标签**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.file_io_enabled`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      file_io_enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否开启 AI Agent 文件 IO 事件采集。
+
 ### 符号表 {#inputs.proc.symbol_table}
 
 #### Golang 特有 {#inputs.proc.symbol_table.golang_specific}
@@ -4218,6 +4309,67 @@ inputs:
 但这可能会导致一些性能下降。此配置仅适用于 `BPF_MAP_TYPE_HASH` 类型的 bpf map。
 目前适用于 socket trace 和 uprobe Golang/OpenSSL trace 功能。禁用内存预分配大约会减少45M的内存占用。
 
+##### Socket Hook Syscall 列表 {#inputs.ebpf.socket.tunning.hooked_socket_syscalls}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.hooked_socket_syscalls`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        hooked_socket_syscalls:
+        - read
+        - readv
+        - recvfrom
+        - recvmsg
+        - recvmmsg
+        - sendmsg
+        - sendmmsg
+        - sendto
+        - write
+        - writev
+```
+
+**枚举可选值**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| read | |
+| readv | |
+| recvfrom | |
+| recvmsg | |
+| recvmmsg | |
+| sendmsg | |
+| sendmmsg | |
+| sendto | |
+| write | |
+| writev | |
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**详细描述**:
+
+控制为哪些受支持的 socket syscall 安装 eBPF hook。
+
+该列表只控制是否 hook 某个 syscall，不控制具体使用哪种 backend。每个启用的
+syscall 仍然遵循当前运行模式下既有的 backend 选择逻辑。例如 mixed 模式继续保留
+现有的 hybrid 与 tracepoint-only 分工，pure-kprobe 模式继续保留既有的 kprobe
+行为，kfunc 模式继续保留既有的 kfunc 行为，以及 `recvfrom` 和 `recvmmsg`
+的 tracepoint fallback。
+
+支持的配置值：`read`、`readv`、`recvfrom`、`recvmsg`、`recvmmsg`、`sendmsg`、
+`sendmmsg`、`sendto`、`write`、`writev`。
+
 ##### 启用fentry/fexit特性 {#inputs.ebpf.socket.tunning.fentry_enabled}
 
 **标签**:
@@ -5198,8 +5350,12 @@ inputs:
 
 **详细描述**:
 
-禁用 Lua 解释器剖析。禁用后将不采集 Lua 进程的函数调用栈，
-可节省约 13 MB 内核内存（lua_tstate_map、lua_lang_flags_map、lua_unwind_info_map、lua_offsets_map、luajit_offsets_map）。
+禁用 Lua 解释器剖析功能。禁用后将不会采集 Lua 进程的函数调用栈，可节省约 13 MB 的内核内存。
+此配置项控制以下 eBPF maps 的创建：
+- lua_tstate_map：缓存每线程 lua_State 栈（按线程，容量较大，约 7 MB）
+- lua_lang_flags_map：记录进程 Lua/LuaJIT 类型标记（约 2.5 MB）
+- lua_unwind_info_map：存储进程级 unwinding 元信息（约 3 MB）
+- lua_offsets_map、luajit_offsets_map：存储 Lua/LuaJIT 结构偏移表（总计 < 2 KB）
 
 ### 网络 {#inputs.ebpf.network}
 
@@ -8349,7 +8505,7 @@ processors:
     application_protocol_inference:
       protocol_special_config:
         mysql:
-          endpoint_disabled: true
+          endpoint_disabled: false
 ```
 
 **模式**:
@@ -8359,7 +8515,15 @@ processors:
 
 **详细描述**:
 
-关闭后不会提取 SQL 语句中的动作和表名放入 endpoint 中
+关闭后不会提取 SQL 语句中的动作和表名放入 endpoint 中，目前支持从如下 SQL 语句中提取：
+- SELECT * FROM users;
+- INSERT INTO users VALUES (DEFAULT, '张三', 'zhang@example.com', 25);
+- UPDATE users SET age = 18;
+- DELETE FROM users WHERE id = 5;
+- CREATE TABLE users ( id INT PRIMARY KEY AUTO_INCREMENT, age INT,);
+- DROP TABLE users;
+- ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+- MySQL 登陆用户名
 
 ##### Grpc {#processors.request_log.application_protocol_inference.protocol_special_config.grpc}
 

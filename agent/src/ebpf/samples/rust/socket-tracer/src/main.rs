@@ -17,6 +17,7 @@
 use chrono::prelude::DateTime;
 use chrono::FixedOffset;
 use chrono::Utc;
+use log::info;
 use socket_tracer::ebpf::*;
 use std::convert::TryInto;
 use std::env;
@@ -26,7 +27,6 @@ use std::net::IpAddr;
 use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
-use log::info;
 
 // Reference trace-utils-interp when building the Enterprise edition.
 // The purpose is to ensure that Rust links against libtrace_utils_interp-xxxx.rlib
@@ -55,6 +55,88 @@ lazy_static::lazy_static! {
 
 lazy_static::lazy_static! {
     static ref COUNTER: Mutex<u32> = Mutex::new(0);
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
+struct HookedSocketSyscallBitmap(c_ulonglong);
+
+impl HookedSocketSyscallBitmap {
+    fn set_enabled(&mut self, bit: c_ulonglong) {
+        self.0 |= bit;
+    }
+}
+
+impl<T: AsRef<str>> From<&[T]> for HookedSocketSyscallBitmap {
+    fn from(vs: &[T]) -> Self {
+        let mut bitmap = HookedSocketSyscallBitmap(0);
+        for v in vs.iter() {
+            match v.as_ref() {
+                "read" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_READ),
+                "readv" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_READV),
+                "recvfrom" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_RECVFROM),
+                "recvmsg" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_RECVMSG),
+                "recvmmsg" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_RECVMMSG),
+                "sendmsg" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_SENDMSG),
+                "sendmmsg" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_SENDMMSG),
+                "sendto" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_SENDTO),
+                "write" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_WRITE),
+                "writev" => bitmap.set_enabled(HOOKED_SOCKET_SYSCALL_WRITEV),
+                _ => {}
+            }
+        }
+        bitmap
+    }
+}
+
+const HOOKED_SOCKET_SYSCALL_READ: c_ulonglong = 1 << 0;
+const HOOKED_SOCKET_SYSCALL_READV: c_ulonglong = 1 << 1;
+const HOOKED_SOCKET_SYSCALL_RECVFROM: c_ulonglong = 1 << 2;
+const HOOKED_SOCKET_SYSCALL_RECVMSG: c_ulonglong = 1 << 3;
+const HOOKED_SOCKET_SYSCALL_RECVMMSG: c_ulonglong = 1 << 4;
+const HOOKED_SOCKET_SYSCALL_SENDMSG: c_ulonglong = 1 << 5;
+const HOOKED_SOCKET_SYSCALL_SENDMMSG: c_ulonglong = 1 << 6;
+const HOOKED_SOCKET_SYSCALL_SENDTO: c_ulonglong = 1 << 7;
+const HOOKED_SOCKET_SYSCALL_WRITE: c_ulonglong = 1 << 8;
+const HOOKED_SOCKET_SYSCALL_WRITEV: c_ulonglong = 1 << 9;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hooked_socket_syscall_bitmap_sets_expected_bits() {
+        let syscalls = ["read", "recvfrom", "sendto", "write"];
+        let bitmap = HookedSocketSyscallBitmap::from(syscalls.as_slice());
+
+        assert_eq!(
+            bitmap,
+            HookedSocketSyscallBitmap(
+                HOOKED_SOCKET_SYSCALL_READ
+                    | HOOKED_SOCKET_SYSCALL_RECVFROM
+                    | HOOKED_SOCKET_SYSCALL_SENDTO
+                    | HOOKED_SOCKET_SYSCALL_WRITE,
+            ),
+        );
+    }
+
+    #[test]
+    fn set_hooked_socket_syscalls_accepts_bitmap_from_syscall_names() {
+        let syscalls = ["write", "read", "write", "sendto"];
+        let bitmap = HookedSocketSyscallBitmap::from(syscalls.as_slice());
+
+        assert_eq!(
+            bitmap,
+            HookedSocketSyscallBitmap(
+                HOOKED_SOCKET_SYSCALL_READ
+                    | HOOKED_SOCKET_SYSCALL_SENDTO
+                    | HOOKED_SOCKET_SYSCALL_WRITE,
+            ),
+        );
+
+        unsafe {
+            set_hooked_socket_syscalls(bitmap.0);
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -216,7 +298,11 @@ extern "C" fn debug_callback(_data: *mut c_char, len: c_int) {
     }
 }
 
-extern "C" fn socket_trace_callback(_: *mut c_void, queue_id: c_int, sd: *mut SK_BPF_DATA) -> c_int {
+extern "C" fn socket_trace_callback(
+    _: *mut c_void,
+    queue_id: c_int,
+    sd: *mut SK_BPF_DATA,
+) -> c_int {
     unsafe {
         let mut proto_tag = String::from("");
         if sk_proto_safe(sd) == SOCK_DATA_OTHER {
@@ -428,7 +514,10 @@ fn main() {
             if e.kind() == std::io::ErrorKind::NotFound {
                 println!("numad process not found, skipping CPU affinity protection (normal)");
             } else {
-                println!("Failed to protect CPU affinity due to unexpected error: {}", e);
+                println!(
+                    "Failed to protect CPU affinity due to unexpected error: {}",
+                    e
+                );
             }
         }
     }
@@ -665,10 +754,20 @@ fn main() {
                 .as_c_str()
                 .as_ptr(),
         );
-	// dpdk enable
-	// set_dpdk_trace_enabled(true);
-	// disable_kprobe_feature();
-	// set_virtual_file_collect(true);
+        //let hooked_socket_syscalls = [
+        //    "read", "readv", "recvfrom", "recvmsg", "recvmmsg", "sendmsg", "sendmmsg", "sendto",
+        //    "write", "writev",
+        //];
+        let hooked_socket_syscalls = [
+            "readv", "recvfrom", "recvmsg", "recvmmsg", "sendmsg", "sendmmsg", "sendto", "writev",
+        ];
+        set_hooked_socket_syscalls(
+            HookedSocketSyscallBitmap::from(hooked_socket_syscalls.as_slice()).0,
+        );
+        // dpdk enable
+        // set_dpdk_trace_enabled(true);
+        // disable_kprobe_feature();
+        // set_virtual_file_collect(true);
         if running_socket_tracer(
             socket_trace_callback, /* Callback interface rust -> C */
             1, /* Number of worker threads, indicating how many user-space threads participate in data processing */
