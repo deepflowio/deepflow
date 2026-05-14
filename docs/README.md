@@ -4,6 +4,8 @@
 
 - **Design**. Here, you'll find a lot about DeepFlow's design and get a first look at what's going on behind it.
 
+- **[eBPF-cBPF-Overview.md](./eBPF-cBPF-Overview.md)**. Comprehensive guide explaining how DeepFlow uses eBPF and cBPF technologies for data collection, including architecture diagrams, protocol support, and kernel requirements.
+
 - **FAQ**. Under this directory is a list of some common problems encountered by most users, please read here before you have any questions.
 
 - **Guides**. If this repositories brings you unexpected surprises or help, and you want to leave your mark on it, start with these guides.
