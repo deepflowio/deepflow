@@ -2300,6 +2300,97 @@ Also ensure the global configuration parameters for related features are enabled
 - ebpf.profile.off_cpu (Ensure `inputs.ebpf.profile.off_cpu.disabled` is configured to **false**)
 - ebpf.profile.memory (Ensure `inputs.ebpf.profile.memory.disabled` is configured to **false**)
 
+### AI Agent {#inputs.proc.ai_agent}
+
+#### HTTP Endpoints {#inputs.proc.ai_agent.http_endpoints}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.http_endpoints`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      http_endpoints:
+      - /v1/chat/completions
+      - /v1/embeddings
+      - /v1/responses
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+HTTP endpoints for AI agent recognition. Requests that match any prefix will mark the process as AI Agent.
+
+#### Max Payload Size {#inputs.proc.ai_agent.max_payload_size}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.max_payload_size`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      max_payload_size: 0
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | byte |
+| Range | [0, 2147483647] |
+
+**Description**:
+
+Maximum payload size for AI agent reassembly. 0 means unlimited.
+
+#### File IO Enabled {#inputs.proc.ai_agent.file_io_enabled}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.file_io_enabled`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      file_io_enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether to enable AI Agent file IO event collection.
+
 ### Symbol Table {#inputs.proc.symbol_table}
 
 #### Golang-specific {#inputs.proc.symbol_table.golang_specific}
@@ -8603,7 +8694,7 @@ processors:
     application_protocol_inference:
       protocol_special_config:
         mysql:
-          endpoint_disabled: true
+          endpoint_disabled: false
 ```
 
 **Schema**:
@@ -8614,6 +8705,15 @@ processors:
 **Description**:
 
 After turning it off, the actions and table names in the SQL statement will not be extracted into the endpoint.
+Currently supports extraction from the following SQL statements:
+- SELECT * FROM users;
+- INSERT INTO users VALUES (DEFAULT, '张三', 'zhang@example.com', 25);
+- UPDATE users SET age = 18;
+- DELETE FROM users WHERE id = 5;
+- CREATE TABLE users ( id INT PRIMARY KEY AUTO_INCREMENT, age INT,);
+- DROP TABLE users;
+- ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+- MySQL Login username 
 
 ##### Grpc {#processors.request_log.application_protocol_inference.protocol_special_config.grpc}
 

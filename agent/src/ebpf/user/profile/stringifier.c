@@ -374,7 +374,7 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 				 */
 				char format_str[4096];
 				snprintf(format_str, sizeof(format_str),
-					 "[%s]", sym->module);
+					 "[%s 0x%016lx]", sym->module, address);
 				int len = strlen(format_str);
 				*sym_ptr =
 				    create_symbol_str(len, format_str, "");
