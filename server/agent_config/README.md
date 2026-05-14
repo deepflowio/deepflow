@@ -2544,7 +2544,11 @@ inputs:
   proc:
     ai_agent:
       enforcement:
-        allowed_mechanisms: [lsm, kprobe_override, sigkill, seccomp]
+        allowed_mechanisms:
+        - lsm
+        - kprobe_override
+        - sigkill
+        - seccomp
 ```
 
 **Enum options**:
@@ -2647,7 +2651,7 @@ inputs:
 
 **Description**:
 
-AI Agent enforcement rules. Exec rules support exact/prefix/suffix matching; syscall rules support selected dangerous syscall names or kernel symbols such as reboot, init_module, finit_module, delete_module and kexec_load.
+AI Agent enforcement rules. Strong-block exec rules support path exact/suffix selectors and optional argv_matches selectors with fixed argv index and exact value. argv_contains_any is audit-only compatibility and is not accepted for strong block. Syscall rules support selected dangerous syscall names or kernel symbols such as reboot, init_module, finit_module, delete_module and kexec_load.
 
 ### Symbol Table {#inputs.proc.symbol_table}
 

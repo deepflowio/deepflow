@@ -1828,9 +1828,9 @@ inputs:
         # ee_feature: true
         # description:
         #   en: |-
-        #     AI Agent enforcement rules. Exec rules support exact/prefix/suffix matching; syscall rules support selected dangerous syscall names or kernel symbols such as reboot, init_module, finit_module, delete_module and kexec_load.
+        #     AI Agent enforcement rules. Strong-block exec rules support path exact/suffix selectors and optional argv_matches selectors with fixed argv index and exact value. argv_contains_any is audit-only compatibility and is not accepted for strong block. Syscall rules support selected dangerous syscall names or kernel symbols such as reboot, init_module, finit_module, delete_module and kexec_load.
         #   ch: |-
-        #     AI Agent 执行阻断规则。exec 规则支持 exact/prefix/suffix 匹配；syscall 规则支持部分危险 syscall 名称或内核符号，例如 reboot、init_module、finit_module、delete_module、kexec_load。
+        #     AI Agent 执行阻断规则。强阻断 exec 规则支持 path exact/suffix 选择器，并可通过 argv_matches 指定固定 argv index 和 exact value。argv_contains_any 仅作为审计兼容字段，不支持强阻断。syscall 规则支持部分危险 syscall 名称或内核符号，例如 reboot、init_module、finit_module、delete_module、kexec_load。
         rules: []
     # type: section
     # name:

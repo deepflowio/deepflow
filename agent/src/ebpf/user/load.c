@@ -46,6 +46,7 @@
 #include "ssl_tracer.h"
 #include "profile/perf_profiler.h"
 #include "unwind_tracer.h"
+#include "extended/extended.h"
 
 #ifndef BPF_PROG_TYPE_LSM
 #define BPF_PROG_TYPE_LSM 29
@@ -669,7 +670,8 @@ static bool is_optional_ai_agent_kprobe_override_prog(struct ebpf_prog *prog)
 {
 	return prog != NULL && prog->type == BPF_PROG_TYPE_KPROBE &&
 	    prog->name != NULL &&
-	    strstr(prog->name, "df_K_ai_agent_syscall_override_") == prog->name;
+	    (strstr(prog->name, "df_K_ai_agent_syscall_override_") == prog->name ||
+	     strstr(prog->name, "df_K_ai_agent_exec_override_") == prog->name);
 }
 
 static int load_obj__progs(struct ebpf_object *obj)
@@ -1405,6 +1407,14 @@ int ebpf_obj_load(struct ebpf_object *obj)
 		}
 
 		extended_map_preprocess(map);
+
+		int reused_fd = extended_map_reuse_fd(obj->name, map->name);
+		if (reused_fd >= 0) {
+			map->fd = reused_fd;
+			ebpf_info("reuse map fd:%d for obj:%s map:%s\n",
+				  map->fd, obj->name, map->name);
+			continue;
+		}
 
 		map->fd =
 		    bcc_create_map(map->def.type, map->name, map->def.key_size,

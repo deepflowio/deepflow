@@ -517,7 +517,22 @@ pub mod ai_agent_enforcement {
         pub exact: Vec<String>,
         pub prefix: Vec<String>,
         pub suffix: Vec<String>,
+        pub argv_matches: Vec<ExecArgvMatchInput>,
         pub argv_contains_any: Vec<String>,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum ExecArgvMatchOp {
+        Exact,
+        Prefix,
+        Suffix,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct ExecArgvMatchInput {
+        pub index: u8,
+        pub op: ExecArgvMatchOp,
+        pub value: String,
     }
 
     #[derive(Clone, Debug, PartialEq, Eq)]

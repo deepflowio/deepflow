@@ -2513,7 +2513,11 @@ inputs:
   proc:
     ai_agent:
       enforcement:
-        allowed_mechanisms: [lsm, kprobe_override, sigkill, seccomp]
+        allowed_mechanisms:
+        - lsm
+        - kprobe_override
+        - sigkill
+        - seccomp
 ```
 
 **枚举可选值**:
@@ -2616,7 +2620,7 @@ inputs:
 
 **详细描述**:
 
-AI Agent 执行阻断规则。exec 规则支持 exact/prefix/suffix 匹配；syscall 规则支持部分危险 syscall 名称或内核符号，例如 reboot、init_module、finit_module、delete_module、kexec_load。
+AI Agent 执行阻断规则。强阻断 exec 规则支持 path exact/suffix 选择器，并可通过 argv_matches 指定固定 argv index 和 exact value。argv_contains_any 仅作为审计兼容字段，不支持强阻断。syscall 规则支持部分危险 syscall 名称或内核符号，例如 reboot、init_module、finit_module、delete_module、kexec_load。
 
 ### 符号表 {#inputs.proc.symbol_table}
 

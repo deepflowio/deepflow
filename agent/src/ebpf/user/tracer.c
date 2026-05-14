@@ -717,7 +717,8 @@ static bool is_optional_ai_agent_kprobe_prog(struct ebpf_prog *prog)
 {
 	return prog != NULL && prog->type == BPF_PROG_TYPE_KPROBE &&
 	    prog->name != NULL &&
-	    strstr(prog->name, "df_K_ai_agent_syscall_override_") == prog->name &&
+	    (strstr(prog->name, "df_K_ai_agent_syscall_override_") == prog->name ||
+	     strstr(prog->name, "df_K_ai_agent_exec_override_") == prog->name) &&
 	    prog->sec_name != NULL &&
 	    !strncmp(prog->sec_name, "kprobe/", 7);
 }

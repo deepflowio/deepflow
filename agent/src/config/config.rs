@@ -709,7 +709,26 @@ pub struct AiAgentExecMatch {
     pub exact: Vec<String>,
     pub prefix: Vec<String>,
     pub suffix: Vec<String>,
+    pub argv_matches: Vec<AiAgentExecArgvMatch>,
     pub argv_contains_any: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AiAgentExecArgvMatch {
+    pub index: u8,
+    pub op: String,
+    pub value: String,
+}
+
+impl Default for AiAgentExecArgvMatch {
+    fn default() -> Self {
+        Self {
+            index: 0,
+            op: "exact".to_string(),
+            value: String::new(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]

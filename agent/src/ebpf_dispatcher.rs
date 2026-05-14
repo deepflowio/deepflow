@@ -730,6 +730,17 @@ fn ai_agent_enforcement_kprobe_override_allowed(
 }
 
 #[cfg(feature = "enterprise")]
+fn ai_agent_exec_argv_match_op(
+    op: &str,
+) -> enterprise_utils::ai_agent_enforcement::ExecArgvMatchOp {
+    match op.trim().to_ascii_lowercase().as_str() {
+        "prefix" => enterprise_utils::ai_agent_enforcement::ExecArgvMatchOp::Prefix,
+        "suffix" => enterprise_utils::ai_agent_enforcement::ExecArgvMatchOp::Suffix,
+        _ => enterprise_utils::ai_agent_enforcement::ExecArgvMatchOp::Exact,
+    }
+}
+
+#[cfg(feature = "enterprise")]
 fn ai_agent_exec_enforcement_inputs(
     config: &crate::config::config::AiAgentEnforcementConfig,
     mode: enterprise_utils::ai_agent_enforcement::EnforcementMode,
@@ -756,6 +767,18 @@ fn ai_agent_exec_enforcement_inputs(
                 exact: rule.exec.exact.clone(),
                 prefix: rule.exec.prefix.clone(),
                 suffix: rule.exec.suffix.clone(),
+                argv_matches: rule
+                    .exec
+                    .argv_matches
+                    .iter()
+                    .map(
+                        |m| enterprise_utils::ai_agent_enforcement::ExecArgvMatchInput {
+                            index: m.index,
+                            op: ai_agent_exec_argv_match_op(&m.op),
+                            value: m.value.clone(),
+                        },
+                    )
+                    .collect(),
                 argv_contains_any: rule.exec.argv_contains_any.clone(),
             }
         })
@@ -1706,13 +1729,16 @@ impl EbpfCollector {
         let lsm_allowed = ai_agent_enforcement_lsm_allowed(config);
         let kprobe_override_allowed = ai_agent_enforcement_kprobe_override_allowed(config);
         let requested_block = ai_agent_enforcement_mode_eq(&config.mode, "block");
-        let exec_effective_mode = if requested_block && exec_bpf_maps_available && lsm_allowed {
+        let exec_effective_mode = if requested_block
+            && exec_bpf_maps_available
+            && (lsm_allowed || kprobe_override_allowed)
+        {
             EnforcementMode::Block
         } else {
             if requested_block {
                 warn!(
-                    "AI Agent enforcement: block mode requested but BPF LSM is unavailable or disallowed; downgrade to audit-only (maps_available={}, lsm_allowed={})",
-                    exec_bpf_maps_available, lsm_allowed
+                    "AI Agent enforcement: block mode requested but no exec blocking mechanism is available or allowed; downgrade to audit-only (maps_available={}, lsm_allowed={}, kprobe_override_allowed={})",
+                    exec_bpf_maps_available, lsm_allowed, kprobe_override_allowed
                 );
             }
             EnforcementMode::AuditOnly
