@@ -96,12 +96,3 @@ func promLabelsEqual(new *labels.Labels, old *labels.Labels) bool {
 	return true
 }
 
-func getpbLabelString(labels *[]prompb.Label, key string) string {
-	// __cache_labels__string__ mostly append in last index, reverse scan avoid useless loop
-	for i := len(*labels) - 1; i >= 0; i-- {
-		if (*labels)[i].Name == key {
-			return (*labels)[i].Value
-		}
-	}
-	return ""
-}
