@@ -323,11 +323,6 @@ void df_send_symbol(enum event_type type, const void *code_addr,
 	send_bytes = meta->len + sizeof(*meta);
 	pthread_mutex_lock(&g_df_lock);
 	if (replay_finish) {
-		if (g_cached_bytes > 0) {
-			send_msg(perf_map_socket_fd, g_symbol_buffer,
-				 g_cached_bytes);
-			g_cached_bytes = 0;
-		}
 		send_msg(perf_map_socket_fd, symbol_str, send_bytes);
 	} else {
 		int buff_remain_bytes =
@@ -545,7 +540,16 @@ enable_replay:
 	if (g_jvmti == NULL)
 		g_jvmti = jvmti;
 	_(replay_callbacks(jvmti));
+	pthread_mutex_lock(&g_df_lock);
+	if (g_cached_bytes > 0) {
+		if (perf_map_socket_fd >= 0) {
+			send_msg(perf_map_socket_fd, g_symbol_buffer,
+				 g_cached_bytes);
+		}
+		g_cached_bytes = 0;
+	}
 	replay_finish = true;
+	pthread_mutex_unlock(&g_df_lock);
 	df_log
 	    ("- JVMTI symbolization agent startup sequence complete. Replay count %d\n",
 	     replay_count);
