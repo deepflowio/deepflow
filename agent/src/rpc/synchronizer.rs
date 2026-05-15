@@ -2064,7 +2064,14 @@ impl Synchronizer {
                     info!("sync interval set to {:?}", sync_interval);
                 }
 
-                time::sleep(sync_interval).await;
+                let last_exception = exception_handler.peek();
+                let count = sync_interval.as_secs().max(1);
+                for _ in 0..count {
+                    time::sleep(Duration::from_secs(1)).await;
+                    if last_exception != exception_handler.peek() {
+                        break;
+                    }
+                }
             }
         }));
     }
