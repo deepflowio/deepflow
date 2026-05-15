@@ -22,12 +22,14 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
 	"os"
 
+	"golang.org/x/crypto/pbkdf2"
 	"google.golang.org/grpc"
 
 	"github.com/deepflowio/deepflow/message/controller"
@@ -163,4 +165,9 @@ func getCAMD5() string {
 
 func GetCAMD5() string {
 	return CAMD5
+}
+
+func DerivePBKDF2Key(userID, orgID int) []byte {
+	salt := fmt.Sprintf("%d", orgID) + "_deepflow"
+	return pbkdf2.Key([]byte(fmt.Sprintf("%d", userID)), []byte(salt), 10000, 32, sha256.New)
 }

@@ -18,6 +18,7 @@ package agent
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -27,7 +28,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 
 	grpcapi "github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/server/controller/common"
@@ -263,8 +263,32 @@ func getAgentID(c *gin.Context, db *metadb.DB) (int, error) {
 
 func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID, ok := c.Get(common.HEADER_KEY_X_USER_ID)
+		if !ok {
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(fmt.Errorf("missing header %s", common.HEADER_KEY_X_USER_ID)))
+			return
+		}
+		orgID, ok := c.Get(common.HEADER_KEY_X_ORG_ID)
+		if !ok {
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(fmt.Errorf("missing header %s", common.HEADER_KEY_X_ORG_ID)))
+			return
+		}
+
+		cipherKey := string(common.DerivePBKDF2Key(userID.(int), orgID.(int)))
+		rawPayload, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
+			return
+		}
+
+		decryptedPayload, err := common.AesDecrypt(string(rawPayload), cipherKey)
+		if err != nil {
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
+			return
+		}
+
 		req := service.RemoteExecReq{}
-		if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		if err := json.Unmarshal([]byte(decryptedPayload), &req); err != nil {
 			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
@@ -287,7 +311,6 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 			Params:       req.Params,
 		}
 
-		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
 		db, err := metadb.GetDB(orgID.(int))
 		if err != nil {
 			response.JSON(c, response.SetError(err))
@@ -299,16 +322,21 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 			return
 		}
 		content, err := service.RunAgentCMD(a.cfg.AgentCommandTimeout, orgID.(int), agentID, &agentReq, req.CMD)
+		encryptedContent, encryptErr := common.AesEncrypt(content, cipherKey)
+		if encryptErr != nil {
+			response.JSON(c, response.SetData(content), response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(encryptErr))
+			return
+		}
 		if err != nil {
-			response.JSON(c, response.SetData(content), response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
+			response.JSON(c, response.SetData(encryptedContent), response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
 			return
 		}
 
 		if req.OutputFormat.String() == grpcapi.OutputFormat_TEXT.String() {
-			response.JSON(c, response.SetData(content))
+			response.JSON(c, response.SetData(encryptedContent))
 			return
 		}
-		sendAsFile(c, req.OutputFilename, bytes.NewBuffer([]byte(content)))
+		sendAsFile(c, req.OutputFilename, bytes.NewBuffer([]byte(encryptedContent)))
 	}
 }
 
