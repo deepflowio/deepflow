@@ -18,6 +18,7 @@ package agent
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -27,13 +28,12 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 
 	grpcapi "github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/config"
-	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadb "github.com/deepflowio/deepflow/server/controller/db/metadb"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	httpcommon "github.com/deepflowio/deepflow/server/controller/http/common"
 	"github.com/deepflowio/deepflow/server/controller/http/common/response"
 	service "github.com/deepflowio/deepflow/server/controller/http/service/agent"
@@ -91,7 +91,7 @@ func (a *AgentCMD) RegisterTo(e *gin.Engine) {
 func forwardToServerConnectedByAgent() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-		db, err := mysql.GetDB(orgID.(int))
+		db, err := metadb.GetDB(orgID.(int))
 		if err != nil {
 			log.Error(err, db.LogPrefixORGID)
 			response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
@@ -105,7 +105,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		var agent *mysqlmodel.VTap
+		var agent *metadbmodel.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
 			log.Error(err, db.LogPrefixORGID)
 			response.JSON(c, response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
@@ -188,7 +188,7 @@ func forwardToServerConnectedByAgent() gin.HandlerFunc {
 func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-		db, err := mysql.GetDB(orgID.(int))
+		db, err := metadb.GetDB(orgID.(int))
 		if err != nil {
 			response.JSON(c, response.SetError(err))
 			return
@@ -198,7 +198,7 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
-		var agent *mysqlmodel.VTap
+		var agent *metadbmodel.VTap
 		if err = db.Where("id = ?", agentID).First(&agent).Error; err != nil {
 			response.JSON(c, response.SetError(err))
 			return
@@ -241,14 +241,14 @@ func (a *AgentCMD) getCMDAndNamespaceHandler() gin.HandlerFunc {
 	}
 }
 
-func getAgentID(c *gin.Context, db *mysql.DB) (int, error) {
+func getAgentID(c *gin.Context, db *metadb.DB) (int, error) {
 	agentIDentStr := c.Param("id-or-name")
 	if agentIDentStr == "" {
 		return 0, errors.New("ident can not be empty")
 	}
 	agentID, err := strconv.Atoi(agentIDentStr)
 	if err != nil {
-		var agent mysqlmodel.VTap
+		var agent metadbmodel.VTap
 		if err := db.Where("name = ?", agentIDentStr).First(&agent).Error; err != nil {
 			return 0, fmt.Errorf("failed to get agent by name(%s), error: %s", err.Error())
 		}
@@ -259,8 +259,32 @@ func getAgentID(c *gin.Context, db *mysql.DB) (int, error) {
 
 func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID, ok := c.Get(common.HEADER_KEY_X_USER_ID)
+		if !ok {
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(fmt.Errorf("missing header %s", common.HEADER_KEY_X_USER_ID)))
+			return
+		}
+		orgID, ok := c.Get(common.HEADER_KEY_X_ORG_ID)
+		if !ok {
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(fmt.Errorf("missing header %s", common.HEADER_KEY_X_ORG_ID)))
+			return
+		}
+
+		cipherKey := string(common.DerivePBKDF2Key(userID.(int), orgID.(int)))
+		rawPayload, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
+			return
+		}
+
+		decryptedPayload, err := common.AesDecrypt(string(rawPayload), cipherKey)
+		if err != nil {
+			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
+			return
+		}
+
 		req := service.RemoteExecReq{}
-		if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
+		if err := json.Unmarshal([]byte(decryptedPayload), &req); err != nil {
 			response.JSON(c, response.SetOptStatus(httpcommon.INVALID_PARAMETERS), response.SetError(err))
 			return
 		}
@@ -283,8 +307,7 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 			Params:       req.Params,
 		}
 
-		orgID, _ := c.Get(common.HEADER_KEY_X_ORG_ID)
-		db, err := mysql.GetDB(orgID.(int))
+		db, err := metadb.GetDB(orgID.(int))
 		if err != nil {
 			response.JSON(c, response.SetError(err))
 			return
@@ -295,16 +318,21 @@ func (a *AgentCMD) cmdRunHandler() gin.HandlerFunc {
 			return
 		}
 		content, err := service.RunAgentCMD(a.cfg.AgentCommandTimeout, orgID.(int), agentID, &agentReq, req.CMD)
+		encryptedContent, encryptErr := common.AesEncrypt(content, cipherKey)
+		if encryptErr != nil {
+			response.JSON(c, response.SetData(content), response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(encryptErr))
+			return
+		}
 		if err != nil {
-			response.JSON(c, response.SetData(content), response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
+			response.JSON(c, response.SetData(encryptedContent), response.SetOptStatus(httpcommon.SERVER_ERROR), response.SetError(err))
 			return
 		}
 
 		if req.OutputFormat.String() == grpcapi.OutputFormat_TEXT.String() {
-			response.JSON(c, response.SetData(content))
+			response.JSON(c, response.SetData(encryptedContent))
 			return
 		}
-		sendAsFile(c, req.OutputFilename, bytes.NewBuffer([]byte(content)))
+		sendAsFile(c, req.OutputFilename, bytes.NewBuffer([]byte(encryptedContent)))
 	}
 }
 
