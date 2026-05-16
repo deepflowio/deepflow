@@ -49,6 +49,10 @@ impl ExceptionHandler {
         }
     }
 
+    pub fn peek(&self) -> u64 {
+        self.exception.load(Ordering::Relaxed)
+    }
+
     pub fn has(&self, e: Exception) -> bool {
         let e = e as u64;
         self.exception.load(Ordering::Relaxed) & e == e

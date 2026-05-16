@@ -698,6 +698,7 @@ impl Guard {
                         match get_memory_rss() {
                             Ok(memory_usage) => {
                                 if memory_usage >= memory_limit {
+                                    exception_handler.set(Exception::MemExceeded, None);
                                     if over_memory_limit {
                                         error!(
                                     "memory usage over memory limit twice, current={}, memory_limit={}, deepflow-agent restart...",
@@ -712,12 +713,18 @@ impl Guard {
                                     );
                                         over_memory_limit = true;
                                     }
+                                } else {
+                                    over_memory_limit = false;
+                                    exception_handler.clear(Exception::MemExceeded);
                                 }
                             }
                             Err(e) => {
                                 warn!("{}", e);
                             }
                         }
+                    } else {
+                        over_memory_limit = false;
+                        exception_handler.clear(Exception::MemExceeded);
                     }
                 }
 
