@@ -221,8 +221,8 @@ if ENTERPRISE_AGENT.exists():
         "AI Agent exec enforcement must emit proc block events",
     )
     require(
-        re.search(r"#define\s+AI_AGENT_EXEC_MAX_RULES\s+8", exec_common_text),
-        "AI Agent exec enforcement must cap BPF-side rule scan to 8 records to stay under old verifier complexity limits",
+        re.search(r"#define\s+AI_AGENT_EXEC_MAX_RULES\s+256", exec_common_text),
+        "AI Agent exec enforcement must expose a 256-record BPF-side exec rule cap",
     )
     require(
         "args ? args->cmdline : exec_path" not in exec_enforce_text,

@@ -690,7 +690,7 @@ static AI_AGENT_SYSCALL_RULES_MAP_FD: AtomicI32 = AtomicI32::new(-1);
 #[cfg(feature = "enterprise")]
 static AI_AGENT_POLICY_EPOCH_MAP_FD: AtomicI32 = AtomicI32::new(-1);
 #[cfg(feature = "enterprise")]
-const AI_AGENT_EXEC_RULES_BPF_MAX: usize = 8;
+const AI_AGENT_EXEC_RULES_BPF_MAX: usize = 256;
 #[cfg(feature = "enterprise")]
 const AI_AGENT_SYSCALL_RULES_BPF_MAX: usize = 32;
 
