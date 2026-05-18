@@ -56,6 +56,31 @@ func TestMySQLDMLInsert_AIAgentEventDataSourcesShareDefaultRetention(t *testing.
 	}
 }
 
+func TestProcBlockEventDataSourceHasPostMainMySQLIssue(t *testing.T) {
+	const mainBaselineVersion = "7.1.0.40"
+
+	if !versionGreater(DB_VERSION_EXPECTED, mainBaselineVersion) {
+		t.Fatalf("DB_VERSION_EXPECTED=%s, want version greater than main baseline %s", DB_VERSION_EXPECTED, mainBaselineVersion)
+	}
+
+	sqlPath := filepath.Join("rawsql", "mysql", "issu", DB_VERSION_EXPECTED+".sql")
+	content, err := os.ReadFile(sqlPath)
+	if err != nil {
+		t.Fatalf("read latest mysql issu sql failed: %v", err)
+	}
+	sql := string(content)
+
+	required := []string{
+		"CALL InsertDataSourceIfNotExists('事件-进程阻断事件', 'event.proc_block_event', 0, 7*24);",
+		"UPDATE db_version SET version='" + DB_VERSION_EXPECTED + "';",
+	}
+	for _, item := range required {
+		if !strings.Contains(sql, item) {
+			t.Fatalf("missing proc block event mysql issu entry: %s", item)
+		}
+	}
+}
+
 func versionGreater(left, right string) bool {
 	leftParts := strings.Split(left, ".")
 	rightParts := strings.Split(right, ".")
