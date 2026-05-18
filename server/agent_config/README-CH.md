@@ -6677,7 +6677,7 @@ inputs:
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -6706,7 +6706,7 @@ Telegraf、OpenTelemetry 和 Skywalking、Vector 的数据。
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 

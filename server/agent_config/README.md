@@ -6852,7 +6852,7 @@ K8s cluster to deepflow-agent.
 
 **Tags**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -6881,7 +6881,7 @@ Telegraf, OpenTelemetry, SkyWalking and Vector.
 
 **Tags**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
