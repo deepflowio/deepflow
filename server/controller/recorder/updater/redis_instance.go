@@ -46,6 +46,10 @@ func (f *RedisInstanceMessageFactory) CreateUpdatedFields() types.UpdatedFields 
 	return &message.UpdatedRedisInstanceFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, &RedisInstanceMessageFactory{})
+}
+
 type RedisInstance struct {
 	UpdaterBase[cloudmodel.RedisInstance, *diffbase.RedisInstance, *metadbmodel.RedisInstance, metadbmodel.RedisInstance]
 }
@@ -61,10 +65,6 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &RedisInstanceMessageFactory{})
-	}
 
 	return updater
 }

@@ -46,6 +46,10 @@ func (f *PeerConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields
 	return &message.UpdatedPeerConnectionFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_PEER_CONNECTION_EN, &PeerConnectionMessageFactory{})
+}
+
 type PeerConnection struct {
 	UpdaterBase[
 		cloudmodel.PeerConnection,
@@ -66,10 +70,6 @@ func NewPeerConnection(wholeCache *cache.Cache, cloudData []cloudmodel.PeerConne
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &PeerConnectionMessageFactory{})
-	}
 
 	return updater
 }

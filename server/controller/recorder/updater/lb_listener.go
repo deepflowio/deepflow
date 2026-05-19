@@ -46,6 +46,10 @@ func (f *LBListenerMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedLBListenerFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, &LBListenerMessageFactory{})
+}
+
 type LBListener struct {
 	UpdaterBase[
 		cloudmodel.LBListener,
@@ -66,10 +70,6 @@ func NewLBListener(wholeCache *cache.Cache, cloudData []cloudmodel.LBListener) *
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &LBListenerMessageFactory{})
-	}
 
 	return updater
 }

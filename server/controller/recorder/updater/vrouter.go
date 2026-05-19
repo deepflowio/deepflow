@@ -47,6 +47,10 @@ func (f *VRouterMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedVRouterFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_VROUTER_EN, &VRouterMessageFactory{})
+}
+
 type VRouter struct {
 	UpdaterBase[
 		cloudmodel.VRouter,
@@ -67,10 +71,6 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter) *VRoute
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &VRouterMessageFactory{})
-	}
 
 	return updater
 }

@@ -47,6 +47,10 @@ func (f *SubnetMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedSubnetFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_SUBNET_EN, &SubnetMessageFactory{})
+}
+
 type Subnet struct {
 	UpdaterBase[
 		cloudmodel.Subnet,
@@ -67,10 +71,6 @@ func NewSubnet(wholeCache *cache.Cache, cloudData []cloudmodel.Subnet) *Subnet {
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &SubnetMessageFactory{})
-	}
 
 	return updater
 }
