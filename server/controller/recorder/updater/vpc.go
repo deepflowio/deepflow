@@ -47,6 +47,10 @@ func (f *VPCMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedVPCFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_VPC_EN, &VPCMessageFactory{})
+}
+
 type VPC struct {
 	UpdaterBase[
 		cloudmodel.VPC,
@@ -67,10 +71,6 @@ func NewVPC(wholeCache *cache.Cache, cloudData []cloudmodel.VPC) *VPC {
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &VPCMessageFactory{})
-	}
 
 	return updater
 }

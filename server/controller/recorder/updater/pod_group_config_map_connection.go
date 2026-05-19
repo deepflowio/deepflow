@@ -46,6 +46,10 @@ func (f *PodGroupConfigMapConnectionMessageFactory) CreateUpdatedFields() types.
 	return &message.UpdatedPodGroupConfigMapConnectionFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_CONFIG_MAP_CONNECTION_EN, &PodGroupConfigMapConnectionMessageFactory{})
+}
+
 type PodGroupConfigMapConnection struct {
 	UpdaterBase[
 		cloudmodel.PodGroupConfigMapConnection,
@@ -66,10 +70,6 @@ func NewPodGroupConfigMapConnection(wholeCache *cache.Cache, cloudData []cloudmo
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &PodGroupConfigMapConnectionMessageFactory{})
-	}
 
 	return updater
 }

@@ -46,6 +46,10 @@ func (f *SubDomainMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedSubDomainFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_SUB_DOMAIN_EN, &SubDomainMessageFactory{})
+}
+
 type SubDomain struct {
 	UpdaterBase[
 		cloudmodel.SubDomain,
@@ -66,10 +70,6 @@ func NewSubDomain(wholeCache *cache.Cache, cloudData []cloudmodel.SubDomain) *Su
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &SubDomainMessageFactory{})
-	}
 
 	return updater
 }

@@ -46,6 +46,10 @@ func (f *NetworkMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedNetworkFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_NETWORK_EN, &NetworkMessageFactory{})
+}
+
 type Network struct {
 	UpdaterBase[
 		cloudmodel.Network,
@@ -66,10 +70,6 @@ func NewNetwork(wholeCache *cache.Cache, cloudData []cloudmodel.Network) *Networ
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &NetworkMessageFactory{})
-	}
 
 	return updater
 }

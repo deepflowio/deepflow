@@ -46,6 +46,10 @@ func (f *LBVMConnectionMessageFactory) CreateUpdatedFields() types.UpdatedFields
 	return &message.UpdatedLBVMConnectionFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_LB_VM_CONNECTION_EN, &LBVMConnectionMessageFactory{})
+}
+
 type LBVMConnection struct {
 	UpdaterBase[
 		cloudmodel.LBVMConnection,
@@ -66,10 +70,6 @@ func NewLBVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.LBVMConne
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &LBVMConnectionMessageFactory{})
-	}
 
 	return updater
 }

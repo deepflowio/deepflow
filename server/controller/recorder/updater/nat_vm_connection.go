@@ -46,6 +46,10 @@ func (f *NATVMConnectionMessageFactory) CreateUpdatedFields() types.UpdatedField
 	return &message.UpdatedNATVMConnectionFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, &NATVMConnectionMessageFactory{})
+}
+
 type NATVMConnection struct {
 	UpdaterBase[
 		cloudmodel.NATVMConnection,
@@ -66,10 +70,6 @@ func NewNATVMConnection(wholeCache *cache.Cache, cloudData []cloudmodel.NATVMCon
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &NATVMConnectionMessageFactory{})
-	}
 
 	return updater
 }
