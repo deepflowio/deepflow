@@ -46,6 +46,10 @@ func (f *LBMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedLBFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_LB_EN, &LBMessageFactory{})
+}
+
 type LB struct {
 	UpdaterBase[
 		cloudmodel.LB,
@@ -66,10 +70,6 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &LBMessageFactory{})
-	}
 
 	return updater
 }

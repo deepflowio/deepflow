@@ -46,6 +46,10 @@ func (f *AZMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedAZFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_AZ_EN, &AZMessageFactory{})
+}
+
 type AZ struct {
 	UpdaterBase[
 		cloudmodel.AZ,
@@ -66,10 +70,6 @@ func NewAZ(wholeCache *cache.Cache, cloudData []cloudmodel.AZ) *AZ {
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &AZMessageFactory{})
-	}
 
 	return updater
 }

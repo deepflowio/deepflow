@@ -46,6 +46,10 @@ func (f *PodGroupPortMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedPodGroupPortFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_POD_GROUP_PORT_EN, &PodGroupPortMessageFactory{})
+}
+
 type PodGroupPort struct {
 	UpdaterBase[
 		cloudmodel.PodGroupPort,
@@ -66,10 +70,6 @@ func NewPodGroupPort(wholeCache *cache.Cache, cloudData []cloudmodel.PodGroupPor
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &PodGroupPortMessageFactory{})
-	}
 
 	return updater
 }

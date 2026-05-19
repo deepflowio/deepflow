@@ -48,6 +48,10 @@ func (f *LANIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedLANIPFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_LAN_IP_EN, &LANIPMessageFactory{})
+}
+
 type LANIP struct {
 	UpdaterBase[
 		cloudmodel.IP,
@@ -69,10 +73,6 @@ func NewLANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *LANIP {
 	}
 	updater.setDomainToolDataSet(domainToolDataSet)
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &LANIPMessageFactory{})
-	}
 
 	return updater
 }

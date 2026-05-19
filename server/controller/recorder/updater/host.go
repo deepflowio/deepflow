@@ -46,6 +46,10 @@ func (f *HostMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedHostFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_HOST_EN, &HostMessageFactory{})
+}
+
 type Host struct {
 	UpdaterBase[
 		cloudmodel.Host,
@@ -66,10 +70,6 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host) *Host {
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &HostMessageFactory{})
-	}
 
 	return updater
 }

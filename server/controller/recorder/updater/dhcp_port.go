@@ -46,6 +46,10 @@ func (f *DHCPPortMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedDHCPPortFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_DHCP_PORT_EN, &DHCPPortMessageFactory{})
+}
+
 type DHCPPort struct {
 	UpdaterBase[
 		cloudmodel.DHCPPort,
@@ -66,10 +70,6 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &DHCPPortMessageFactory{})
-	}
 
 	return updater
 }

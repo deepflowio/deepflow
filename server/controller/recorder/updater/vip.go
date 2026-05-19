@@ -46,6 +46,10 @@ func (f *VIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedVIPFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_VIP_EN, &VIPMessageFactory{})
+}
+
 type VIP struct {
 	UpdaterBase[
 		cloudmodel.VIP,
@@ -66,10 +70,6 @@ func NewVIP(wholeCache *cache.Cache, cloudData []cloudmodel.VIP) *VIP {
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &VIPMessageFactory{})
-	}
 
 	return updater
 }
