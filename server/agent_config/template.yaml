@@ -1727,20 +1727,25 @@ inputs:
       # type: section
       # name:
       #   en: Enforcement
-      #   ch: 执行阻断
+      #   ch: 执行治理
       # description:
-      #   en: AI Agent command and selected direct syscall execution enforcement.
-      #   ch: AI Agent 命令和部分直接 syscall 执行阻断。
+      #   en: AI Agent command and selected direct syscall audit/block enforcement.
+      #   ch: AI Agent 命令和部分直接 syscall 的审计/阻断。
       enforcement:
         # type: bool
         # name:
         #   en: Enabled
-        #   ch: 开启执行阻断
+        #   ch: 开启执行治理
         # unit:
         # range: []
         # enum_options: []
         # modification: hot_update
         # ee_feature: true
+        # description:
+        #   en: |-
+        #     Enable the AI Agent enforcement pipeline. In audit_only mode it emits audit events only; in block mode deny rules may prevent execution.
+        #   ch: |-
+        #     开启 AI Agent enforcement 链路。mode=audit_only 时只输出审计事件；mode=block 时 deny 规则可能真正阻止执行。
         enabled: false
         # type: string
         # name:
@@ -1751,6 +1756,17 @@ inputs:
         # enum_options: [audit_only, block]
         # modification: hot_update
         # ee_feature: true
+        # description:
+        #   en: |-
+        #     Global enforcement mode.
+        #     - audit_only: all matching rules emit proc_block_event with guarantee=audit_only; no command or syscall is prevented.
+        #     - block: rules whose action.type is deny attempt strong block; rules with any other action.type remain audit-only.
+        #     Use action.type: audit explicitly when you want a per-rule audit-only behavior under mode=block.
+        #   ch: |-
+        #     全局 enforcement 模式。
+        #     - audit_only：所有命中规则都只输出 proc_block_event（guarantee=audit_only），不会真正阻止命令或 syscall。
+        #     - block：只有 action.type 为 deny 的规则会尝试进入强阻断链路，其他规则仍为 audit-only。
+        #     如果希望在 mode=block 下让某条规则只审计，建议显式配置 action.type: audit。
         mode: audit_only
         # type: string
         # name:
@@ -1758,14 +1774,18 @@ inputs:
         #   ch: Exec 阻断策略
         # unit:
         # range: []
-        # enum_options: [auto, lsm_only, override_only, sigkill_only, audit_only]
+        # enum_options: [auto, lsm_only]
         # modification: hot_update
         # ee_feature: true
         # description:
         #   en: |-
-        #     Enforcement mechanism selection for exec command blocking. Exec blocking uses BPF LSM when available.
+        #     Enforcement mechanism selection for path-only exec blocking. Current strong block support uses BPF LSM for exact/suffix path rules.
+        #     argv-qualified exec blocking still depends on allowed_mechanisms containing kprobe_override and syscall_strategy allowing override.
+        #     Other legacy values are reserved for compatibility and are not recommended.
         #   ch: |-
-        #     exec 命令阻断的机制选择。exec 阻断在可用时使用 BPF LSM。
+        #     path-only exec 阻断的机制选择。当前强阻断仅通过 BPF LSM 处理 exact/suffix 路径规则。
+        #     带 argv 条件的 exec 阻断仍依赖 allowed_mechanisms 包含 kprobe_override 且 syscall_strategy 允许 override。
+        #     其他历史值仅为兼容保留，不建议配置。
         strategy: auto
         # type: string
         # name:
@@ -1773,14 +1793,16 @@ inputs:
         #   ch: Syscall 阻断策略
         # unit:
         # range: []
-        # enum_options: [auto, lsm_only, override_only, sigkill_only, audit_only]
+        # enum_options: [auto, override_only]
         # modification: hot_update
         # ee_feature: true
         # description:
         #   en: |-
-        #     Mechanism selection for direct syscall blocking. kprobe override requires CONFIG_BPF_KPROBE_OVERRIDE and an error-injectable kernel function.
+        #     Mechanism selection for direct syscall blocking. Current strong block support uses kprobe override only.
+        #     Other legacy values are reserved for compatibility and are not recommended.
         #   ch: |-
-        #     直接 syscall 阻断的机制选择。kprobe override 需要 CONFIG_BPF_KPROBE_OVERRIDE，并且目标内核函数必须支持 error injection。
+        #     直接 syscall 阻断的机制选择。当前强阻断仅支持 kprobe override。
+        #     其他历史值仅为兼容保留，不建议配置。
         syscall_strategy: auto
         # type: string
         # name:
@@ -1788,15 +1810,17 @@ inputs:
         #   ch: 允许的阻断机制
         # unit:
         # range: []
-        # enum_options: [lsm, kprobe_override, sigkill, seccomp]
+        # enum_options: [lsm, kprobe_override]
         # modification: hot_update
         # ee_feature: true
         # description:
         #   en: |-
-        #     Mechanisms allowed by configuration. kprobe_override is only attempted when this list contains it and runtime capability probing confirms support.
+        #     Mechanisms allowed by configuration. Current implementation uses lsm for path-only exec rules and kprobe_override for argv-qualified exec rules and selected direct syscalls.
+        #     sigkill/seccomp are reserved compatibility values and are not consumed by the current kernel blocking path.
         #   ch: |-
-        #     配置允许使用的阻断机制。只有列表包含 kprobe_override 且运行时能力探测确认支持时，才会尝试使用 bpf_override_return。
-        allowed_mechanisms: [lsm, kprobe_override, sigkill, seccomp]
+        #     配置允许使用的阻断机制。当前实现使用 lsm 处理 path-only exec 规则，使用 kprobe_override 处理 argv-qualified exec 规则和部分 direct syscall。
+        #     sigkill/seccomp 仅为兼容保留值，当前内核阻断链路不会消费。
+        allowed_mechanisms: [lsm, kprobe_override]
         # type: string
         # name:
         #   en: Default Fallback
@@ -1806,18 +1830,34 @@ inputs:
         # enum_options: [sigkill]
         # modification: hot_update
         # ee_feature: true
+        # description:
+        #   en: |-
+        #     Reserved compatibility field. The current kernel blocking path does not consume this value; keep the default.
+        #   ch: |-
+        #     兼容保留字段。当前内核阻断链路不会消费该值，建议保持默认。
         default_fallback: sigkill
         # type: int
         # name:
         #   en: Max Rules
         #   ch: 最大规则数
         # unit:
-        # range: [0, 1024]
+        # range: [0, 256]
         # enum_options: []
         # modification: hot_update
         # ee_feature: true
+        # description:
+        #   en: |-
+        #     Maximum compiled exec BPF record count, not the number of top-level rule objects.
+        #     Each exact/suffix path selector consumes one exec record; if argv_matches is present, the record count is multiplied by the number of argv_matches.
+        #     Audit-only rules still count when they compile into exact/suffix/argv_matches-backed exec records; pure prefix/argv_contains_any audit rules stay in user space and do not consume exec BPF records.
+        #     Current exec strong-block cap is 256 compiled records. The direct-syscall path still uses a smaller fixed map and a fixed supported syscall set.
+        #   ch: |-
+        #     编译后的 exec BPF record 最大条数，不是顶层规则对象数量。
+        #     每个 exact/suffix 路径选择器会占用 1 条 exec record；如果配置了 argv_matches，还会按 argv_matches 数量再放大。
+        #     只审计规则如果会编译成 exact/suffix/argv_matches 形式的 exec record，也会计入这里；纯 prefix/argv_contains_any 审计规则留在用户态匹配，不消耗 exec BPF record。
+        #     当前 exec 强阻断上限是 256 条编译后的 record；direct syscall 路径仍使用更小的固定 map 和固定 syscall 集。
         max_rules: 256
-        # type: dict
+        # type: list
         # name:
         #   en: Rules
         #   ch: 规则
@@ -1828,9 +1868,31 @@ inputs:
         # ee_feature: true
         # description:
         #   en: |-
-        #     AI Agent enforcement rules. Strong-block exec rules support path exact/suffix selectors and optional argv_matches selectors with fixed argv index and exact value. argv_contains_any is audit-only compatibility and is not accepted for strong block. Syscall rules support selected dangerous syscall names or kernel symbols such as reboot, init_module, finit_module, delete_module and kexec_load.
+        #     AI Agent enforcement rules.
+        #     Current effective fields:
+        #       - scope: only ai_agent_tree is supported
+        #       - target_type: exec or syscall
+        #       - action.type: recommended values are deny and audit; only deny enters the strong-block path, other values remain audit-only
+        #       - action.errno: reserved compatibility field; current BPF block path uses EPERM
+        #       - audit: reserved compatibility field; it does not switch behavior, and matched rules still emit proc_block_event
+        #       - exec.exact / exec.suffix: strong-block selectors
+        #       - exec.prefix: user-space audit-only selector; not used for strong block on 4.18
+        #       - exec.argv_matches: strong block supports index 0..3, op exact, and requires exact/suffix path selectors
+        #       - exec.argv_contains_any: user-space audit-only selector; not accepted for strong block
+        #       - syscall.names / syscall.symbols: current direct-syscall support is limited to reboot, init_module, finit_module, delete_module and kexec_load, and both block/audit-only syscall handling still rely on kprobe_override support
         #   ch: |-
-        #     AI Agent 执行阻断规则。强阻断 exec 规则支持 path exact/suffix 选择器，并可通过 argv_matches 指定固定 argv index 和 exact value。argv_contains_any 仅作为审计兼容字段，不支持强阻断。syscall 规则支持部分危险 syscall 名称或内核符号，例如 reboot、init_module、finit_module、delete_module、kexec_load。
+        #     AI Agent 执行阻断规则。
+        #     当前真正生效的字段包括：
+        #       - scope：仅支持 ai_agent_tree
+        #       - target_type：exec 或 syscall
+        #       - action.type：建议使用 deny 和 audit；只有 deny 会进入强阻断链路，其他值都会保持 audit-only
+        #       - action.errno：兼容保留字段；当前 BPF 阻断路径固定使用 EPERM
+        #       - audit：兼容保留字段；它不是行为开关，规则命中后仍会输出 proc_block_event
+        #       - exec.exact / exec.suffix：强阻断选择器
+        #       - exec.prefix：仅用户态审计选择器；4.18 上不参与强阻断
+        #       - exec.argv_matches：强阻断只支持 index 0..3、op exact，且必须搭配 exact/suffix 路径
+        #       - exec.argv_contains_any：仅用户态审计选择器，不参与强阻断
+        #       - syscall.names / syscall.symbols：当前 direct syscall 仅支持 reboot、init_module、finit_module、delete_module、kexec_load，且无论阻断还是审计都依赖 kprobe_override 支持
         rules: []
     # type: section
     # name:

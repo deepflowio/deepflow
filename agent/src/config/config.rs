@@ -645,12 +645,7 @@ impl Default for AiAgentEnforcementConfig {
             mode: "audit_only".to_string(),
             strategy: "auto".to_string(),
             syscall_strategy: "auto".to_string(),
-            allowed_mechanisms: vec![
-                "lsm".to_string(),
-                "kprobe_override".to_string(),
-                "sigkill".to_string(),
-                "seccomp".to_string(),
-            ],
+            allowed_mechanisms: vec!["lsm".to_string(), "kprobe_override".to_string()],
             default_fallback: "sigkill".to_string(),
             max_rules: 256,
             rules: Vec::new(),

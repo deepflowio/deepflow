@@ -2360,11 +2360,11 @@ inputs:
 
 是否开启 AI Agent 文件 IO 事件采集。
 
-#### 执行阻断 {#inputs.proc.ai_agent.enforcement}
+#### 执行治理 {#inputs.proc.ai_agent.enforcement}
 
-AI Agent 命令和部分直接 syscall 执行阻断。
+AI Agent 命令和部分直接 syscall 的审计/阻断。
 
-##### 开启执行阻断 {#inputs.proc.ai_agent.enforcement.enabled}
+##### 开启执行治理 {#inputs.proc.ai_agent.enforcement.enabled}
 
 **标签**:
 
@@ -2388,6 +2388,13 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | bool |
+
+**详细描述**:
+
+开启 AI Agent enforcement 链路。
+
+- `mode: audit_only` 时，只输出审计事件，不真正阻止执行。
+- `mode: block` 时，命中的 `deny` 规则可能真正阻止执行。
 
 ##### 模式 {#inputs.proc.ai_agent.enforcement.mode}
 
@@ -2420,6 +2427,20 @@ inputs:
 | ---- | ---------------------------- |
 | Type | string |
 
+**详细描述**:
+
+全局 enforcement 模式。
+
+- `audit_only`：所有命中规则都只输出 `proc_block_event`，`guarantee=audit_only`，不会真正阻止命令或 syscall。
+- `block`：只有 `action.type: deny` 的规则会尝试进入强阻断链路，其他规则仍然是 audit-only。
+
+如果希望在 `mode: block` 下让某条规则只审计，建议显式配置：
+
+```yaml
+action:
+  type: audit
+```
+
 ##### Exec 阻断策略 {#inputs.proc.ai_agent.enforcement.strategy}
 
 **标签**:
@@ -2443,11 +2464,8 @@ inputs:
 **枚举可选值**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| auto | |
-| lsm_only | |
-| override_only | |
-| sigkill_only | |
-| audit_only | |
+| auto | 推荐值 |
+| lsm_only | 仅启用 path-only LSM exec 阻断 |
 
 **模式**:
 | Key  | Value                        |
@@ -2456,7 +2474,17 @@ inputs:
 
 **详细描述**:
 
-exec 命令阻断的机制选择。exec 阻断在可用时使用 BPF LSM。
+path-only exec 阻断的机制选择。
+
+当前强阻断行为：
+
+- `auto`：在允许且可用时，path-only exec 规则走 BPF LSM。
+- `lsm_only`：path-only exec 规则必须走 LSM。
+
+说明：
+
+- 带 `argv` 条件的 exec 阻断依赖 `allowed_mechanisms` 包含 `kprobe_override` 且 `syscall_strategy` 允许 override。
+- `override_only`、`sigkill_only`、`audit_only` 等历史值当前仅为兼容保留，不建议新配置使用。
 
 ##### Syscall 阻断策略 {#inputs.proc.ai_agent.enforcement.syscall_strategy}
 
@@ -2481,11 +2509,8 @@ inputs:
 **枚举可选值**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| auto | |
-| lsm_only | |
-| override_only | |
-| sigkill_only | |
-| audit_only | |
+| auto | 推荐值 |
+| override_only | 通过 kprobe override 处理 direct syscall 阻断 |
 
 **模式**:
 | Key  | Value                        |
@@ -2494,7 +2519,14 @@ inputs:
 
 **详细描述**:
 
-直接 syscall 阻断的机制选择。kprobe override 需要 CONFIG_BPF_KPROBE_OVERRIDE，并且目标内核函数必须支持 error injection。
+直接 syscall 阻断的机制选择。
+
+当前强阻断行为只有两种有效写法：
+
+- `auto`
+- `override_only`
+
+两者当前都会走 kprobe override。`lsm_only`、`sigkill_only`、`audit_only` 等历史值仅为兼容保留，不建议新配置使用。
 
 ##### 允许的阻断机制 {#inputs.proc.ai_agent.enforcement.allowed_mechanisms}
 
@@ -2516,17 +2548,13 @@ inputs:
         allowed_mechanisms:
         - lsm
         - kprobe_override
-        - sigkill
-        - seccomp
 ```
 
 **枚举可选值**:
 | Value | Note                         |
 | ----- | ---------------------------- |
-| lsm | |
-| kprobe_override | |
-| sigkill | |
-| seccomp | |
+| lsm | path-only exec 强阻断 |
+| kprobe_override | argv-qualified exec 和 direct syscall 强阻断 |
 
 **模式**:
 | Key  | Value                        |
@@ -2535,7 +2563,17 @@ inputs:
 
 **详细描述**:
 
-配置允许使用的阻断机制。只有列表包含 kprobe_override 且运行时能力探测确认支持时，才会尝试使用 bpf_override_return。
+配置允许使用的阻断机制。
+
+当前实现真正消费的只有：
+
+- `lsm`
+- `kprobe_override`
+
+说明：
+
+- 只有列表包含 `kprobe_override` 且运行时能力探测确认支持时，才会尝试使用 `bpf_override_return`。
+- `sigkill`、`seccomp` 当前只是兼容保留值，不参与现有内核阻断链路。
 
 ##### 默认降级动作 {#inputs.proc.ai_agent.enforcement.default_fallback}
 
@@ -2567,6 +2605,10 @@ inputs:
 | ---- | ---------------------------- |
 | Type | string |
 
+**详细描述**:
+
+兼容保留字段。当前内核阻断链路不会消费该值，建议保持默认。
+
 ##### 最大规则数 {#inputs.proc.ai_agent.enforcement.max_rules}
 
 **标签**:
@@ -2591,7 +2633,21 @@ inputs:
 | Key  | Value                        |
 | ---- | ---------------------------- |
 | Type | int |
-| Range | [0, 1024] |
+| Range | [0, 256] |
+
+**详细描述**:
+
+编译后的 exec BPF record 最大条数，不是顶层规则对象数量。
+
+说明：
+
+- 每个 `exec.exact` 会占用 1 条 exec BPF record。
+- 每个 `exec.suffix` 会占用 1 条 exec BPF record。
+- 如果配置了 `argv_matches`，还会按 `argv_matches` 数量放大。
+- 只审计规则如果最终会编译成 `exact` / `suffix` / `argv_matches` 形式的 exec record，也会计入这里。
+- 纯 `exec.prefix` / `exec.argv_contains_any` 审计规则只在用户态匹配，不消耗 exec BPF record。
+- 当前 exec 强阻断上限是 `256` 条编译后的 record。
+- direct syscall 路径使用单独的固定 map，并且支持的 syscall 集更小。
 
 ##### 规则 {#inputs.proc.ai_agent.enforcement.rules}
 
@@ -2616,11 +2672,145 @@ inputs:
 **模式**:
 | Key  | Value                        |
 | ---- | ---------------------------- |
-| Type | dict |
+| Type | list |
 
 **详细描述**:
 
-AI Agent 执行阻断规则。强阻断 exec 规则支持 path exact/suffix 选择器，并可通过 argv_matches 指定固定 argv index 和 exact value。argv_contains_any 仅作为审计兼容字段，不支持强阻断。syscall 规则支持部分危险 syscall 名称或内核符号，例如 reboot、init_module、finit_module、delete_module、kexec_load。
+AI Agent 执行阻断规则。
+
+当前真正生效的字段包括：
+
+- `scope`：仅支持 `ai_agent_tree`
+- `target_type`：`exec` 或 `syscall`
+- `action.type`：建议使用 `deny` 和 `audit`；只有 `deny` 会进入强阻断链路，其他值都会保持 audit-only
+- `action.errno`：兼容保留字段；当前 BPF 阻断固定使用 `EPERM`
+- `audit`：兼容保留字段；它不是行为开关，规则命中后仍会输出 `proc_block_event`
+- `exec.exact` / `exec.suffix`：强阻断选择器
+- `exec.prefix`：仅用户态审计选择器；4.18 上不参与强阻断
+- `exec.argv_matches`：强阻断只支持 `index: 0..3`、`op: exact`，并且必须搭配 `exact` 或 `suffix`
+- `exec.argv_contains_any`：仅用户态审计选择器，不参与强阻断
+- `syscall.names` / `syscall.symbols`：当前 direct syscall 仅支持 `reboot`、`init_module`、`finit_module`、`delete_module`、`kexec_load`，并且无论阻断还是审计都依赖 `kprobe_override` 支持
+
+推荐示例：
+
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        enabled: true
+        mode: block
+        strategy: auto
+        syscall_strategy: override_only
+        allowed_mechanisms:
+        - lsm
+        - kprobe_override
+        max_rules: 256
+        rules:
+        - id: block-uname
+          scope: ai_agent_tree
+          target_type: exec
+          action:
+            type: deny
+            errno: EPERM
+          audit: true
+          exec:
+            exact:
+            - /usr/bin/uname
+            - /bin/uname
+            suffix:
+            - /uname
+        - id: block-systemctl-reboot
+          scope: ai_agent_tree
+          target_type: exec
+          action:
+            type: deny
+            errno: EPERM
+          audit: true
+          exec:
+            exact:
+            - /usr/bin/systemctl
+            - /bin/systemctl
+            argv_matches:
+            - index: 1
+              op: exact
+              value: reboot
+        - id: block-direct-reboot
+          scope: ai_agent_tree
+          target_type: syscall
+          action:
+            type: deny
+            errno: EPERM
+          audit: true
+          syscall:
+            names:
+            - reboot
+            symbols:
+            - __x64_sys_reboot
+```
+
+上面的示例一共占用 5 条编译后的 exec BPF record：
+
+- `block-uname`：2 个 `exact` + 1 个 `suffix` = 3
+- `block-systemctl-reboot`：2 个 `exact` * 1 个 `argv_matches` = 2
+
+只审计示例：
+
+1. 如果希望所有规则都只审计，直接使用全局 `mode: audit_only`：
+
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        enabled: true
+        mode: audit_only
+        rules:
+        - id: audit-uname
+          scope: ai_agent_tree
+          target_type: exec
+          exec:
+            exact:
+            - /usr/bin/uname
+            - /bin/uname
+```
+
+2. 如果希望一部分规则阻断、另一部分规则只审计，保持 `mode: block`，并对只审计的规则显式写 `action.type: audit`：
+
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        enabled: true
+        mode: block
+        rules:
+        - id: audit-uname
+          scope: ai_agent_tree
+          target_type: exec
+          action:
+            type: audit
+          exec:
+            exact:
+            - /usr/bin/uname
+            - /bin/uname
+        - id: block-direct-reboot
+          scope: ai_agent_tree
+          target_type: syscall
+          action:
+            type: deny
+            errno: EPERM
+          syscall:
+            names:
+            - reboot
+            symbols:
+            - __x64_sys_reboot
+```
+
+说明：
+
+- `action.type: audit` 的规则仍会输出 `proc_block_event`，但 `guarantee` 会是 `audit_only`。
+- `audit: true/false` 不是“只审计”开关，不决定阻断行为。
 
 ### 符号表 {#inputs.proc.symbol_table}
 
