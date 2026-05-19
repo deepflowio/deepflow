@@ -47,6 +47,10 @@ func (f *FloatingIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedFloatingIPFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_FLOATING_IP_EN, &FloatingIPMessageFactory{})
+}
+
 type FloatingIP struct {
 	UpdaterBase[
 		cloudmodel.FloatingIP,
@@ -67,10 +71,6 @@ func NewFloatingIP(wholeCache *cache.Cache, cloudData []cloudmodel.FloatingIP) *
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &FloatingIPMessageFactory{})
-	}
 
 	return updater
 }

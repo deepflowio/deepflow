@@ -50,6 +50,10 @@ func (f *VMMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedVMFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_VM_EN, &VMMessageFactory{})
+}
+
 type VM struct {
 	UpdaterBase[cloudmodel.VM,
 		*diffbase.VM,
@@ -69,10 +73,6 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &VMMessageFactory{})
-	}
 
 	return updater
 }

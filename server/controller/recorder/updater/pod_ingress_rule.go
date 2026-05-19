@@ -46,6 +46,10 @@ func (f *PodIngressRuleMessageFactory) CreateUpdatedFields() types.UpdatedFields
 	return &message.UpdatedPodIngressRuleFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, &PodIngressRuleMessageFactory{})
+}
+
 type PodIngressRule struct {
 	UpdaterBase[
 		cloudmodel.PodIngressRule,
@@ -66,10 +70,6 @@ func NewPodIngressRule(wholeCache *cache.Cache, cloudData []cloudmodel.PodIngres
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &PodIngressRuleMessageFactory{})
-	}
 
 	return updater
 }

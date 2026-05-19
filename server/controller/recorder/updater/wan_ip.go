@@ -50,6 +50,10 @@ func (f *WANIPMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedWANIPFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_WAN_IP_EN, &WANIPMessageFactory{})
+}
+
 type WANIP struct {
 	UpdaterBase[
 		cloudmodel.IP,
@@ -71,10 +75,6 @@ func NewWANIP(wholeCache *cache.Cache, domainToolDataSet *tool.DataSet) *WANIP {
 	}
 	updater.setDomainToolDataSet(domainToolDataSet)
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &WANIPMessageFactory{})
-	}
 
 	return updater
 }

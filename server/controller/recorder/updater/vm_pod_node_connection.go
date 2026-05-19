@@ -46,6 +46,10 @@ func (f *VMPodNodeConnectionMessageFactory) CreateUpdatedFields() types.UpdatedF
 	return &message.UpdatedVMPodNodeConnectionFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, &VMPodNodeConnectionMessageFactory{})
+}
+
 type VMPodNodeConnection struct {
 	UpdaterBase[
 		cloudmodel.VMPodNodeConnection,
@@ -66,10 +70,6 @@ func NewVMPodNodeConnection(wholeCache *cache.Cache, cloudData []cloudmodel.VMPo
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &VMPodNodeConnectionMessageFactory{})
-	}
 
 	return updater
 }

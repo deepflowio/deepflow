@@ -47,6 +47,10 @@ func (f *CENMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedCENFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_CEN_EN, &CENMessageFactory{})
+}
+
 type CEN struct {
 	UpdaterBase[
 		cloudmodel.CEN,
@@ -67,10 +71,6 @@ func NewCEN(wholeCache *cache.Cache, cloudData []cloudmodel.CEN) *CEN {
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &CENMessageFactory{})
-	}
 
 	return updater
 }
