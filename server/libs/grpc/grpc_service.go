@@ -150,8 +150,8 @@ func (s *ServiceTable) QueryPodService(t *PlatformInfoTable, orgId uint16, podID
 }
 
 func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ipv4 uint32, ipv6 net.IP, serverPort uint16, podServiceId, podGroupId, l3DeviceId, podId uint32, l3DeviceType uint8) uint32 {
-	// for performance optimization, return directly. Since when epcID <= 0, there is no Service information.
-	if epcID <= 0 {
+	// for performance optimization, return directly. Since when epcID < 0, there is no Service information.
+	if epcID < 0 {
 		return 0
 	}
 
@@ -203,7 +203,17 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ipv4 uint32,
 		if serviceID > 0 || serverPort == 0 {
 			return serviceID
 		}
-		return s.customServiceIpv6Table[genEpcIDIPv6Key(epcID, ipv6, 0, 0)]
+		serviceID = s.customServiceIpv6Table[genEpcIDIPv6Key(epcID, ipv6, 0, 0)]
+		if serviceID > 0 {
+			return serviceID
+		}
+		// thirdly query without epc
+		serviceID = s.customServiceIpv6Table[genEpcIDIPv6Key(0, ipv6, 0, serverPort)]
+		if serviceID > 0 || serverPort == 0 {
+			return serviceID
+		}
+		// fourthly query without epc/port
+		return s.customServiceIpv6Table[genEpcIDIPv6Key(0, ipv6, 0, 0)]
 	}
 	if len(s.customServiceIpv4Table) == 0 {
 		return 0
@@ -212,7 +222,17 @@ func (s *ServiceTable) QueryCustomService(epcID int32, isIPv6 bool, ipv4 uint32,
 	if serviceID > 0 || serverPort == 0 {
 		return serviceID
 	}
-	return s.customServiceIpv4Table[genEpcIDIPv4Key(epcID, ipv4, 0)]
+	serviceID = s.customServiceIpv4Table[genEpcIDIPv4Key(epcID, ipv4, 0)]
+	if serviceID > 0 {
+		return serviceID
+	}
+	// thirdly query without epc
+	serviceID = s.customServiceIpv4Table[genEpcIDIPv4Key(0, ipv4, serverPort)]
+	if serviceID > 0 || serverPort == 0 {
+		return serviceID
+	}
+	// fourthly query without epc/port
+	return s.customServiceIpv4Table[genEpcIDIPv4Key(0, ipv4, 0)]
 }
 
 func NewServiceTable(grpcServices []*trident.ServiceInfo) *ServiceTable {
