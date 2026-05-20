@@ -222,11 +222,12 @@ type Decoder struct {
 }
 
 type ProcEventWriters struct {
-	FileWriter     *dbwriter.EventWriter
-	FileAggWriter  *dbwriter.EventWriter
-	FileMgmtWriter *dbwriter.EventWriter
-	ProcPermWriter *dbwriter.EventWriter
-	ProcOpsWriter  *dbwriter.EventWriter
+	FileWriter      *dbwriter.EventWriter
+	FileAggWriter   *dbwriter.EventWriter
+	FileMgmtWriter  *dbwriter.EventWriter
+	ProcPermWriter  *dbwriter.EventWriter
+	ProcOpsWriter   *dbwriter.EventWriter
+	ProcBlockWriter *dbwriter.EventWriter
 }
 
 func NewDecoder(
@@ -350,8 +351,42 @@ func routeProcEventType(e *pb.ProcEvent) common.EventType {
 		return common.PROC_PERM_EVENT
 	case e.ProcLifecycleEventData != nil:
 		return common.PROC_OPS_EVENT
+	case e.ProcBlockEventData != nil:
+		return common.PROC_BLOCK_EVENT
 	default:
 		return common.FILE_EVENT
+	}
+}
+
+func enforcementTargetTypeString(t pb.EnforcementTargetType) string {
+	switch t {
+	case pb.EnforcementTargetType_EnforcementTargetExec:
+		return "exec"
+	case pb.EnforcementTargetType_EnforcementTargetSyscall:
+		return "syscall"
+	default:
+		name := strings.TrimPrefix(t.String(), "EnforcementTarget")
+		if name == "" || name == t.String() {
+			return "unknown"
+		}
+		return strings.ToLower(name)
+	}
+}
+
+func enforcementActionString(a pb.EnforcementAction) string {
+	switch a {
+	case pb.EnforcementAction_EnforcementActionAudit:
+		return "audit"
+	case pb.EnforcementAction_EnforcementActionDeny:
+		return "deny"
+	case pb.EnforcementAction_EnforcementActionSigkill:
+		return "sigkill"
+	default:
+		name := strings.TrimPrefix(a.String(), "EnforcementAction")
+		if name == "" || name == a.String() {
+			return "unknown"
+		}
+		return strings.ToLower(name)
 	}
 }
 
@@ -627,6 +662,45 @@ func (d *Decoder) writeProcOpsEvent(vtapId uint16, e *pb.ProcEvent) {
 	s.Release()
 }
 
+func (d *Decoder) writeProcBlockEvent(vtapId uint16, e *pb.ProcEvent) {
+	s := dbwriter.AcquireProcBlockEventStore()
+	d.initEventStoreCommon(&s.EventStore, vtapId, e)
+
+	data := e.ProcBlockEventData
+	s.RuleID = data.RuleId
+	s.TargetType = enforcementTargetTypeString(data.TargetType)
+	s.EventType = s.TargetType
+	s.Action = enforcementActionString(data.Action)
+	s.Mechanism = data.Mechanism
+	s.Guarantee = data.Guarantee
+	s.Errno = data.Errno
+	s.Pid = data.Pid
+	s.ParentPid = data.ParentPid
+	s.RootPID = data.AiAgentRootPid
+	if s.RootPID == 0 {
+		s.RootPID = e.AiAgentRootPid
+	}
+	s.UID = data.Uid
+	s.GID = data.Gid
+	s.ProcessKName = string(data.Comm)
+	if s.ProcessKName == "" {
+		s.ProcessKName = string(e.ProcessKname)
+	}
+	s.Cmdline = string(data.Cmdline)
+	s.ExecPath = string(data.ExecPath)
+	s.SyscallName = data.SyscallName
+	s.SyscallID = data.SyscallId
+	s.PolicyEpoch = data.PolicyEpoch
+	s.SyscallThread = e.ThreadId
+	s.SyscallCoroutine = e.CoroutineId
+
+	if d.procEventWriters != nil && d.procEventWriters.ProcBlockWriter != nil {
+		d.procEventWriters.ProcBlockWriter.WriteCKItem(s)
+		return
+	}
+	s.Release()
+}
+
 func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 	switch routeProcEventType(e) {
 	case common.FILE_EVENT:
@@ -642,6 +716,8 @@ func (d *Decoder) WriteFileEvent(vtapId uint16, e *pb.ProcEvent) {
 		d.writeProcPermEvent(vtapId, e)
 	case common.PROC_OPS_EVENT:
 		d.writeProcOpsEvent(vtapId, e)
+	case common.PROC_BLOCK_EVENT:
+		d.writeProcBlockEvent(vtapId, e)
 	}
 }
 

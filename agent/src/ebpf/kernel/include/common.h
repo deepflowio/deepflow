@@ -119,6 +119,7 @@ enum process_data_extra_source {
 	DATA_SOURCE_FILE_OP_EVENT,
 	DATA_SOURCE_PERM_OP_EVENT,
 	DATA_SOURCE_PROC_LIFECYCLE_EVENT,
+	DATA_SOURCE_PROC_BLOCK_EVENT,
 };
 
 struct protocol_message_t {

@@ -2391,6 +2391,268 @@ inputs:
 
 Whether to enable AI Agent file IO event collection.
 
+#### Enforcement {#inputs.proc.ai_agent.enforcement}
+
+AI Agent command and selected direct syscall execution enforcement.
+
+##### Enabled {#inputs.proc.ai_agent.enforcement.enabled}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.enabled`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+##### Mode {#inputs.proc.ai_agent.enforcement.mode}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.mode`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        mode: audit_only
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| audit_only | |
+| block | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+##### Strategy {#inputs.proc.ai_agent.enforcement.strategy}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.strategy`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        strategy: auto
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| auto | |
+| lsm_only | |
+| override_only | |
+| sigkill_only | |
+| audit_only | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Enforcement mechanism selection for exec command blocking. Exec blocking uses BPF LSM when available.
+
+##### Syscall Strategy {#inputs.proc.ai_agent.enforcement.syscall_strategy}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.syscall_strategy`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        syscall_strategy: auto
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| auto | |
+| lsm_only | |
+| override_only | |
+| sigkill_only | |
+| audit_only | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Mechanism selection for direct syscall blocking. kprobe override requires CONFIG_BPF_KPROBE_OVERRIDE and an error-injectable kernel function.
+
+##### Allowed Mechanisms {#inputs.proc.ai_agent.enforcement.allowed_mechanisms}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.allowed_mechanisms`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        allowed_mechanisms:
+        - lsm
+        - kprobe_override
+        - sigkill
+        - seccomp
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| lsm | |
+| kprobe_override | |
+| sigkill | |
+| seccomp | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Mechanisms allowed by configuration. kprobe_override is only attempted when this list contains it and runtime capability probing confirms support.
+
+##### Default Fallback {#inputs.proc.ai_agent.enforcement.default_fallback}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.default_fallback`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        default_fallback: sigkill
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| sigkill | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+##### Max Rules {#inputs.proc.ai_agent.enforcement.max_rules}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.max_rules`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        max_rules: 256
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 1024] |
+
+##### Rules {#inputs.proc.ai_agent.enforcement.rules}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.rules`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        rules: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | dict |
+
+**Description**:
+
+AI Agent enforcement rules. Strong-block exec rules support path exact/suffix selectors and optional argv_matches selectors with fixed argv index and exact value. argv_contains_any is audit-only compatibility and is not accepted for strong block. Syscall rules support selected dangerous syscall names or kernel symbols such as reboot, init_module, finit_module, delete_module and kexec_load.
+
 ### Symbol Table {#inputs.proc.symbol_table}
 
 #### Golang-specific {#inputs.proc.symbol_table.golang_specific}
@@ -11970,4 +12232,3 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
-

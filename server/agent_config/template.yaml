@@ -1724,6 +1724,114 @@ inputs:
       #   ch: |-
       #     是否开启 AI Agent 文件 IO 事件采集。
       file_io_enabled: true
+      # type: section
+      # name:
+      #   en: Enforcement
+      #   ch: 执行阻断
+      # description:
+      #   en: AI Agent command and selected direct syscall execution enforcement.
+      #   ch: AI Agent 命令和部分直接 syscall 执行阻断。
+      enforcement:
+        # type: bool
+        # name:
+        #   en: Enabled
+        #   ch: 开启执行阻断
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: true
+        enabled: false
+        # type: string
+        # name:
+        #   en: Mode
+        #   ch: 模式
+        # unit:
+        # range: []
+        # enum_options: [audit_only, block]
+        # modification: hot_update
+        # ee_feature: true
+        mode: audit_only
+        # type: string
+        # name:
+        #   en: Strategy
+        #   ch: Exec 阻断策略
+        # unit:
+        # range: []
+        # enum_options: [auto, lsm_only, override_only, sigkill_only, audit_only]
+        # modification: hot_update
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     Enforcement mechanism selection for exec command blocking. Exec blocking uses BPF LSM when available.
+        #   ch: |-
+        #     exec 命令阻断的机制选择。exec 阻断在可用时使用 BPF LSM。
+        strategy: auto
+        # type: string
+        # name:
+        #   en: Syscall Strategy
+        #   ch: Syscall 阻断策略
+        # unit:
+        # range: []
+        # enum_options: [auto, lsm_only, override_only, sigkill_only, audit_only]
+        # modification: hot_update
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     Mechanism selection for direct syscall blocking. kprobe override requires CONFIG_BPF_KPROBE_OVERRIDE and an error-injectable kernel function.
+        #   ch: |-
+        #     直接 syscall 阻断的机制选择。kprobe override 需要 CONFIG_BPF_KPROBE_OVERRIDE，并且目标内核函数必须支持 error injection。
+        syscall_strategy: auto
+        # type: string
+        # name:
+        #   en: Allowed Mechanisms
+        #   ch: 允许的阻断机制
+        # unit:
+        # range: []
+        # enum_options: [lsm, kprobe_override, sigkill, seccomp]
+        # modification: hot_update
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     Mechanisms allowed by configuration. kprobe_override is only attempted when this list contains it and runtime capability probing confirms support.
+        #   ch: |-
+        #     配置允许使用的阻断机制。只有列表包含 kprobe_override 且运行时能力探测确认支持时，才会尝试使用 bpf_override_return。
+        allowed_mechanisms: [lsm, kprobe_override, sigkill, seccomp]
+        # type: string
+        # name:
+        #   en: Default Fallback
+        #   ch: 默认降级动作
+        # unit:
+        # range: []
+        # enum_options: [sigkill]
+        # modification: hot_update
+        # ee_feature: true
+        default_fallback: sigkill
+        # type: int
+        # name:
+        #   en: Max Rules
+        #   ch: 最大规则数
+        # unit:
+        # range: [0, 1024]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: true
+        max_rules: 256
+        # type: dict
+        # name:
+        #   en: Rules
+        #   ch: 规则
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: true
+        # description:
+        #   en: |-
+        #     AI Agent enforcement rules. Strong-block exec rules support path exact/suffix selectors and optional argv_matches selectors with fixed argv index and exact value. argv_contains_any is audit-only compatibility and is not accepted for strong block. Syscall rules support selected dangerous syscall names or kernel symbols such as reboot, init_module, finit_module, delete_module and kexec_load.
+        #   ch: |-
+        #     AI Agent 执行阻断规则。强阻断 exec 规则支持 path exact/suffix 选择器，并可通过 argv_matches 指定固定 argv index 和 exact value。argv_contains_any 仅作为审计兼容字段，不支持强阻断。syscall 规则支持部分危险 syscall 名称或内核符号，例如 reboot、init_module、finit_module、delete_module、kexec_load。
+        rules: []
     # type: section
     # name:
     #   en: Symbol Table

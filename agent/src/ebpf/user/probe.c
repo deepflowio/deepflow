@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <errno.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <bcc/linux/bpf.h>
 #include <bcc/linux/bpf_common.h>
 #include <bcc/libbpf.h>
@@ -27,6 +30,7 @@
 extern bool *cpu_online;
 extern int sys_cpus_count;
 extern int ioctl(int fd, unsigned long request, ...);
+extern int bpf_raw_tracepoint_open(const char *name, int prog_fd);
 
 int bpf_get_program_fd(void *obj, const char *name, void **p)
 {
@@ -465,6 +469,61 @@ struct ebpf_link *program__attach_kfunc(void *prog)
 	if (pfd < 0) {
 		ebpf_warning("kfunc attach failed, with %s(%d)\n",
 			     strerror(errno), errno);
+		return NULL;
+	}
+
+	link = calloc(1, sizeof(*link));
+	if (!link) {
+		close(pfd);
+		ebpf_warning("Call calloc() is failed.\n");
+		return NULL;
+	}
+
+	link->detach = ebpf_link__detach_kfunc;
+	link->fd = pfd;
+
+	return link;
+}
+
+struct ebpf_link *program__attach_lsm(void *prog)
+{
+	struct ebpf_prog *ebpf_prog;
+	struct ebpf_link *link = NULL;
+	const char *hook;
+	int pfd;
+
+	if (prog == NULL) {
+		ebpf_warning("prog is NULL.\n");
+		return NULL;
+	}
+
+	ebpf_prog = prog;
+	if (strncmp(ebpf_prog->sec_name, "lsm/", 4)) {
+		ebpf_warning("lsm section name %s is invalid.\n",
+			     ebpf_prog->sec_name);
+		return NULL;
+	}
+
+	hook = ebpf_prog->sec_name + 4;
+	if (hook[0] == '\0') {
+		ebpf_warning("lsm hook name is empty, section:%s.\n",
+			     ebpf_prog->sec_name);
+		return NULL;
+	}
+
+	/*
+	 * BPF LSM programs are loaded with attach_btf_id. The raw tracepoint
+	 * attach syscall should use a NULL name and attach by that BTF id.
+	 */
+	pfd = bpf_raw_tracepoint_open(NULL, ebpf_prog->prog_fd);
+	if (pfd < 0) {
+		if (errno == EOPNOTSUPP || errno == EINVAL) {
+			ebpf_warning("BPF LSM attach unsupported for %s: %s(%d)\n",
+				     hook, strerror(errno), errno);
+		} else {
+			ebpf_warning("BPF LSM attach failed for %s: %s(%d)\n",
+				     hook, strerror(errno), errno);
+		}
 		return NULL;
 	}
 
