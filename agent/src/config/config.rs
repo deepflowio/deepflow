@@ -3676,6 +3676,7 @@ pub const OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME: &'static str = "process_name";
 pub const OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME: &'static str = "parent_process_name";
 pub const OS_PROC_REGEXP_MATCH_TYPE_TAG: &'static str = "tag";
 pub const OS_PROC_REGEXP_MATCH_TYPE_CMD_WITH_ARGS: &'static str = "cmdline_with_args";
+pub const OS_PROC_ENABLED_FEATURE_AI_AGENT: &str = "proc.ai_agent";
 
 // use for proc scan match and replace
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
@@ -4304,6 +4305,25 @@ enabled: true
 "#;
         let proc: Proc = serde_yaml::from_str(default_matcher_yaml).unwrap();
         assert_eq!(proc.process_matcher, Proc::default().process_matcher);
+    }
+
+    #[test]
+    fn parse_proc_config_with_ai_agent_feature() {
+        let yaml = r#"
+process_matcher:
+- match_regex: ^python3$
+  match_type: process_name
+  enabled_features: [proc.ai_agent, proc.gprocess_info]
+"#;
+        let proc: Proc = serde_yaml::from_str(yaml).unwrap();
+
+        assert_eq!(
+            proc.process_matcher[0].enabled_features,
+            vec![
+                OS_PROC_ENABLED_FEATURE_AI_AGENT.to_string(),
+                "proc.gprocess_info".to_string(),
+            ]
+        );
     }
 
     #[test]

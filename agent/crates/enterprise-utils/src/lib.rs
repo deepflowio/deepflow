@@ -672,6 +672,15 @@ pub mod ai_agent {
             false
         }
 
+        pub fn register_process_matcher(
+            &self,
+            _pid: u32,
+            _process_name: &str,
+            _now: Duration,
+        ) -> bool {
+            false
+        }
+
         pub fn is_ai_agent(&self, _pid: u32) -> bool {
             false
         }
@@ -689,6 +698,10 @@ pub mod ai_agent {
         }
 
         pub fn cleanup_dead_pids(&self, _alive_pids: &[u32]) -> Vec<u32> {
+            vec![]
+        }
+
+        pub fn remove_process_matcher_root(&self, _root_pid: u32) -> Vec<u32> {
             vec![]
         }
 

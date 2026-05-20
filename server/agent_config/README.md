@@ -1968,6 +1968,7 @@ Configuration Item:
 - rewrite_name: The name will replace the process name or cmd use regexp replace.
   Default value `""` means no replacement.
 - enabled_features: List of features enabled for matched processes. Available options:
+  - proc.ai_agent (Only identifies AI Agents; it does not implicitly enable `proc.gprocess_info` or `proc.socket_list`)
   - proc.gprocess_info (Ensure `inputs.proc.enabled` is configured to **true**)
   - proc.golang_symbol_table (Ensure `inputs.proc.symbol_table.golang_specific.enabled` is configured to **true**)
   - proc.socket_list (Ensure `inputs.proc.socket_info_sync_interval` is configured to a **number > 0**)
@@ -2274,6 +2275,7 @@ inputs:
 **Enum options**:
 | Value | Note                         |
 | ----- | ---------------------------- |
+| proc.ai_agent | Only identifies AI Agents; it does not implicitly enable `proc.gprocess_info` or `proc.socket_list` |
 | proc.gprocess_info | Synchronize process resource information and inject process tags from the observation point into raw eBPF data |
 | proc.golang_symbol_table | Parse Golang-specific symbol tables to optimize profiling data when Golang processes prune the standard symbol table |
 | proc.socket_list | Synchronize active socket information of processes to inject process labels for both peers in application and network observation data |
@@ -2290,7 +2292,12 @@ inputs:
 
 **Description**:
 
-Also ensure the global configuration parameters for related features are enabled:
+`proc.ai_agent` only identifies AI Agents. It does not require another
+global feature toggle, and it does not implicitly enable
+`proc.gprocess_info` or `proc.socket_list`.
+
+Other related features still require their corresponding global
+configuration parameters to be enabled:
 - proc.gprocess_info (Ensure `inputs.proc.enabled` is configured to **true**)
 - proc.golang_symbol_table (Ensure `inputs.proc.symbol_table.golang_specific.enabled` is configured to **true**)
 - proc.socket_list (Ensure `inputs.proc.socket_info_sync_interval` is configured to a **number > 0**)

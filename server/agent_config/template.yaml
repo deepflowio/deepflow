@@ -1339,6 +1339,7 @@ inputs:
     #     - ignore: 是否要忽略匹配到的进程，缺省值为 `false`
     #     - rewrite_name: 使用正则替换匹配到的进程名或命令行，缺省值为 `""` 表示不做替换。
     #     - enabled_features: 为匹配到的进程开启的特性列表，可选项如下
+    #       - proc.ai_agent（仅负责 AI Agent 识别，不会隐式开启 `proc.gprocess_info` 或 `proc.socket_list`）
     #       - proc.gprocess_info（注意确认 `inputs.proc.enabled` 已配置为 **true**）
     #       - proc.golang_symbol_table（注意确认 `inputs.proc.symbol_table.golang_specific.enabled` 已配置为 **true**）
     #       - proc.socket_list（注意确认 `inputs.proc.socket_info_sync_interval` 已配置为**大于 0 的数字**）
@@ -1392,6 +1393,7 @@ inputs:
     #     - rewrite_name: The name will replace the process name or cmd use regexp replace.
     #       Default value `""` means no replacement.
     #     - enabled_features: List of features enabled for matched processes. Available options:
+    #       - proc.ai_agent (Only identifies AI Agents; it does not implicitly enable `proc.gprocess_info` or `proc.socket_list`)
     #       - proc.gprocess_info (Ensure `inputs.proc.enabled` is configured to **true**)
     #       - proc.golang_symbol_table (Ensure `inputs.proc.symbol_table.golang_specific.enabled` is configured to **true**)
     #       - proc.socket_list (Ensure `inputs.proc.socket_info_sync_interval` is configured to a **number > 0**)
@@ -1578,6 +1580,9 @@ inputs:
     # unit:
     # range: []
     # enum_options:
+    #   - proc.ai_agent:
+    #       ch: 仅负责 AI Agent 识别，不会隐式开启 `proc.gprocess_info` 或 `proc.socket_list`
+    #       en: Only identifies AI Agents; it does not implicitly enable `proc.gprocess_info` or `proc.socket_list`
     #   - proc.gprocess_info:
     #       ch: 同步进程资源信息，并为 eBPF 原始观测数据注入所在观测点上的进程标签
     #       en: Synchronize process resource information and inject process tags from the observation point into raw eBPF data
@@ -1612,7 +1617,10 @@ inputs:
     # ee_feature: false
     # description:
     #   ch: |-
-    #     注意也需要同时开启相关特性的总开关：
+    #     `proc.ai_agent` 仅负责 AI Agent 识别，不需要额外开启其他全局总开关，
+    #     但也不会隐式开启 `proc.gprocess_info` 或 `proc.socket_list`。
+    #
+    #     其他相关特性仍需同时开启对应的总开关：
     #     - proc.gprocess_info（注意确认 `inputs.proc.enabled` 已配置为 **true**）
     #     - proc.golang_symbol_table（注意确认 `inputs.proc.symbol_table.golang_specific.enabled` 已配置为 **true**）
     #     - proc.socket_list（注意确认 `inputs.proc.socket_info_sync_interval` 已配置为**大于 0 的数字**）
@@ -1622,7 +1630,12 @@ inputs:
     #     - ebpf.profile.off_cpu（注意确认 `inputs.ebpf.profile.off_cpu.disabled` 已配置为 **false**）
     #     - ebpf.profile.memory（注意确认 `inputs.ebpf.profile.memory.disabled` 已配置为 **false**）
     #   en: |-
-    #     Also ensure the global configuration parameters for related features are enabled:
+    #     `proc.ai_agent` only identifies AI Agents. It does not require another
+    #     global feature toggle, and it does not implicitly enable
+    #     `proc.gprocess_info` or `proc.socket_list`.
+    #
+    #     Other related features still require their corresponding global
+    #     configuration parameters to be enabled:
     #     - proc.gprocess_info (Ensure `inputs.proc.enabled` is configured to **true**)
     #     - proc.golang_symbol_table (Ensure `inputs.proc.symbol_table.golang_specific.enabled` is configured to **true**)
     #     - proc.socket_list (Ensure `inputs.proc.socket_info_sync_interval` is configured to a **number > 0**)
