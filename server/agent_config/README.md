@@ -2299,97 +2299,6 @@ Also ensure the global configuration parameters for related features are enabled
 - ebpf.profile.off_cpu (Ensure `inputs.ebpf.profile.off_cpu.disabled` is configured to **false**)
 - ebpf.profile.memory (Ensure `inputs.ebpf.profile.memory.disabled` is configured to **false**)
 
-### AI Agent {#inputs.proc.ai_agent}
-
-#### HTTP Endpoints {#inputs.proc.ai_agent.http_endpoints}
-
-**Tags**:
-
-`hot_update`
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`inputs.proc.ai_agent.http_endpoints`
-
-**Default value**:
-```yaml
-inputs:
-  proc:
-    ai_agent:
-      http_endpoints:
-      - /v1/chat/completions
-      - /v1/embeddings
-      - /v1/responses
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | string |
-
-**Description**:
-
-HTTP endpoints for AI agent recognition. Requests that match any prefix will mark the process as AI Agent.
-
-#### Max Payload Size {#inputs.proc.ai_agent.max_payload_size}
-
-**Tags**:
-
-`hot_update`
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`inputs.proc.ai_agent.max_payload_size`
-
-**Default value**:
-```yaml
-inputs:
-  proc:
-    ai_agent:
-      max_payload_size: 0
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | int |
-| Unit | byte |
-| Range | [0, 2147483647] |
-
-**Description**:
-
-Maximum payload size for AI agent reassembly. 0 means unlimited.
-
-#### File IO Enabled {#inputs.proc.ai_agent.file_io_enabled}
-
-**Tags**:
-
-`hot_update`
-<mark>ee_feature</mark>
-
-**FQCN**:
-
-`inputs.proc.ai_agent.file_io_enabled`
-
-**Default value**:
-```yaml
-inputs:
-  proc:
-    ai_agent:
-      file_io_enabled: true
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | bool |
-
-**Description**:
-
-Whether to enable AI Agent file IO event collection.
-
 ### Symbol Table {#inputs.proc.symbol_table}
 
 #### Golang-specific {#inputs.proc.symbol_table.golang_specific}
@@ -8711,6 +8620,552 @@ processors:
 
 When enabled, all gRPC packets are considered to be of the `stream` type, and the `data` will be reported,
 and the rrt calculation of the response will use the `grpc-status` field.
+
+##### OpenAI API {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api}
+
+Configuration for OpenAI-compatible API protocol enhancement.
+When enabled, HTTP/1 and HTTP/2 traffic matching the configured paths will be
+recognised as OpenAI API calls and enriched with LLM-specific metrics and
+business-dimension attributes (org_path, user_id, app_id).
+
+###### Enabled {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.enabled`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Enable OpenAI-compatible API protocol enhancement.
+
+###### Path Prefixes {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.path_prefixes}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.path_prefixes`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          path_prefixes: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**Description**:
+
+HTTP requests whose path starts with any of these prefixes will be treated
+as OpenAI API calls. path_prefixes and path_suffixes are matched independently
+with OR logic: a path is accepted if it satisfies either list. An empty list
+contributes nothing; if both lists are empty, no paths will be matched.
+
+###### Path Suffixes {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.path_suffixes}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.path_suffixes`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          path_suffixes:
+          - /v1/chat/completions
+          - /v1/responses
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**Description**:
+
+HTTP requests whose path ends with any of these suffixes will be treated
+as OpenAI API calls. path_prefixes and path_suffixes are matched independently
+with OR logic: a path is accepted if it satisfies either list. An empty list
+contributes nothing; if both lists are empty, no paths will be matched.
+
+###### Request Body Max Bytes {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.request_body_max_bytes}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.request_body_max_bytes`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          request_body_max_bytes: 65536
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | byte |
+| Range | [1024, 1048576] |
+
+**Description**:
+
+Maximum bytes of the request body to cache and parse for extracting
+the `stream` flag and business-dimension fields.
+
+###### Response Event Max Bytes {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.response_event_max_bytes}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.response_event_max_bytes`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          response_event_max_bytes: 32768
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | byte |
+| Range | [1024, 1048576] |
+
+**Description**:
+
+Maximum bytes per SSE event JSON to parse (non-streaming response body limit).
+
+###### SSE Buffer Max Bytes {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.sse_buffer_max_bytes}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.sse_buffer_max_bytes`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          sse_buffer_max_bytes: 131072
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | byte |
+| Range | [4096, 4194304] |
+
+**Description**:
+
+Maximum total bytes buffered for SSE event reassembly across multiple
+response packets. When exceeded, further events are dropped and
+`attribute.llm_abort_reason=sse_buffer_overflow` is set.
+
+###### Usage Field Paths {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths}
+
+Configure the JSON paths used to extract token usage counts from API
+responses. Paths use dot-notation relative to the top-level response JSON
+(e.g. "usage.prompt_tokens" resolves as json["usage"]["prompt_tokens"]).
+Multiple paths are tried in order; the first non-null value wins.
+
+####### Input Tokens {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.input_tokens}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.input_tokens`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          usage_field_paths:
+            input_tokens:
+            - usage.prompt_tokens
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**Description**:
+
+JSON paths to read the input (prompt) token count, tried in order.
+
+####### Output Tokens {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.output_tokens}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.output_tokens`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          usage_field_paths:
+            output_tokens:
+            - usage.completion_tokens
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**Description**:
+
+JSON paths to read the output (completion) token count, tried in order.
+
+####### Total Tokens {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.total_tokens}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.total_tokens`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          usage_field_paths:
+            total_tokens:
+            - usage.total_tokens
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**Description**:
+
+JSON paths to read the total token count, tried in order.
+If none match, total is computed as input_tokens + output_tokens.
+
+####### Cached Tokens {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.cached_tokens}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.cached_tokens`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          usage_field_paths:
+            cached_tokens:
+            - usage.prompt_tokens_details.cached_tokens
+            - usage.cache_read_input_tokens
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**Description**:
+
+JSON paths to read the cached (prompt cache hit) token count, tried in order.
+usage.prompt_tokens_details.cached_tokens covers the OpenAI API;
+usage.cache_read_input_tokens covers the Anthropic API.
+If none match, the llm_cached_tokens metric is omitted.
+
+###### Business Dimension Extractors {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors}
+
+Configure how to extract org_path, user_id, and app_id from request
+headers or JSON body fields. Extraction uses a first-match-wins strategy:
+for each dimension, headers are tried in listed order first; if none match,
+json_paths are tried in listed order. The first non-empty value found stops
+further attempts for that dimension.
+
+####### Org Path {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.org_path}
+
+Rules for extracting the organization/department path dimension.
+
+######## Headers {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.org_path.headers}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.org_path.headers`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          biz_dimension_extractors:
+            org_path:
+              headers:
+              - x-org-path
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**Description**:
+
+HTTP request header names to try, in order, for org_path extraction.
+
+######## JSON Paths {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.org_path.json_paths}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.org_path.json_paths`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          biz_dimension_extractors:
+            org_path:
+              json_paths: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**Description**:
+
+JSON body field paths to try, in order, for org_path extraction.
+Supports one level of dot notation, e.g. "metadata.org_path".
+
+####### User ID {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.user_id}
+
+Rules for extracting the business user identifier dimension.
+
+######## Headers {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.user_id.headers}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.user_id.headers`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          biz_dimension_extractors:
+            user_id:
+              headers:
+              - x-user-id
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**Description**:
+
+HTTP request header names to try, in order, for user_id extraction.
+
+######## JSON Paths {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.user_id.json_paths}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.user_id.json_paths`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          biz_dimension_extractors:
+            user_id:
+              json_paths: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**Description**:
+
+JSON body field paths to try, in order, for user_id extraction.
+Supports one level of dot notation, e.g. "metadata.user_id".
+
+####### App ID {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.app_id}
+
+Rules for extracting the application identifier dimension.
+
+######## Headers {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.app_id.headers}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.app_id.headers`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          biz_dimension_extractors:
+            app_id:
+              headers:
+              - appid
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**Description**:
+
+HTTP request header names to try, in order, for app_id extraction.
+
+######## JSON Paths {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.app_id.json_paths}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.app_id.json_paths`
+
+**Default value**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          biz_dimension_extractors:
+            app_id:
+              json_paths: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**Description**:
+
+JSON body field paths to try, in order, for app_id extraction.
+Supports one level of dot notation, e.g. "metadata.app_id".
 
 #### Custom Protocol Parsing {#processors.request_log.application_protocol_inference.custom_protocols}
 

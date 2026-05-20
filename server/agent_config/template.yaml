@@ -6138,6 +6138,341 @@ processors:
           #   ch: |-
           #     开启后所有 gRPC 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
           streaming_data_enabled: false
+        # type: section
+        # name: OpenAI API
+        # description:
+        #   en: |-
+        #     Configuration for OpenAI-compatible API protocol enhancement.
+        #     When enabled, HTTP/1 and HTTP/2 traffic matching the configured paths will be
+        #     recognised as OpenAI API calls and enriched with LLM-specific metrics and
+        #     business-dimension attributes (org_path, user_id, app_id).
+        #   ch: |-
+        #     OpenAI 兼容 API 协议增强配置。开启后，对命中配置路径的 HTTP/1 和 HTTP/2 流量进行
+        #     OpenAI API 识别，并附加 LLM 专用指标（TTFT/TPOT/Token 用量）和业务维度属性（组织/用户/应用）。
+        openai_api:
+          # type: bool
+          # name:
+          #   en: Enabled
+          #   ch: 开启 OpenAI API 解析
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     Enable OpenAI-compatible API protocol enhancement.
+          #   ch: |-
+          #     开启 OpenAI 兼容 API 协议增强。
+          enabled: false
+          # type: string[]
+          # name:
+          #   en: Path Prefixes
+          #   ch: 路径前缀过滤
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     HTTP requests whose path starts with any of these prefixes will be treated
+          #     as OpenAI API calls. path_prefixes and path_suffixes are matched independently
+          #     with OR logic: a path is accepted if it satisfies either list. An empty list
+          #     contributes nothing; if both lists are empty, no paths will be matched.
+          #   ch: |-
+          #     路径以任意配置前缀开头的 HTTP 请求将进行 OpenAI API 增强。path_prefixes 与
+          #     path_suffixes 独立匹配，满足其中任意一个即可。列表为空时该组不参与匹配；
+          #     两个列表同时为空则不匹配任何路径。
+          path_prefixes: []
+          # type: string[]
+          # name:
+          #   en: Path Suffixes
+          #   ch: 路径后缀过滤
+          # unit:
+          # range: []
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     HTTP requests whose path ends with any of these suffixes will be treated
+          #     as OpenAI API calls. path_prefixes and path_suffixes are matched independently
+          #     with OR logic: a path is accepted if it satisfies either list. An empty list
+          #     contributes nothing; if both lists are empty, no paths will be matched.
+          #   ch: |-
+          #     路径以任意配置后缀结尾的 HTTP 请求将进行 OpenAI API 增强。path_prefixes 与
+          #     path_suffixes 独立匹配，满足其中任意一个即可。列表为空时该组不参与匹配；
+          #     两个列表同时为空则不匹配任何路径。
+          path_suffixes:
+            - /v1/chat/completions
+            - /v1/responses
+          # type: int
+          # name:
+          #   en: Request Body Max Bytes
+          #   ch: 请求体最大缓存字节数
+          # unit: byte
+          # range: [1024, 1048576]
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     Maximum bytes of the request body to cache and parse for extracting
+          #     the `stream` flag and business-dimension fields.
+          #   ch: |-
+          #     请求体的最大缓存和解析字节数，用于提取 `stream` 标志和业务维度字段。
+          request_body_max_bytes: 65536
+          # type: int
+          # name:
+          #   en: Response Event Max Bytes
+          #   ch: 响应事件最大解析字节数
+          # unit: byte
+          # range: [1024, 1048576]
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     Maximum bytes per SSE event JSON to parse (non-streaming response body limit).
+          #   ch: |-
+          #     单个 SSE 事件 JSON 的最大解析字节数（非流式响应体大小限制）。
+          response_event_max_bytes: 32768
+          # type: int
+          # name:
+          #   en: SSE Buffer Max Bytes
+          #   ch: SSE 缓冲区最大字节数
+          # unit: byte
+          # range: [4096, 4194304]
+          # enum_options: []
+          # modification: agent_restart
+          # ee_feature: false
+          # description:
+          #   en: |-
+          #     Maximum total bytes buffered for SSE event reassembly across multiple
+          #     response packets. When exceeded, further events are dropped and
+          #     `attribute.llm_abort_reason=sse_buffer_overflow` is set.
+          #   ch: |-
+          #     SSE 事件跨多个响应包重组时的总缓冲上限。超限后丢弃后续事件并设置
+          #     `attribute.llm_abort_reason=sse_buffer_overflow`。
+          sse_buffer_max_bytes: 131072
+          # type: section
+          # name:
+          #   en: Usage Field Paths
+          #   ch: Token 用量字段路径配置
+          # description:
+          #   en: |-
+          #     Configure the JSON paths used to extract token usage counts from API
+          #     responses. Paths use dot-notation relative to the top-level response JSON
+          #     (e.g. "usage.prompt_tokens" resolves as json["usage"]["prompt_tokens"]).
+          #     Multiple paths are tried in order; the first non-null value wins.
+          #   ch: |-
+          #     配置从 API 响应中提取 Token 用量的 JSON 路径。路径为相对于响应顶层 JSON 的点分格式
+          #     （如 "usage.prompt_tokens" 解析为 json["usage"]["prompt_tokens"]）。
+          #     多个路径按顺序尝试，取第一个非空值。
+          usage_field_paths:
+            # type: string[]
+            # name:
+            #   en: Input Tokens
+            #   ch: 输入 Token 字段路径
+            # unit:
+            # range: []
+            # enum_options: []
+            # modification: agent_restart
+            # ee_feature: false
+            # description:
+            #   en: JSON paths to read the input (prompt) token count, tried in order.
+            #   ch: 按顺序尝试的 JSON 路径，用于读取输入（prompt）Token 数量。
+            input_tokens:
+              - usage.prompt_tokens
+            # type: string[]
+            # name:
+            #   en: Output Tokens
+            #   ch: 输出 Token 字段路径
+            # unit:
+            # range: []
+            # enum_options: []
+            # modification: agent_restart
+            # ee_feature: false
+            # description:
+            #   en: JSON paths to read the output (completion) token count, tried in order.
+            #   ch: 按顺序尝试的 JSON 路径，用于读取输出（completion）Token 数量。
+            output_tokens:
+              - usage.completion_tokens
+            # type: string[]
+            # name:
+            #   en: Total Tokens
+            #   ch: 总 Token 字段路径
+            # unit:
+            # range: []
+            # enum_options: []
+            # modification: agent_restart
+            # ee_feature: false
+            # description:
+            #   en: |-
+            #     JSON paths to read the total token count, tried in order.
+            #     If none match, total is computed as input_tokens + output_tokens.
+            #   ch: |-
+            #     按顺序尝试的 JSON 路径，用于读取总 Token 数量。
+            #     若均未命中，则自动计算为 input_tokens + output_tokens。
+            total_tokens:
+              - usage.total_tokens
+            # type: string[]
+            # name:
+            #   en: Cached Tokens
+            #   ch: 缓存 Token 字段路径
+            # unit:
+            # range: []
+            # enum_options: []
+            # modification: agent_restart
+            # ee_feature: false
+            # description:
+            #   en: |-
+            #     JSON paths to read the cached (prompt cache hit) token count, tried in order.
+            #     usage.prompt_tokens_details.cached_tokens covers the OpenAI API;
+            #     usage.cache_read_input_tokens covers the Anthropic API.
+            #     If none match, the llm_cached_tokens metric is omitted.
+            #   ch: |-
+            #     按顺序尝试的 JSON 路径，用于读取缓存（Prompt Cache 命中）Token 数量。
+            #     usage.prompt_tokens_details.cached_tokens 对应 OpenAI API；
+            #     usage.cache_read_input_tokens 对应 Anthropic API。
+            #     若均未命中，则不输出 llm_cached_tokens 指标。
+            cached_tokens:
+              - usage.prompt_tokens_details.cached_tokens
+              - usage.cache_read_input_tokens
+          # type: section
+          # name:
+          #   en: Business Dimension Extractors
+          #   ch: 业务维度提取配置
+          # description:
+          #   en: |-
+          #     Configure how to extract org_path, user_id, and app_id from request
+          #     headers or JSON body fields. Extraction uses a first-match-wins strategy:
+          #     for each dimension, headers are tried in listed order first; if none match,
+          #     json_paths are tried in listed order. The first non-empty value found stops
+          #     further attempts for that dimension.
+          #   ch: |-
+          #     配置从请求头或 JSON Body 字段提取 org_path、user_id、app_id 的规则。
+          #     每个维度采用"首个命中即停止"策略：先按顺序尝试 headers，若均未命中则
+          #     按顺序尝试 json_paths，找到第一个非空值后不再继续后续候选项。
+          biz_dimension_extractors:
+            # type: section
+            # name:
+            #   en: Org Path
+            #   ch: 组织架构路径
+            # description:
+            #   en: Rules for extracting the organization/department path dimension.
+            #   ch: 提取组织架构路径维度的规则。
+            org_path:
+              # type: string[]
+              # name:
+              #   en: Headers
+              #   ch: 请求头候选列表
+              # unit:
+              # range: []
+              # enum_options: []
+              # modification: agent_restart
+              # ee_feature: false
+              # description:
+              #   en: HTTP request header names to try, in order, for org_path extraction.
+              #   ch: 按顺序尝试的 HTTP 请求头名称，用于提取 org_path。
+              headers:
+                - x-org-path
+              # type: string[]
+              # name:
+              #   en: JSON Paths
+              #   ch: JSON 字段路径候选列表
+              # unit:
+              # range: []
+              # enum_options: []
+              # modification: agent_restart
+              # ee_feature: false
+              # description:
+              #   en: |-
+              #     JSON body field paths to try, in order, for org_path extraction.
+              #     Supports one level of dot notation, e.g. "metadata.org_path".
+              #   ch: |-
+              #     按顺序尝试的 JSON Body 字段路径，用于提取 org_path。
+              #     支持一级点号路径，如 "metadata.org_path"。
+              json_paths: []
+            # type: section
+            # name:
+            #   en: User ID
+            #   ch: 用户标识
+            # description:
+            #   en: Rules for extracting the business user identifier dimension.
+            #   ch: 提取业务用户标识维度的规则。
+            user_id:
+              # type: string[]
+              # name:
+              #   en: Headers
+              #   ch: 请求头候选列表
+              # unit:
+              # range: []
+              # enum_options: []
+              # modification: agent_restart
+              # ee_feature: false
+              # description:
+              #   en: HTTP request header names to try, in order, for user_id extraction.
+              #   ch: 按顺序尝试的 HTTP 请求头名称，用于提取 user_id。
+              headers:
+                - x-user-id
+              # type: string[]
+              # name:
+              #   en: JSON Paths
+              #   ch: JSON 字段路径候选列表
+              # unit:
+              # range: []
+              # enum_options: []
+              # modification: agent_restart
+              # ee_feature: false
+              # description:
+              #   en: |-
+              #     JSON body field paths to try, in order, for user_id extraction.
+              #     Supports one level of dot notation, e.g. "metadata.user_id".
+              #   ch: |-
+              #     按顺序尝试的 JSON Body 字段路径，用于提取 user_id。
+              #     支持一级点号路径，如 "metadata.user_id"。
+              json_paths: []
+            # type: section
+            # name:
+            #   en: App ID
+            #   ch: 应用标识
+            # description:
+            #   en: Rules for extracting the application identifier dimension.
+            #   ch: 提取应用标识维度的规则。
+            app_id:
+              # type: string[]
+              # name:
+              #   en: Headers
+              #   ch: 请求头候选列表
+              # unit:
+              # range: []
+              # enum_options: []
+              # modification: agent_restart
+              # ee_feature: false
+              # description:
+              #   en: HTTP request header names to try, in order, for app_id extraction.
+              #   ch: 按顺序尝试的 HTTP 请求头名称，用于提取 app_id。
+              headers:
+                - appid
+              # type: string[]
+              # name:
+              #   en: JSON Paths
+              #   ch: JSON 字段路径候选列表
+              # unit:
+              # range: []
+              # enum_options: []
+              # modification: agent_restart
+              # ee_feature: false
+              # description:
+              #   en: |-
+              #     JSON body field paths to try, in order, for app_id extraction.
+              #     Supports one level of dot notation, e.g. "metadata.app_id".
+              #   ch: |-
+              #     按顺序尝试的 JSON Body 字段路径，用于提取 app_id。
+              #     支持一级点号路径，如 "metadata.app_id"。
+              json_paths: []
       # type: dict
       # name:
       #   en: Custom Protocol Parsing
