@@ -4070,14 +4070,15 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 				}
 			}
 
-			if (double_args)
+			if (double_args) {
 				remaining = (int64_t)sizeof(buff) - len;
 				len += safe_snprintf(buff + len, remaining,
 						     format, v, v);
-			else
+			} else {
 				remaining = (int64_t)sizeof(buff) - len;
 				len += safe_snprintf(buff + len, remaining,
 						     format, v);
+			}
 
 			if (len >= sizeof(buff)) {
 				break;
