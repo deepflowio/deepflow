@@ -73,6 +73,18 @@ require(
     "__u64 pid_tgid = bpf_get_current_pid_tgid();" in data_submit_text,
     "__data_submit must define pid_tgid before EXTENDED_AI_AGENT_FILE_IO branch uses it",
 )
+require(
+    re.search(
+        r"#ifdef USE_SOCKET_TRACE_SYSCALL_TAIL_CALLS\s+"
+        r"if \(extra->source == DATA_SOURCE_SYSCALL\) \{\s+"
+        r"struct tail_calls_context \*context =\s+"
+        r"\(struct tail_calls_context \*\)v->data;.*?"
+        r"return SUBMIT_OK;\s+\}\s+#endif\s+#ifdef USE_SOCKET_TRACE_INLINE_OUTPUT",
+        data_submit_text,
+        re.S,
+    ),
+    "__data_submit must keep 5.2_plus syscall traffic on the tail-call output path before inline output fallback",
+)
 
 push_close_end = socket_trace_text.find("\n}\n\n#ifdef SUPPORTS_KPROBE_ONLY", push_close_start)
 require(push_close_end != -1, "missing __push_close_event end")
@@ -139,6 +151,31 @@ require(
     "#ifdef EXTENDED_AI_AGENT_FILE_IO_FULL\n\tbuffer->access_permission =\n"
     "\t    ai_agent_get_access_permission" in trace_io_text,
     "AI Agent access_permission extraction must be guarded by EXTENDED_AI_AGENT_FILE_IO_FULL",
+)
+
+require(
+    "#define USE_SOCKET_TRACE_SYSCALL_TAIL_CALLS 1" in socket_trace_text
+    and "defined(LINUX_VER_5_2_PLUS)" in socket_trace_text
+    and "defined(EXTENDED_AI_AGENT_FILE_IO)" in socket_trace_text,
+    "5.2_plus socket-trace must re-enable syscall tail-call splitting when AI Agent governance is compiled in",
+)
+
+for helper_name in (
+    "process_syscall_data",
+    "process_syscall_data_vecs",
+):
+    helper_idx = socket_trace_text.find(helper_name)
+    require(helper_idx != -1, f"missing {helper_name}")
+    helper_text = socket_trace_text[helper_idx : helper_idx + 2200]
+    require(
+        "USE_SOCKET_TRACE_SYSCALL_TAIL_CALLS" in helper_text,
+        f"{helper_name} must use the syscall tail-call split guard",
+    )
+
+require(
+    "USE_SOCKET_TRACE_SYSCALL_TAIL_CALLS" in socket_trace_text
+    and "extra->source == DATA_SOURCE_SYSCALL" in socket_trace_text,
+    "5.2_plus AI Agent tail-call split must be limited to syscall source paths",
 )
 
 require('"lsm/"' in load_text, "load.c must recognize lsm/ section prefix")
