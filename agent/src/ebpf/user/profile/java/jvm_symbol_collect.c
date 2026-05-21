@@ -1221,6 +1221,12 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 	char copy_target_path[MAX_PATH_LENGTH];
 	int len = snprintf(copy_target_path, sizeof(copy_target_path),
 			   TARGET_NS_STORAGE_PATH, target_pid);
+	if (len < 0 || len >= sizeof(copy_target_path)) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "Fun %s target ns path is too long for pid %d\n",
+			     __func__, target_pid);
+		return ETR_INVAL;
+	}
 	if (access(copy_target_path, F_OK)) {
 		/*
 		 * The purpose of umask(0); is to set the current process's file
@@ -1240,8 +1246,9 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 		}
 	}
 
-	snprintf(copy_target_path + len, sizeof(copy_target_path) - len,
-		 "/%s", AGENT_LIB_NAME);
+	safe_snprintf(copy_target_path + len,
+		      (int64_t)sizeof(copy_target_path) - len, "/%s",
+		      AGENT_LIB_NAME);
 	if ((ret =
 	     agent_so_lib_copy(AGENT_LIB_SRC_PATH,
 			       copy_target_path, target_uid,
@@ -1251,8 +1258,9 @@ static int copy_agent_libs_into_target_ns(pid_t target_pid, int target_uid,
 		return ret;
 	}
 
-	snprintf(copy_target_path + len, sizeof(copy_target_path) - len,
-		 "/%s", AGENT_MUSL_LIB_NAME);
+	safe_snprintf(copy_target_path + len,
+		      (int64_t)sizeof(copy_target_path) - len, "/%s",
+		      AGENT_MUSL_LIB_NAME);
 
 	if ((ret =
 	     agent_so_lib_copy(AGENT_MUSL_LIB_SRC_PATH,

@@ -1212,13 +1212,15 @@ int exec_command(const char *cmd, const char *args,
 	if (ret_buf != NULL && ret_buf_size > 0) {
 		/* Read and print the output */
 		char buffer[1024];
-		int write_bytes =
-		    snprintf(ret_buf, ret_buf_size, "[ %s ]", cmd_buf);
+		int64_t remaining;
+		size_t write_bytes =
+		    safe_snprintf(ret_buf, ret_buf_size, "[ %s ]", cmd_buf);
 		while (fgets(buffer, sizeof(buffer), fp) != NULL) {
-			write_bytes +=
-			    snprintf(ret_buf + write_bytes,
-				     ret_buf_size - write_bytes, "%s", buffer);
-			if (write_bytes >= ret_buf_size)
+			remaining = (int64_t)ret_buf_size - (int64_t)write_bytes;
+			write_bytes += safe_snprintf(ret_buf + write_bytes,
+						     remaining, "%s",
+						     buffer);
+			if (write_bytes >= (size_t)ret_buf_size - 1)
 				break;
 		}
 	}
@@ -1688,8 +1690,9 @@ void format_port_ranges(uint16_t * ports, size_t size, char *ret_str,
 	qsort(ports, size, sizeof(uint16_t), compare);
 
 	int bytes_cnt = 0;	// To keep track of how many bytes we've written to ret_str
+	int64_t remaining;
 	bytes_cnt +=
-	    snprintf(ret_str + bytes_cnt, str_sz - bytes_cnt, "Ports: ");
+	    safe_snprintf(ret_str + bytes_cnt, str_sz - bytes_cnt, "Ports: ");
 
 	size_t i = 0;
 	while (i < size) {
@@ -1702,16 +1705,23 @@ void format_port_ranges(uint16_t * ports, size_t size, char *ret_str,
 
 		// If start == i, it means it's a single number; otherwise, it's a range
 		if (start == i) {
-			bytes_cnt += snprintf(ret_str + bytes_cnt, str_sz - bytes_cnt, "%d", ports[start]);	// Print a single number
+			remaining = (int64_t)str_sz - bytes_cnt;
+			bytes_cnt += safe_snprintf(ret_str + bytes_cnt,
+						   remaining, "%d",
+						   ports[start]);	// Print a single number
 		} else {
-			bytes_cnt += snprintf(ret_str + bytes_cnt, str_sz - bytes_cnt, "%d-%d", ports[start], ports[i]);	// Print the range
+			remaining = (int64_t)str_sz - bytes_cnt;
+			bytes_cnt += safe_snprintf(ret_str + bytes_cnt,
+						   remaining, "%d-%d",
+						   ports[start], ports[i]);	// Print the range
 		}
 
 		// Print a comma if not the last range/number
 		if (i + 1 < size) {
+			remaining = (int64_t)str_sz - bytes_cnt;
 			bytes_cnt +=
-			    snprintf(ret_str + bytes_cnt, str_sz - bytes_cnt,
-				     ", ");
+			    safe_snprintf(ret_str + bytes_cnt, remaining,
+					  ", ");
 		}
 
 		i++;

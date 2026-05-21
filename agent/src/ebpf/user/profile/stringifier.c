@@ -266,38 +266,47 @@ char *rewrite_java_symbol(char *sym)
 	}
 	memset(dst, 0, new_len);
 	int offset = 0;
+	int64_t remaining;
 
 	switch (sym[i]) {
 	case 'B':
-		offset += snprintf(dst + offset, new_len - offset, "byte");
+		remaining = (int64_t)new_len - offset;
+		offset += safe_snprintf(dst + offset, remaining, "byte");
 		i++;
 		break;
 	case 'C':
-		offset += snprintf(dst + offset, new_len - offset, "char");
+		remaining = (int64_t)new_len - offset;
+		offset += safe_snprintf(dst + offset, remaining, "char");
 		i++;
 		break;
 	case 'D':
-		offset += snprintf(dst + offset, new_len - offset, "double");
+		remaining = (int64_t)new_len - offset;
+		offset += safe_snprintf(dst + offset, remaining, "double");
 		i++;
 		break;
 	case 'F':
-		offset += snprintf(dst + offset, new_len - offset, "float");
+		remaining = (int64_t)new_len - offset;
+		offset += safe_snprintf(dst + offset, remaining, "float");
 		i++;
 		break;
 	case 'I':
-		offset += snprintf(dst + offset, new_len - offset, "int");
+		remaining = (int64_t)new_len - offset;
+		offset += safe_snprintf(dst + offset, remaining, "int");
 		i++;
 		break;
 	case 'J':
-		offset += snprintf(dst + offset, new_len - offset, "long");
+		remaining = (int64_t)new_len - offset;
+		offset += safe_snprintf(dst + offset, remaining, "long");
 		i++;
 		break;
 	case 'S':
-		offset += snprintf(dst + offset, new_len - offset, "short");
+		remaining = (int64_t)new_len - offset;
+		offset += safe_snprintf(dst + offset, remaining, "short");
 		i++;
 		break;
 	case 'Z':
-		offset += snprintf(dst + offset, new_len - offset, "boolean");
+		remaining = (int64_t)new_len - offset;
+		offset += safe_snprintf(dst + offset, remaining, "boolean");
 		i++;
 		break;
 	case 'L':
@@ -319,11 +328,13 @@ char *rewrite_java_symbol(char *sym)
 	}
 
 	for (j = 0; j < array_dims; j++) {
-		offset += snprintf(dst + offset, new_len - offset, "[]");
+		remaining = (int64_t)new_len - offset;
+		offset += safe_snprintf(dst + offset, remaining, "[]");
 	}
 
 	// rest
-	snprintf(dst + offset, new_len - offset, sym + i);
+	remaining = (int64_t)new_len - offset;
+	safe_snprintf(dst + offset, remaining, "%s", sym + i);
 
 	return dst;
 
@@ -650,18 +661,20 @@ static char *build_stack_trace_string(struct bpf_tracer *t,
 	if (fold_stack_trace_str == NULL)
 		goto failed;
 
-	int len = 0;
+	size_t len = 0;
+	int64_t remaining;
 	for (i = PERF_MAX_STACK_DEPTH - 1; i >= 0; i--) {
 		if (symbol_array[i]) {
-			len += snprintf(fold_stack_trace_str + len,
-					folded_size - len,
-					"%s;", (char *)symbol_array[i]);
+			remaining = (int64_t)folded_size - (int64_t)len;
+			len += safe_snprintf(fold_stack_trace_str + len,
+					     remaining, "%s;",
+					     (char *)symbol_array[i]);
 			clib_mem_free((void *)symbol_array[i]);
 		}
 	}
 
 	/* Remove the semicolon at the end of the string. */
-	if (len - 1 >= 0) {
+	if (len > 0) {
 		fold_stack_trace_str[len - 1] = '\0';
 	}
 	vec_free(symbol_array);
@@ -892,33 +905,48 @@ char *resolve_and_gen_stack_trace_str(struct bpf_tracer *t,
 	}
 
 	/* trace_str combines user/interpreter/kstack strings in call-order (root -> leaf). */
-	int offset = 0;
+	size_t offset = 0;
+	int64_t remaining;
 	if (i_trace_str && u_trace_str) {
 		/* Use extended merge */
+		remaining = (int64_t)len - (int64_t)offset;
 		int merged = extended_merge_stacks(trace_str + offset,
-						   len - offset, i_trace_str,
+						   (int)remaining, i_trace_str,
 						   u_trace_str, v->tgid);
 		if (merged > 0) {
 			offset += merged;
 		} else {
 			/* Fallback */
-			offset += snprintf(trace_str + offset, len - offset,
-					   "%s;%s", i_trace_str, u_trace_str);
+			remaining = (int64_t)len - (int64_t)offset;
+			offset += safe_snprintf(trace_str + offset, remaining,
+						"%s;%s", i_trace_str,
+						u_trace_str);
 		}
 	} else if (i_trace_str) {
-		offset += snprintf(trace_str + offset, len - offset, "%s", i_trace_str);
+		remaining = (int64_t)len - (int64_t)offset;
+		offset += safe_snprintf(trace_str + offset, remaining, "%s",
+					i_trace_str);
 	} else if (u_trace_str) {
 		if (has_intpstack) {
-			offset += snprintf(trace_str + offset, len - offset, "%s;%s", i_err_tag, u_trace_str);
+			remaining = (int64_t)len - (int64_t)offset;
+			offset += safe_snprintf(trace_str + offset, remaining,
+						"%s;%s", i_err_tag,
+						u_trace_str);
 		} else {
-			offset += snprintf(trace_str + offset, len - offset, "%s", u_trace_str);
+			remaining = (int64_t)len - (int64_t)offset;
+			offset += safe_snprintf(trace_str + offset, remaining,
+						"%s", u_trace_str);
 		}
 	}
 	if (u_trace_str && uprobe_str) {
-		offset += snprintf(trace_str + offset, len - offset, ";%s", uprobe_str);
+		remaining = (int64_t)len - (int64_t)offset;
+		offset += safe_snprintf(trace_str + offset, remaining, ";%s",
+					uprobe_str);
 	}
 	if (k_trace_str) {
-		offset += snprintf(trace_str + offset, len - offset, "%s%s", offset > 0 ? ";" : "", k_trace_str);
+		remaining = (int64_t)len - (int64_t)offset;
+		offset += safe_snprintf(trace_str + offset, remaining, "%s%s",
+					offset > 0 ? ";" : "", k_trace_str);
 	}
 
 	if (offset == 0) {
