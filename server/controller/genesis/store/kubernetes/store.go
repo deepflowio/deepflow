@@ -84,26 +84,32 @@ func (k *KubernetesStorage) Add(orgID int, newInfo common.KubernetesInfo) {
 			newInfo.ClusterID: newInfo,
 		}
 	}
-	k.fetch()
+	toSend := k.collect()
 	k.mutex.Unlock()
 
+	for _, d := range toSend {
+		k.channel <- d
+	}
+
 	if !unTriggerFlag {
-		err := k.triggerCloudRrefresh(orgID, newInfo.ClusterID, newInfo.Version)
+		err := k.triggerCloudRefresh(orgID, newInfo.ClusterID, newInfo.Version)
 		if err != nil {
 			log.Warning(fmt.Sprintf("trigger cloud kubernetes refresh failed: (%s)", err.Error()), logger.NewORGPrefix(orgID))
 		}
 	}
 }
 
-func (k *KubernetesStorage) fetch() {
+func (k *KubernetesStorage) collect() []common.KubernetesInfo {
+	var result []common.KubernetesInfo
 	for _, k8sDatas := range k.kubernetesData {
 		for _, kData := range k8sDatas {
-			k.channel <- kData
+			result = append(result, kData)
 		}
 	}
+	return result
 }
 
-func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, version uint64) error {
+func (k *KubernetesStorage) triggerCloudRefresh(orgID int, clusterID string, version uint64) error {
 	var controllerIP, domainLcuuid, subDomainLcuuid string
 
 	db, err := mysql.GetDB(orgID)
@@ -164,20 +170,29 @@ func (k *KubernetesStorage) triggerCloudRrefresh(orgID int, clusterID string, ve
 }
 
 func (k *KubernetesStorage) run() {
+	ticker := time.NewTicker(time.Duration(k.cfg.DataPersistenceInterval) * time.Second)
+	defer ticker.Stop()
 	for {
-		time.Sleep(time.Duration(k.cfg.DataPersistenceInterval) * time.Second)
-		now := time.Now()
-		k.mutex.Lock()
-		for _, kubernetesData := range k.kubernetesData {
-			for key, s := range kubernetesData {
-				if now.Sub(s.Epoch) <= time.Duration(k.cfg.AgingTime)*time.Second {
-					continue
+		select {
+		case <-ticker.C:
+			now := time.Now()
+			k.mutex.Lock()
+			for _, kubernetesData := range k.kubernetesData {
+				for key, s := range kubernetesData {
+					if now.Sub(s.Epoch) <= time.Duration(k.cfg.AgingTime)*time.Second {
+						continue
+					}
+					delete(kubernetesData, key)
 				}
-				delete(kubernetesData, key)
 			}
+			toSend := k.collect()
+			k.mutex.Unlock()
+			for _, d := range toSend {
+				k.channel <- d
+			}
+		case <-k.kCtx.Done():
+			return
 		}
-		k.fetch()
-		k.mutex.Unlock()
 	}
 }
 

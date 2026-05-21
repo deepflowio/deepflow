@@ -171,7 +171,8 @@ func GetGenesisAgentStorage(vtapIDString string, orgDB *mysql.DB) (model.Genesis
 	}
 
 	redisCli := dbredis.GetClient()
-	if redisCli != nil {
+	// awaiting activation
+	if false && redisCli != nil {
 		var azControllerConn mysqlmodel.AZControllerConnection
 		err = orgDB.Where("controller_ip = ?", os.Getenv(ccommon.NODE_IP_KEY)).First(&azControllerConn).Error
 		if err != nil {

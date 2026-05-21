@@ -26,6 +26,7 @@ import (
 	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
 	mmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
+	"github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -44,6 +45,7 @@ type GenesisSyncDataOperation struct {
 }
 
 type GenesisSyncTypeOperation[T common.GenesisSyncType] struct {
+	cfg        config.GenesisConfig
 	mutex      sync.Mutex
 	lastSeen   map[int]map[string]time.Time
 	dataStore  map[int]map[string]T
@@ -82,12 +84,22 @@ func (g *GenesisSyncTypeOperation[T]) Renew(orgID int, key string, timestamp tim
 			}
 		}
 	} else {
-		g.lastSeen[orgID][key] = timestamp
-		g.dataStore2[orgID][key] = items
+		if orgLastSeen, ok := g.lastSeen[orgID]; ok {
+			orgLastSeen[key] = timestamp
+		} else {
+			g.lastSeen[orgID] = map[string]time.Time{key: timestamp}
+		}
+		if orgDataStore2, ok := g.dataStore2[orgID]; ok {
+			orgDataStore2[key] = items
+		} else {
+			g.dataStore2[orgID] = map[string][]T{key: items}
+		}
 	}
 }
 
 func (g *GenesisSyncTypeOperation[T]) Update(orgID int, key string, timestamp time.Time, items []T) {
+	log.Infof("update %T vtap (%s) entries: %d", items, key, len(items), logger.NewORGPrefix(orgID))
+
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
@@ -100,13 +112,20 @@ func (g *GenesisSyncTypeOperation[T]) Update(orgID int, key string, timestamp ti
 				g.lastSeen[orgID] = map[string]time.Time{itemLcuuid: timestamp}
 			}
 			if orgDataStore, ok := g.dataStore[orgID]; ok {
-				if _, ok := orgDataStore[itemLcuuid]; !ok && item.GetVtapID() != 0 {
-					log.Infof("sync add (%#+v)", item, logger.NewORGPrefix(orgID))
-				}
+				_, existed := orgDataStore[itemLcuuid]
 				orgDataStore[itemLcuuid] = item
+				if !g.cfg.LogDetailEnabled {
+					continue
+				}
+				if !existed && item.GetVtapID() != 0 {
+					log.Infof("sync add (%#+v)", item.GetInfo(), logger.NewORGPrefix(orgID))
+				}
 			} else {
 				g.dataStore[orgID] = map[string]T{itemLcuuid: item}
 				if item.GetVtapID() == 0 {
+					continue
+				}
+				if !g.cfg.LogDetailEnabled {
 					continue
 				}
 				log.Infof("sync add (%#+v)", item, logger.NewORGPrefix(orgID))
@@ -119,7 +138,12 @@ func (g *GenesisSyncTypeOperation[T]) Update(orgID int, key string, timestamp ti
 			g.lastSeen[orgID] = map[string]time.Time{key: timestamp}
 		}
 		if orgDataStore2, ok := g.dataStore2[orgID]; ok {
-			if orgItems, ok := orgDataStore2[key]; ok {
+			orgItems, itemExists := orgDataStore2[key]
+			orgDataStore2[key] = items
+			if !g.cfg.LogDetailEnabled {
+				return
+			}
+			if itemExists {
 				newData := map[string]T{}
 				for _, item := range items {
 					newData[item.GetLcuuid()] = item
@@ -136,7 +160,7 @@ func (g *GenesisSyncTypeOperation[T]) Update(orgID int, key string, timestamp ti
 					if ok || data.GetVtapID() == 0 {
 						continue
 					}
-					log.Infof("sync (%s) add (%#+v)", key, data, logger.NewORGPrefix(orgID))
+					log.Infof("sync (%s) add (%#+v)", key, data.GetInfo(), logger.NewORGPrefix(orgID))
 				}
 
 				// delete
@@ -145,12 +169,14 @@ func (g *GenesisSyncTypeOperation[T]) Update(orgID int, key string, timestamp ti
 					if ok || data.GetVtapID() == 0 {
 						continue
 					}
-					log.Infof("sync (%s) delete (%#+v)", key, data, logger.NewORGPrefix(orgID))
+					log.Infof("sync (%s) delete (%#+v)", key, data.GetInfo(), logger.NewORGPrefix(orgID))
 				}
 			}
-			orgDataStore2[key] = items
 		} else {
 			g.dataStore2[orgID] = map[string][]T{key: items}
+			if !g.cfg.LogDetailEnabled {
+				return
+			}
 			for _, item := range items {
 				if item.GetVtapID() == 0 {
 					continue
@@ -180,7 +206,13 @@ func (g *GenesisSyncTypeOperation[T]) Age(timestamp time.Time, timeout time.Dura
 			if !ageTimestamp.After(lastSeenTime) {
 				continue
 			}
+
 			removed = true
+
+			if g.cfg.LogDetailEnabled {
+				log.Infof("aging data (%s)", dataMap[dataLcuuid].GetInfo(), logger.NewORGPrefix(orgID))
+			}
+
 			delete(g.dataStore[orgID], dataLcuuid)
 			delete(g.lastSeen[orgID], dataLcuuid)
 		}
@@ -190,6 +222,13 @@ func (g *GenesisSyncTypeOperation[T]) Age(timestamp time.Time, timeout time.Dura
 		for key := range dataMap {
 			if ageTimestamp.After(g.lastSeen[orgID][key]) {
 				removed = true
+
+				if g.cfg.LogDetailEnabled {
+					for _, item := range dataMap[key] {
+						log.Infof("aging (%s) data (%s)", key, item.GetInfo(), logger.NewORGPrefix(orgID))
+					}
+				}
+
 				delete(g.dataStore2[orgID], key)
 				delete(g.lastSeen[orgID], key)
 			}
@@ -213,26 +252,37 @@ func (g *GenesisSyncTypeOperation[T]) Load(nodeIP string) {
 		lastSeen := map[string]time.Time{}
 		dataStore2 := map[string][]T{}
 		for _, storage := range storages {
-			var items []T
-			err = db.Where("node_ip = ?", nodeIP).Where("vtap_id = ?", storage.VtapID).Find(&items).Error
-			if err != nil {
-				log.Errorf("get vtap (%d) data failed:%s", storage.VtapID, err.Error(), logger.NewORGPrefix(db.ORGID))
-				continue
-			}
 			var vtap mmodel.VTap
 			err = db.Where("id = ?", storage.VtapID).First(&vtap).Error
 			if err != nil {
 				log.Errorf("get vtap (%d) failed:%s", storage.VtapID, err.Error(), logger.NewORGPrefix(db.ORGID))
 				continue
 			}
+			var items []T
+			err = db.Where("node_ip = ?", nodeIP).Where("vtap_id = ?", storage.VtapID).Find(&items).Error
+			if err != nil {
+				log.Errorf("get vtap (%d) data failed:%s", storage.VtapID, err.Error(), logger.NewORGPrefix(db.ORGID))
+				continue
+			}
+
+			if len(items) == 0 {
+				continue
+			}
+
 			key := fmt.Sprintf("%s-%s", vtap.CtrlIP, vtap.CtrlMac)
+			if g.cfg.LogDetailEnabled {
+				for _, item := range items {
+					log.Infof("genesis load %T vtap (%s) data (%s)", item, key, item.GetInfo(), logger.NewORGPrefix(db.ORGID))
+				}
+			}
 			lastSeen[key] = time.Now()
 			dataStore2[key] = items
+
+			log.Infof("genesis load %T vtap (%s) %d entries", items[0], key, len(items), logger.NewORGPrefix(db.ORGID))
 		}
 		g.lastSeen[db.ORGID] = lastSeen
 		g.dataStore2[db.ORGID] = dataStore2
 	}
-
 }
 
 func (g *GenesisSyncTypeOperation[T]) Save(nodeIP string) {
@@ -248,6 +298,17 @@ func (g *GenesisSyncTypeOperation[T]) Save(nodeIP string) {
 			continue
 		}
 
+		var vtaps []mmodel.VTap
+		err = db.Find(&vtaps).Error
+		if err != nil {
+			log.Warning("get vtaps failed: %s", err.Error(), logger.NewORGPrefix(db.ORGID))
+			continue
+		}
+		vtapIDs := map[int]mmodel.VTap{}
+		for _, vtap := range vtaps {
+			vtapIDs[vtap.ID] = vtap
+		}
+
 		// current memory data
 		var items []T
 		vtapIDMap := map[uint32]int{0: 0}
@@ -258,15 +319,16 @@ func (g *GenesisSyncTypeOperation[T]) Save(nodeIP string) {
 				log.Debugf("not found org (%d) data of dataStroe2", db.ORGID)
 				continue
 			}
-			var vtap mmodel.VTap
-			err = db.Where("id = ?", storage.VtapID).First(&vtap).Error
-			if err != nil {
-				log.Warningf("get vtap id (%d) failed: %s", storage.VtapID, err.Error(), logger.NewORGPrefix(db.ORGID))
+
+			vtap, ok := vtapIDs[int(storage.VtapID)]
+			if !ok {
+				log.Debugf("vtap (%d) not found", storage.VtapID, logger.NewORGPrefix(db.ORGID))
 				continue
 			}
+
 			data, ok := dataMap[fmt.Sprintf("%s-%s", vtap.CtrlIP, vtap.CtrlMac)]
 			if !ok {
-				log.Debugf("not found vtap id (%d) data of dataStore2", storage.VtapID)
+				log.Debugf("not found vtap id (%d) data of dataStore2", storage.VtapID, logger.NewORGPrefix(db.ORGID))
 				continue
 			}
 			items = append(items, data...)
@@ -300,8 +362,9 @@ func (g *GenesisSyncTypeOperation[T]) Save(nodeIP string) {
 	}
 }
 
-func NewHostPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisHost] {
+func NewHostPlatformDataOperation(cfg config.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisHost] {
 	return &GenesisSyncTypeOperation[model.GenesisHost]{
+		cfg:        cfg,
 		mutex:      sync.Mutex{},
 		lastSeen:   map[int]map[string]time.Time{},
 		dataStore:  map[int]map[string]model.GenesisHost{},
@@ -309,8 +372,9 @@ func NewHostPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisHost]
 	}
 }
 
-func NewVMPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisVM] {
+func NewVMPlatformDataOperation(cfg config.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisVM] {
 	return &GenesisSyncTypeOperation[model.GenesisVM]{
+		cfg:        cfg,
 		mutex:      sync.Mutex{},
 		lastSeen:   map[int]map[string]time.Time{},
 		dataStore:  map[int]map[string]model.GenesisVM{},
@@ -318,8 +382,9 @@ func NewVMPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisVM] {
 	}
 }
 
-func NewVIPPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisVIP] {
+func NewVIPPlatformDataOperation(cfg config.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisVIP] {
 	return &GenesisSyncTypeOperation[model.GenesisVIP]{
+		cfg:        cfg,
 		mutex:      sync.Mutex{},
 		lastSeen:   map[int]map[string]time.Time{},
 		dataStore:  map[int]map[string]model.GenesisVIP{},
@@ -327,8 +392,9 @@ func NewVIPPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisVIP] {
 	}
 }
 
-func NewVpcPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisVPC] {
+func NewVpcPlatformDataOperation(cfg config.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisVPC] {
 	return &GenesisSyncTypeOperation[model.GenesisVPC]{
+		cfg:        cfg,
 		mutex:      sync.Mutex{},
 		lastSeen:   map[int]map[string]time.Time{},
 		dataStore:  map[int]map[string]model.GenesisVPC{},
@@ -336,8 +402,9 @@ func NewVpcPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisVPC] {
 	}
 }
 
-func NewPortPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisPort] {
+func NewPortPlatformDataOperation(cfg config.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisPort] {
 	return &GenesisSyncTypeOperation[model.GenesisPort]{
+		cfg:        cfg,
 		mutex:      sync.Mutex{},
 		lastSeen:   map[int]map[string]time.Time{},
 		dataStore:  map[int]map[string]model.GenesisPort{},
@@ -345,8 +412,9 @@ func NewPortPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisPort]
 	}
 }
 
-func NewNetworkPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisNetwork] {
+func NewNetworkPlatformDataOperation(cfg config.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisNetwork] {
 	return &GenesisSyncTypeOperation[model.GenesisNetwork]{
+		cfg:        cfg,
 		mutex:      sync.Mutex{},
 		lastSeen:   map[int]map[string]time.Time{},
 		dataStore:  map[int]map[string]model.GenesisNetwork{},
@@ -354,8 +422,9 @@ func NewNetworkPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisNe
 	}
 }
 
-func NewVinterfacePlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisVinterface] {
+func NewVinterfacePlatformDataOperation(cfg config.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisVinterface] {
 	return &GenesisSyncTypeOperation[model.GenesisVinterface]{
+		cfg:        cfg,
 		mutex:      sync.Mutex{},
 		lastSeen:   map[int]map[string]time.Time{},
 		dataStore:  map[int]map[string]model.GenesisVinterface{},
@@ -363,8 +432,9 @@ func NewVinterfacePlatformDataOperation() *GenesisSyncTypeOperation[model.Genesi
 	}
 }
 
-func NewIPLastSeenPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisIP] {
+func NewIPLastSeenPlatformDataOperation(cfg config.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisIP] {
 	return &GenesisSyncTypeOperation[model.GenesisIP]{
+		cfg:        cfg,
 		mutex:      sync.Mutex{},
 		lastSeen:   map[int]map[string]time.Time{},
 		dataStore:  map[int]map[string]model.GenesisIP{},
@@ -372,8 +442,9 @@ func NewIPLastSeenPlatformDataOperation() *GenesisSyncTypeOperation[model.Genesi
 	}
 }
 
-func NewLldpInfoPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisLldp] {
+func NewLldpInfoPlatformDataOperation(cfg config.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisLldp] {
 	return &GenesisSyncTypeOperation[model.GenesisLldp]{
+		cfg:        cfg,
 		mutex:      sync.Mutex{},
 		lastSeen:   map[int]map[string]time.Time{},
 		dataStore:  map[int]map[string]model.GenesisLldp{},
@@ -381,8 +452,9 @@ func NewLldpInfoPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisL
 	}
 }
 
-func NewProcessPlatformDataOperation() *GenesisSyncTypeOperation[model.GenesisProcess] {
+func NewProcessPlatformDataOperation(cfg config.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisProcess] {
 	return &GenesisSyncTypeOperation[model.GenesisProcess]{
+		cfg:        cfg,
 		mutex:      sync.Mutex{},
 		lastSeen:   map[int]map[string]time.Time{},
 		dataStore:  map[int]map[string]model.GenesisProcess{},

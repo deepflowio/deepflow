@@ -17,7 +17,6 @@
 package kubernetes_gather
 
 import (
-	"errors"
 	"regexp"
 	"sort"
 	"strings"
@@ -28,7 +27,6 @@ import (
 	cloudcommon "github.com/deepflowio/deepflow/server/controller/cloud/common"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	"github.com/deepflowio/deepflow/server/controller/genesis"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/mikioh/ipaddr"
 )
@@ -59,20 +57,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	}
 
 	// 获取vinterface API返回中host ip与其上所有node ip的对应关系
-	if genesis.GenesisService == nil {
-		err = errors.New("genesis service is nil")
-		return
-	}
-	genesisData, err := genesis.GenesisService.GetGenesisSyncResponse(k.orgID)
-	if err != nil {
-		log.Error(err.Error(), logger.NewORGPrefix(k.orgID))
-		return
-	}
-	vData := genesisData.Vinterfaces
-	for _, vItem := range vData {
-		if vItem.KubernetesClusterID != k.ClusterID {
-			continue
-		}
+	for _, vItem := range k.vinterfaceData {
 		deviceType := vItem.DeviceType
 		if deviceType == "docker-host" || deviceType == "kvm-host" {
 			hostIP := vItem.HostIP
@@ -96,10 +81,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		}
 	}
 	// 生成device_uuid或uuid和pod lcuuid的对应关系
-	for _, vItem := range vData {
-		if vItem.KubernetesClusterID != k.ClusterID {
-			continue
-		}
+	for _, vItem := range k.vinterfaceData {
 		if vItem.DeviceType != "docker-container" {
 			continue
 		}
@@ -135,10 +117,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	}
 
 	// 处理POD IP，生成port，ip，cidrs信息
-	for _, vItem := range vData {
-		if vItem.KubernetesClusterID != k.ClusterID {
-			continue
-		}
+	for _, vItem := range k.vinterfaceData {
 		if vItem.DeviceType != "docker-container" {
 			continue
 		}
@@ -402,10 +381,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 
 	// 处理nodeIP，生成port，ip，cidrs信息
 	nodeVinterfaceLcuuids := mapset.NewSet()
-	for _, vItem := range vData {
-		if vItem.KubernetesClusterID != k.ClusterID {
-			continue
-		}
+	for _, vItem := range k.vinterfaceData {
 		deviceType := vItem.DeviceType
 		if deviceType != "docker-host" && deviceType != "kvm-host" {
 			continue
