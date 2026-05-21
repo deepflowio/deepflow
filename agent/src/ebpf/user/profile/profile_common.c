@@ -1110,27 +1110,31 @@ static void aggregate_stack_traces(struct profiler_context *ctx,
 
 			char *msg_str = (char *)&msg->data[0];
 			int offset = 0;
+			int64_t remaining;
 			if (matched) {
-				offset +=
-				    snprintf(msg_str + offset, str_len - offset,
-					     "%s%s;", pre_tag, v->comm);
+				remaining = (int64_t)str_len - offset;
+				offset += safe_snprintf(msg_str + offset,
+							remaining, "%s%s;",
+							pre_tag, v->comm);
 			}
-			offset +=
-			    snprintf(msg_str + offset, str_len - offset, "%s",
-				     trace_str);
+			remaining = (int64_t)str_len - offset;
+			offset += safe_snprintf(msg_str + offset, remaining, "%s",
+						trace_str);
 			if (ctx->type == PROFILER_TYPE_MEMORY && v->memory.class_id != 0) {
 				if (class_name) {
-					offset +=
-					    snprintf(msg_str + offset,
-						     str_len - offset, ";%s",
-						     class_name);
+					remaining = (int64_t)str_len - offset;
+					offset += safe_snprintf(msg_str + offset,
+								remaining,
+								";%s",
+								class_name);
 					clib_mem_free(class_name);
 					class_name = NULL;
 				} else {
-					offset +=
-					    snprintf(msg_str + offset,
-						     str_len - offset, ";%s",
-						     UNKNOWN_JAVA_SYMBOL_STR);
+					remaining = (int64_t)str_len - offset;
+					offset += safe_snprintf(msg_str + offset,
+								remaining,
+								";%s",
+								UNKNOWN_JAVA_SYMBOL_STR);
 				}
 			}
 

@@ -3673,14 +3673,15 @@ int print_uprobe_http2_info(const char *data, int len, char *buf, int buf_len)
 	} __attribute__ ((packed)) header;
 
 	int bytes = 0;
+	int64_t remaining;
 	char key[1024] = { 0 };
 	char value[1024] = { 0 };
 	memcpy(&header, data, sizeof(header));
 	if (datadump_enable) {
-		bytes +=
-		    snprintf(buf + bytes, buf_len - bytes,
-			     "fd=[%d]\nstream_id=[%d]\n", header.fd,
-			     header.stream_id);
+		remaining = (int64_t)buf_len - bytes;
+		bytes += safe_snprintf(buf + bytes, remaining,
+				       "fd=[%d]\nstream_id=[%d]\n", header.fd,
+				       header.stream_id);
 
 	} else {
 		fprintf(stdout, "fd=[%d]\nstream_id=[%d]\n", header.fd,
@@ -3696,9 +3697,9 @@ int print_uprobe_http2_info(const char *data, int len, char *buf, int buf_len)
 	memcpy(&value, data + value_start, header.value_len);
 
 	if (datadump_enable) {
-		bytes +=
-		    snprintf(buf + bytes, buf_len - bytes, "header=[%s:%s]\n",
-			     key, value);
+		remaining = (int64_t)buf_len - bytes;
+		bytes += safe_snprintf(buf + bytes, remaining,
+				       "header=[%s:%s]\n", key, value);
 	} else {
 		fprintf(stdout, "header=[%s:%s]\n", key, value);
 		fflush(stdout);
@@ -3725,16 +3726,19 @@ int print_io_event_info(pid_t pid, u32 fd, const char *data, int len, char *buf,
 
 	int path_len = strlen(event->filename) + 1;
 	if (datadump_enable) {
-		bytes = snprintf(buf, buf_len,
-				 "bytes_count=[%u]\noperation=[%u]\noffset=[%llu]\n"
-				 "latency=[%llu]\nmount_source=[%s]\nmount_point=[%s]\n"
-				 "file_dir=[%s]\nfilename=[%s](len %d)\nfile_type=[%s]\n"
-				 "mountID=[%d]\nmntnsID=[%u]\nmountinfo file %s\n",
-				 event->bytes_count, event->operation,
-				 event->offset, event->latency, event->mount_source,
-				 event->mount_point, event->file_dir, event->filename,
-				 path_len, fs_type_to_string(event->file_type),
-				 event->mnt_id, event->mntns_id, mount_file_tag);
+		bytes = safe_snprintf(buf, buf_len,
+				      "bytes_count=[%u]\noperation=[%u]\noffset=[%llu]\n"
+				      "latency=[%llu]\nmount_source=[%s]\nmount_point=[%s]\n"
+				      "file_dir=[%s]\nfilename=[%s](len %d)\nfile_type=[%s]\n"
+				      "mountID=[%d]\nmntnsID=[%u]\nmountinfo file %s\n",
+				      event->bytes_count, event->operation,
+				      event->offset, event->latency,
+				      event->mount_source,
+				      event->mount_point, event->file_dir,
+				      event->filename, path_len,
+				      fs_type_to_string(event->file_type),
+				      event->mnt_id, event->mntns_id,
+				      mount_file_tag);
 	} else {
 		fprintf(stdout,
 			"bytes_count=[%u]\noperation=[%u]\noffset=[%llu]\n"
@@ -3764,13 +3768,15 @@ int print_uprobe_grpc_dataframe(const char *data, int len, char *buf,
 	} __attribute__ ((packed)) dataframe;
 
 	int bytes = 0;
+	int64_t remaining;
 	memcpy(&dataframe, data, len);
 
 	if (datadump_enable) {
-		bytes +=
-		    snprintf(buf + bytes, buf_len - bytes,
-			     "stream_id=[%d]\ndata_len=[%d]\n",
-			     dataframe.stream_id, dataframe.data_len);
+		remaining = (int64_t)buf_len - bytes;
+		bytes += safe_snprintf(buf + bytes, remaining,
+				       "stream_id=[%d]\ndata_len=[%d]\n",
+				       dataframe.stream_id,
+				       dataframe.data_len);
 	} else {
 		fprintf(stdout, "stream_id=[%d]\ndata_len=[%d]\n",
 			dataframe.stream_id, dataframe.data_len);
@@ -3785,9 +3791,9 @@ int print_uprobe_grpc_dataframe(const char *data, int len, char *buf,
 	dataframe.data[dataframe.data_len] = '\0';
 
 	if (datadump_enable) {
-		bytes +=
-		    snprintf(buf + bytes, buf_len - bytes, "data=[%s]\n",
-			     dataframe.data);
+		remaining = (int64_t)buf_len - bytes;
+		bytes += safe_snprintf(buf + bytes, remaining,
+				       "data=[%s]\n", dataframe.data);
 	} else {
 		fprintf(stdout, "data=[%s]\n", dataframe.data);
 		fflush(stdout);
@@ -4006,39 +4012,44 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 
 	char buff[DEBUG_BUFF_SIZE];
 	int len = 0;
+	int64_t remaining = sizeof(buff);
 	len +=
-	    snprintf(buff, sizeof(buff), DATADUMP_FORMAT, timestamp,
-		     datadump_seq++,
-		     sd->source == DATA_SOURCE_DPDK ? "Pkt" : proto_tag,
-		     sd->direction == T_EGRESS ? "out" : "in", type,
-		     sd->msg_type, sd->process_id, sd->thread_id,
-		     sd->coroutine_id, sd->fd, role_str,
-		     strlen((char *)sd->container_id) ==
-		     0 ? "null" : (char *)sd->container_id, sd->source,
-		     sd->process_kname, flow_str, sd->cap_len,
-		     sd->syscall_len, sd->socket_id,
-		     sd->syscall_trace_id_call, sd->tcp_seq,
-		     sd->cap_seq, sd->is_tls ? "true" : "false",
-		     kern_syscall_time, sd->timestamp / NS_IN_USEC,
-		     kern_cap_time, sd->cap_timestamp / NS_IN_USEC);
+	    safe_snprintf(buff, remaining, DATADUMP_FORMAT, timestamp,
+			  datadump_seq++,
+			  sd->source == DATA_SOURCE_DPDK ? "Pkt" : proto_tag,
+			  sd->direction == T_EGRESS ? "out" : "in", type,
+			  sd->msg_type, sd->process_id, sd->thread_id,
+			  sd->coroutine_id, sd->fd, role_str,
+			  strlen((char *)sd->container_id) ==
+			  0 ? "null" : (char *)sd->container_id, sd->source,
+			  sd->process_kname, flow_str, sd->cap_len,
+			  sd->syscall_len, sd->socket_id,
+			  sd->syscall_trace_id_call, sd->tcp_seq,
+			  sd->cap_seq, sd->is_tls ? "true" : "false",
+			  kern_syscall_time, sd->timestamp / NS_IN_USEC,
+			  kern_cap_time, sd->cap_timestamp / NS_IN_USEC);
 
 	if (sd->source == DATA_SOURCE_GO_HTTP2_UPROBE) {
+		remaining = (int64_t)sizeof(buff) - len;
 		len +=
 		    print_uprobe_http2_info(sd->cap_data, sd->cap_len,
-					    buff + len, sizeof(buff) - len);
+					    buff + len, remaining);
 	} else if (sd->source == DATA_SOURCE_IO_EVENT) {
+		remaining = (int64_t)sizeof(buff) - len;
 		len +=
 		    print_io_event_info(sd->process_id, (__u32)sd->cap_seq, sd->cap_data,
-					sd->cap_len, buff + len, sizeof(buff) - len);
+					sd->cap_len, buff + len, remaining);
 	} else if (sd->source == DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE) {
+		remaining = (int64_t)sizeof(buff) - len;
 		len +=
 		    print_uprobe_grpc_dataframe(sd->cap_data, sd->cap_len,
-						buff + len, sizeof(buff) - len);
+						buff + len, remaining);
 	} else if (sd->source == DATA_SOURCE_DPDK) {
+		remaining = (int64_t)sizeof(buff) - len;
 		len +=
 		    print_extra_pkt_info(datadump_enable, sd->cap_data,
 					 sd->cap_len, buff + len,
-					 sizeof(buff) - len, sd->direction);
+					 remaining, sd->direction);
 	} else {
 		int i;
 		uint8_t v;
@@ -4059,14 +4070,15 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 				}
 			}
 
-			if (double_args)
-				len +=
-				    snprintf(buff + len, sizeof(buff) - len,
-					     format, v, v);
-			else
-				len +=
-				    snprintf(buff + len, sizeof(buff) - len,
-					     format, v);
+			if (double_args) {
+				remaining = (int64_t)sizeof(buff) - len;
+				len += safe_snprintf(buff + len, remaining,
+						     format, v, v);
+			} else {
+				remaining = (int64_t)sizeof(buff) - len;
+				len += safe_snprintf(buff + len, remaining,
+						     format, v);
+			}
 
 			if (len >= sizeof(buff)) {
 				break;
