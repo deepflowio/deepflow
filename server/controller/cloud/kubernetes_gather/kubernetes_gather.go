@@ -17,6 +17,7 @@
 package kubernetes_gather
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 	"time"
@@ -33,6 +34,7 @@ import (
 	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis"
+	cmodel "github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/controller/statsd"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -63,6 +65,7 @@ type KubernetesGather struct {
 	podGroupLcuuids              mapset.Set
 	podNetworkLcuuidCIDRs        networkLcuuidCIDRs
 	nodeNetworkLcuuidCIDRs       networkLcuuidCIDRs
+	vinterfaceData               []cmodel.GenesisVinterface
 	podIPToLcuuid                map[string]string
 	nodeIPToLcuuid               map[string]string
 	namespaceToLcuuid            map[string]string
@@ -96,6 +99,10 @@ func NewKubernetesGather(db *mysql.DB, domain *mysqlmodel.Domain, subDomain *mys
 	var err error
 
 	domainConfigJson, err = simplejson.NewJson([]byte(domain.Config))
+	if err != nil {
+		log.Error(err, logger.NewORGPrefix(db.ORGID))
+		return nil
+	}
 	portNameRegex := domainConfigJson.Get("node_port_name_regex").MustString()
 	if portNameRegex == "" {
 		portNameRegex = common.DEFAULT_PORT_NAME_REGEX
@@ -202,6 +209,7 @@ func NewKubernetesGather(db *mysql.DB, domain *mysqlmodel.Domain, subDomain *mys
 		customTagLenMax:              cfg.CustomTagLenMax,
 		isSubDomain:                  isSubDomain,
 		podGroupLcuuids:              mapset.NewSet(),
+		vinterfaceData:               []cmodel.GenesisVinterface{},
 		nodeNetworkLcuuidCIDRs:       networkLcuuidCIDRs{},
 		podNetworkLcuuidCIDRs:        networkLcuuidCIDRs{},
 		podIPToLcuuid:                map[string]string{},
@@ -277,7 +285,7 @@ func (k *KubernetesGather) pgSpecGenerateConnections(nsName, pgName, pgLcuuid st
 			if !ok {
 				continue
 			}
-			cmName := ref.Get("Name").MustString()
+			cmName := ref.Get("name").MustString()
 			cmLcuuid, ok := k.configMapToLcuuid[[2]string{nsName, cmName}]
 			if !ok {
 				log.Infof("pod group (%s) imported env config map (%s) not found", pgName, cmName, logger.NewORGPrefix(k.orgID))
@@ -328,6 +336,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	// 任务循环的是同一个实例，所以这里要对关联关系进行初始化
 	k.azLcuuid = ""
 	k.k8sInfo = nil
+	k.vinterfaceData = []cmodel.GenesisVinterface{}
 	k.podNetworkLcuuidCIDRs = networkLcuuidCIDRs{}
 	k.nodeNetworkLcuuidCIDRs = networkLcuuidCIDRs{}
 	k.podGroupLcuuids = mapset.NewSet()
@@ -344,6 +353,39 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	k.namespaceToExLabels = map[string]map[string]interface{}{}
 	k.nsServiceNameToService = map[string]map[string]map[string]int{}
 	k.cloudStatsd = statsd.NewCloudStatsd()
+
+	if genesis.GenesisService == nil {
+		errMsg := "genesis service is nil"
+		log.Warning(errMsg, logger.NewORGPrefix(k.orgID))
+		return model.KubernetesGatherResource{
+			ErrorState:   common.RESOURCE_STATE_CODE_EXIT,
+			ErrorMessage: errMsg,
+		}, errors.New(errMsg)
+	}
+
+	k8sInfo, err := k.getKubernetesInfo()
+	if err != nil {
+		log.Warning(err.Error(), logger.NewORGPrefix(k.orgID))
+		return model.KubernetesGatherResource{
+			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
+			ErrorMessage: err.Error(),
+		}, err
+	}
+	k.k8sInfo = k8sInfo
+
+	gsData, err := genesis.GenesisService.GetGenesisSyncResponse(k.orgID)
+	if err != nil {
+		return model.KubernetesGatherResource{
+			ErrorState:   common.RESOURCE_STATE_CODE_EXIT,
+			ErrorMessage: err.Error(),
+		}, err
+	}
+	for _, v := range gsData.Vinterfaces {
+		if v.KubernetesClusterID != k.ClusterID {
+			continue
+		}
+		k.vinterfaceData = append(k.vinterfaceData, v)
+	}
 
 	region, err := k.getRegion()
 	if err != nil {
@@ -367,16 +409,6 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 			ErrorMessage: err.Error(),
 		}, err
 	}
-
-	k8sInfo, err := k.getKubernetesInfo()
-	if err != nil {
-		log.Warning(err.Error(), logger.NewORGPrefix(k.orgID))
-		return model.KubernetesGatherResource{
-			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
-			ErrorMessage: err.Error(),
-		}, err
-	}
-	k.k8sInfo = k8sInfo
 
 	podCluster, err := k.getPodCluster()
 	if err != nil {

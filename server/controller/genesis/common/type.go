@@ -26,6 +26,7 @@ import (
 )
 
 type GenesisSyncType interface {
+	GetInfo() string
 	GetLcuuid() string
 	GetVtapID() uint32
 }
@@ -79,6 +80,7 @@ type VIFRPCMessage struct {
 	MessageType             int
 	TeamID                  uint32
 	VtapID                  uint32
+	Version                 uint64
 	Peer                    string
 	K8SClusterID            string
 	Key                     string

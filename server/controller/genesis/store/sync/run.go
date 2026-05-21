@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -43,11 +44,12 @@ import (
 var log = logger.MustGetLogger("genesis.store.sync")
 
 type GenesisSync struct {
-	data   atomic.Value
-	ctx    context.Context
-	cancel context.CancelFunc
-	queue  queue.QueueReader
-	config *config.ControllerConfig
+	data               atomic.Value
+	ctx                context.Context
+	cancel             context.CancelFunc
+	queue              queue.QueueReader
+	config             *config.ControllerConfig
+	vtapUpdatedVersion sync.Map
 }
 
 func NewGenesisSync(ctx context.Context, queue queue.QueueReader, config *config.ControllerConfig) *GenesisSync {
@@ -55,11 +57,12 @@ func NewGenesisSync(ctx context.Context, queue queue.QueueReader, config *config
 	data.Store(common.GenesisSyncData{})
 	ctx, cancel := context.WithCancel(ctx)
 	return &GenesisSync{
-		ctx:    ctx,
-		cancel: cancel,
-		data:   data,
-		queue:  queue,
-		config: config,
+		ctx:                ctx,
+		cancel:             cancel,
+		data:               data,
+		queue:              queue,
+		config:             config,
+		vtapUpdatedVersion: sync.Map{},
 	}
 }
 
@@ -69,7 +72,7 @@ func (g *GenesisSync) receiveGenesisSyncData(sChan chan common.GenesisSyncData) 
 		case s := <-sChan:
 			g.data.Store(s)
 		case <-g.ctx.Done():
-			break
+			return
 		}
 	}
 }
@@ -90,9 +93,18 @@ func (g *GenesisSync) GetGenesisSyncData(orgID int) common.GenesisSyncDataRespon
 	}
 }
 
+func (g *GenesisSync) GetVtapUpdatedVersion(key string) (uint64, bool) {
+	version, ok := g.vtapUpdatedVersion.Load(key)
+	if !ok {
+		return 0, false
+	}
+	return version.(uint64), true
+}
+
 func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataResponse, error) {
 	retGenesisSyncData := common.GenesisSyncDataResponse{}
 
+	startTime := time.Now()
 	db, err := mysql.GetDB(orgID)
 	if err != nil {
 		log.Error("get mysql session failed", logger.NewORGPrefix(orgID))
@@ -100,18 +112,36 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 	}
 
 	var controllers []mmodel.Controller
+	err = db.Where("state <> ?", ccommon.CONTROLLER_STATE_EXCEPTION).Find(&controllers).Error
+	if err != nil {
+		log.Error("get controllers from db failed", logger.NewORGPrefix(orgID))
+		return common.GenesisSyncDataResponse{}, err
+	}
+
 	var azControllerConns []mmodel.AZControllerConnection
+	err = db.Find(&azControllerConns).Error
+	if err != nil {
+		log.Error("get az controller connections from db failed", logger.NewORGPrefix(orgID))
+		return common.GenesisSyncDataResponse{}, err
+	}
 	var currentRegion string
-
-	db.Where("state <> ?", ccommon.CONTROLLER_STATE_EXCEPTION).Find(&controllers)
-	db.Find(&azControllerConns)
-
 	controllerIPToRegion := make(map[string]string)
 	for _, conn := range azControllerConns {
 		if os.Getenv(ccommon.NODE_IP_KEY) == conn.ControllerIP {
 			currentRegion = conn.Region
 		}
 		controllerIPToRegion[conn.ControllerIP] = conn.Region
+	}
+
+	var storages []model.GenesisStorage
+	err = db.Find(&storages).Error
+	if err != nil {
+		log.Error("get storages from db failed", logger.NewORGPrefix(orgID))
+		return common.GenesisSyncDataResponse{}, err
+	}
+	nodeIPToVtapIDs := map[string][]uint32{}
+	for _, storage := range storages {
+		nodeIPToVtapIDs[storage.NodeIP] = append(nodeIPToVtapIDs[storage.NodeIP], storage.VtapID)
 	}
 
 	syncIPLcuuidSet := map[string]bool{}
@@ -124,18 +154,37 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 	syncVPCLcuuidSet := map[string]bool{}
 	syncVinterfaceLcuuidSet := map[string]bool{}
 	syncProcessLcuuidSet := map[string]bool{}
+
+	requestControllers := []string{}
 	for _, controller := range controllers {
 		// skip other region controller
 		if region, ok := controllerIPToRegion[controller.IP]; !ok || region != currentRegion {
 			continue
 		}
 
+		requestControllers = append(requestControllers, controller.NodeName+":"+controller.IP)
+
 		// get effective vtap ids in current controller
-		var storages []model.GenesisStorage
-		db.Where("node_ip = ?", controller.IP).Find(&storages)
+		vtapIDs := nodeIPToVtapIDs[controller.IP]
 		vtapIDMap := map[uint32]int{0: 0}
-		for _, storage := range storages {
-			vtapIDMap[storage.VtapID] = 0
+		for _, vtapID := range vtapIDs {
+			vtapIDMap[vtapID] = 0
+		}
+
+		// Optimistic Lock
+		var nodeStorages []model.GenesisStorage
+		err = db.Where("node_ip = ?", controller.IP).Find(&nodeStorages).Error
+		if err != nil {
+			log.Errorf("get node (%s) storages from db failed", controller.IP, logger.NewORGPrefix(orgID))
+			return common.GenesisSyncDataResponse{}, err
+		}
+		if len(nodeStorages) != len(vtapIDs) {
+			return common.GenesisSyncDataResponse{}, fmt.Errorf("node (%s) vinterface storages have changed during the acquisition process, please try again.", controller.IP)
+		}
+		for _, storage := range nodeStorages {
+			if _, ok := vtapIDMap[storage.VtapID]; !ok {
+				return common.GenesisSyncDataResponse{}, fmt.Errorf("node (%s) vinterface storages have changed during the acquisition process, please try again.", controller.IP)
+			}
 		}
 
 		// use pod ip communication in internal region
@@ -339,19 +388,36 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 				continue
 			}
 			sVinterfaceLcuuid := v.GetLcuuid()
+			sVinterfaceIP := v.GetIps()
+			sVinterfaceMac := v.GetMac()
+			sVinterfaceVtapId := v.GetVtapId()
 			if _, ok := syncVinterfaceLcuuidSet[sVinterfaceLcuuid]; ok {
+				if g.config.GenesisCfg.LogDetailEnabled {
+					log.Infof("lcuuid (%s) duplicate, vtap (%d) vinterface (%s-%s), from node (%s)",
+						sVinterfaceLcuuid, sVinterfaceVtapId, sVinterfaceIP, sVinterfaceMac, controller.NodeName,
+						logger.NewORGPrefix(orgID))
+				}
 				continue
 			}
+
+			if g.config.GenesisCfg.LogDetailEnabled {
+				if v.GetKubernetesClusterId() != "" {
+					log.Infof("cluster (%s) vtap (%d) vinterface (%s-%s), device type (%s) from (%s)",
+						v.GetKubernetesClusterId(), sVinterfaceVtapId, sVinterfaceIP, sVinterfaceMac, v.GetDeviceType(), controller.NodeName,
+						logger.NewORGPrefix(orgID))
+				}
+			}
+
 			syncVinterfaceLcuuidSet[sVinterfaceLcuuid] = false
 			vLastSeenStr := v.GetLastSeen()
 			vpLastSeen, _ := time.ParseInLocation(ccommon.GO_BIRTHDAY, vLastSeenStr, time.Local)
 			retGenesisSyncData.Vinterfaces = append(retGenesisSyncData.Vinterfaces, model.GenesisVinterface{
-				VtapID:              v.GetVtapId(),
+				VtapID:              sVinterfaceVtapId,
 				Lcuuid:              sVinterfaceLcuuid,
 				NetnsID:             v.GetNetnsId(),
 				Name:                v.GetName(),
-				IPs:                 v.GetIps(),
-				Mac:                 v.GetMac(),
+				IPs:                 sVinterfaceIP,
+				Mac:                 sVinterfaceMac,
 				TapName:             v.GetTapName(),
 				TapMac:              v.GetTapMac(),
 				DeviceLcuuid:        v.GetDeviceLcuuid(),
@@ -394,6 +460,11 @@ func (g *GenesisSync) GetGenesisSyncResponse(orgID int) (common.GenesisSyncDataR
 			})
 		}
 	}
+
+	if g.config.GenesisCfg.LogDetailEnabled {
+		log.Infof("sync start (%v)", startTime, logger.NewORGPrefix(orgID))
+		log.Infof("request controllers (%v)", requestControllers, logger.NewORGPrefix(orgID))
+	}
 	return retGenesisSyncData, nil
 }
 
@@ -403,10 +474,10 @@ func (g *GenesisSync) Start() {
 	go g.receiveGenesisSyncData(sDataChan)
 
 	go func() {
+		genesisSyncDataByVtap := map[string]common.GenesisSyncDataResponse{}
 		vStorage := NewSyncStorage(g.ctx, g.config.GenesisCfg, sDataChan)
 		vStorage.Start()
 
-		genesisSyncDataByVtap := map[string]common.GenesisSyncDataResponse{}
 		vUpdater := updater.NewGenesisSyncRpcUpdater(g.config.GenesisCfg)
 		for {
 			genesisSyncData := common.GenesisSyncDataResponse{}
@@ -418,7 +489,7 @@ func (g *GenesisSync) Start() {
 
 			log.Debugf("sync received (%s) vtap_id (%v) type (%v) workload resource enabled (%t) received (%s)|(%s)", info.Peer, info.VtapID, info.MessageType, info.WorkloadResourceEnabled, info.Message, info.AgentMessage, logger.NewORGPrefix(info.ORGID))
 
-			vtap := fmt.Sprintf("%d%d", info.ORGID, info.VtapID)
+			vtap := fmt.Sprintf("%d-%d", info.ORGID, info.VtapID)
 			if info.MessageType == common.TYPE_RENEW {
 				if info.VtapID != 0 {
 					peerInfo, ok := genesisSyncDataByVtap[vtap]
@@ -458,6 +529,7 @@ func (g *GenesisSync) Start() {
 
 				if info.VtapID != 0 {
 					genesisSyncDataByVtap[vtap] = genesisSyncData
+					g.vtapUpdatedVersion.Store(vtap, info.Version)
 				}
 				vStorage.Update(info.ORGID, info.VtapID, info.Key, genesisSyncData)
 			}

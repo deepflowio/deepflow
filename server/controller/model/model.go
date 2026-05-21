@@ -17,6 +17,7 @@
 package model
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/agent_config"
@@ -552,6 +553,10 @@ func (g GenesisHost) GetVtapID() uint32 {
 	return g.VtapID
 }
 
+func (g GenesisHost) GetInfo() string {
+	return g.Hostname
+}
+
 type GenesisIP struct {
 	Masklen          uint32    `gorm:"column:masklen;type:int;default:null;default:0" json:"MASKLEN"`
 	VtapID           uint32    `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
@@ -574,6 +579,10 @@ func (g GenesisIP) GetVtapID() uint32 {
 	return g.VtapID
 }
 
+func (g GenesisIP) GetInfo() string {
+	return g.IP
+}
+
 type GenesisVIP struct {
 	VtapID uint32 `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	IP     string `gorm:"column:ip;type:char(64);default:null" json:"IP"`
@@ -591,6 +600,10 @@ func (g GenesisVIP) GetLcuuid() string {
 
 func (g GenesisVIP) GetVtapID() uint32 {
 	return g.VtapID
+}
+
+func (g GenesisVIP) GetInfo() string {
+	return g.IP
 }
 
 type GenesisLldp struct {
@@ -618,6 +631,10 @@ func (g GenesisLldp) GetVtapID() uint32 {
 	return g.VtapID
 }
 
+func (g GenesisLldp) GetInfo() string {
+	return fmt.Sprintf("system_name: %s, management_address: %s, vinterface_description: %s", g.SystemName, g.ManagementAddress, g.VinterfaceDescription)
+}
+
 type GenesisNetwork struct {
 	SegmentationID uint32 `gorm:"column:segmentation_id;type:int;default:null" json:"SEGMENTATION_ID"`
 	NetType        uint32 `gorm:"column:net_type;type:int;default:null" json:"NET_TYPE"`
@@ -639,6 +656,10 @@ func (g GenesisNetwork) GetLcuuid() string {
 
 func (g GenesisNetwork) GetVtapID() uint32 {
 	return g.VtapID
+}
+
+func (g GenesisNetwork) GetInfo() string {
+	return fmt.Sprintf("name: %s, segmentation_id: %d, net_type: %d", g.Name, g.SegmentationID, g.NetType)
 }
 
 type GenesisPort struct {
@@ -663,6 +684,10 @@ func (g GenesisPort) GetLcuuid() string {
 
 func (g GenesisPort) GetVtapID() uint32 {
 	return g.VtapID
+}
+
+func (g GenesisPort) GetInfo() string {
+	return fmt.Sprintf("type: %d, device_type: %d, mac: %s", g.Type, g.DeviceType, g.Mac)
 }
 
 type GenesisVinterface struct {
@@ -697,6 +722,10 @@ func (g GenesisVinterface) GetVtapID() uint32 {
 	return g.VtapID
 }
 
+func (g GenesisVinterface) GetInfo() string {
+	return fmt.Sprintf("name: %s, ips: %s, mac:%s ", g.Name, g.IPs, g.Mac)
+}
+
 type GenesisVM struct {
 	State        uint32    `gorm:"column:state;type:int;default:null" json:"STATE"`
 	VtapID       uint32    `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
@@ -721,6 +750,10 @@ func (g GenesisVM) GetVtapID() uint32 {
 	return g.VtapID
 }
 
+func (g GenesisVM) GetInfo() string {
+	return g.Name
+}
+
 type GenesisVPC struct {
 	VtapID uint32 `gorm:"primaryKey;column:vtap_id;type:int" json:"VTAP_ID"`
 	Lcuuid string `gorm:"primaryKey;column:lcuuid;type:char(64)" json:"LCUUID"`
@@ -738,6 +771,10 @@ func (g GenesisVPC) GetLcuuid() string {
 
 func (g GenesisVPC) GetVtapID() uint32 {
 	return g.VtapID
+}
+
+func (g GenesisVPC) GetInfo() string {
+	return g.Name
 }
 
 type GenesisProcess struct {
@@ -765,6 +802,10 @@ func (g GenesisProcess) GetLcuuid() string {
 
 func (g GenesisProcess) GetVtapID() uint32 {
 	return g.VtapID
+}
+
+func (g GenesisProcess) GetInfo() string {
+	return fmt.Sprintf("pid:%d, name:%s", g.PID, g.Name)
 }
 
 type GenesisStorage struct {

@@ -81,13 +81,15 @@ func (s *SyncStorage) Renew(orgID int, vtapID uint32, key string, refresh, wrEna
 	}
 	db, err := mysql.GetDB(orgID)
 	if err != nil {
-		log.Errorf("get mysql session failed: %s", logger.NewORGPrefix(orgID))
+		log.Errorf("get mysql session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 		return
 	}
-	err = db.Model(&model.GenesisStorage{}).Where("vtap_id = ? AND node_ip <> ?", vtapID, s.nodeIP).Update("node_ip", s.nodeIP).Error
-	if err != nil {
-		log.Warningf("vtap id (%d) refresh storage to node (%s) failed: %s", vtapID, s.nodeIP, err.Error(), logger.NewORGPrefix(orgID))
+	tx := db.Model(&model.GenesisStorage{}).Where("vtap_id = ?", vtapID).Update("node_ip", s.nodeIP)
+	if tx.Error != nil || tx.RowsAffected == 0 {
+		log.Warningf("update storage vtap=%d to node (%s) failed: %s", vtapID, s.nodeIP, tx.Error, logger.NewORGPrefix(orgID))
+		return
 	}
+	log.Infof("update storage vtap=%d, set node=%s", vtapID, s.nodeIP, logger.NewORGPrefix(orgID))
 }
 
 func (s *SyncStorage) Update(orgID int, vtapID uint32, key string, data common.GenesisSyncDataResponse) {
@@ -157,6 +159,7 @@ func (s *SyncStorage) Update(orgID int, vtapID uint32, key string, data common.G
 			log.Errorf("update storage (vtap_id:%d/node_ip:%s) failed: %s", vtapID, s.nodeIP, err.Error(), logger.NewORGPrefix(orgID))
 			return
 		}
+		log.Infof("update storage vtap=%d and node=%s", vtapID, s.nodeIP, logger.NewORGPrefix(orgID))
 	}
 	s.dirty = true
 }
@@ -180,35 +183,37 @@ func (s *SyncStorage) loadFromDatabase() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.genesisSyncInfo.VIPs = NewVIPPlatformDataOperation()
+	s.genesisSyncInfo.VIPs = NewVIPPlatformDataOperation(s.cfg)
 	s.genesisSyncInfo.VIPs.Load(s.nodeIP)
 
-	s.genesisSyncInfo.VMs = NewVMPlatformDataOperation()
+	s.genesisSyncInfo.VMs = NewVMPlatformDataOperation(s.cfg)
 	s.genesisSyncInfo.VMs.Load(s.nodeIP)
 
-	s.genesisSyncInfo.VPCs = NewVpcPlatformDataOperation()
+	s.genesisSyncInfo.VPCs = NewVpcPlatformDataOperation(s.cfg)
 	s.genesisSyncInfo.VPCs.Load(s.nodeIP)
 
-	s.genesisSyncInfo.Hosts = NewHostPlatformDataOperation()
+	s.genesisSyncInfo.Hosts = NewHostPlatformDataOperation(s.cfg)
 	s.genesisSyncInfo.Hosts.Load(s.nodeIP)
 
-	s.genesisSyncInfo.Ports = NewPortPlatformDataOperation()
+	s.genesisSyncInfo.Ports = NewPortPlatformDataOperation(s.cfg)
 	s.genesisSyncInfo.Ports.Load(s.nodeIP)
 
-	s.genesisSyncInfo.Lldps = NewLldpInfoPlatformDataOperation()
+	s.genesisSyncInfo.Lldps = NewLldpInfoPlatformDataOperation(s.cfg)
 	s.genesisSyncInfo.Lldps.Load(s.nodeIP)
 
-	s.genesisSyncInfo.IPlastseens = NewIPLastSeenPlatformDataOperation()
+	s.genesisSyncInfo.IPlastseens = NewIPLastSeenPlatformDataOperation(s.cfg)
 	s.genesisSyncInfo.IPlastseens.Load(s.nodeIP)
 
-	s.genesisSyncInfo.Networks = NewNetworkPlatformDataOperation()
+	s.genesisSyncInfo.Networks = NewNetworkPlatformDataOperation(s.cfg)
 	s.genesisSyncInfo.Networks.Load(s.nodeIP)
 
-	s.genesisSyncInfo.Vinterfaces = NewVinterfacePlatformDataOperation()
+	s.genesisSyncInfo.Vinterfaces = NewVinterfacePlatformDataOperation(s.cfg)
 	s.genesisSyncInfo.Vinterfaces.Load(s.nodeIP)
 
-	s.genesisSyncInfo.Processes = NewProcessPlatformDataOperation()
+	s.genesisSyncInfo.Processes = NewProcessPlatformDataOperation(s.cfg)
 	s.genesisSyncInfo.Processes.Load(s.nodeIP)
+
+	log.Info("genesis load from db complete")
 
 	s.fetch()
 }
@@ -238,7 +243,7 @@ func (s *SyncStorage) refreshDatabase() {
 		orgIDs, err := mysql.GetORGIDs()
 		if err != nil {
 			log.Errorf("get org ids failed: %s", err.Error())
-			return
+			continue
 		}
 		for _, orgID := range orgIDs {
 			db, err := mysql.GetDB(orgID)
@@ -276,26 +281,32 @@ func (s *SyncStorage) refreshDatabase() {
 
 func (s *SyncStorage) run() {
 	ageTime := time.Duration(s.cfg.AgingTime) * time.Second
+	ticker := time.NewTicker(time.Duration(s.cfg.DataPersistenceInterval) * time.Second)
+	defer ticker.Stop()
 	for {
-		time.Sleep(time.Duration(s.cfg.DataPersistenceInterval) * time.Second)
-		now := time.Now()
-		hasChange := false
-		s.mutex.Lock()
-		hasChange = hasChange || s.genesisSyncInfo.VIPs.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.VMs.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.VPCs.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.Lldps.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.Ports.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.Networks.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.IPlastseens.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.Processes.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.Vinterfaces.Age(now, time.Duration(s.cfg.VinterfaceAgingTime)*time.Second)
-		hasChange = hasChange || s.dirty
-		s.dirty = false
-		s.mutex.Unlock()
-		if hasChange {
-			s.storeToDatabase()
-			s.fetch()
+		select {
+		case <-ticker.C:
+			now := time.Now()
+			hasChange := false
+			s.mutex.Lock()
+			hasChange = hasChange || s.genesisSyncInfo.VIPs.Age(now, ageTime)
+			hasChange = hasChange || s.genesisSyncInfo.VMs.Age(now, ageTime)
+			hasChange = hasChange || s.genesisSyncInfo.VPCs.Age(now, ageTime)
+			hasChange = hasChange || s.genesisSyncInfo.Lldps.Age(now, ageTime)
+			hasChange = hasChange || s.genesisSyncInfo.Ports.Age(now, ageTime)
+			hasChange = hasChange || s.genesisSyncInfo.Networks.Age(now, ageTime)
+			hasChange = hasChange || s.genesisSyncInfo.IPlastseens.Age(now, ageTime)
+			hasChange = hasChange || s.genesisSyncInfo.Processes.Age(now, ageTime)
+			hasChange = hasChange || s.genesisSyncInfo.Vinterfaces.Age(now, time.Duration(s.cfg.VinterfaceAgingTime)*time.Second)
+			hasChange = hasChange || s.dirty
+			s.dirty = false
+			s.mutex.Unlock()
+			if hasChange {
+				s.storeToDatabase()
+				s.fetch()
+			}
+		case <-s.sCtx.Done():
+			return
 		}
 	}
 }

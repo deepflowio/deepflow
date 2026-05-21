@@ -36,12 +36,6 @@ import (
 func (v *GenesisSyncRpcUpdater) ParseAgentVinterfaceInfo(orgID int, teamID, vtapID uint32, peer, deviceType string, message *agent.GenesisSyncRequest) []model.GenesisVinterface {
 	platformData := message.GetPlatformData()
 	k8sClusterID := message.GetKubernetesClusterId()
-	// 当采集器为容器类型时（cluster id 非空）
-	//  - 采集器未注册（vtapID==0），即使没有 Interfaces 也需要处理 vinterface 来让采集器能够注册
-	//  - 采集器已经注册（vtapID!=0），采集器重启会出现 Interfaces 为空的情况，为了避免 vinterface 异常增删，不解析当前消息
-	if k8sClusterID != "" && len(platformData.Interfaces) == 0 && vtapID != 0 {
-		return []model.GenesisVinterface{}
-	}
 
 	isContainer := deviceType == common.DEVICE_TYPE_DOCKER_HOST
 	epoch := time.Now()
@@ -138,7 +132,9 @@ func (v *GenesisSyncRpcUpdater) ParseAgentVinterfaceInfo(orgID int, teamID, vtap
 		var hasNetMask bool
 		var validIPs []string
 		for _, addr := range iface.Ip {
-			hasNetMask = strings.Contains(addr, `/`)
+			if strings.Contains(addr, `/`) {
+				hasNetMask = true
+			}
 			var netIP netaddr.IP
 			if hasNetMask {
 				ipPrefix, err := netaddr.ParseIPPrefix(addr)
