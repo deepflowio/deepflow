@@ -1833,7 +1833,8 @@ int maps_config(struct bpf_tracer *tracer, const char *map_name, int entries)
 	if (map_conf == NULL)
 		return -ENOMEM;
 
-	snprintf(map_conf->map_name, sizeof(map_conf->map_name), map_name);
+	snprintf(map_conf->map_name, sizeof(map_conf->map_name), "%s",
+		 map_name);
 	map_conf->max_entries = entries;
 	list_add_tail(&map_conf->list, &tracer->maps_conf_head);
 

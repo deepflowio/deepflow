@@ -39,6 +39,7 @@
 #include <jvmticmlr.h>
 
 #include "../../config.h"
+#include "../../utils.h"
 #include "config.h"
 
 #define LOG_BUF_SZ 512
@@ -80,7 +81,7 @@ jint close_files(void);
   do {                                            \
 	if (perf_map_log_socket_fd > 0) { \
 		char str_buf[LOG_BUF_SZ]; \
-		int n = snprintf(str_buf, sizeof(str_buf), format, ##__VA_ARGS__); \
+		size_t n = safe_snprintf(str_buf, sizeof(str_buf), format, ##__VA_ARGS__); \
 	        pthread_mutex_lock(&g_df_lock);	 \
 	        send_msg(perf_map_log_socket_fd, str_buf, n); \
 	        pthread_mutex_unlock(&g_df_lock); \

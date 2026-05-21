@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include "log.h"
+#include "utils.h"
 
 #include "trace_utils.h"
 
@@ -81,7 +82,7 @@ __attribute__((weak)) void rust_info_wrapper(char *msg)
 	printf("%s\n", msg);
 }
 
-static char *dispatch_message(char *msg, uint16_t len)
+static char *dispatch_message(char *msg, size_t len)
 {
 	if (!msg || len < 1)
 		return msg;
@@ -96,28 +97,38 @@ void _ebpf_error(int how_to_die, char *function_name, char *file_path,
 		 uint32_t line_number, char *fmt, ...)
 {
 	char msg[MSG_SZ] = {};
-	uint16_t len = 0;
-	uint16_t max = MSG_SZ;
+	size_t len = 0;
+	int64_t remaining;
 	va_list va;
 
 	if (function_name) {
+		remaining = (int64_t)sizeof(msg) - (int64_t)len;
 		if (how_to_die & ERROR_WARNING) {
-			len += snprintf(msg + len, max - len, "[eBPF] WARN func %s()", function_name);
+			len += safe_snprintf(msg + len, remaining,
+					     "[eBPF] WARN func %s()",
+					     function_name);
 		} else {
-			len += snprintf(msg + len, max - len, "[eBPF] ERROR func %s()", function_name);
+			len += safe_snprintf(msg + len, remaining,
+					     "[eBPF] ERROR func %s()",
+					     function_name);
 		}
-		if (line_number > 0)
-			len +=
-			    snprintf(msg + len, max - len, " [%s:%u] ",
-				     file_path, line_number);
+		if (line_number > 0) {
+			remaining = (int64_t)sizeof(msg) - (int64_t)len;
+			len += safe_snprintf(msg + len, remaining, " [%s:%u] ",
+					     file_path, line_number);
+		}
 	}
 #ifdef HAVE_ERRNO
-	if (how_to_die & ERROR_ERRNO_VALID)
-		len += snprintf(msg + len, max - len,
-				": %s (errno %d)", strerror(errno), errno);
+	if (how_to_die & ERROR_ERRNO_VALID) {
+		remaining = (int64_t)sizeof(msg) - (int64_t)len;
+		len += safe_snprintf(msg + len, remaining,
+				     ": %s (errno %d)", strerror(errno),
+				     errno);
+	}
 #endif
 	va_start(va, fmt);
-	len += vsnprintf(msg + len, max - len, fmt, va);
+	remaining = (int64_t)sizeof(msg) - (int64_t)len;
+	len += safe_vsnprintf(msg + len, remaining, fmt, va);
 	va_end(va);
 
 	dispatch_message(msg, len);
@@ -131,17 +142,19 @@ void _ebpf_error(int how_to_die, char *function_name, char *file_path,
 void _ebpf_info(char *fmt, ...)
 {
 	char msg[MSG_SZ] = {};
-	uint16_t len = 0;
-	uint16_t max = MSG_SZ;
+	size_t len = 0;
+	int64_t remaining;
 	va_list va;
 
-	len += snprintf(msg + len, max - len, "[eBPF] INFO ");
+	remaining = (int64_t)sizeof(msg) - (int64_t)len;
+	len += safe_snprintf(msg + len, remaining, "[eBPF] INFO ");
 
 	va_start(va, fmt);
-	len += vsnprintf(msg + len, max - len, fmt, va);
+	remaining = (int64_t)sizeof(msg) - (int64_t)len;
+	len += safe_vsnprintf(msg + len, remaining, fmt, va);
 	va_end(va);
-	if (msg[len - 1] != '\n') {
-		if (len < max)
+	if (len > 0 && msg[len - 1] != '\n') {
+		if (len < sizeof(msg))
 			msg[len++] = '\n';
 		else
 			msg[len - 1] = '\n';
@@ -165,16 +178,23 @@ void _ebpf_log(int how_to_die, char *function_name, char *file_path,
 {
     char msg[MSG_SZ] = {};
     va_list va;
+    int ret;
+    size_t len;
 
     va_start(va, fmt);
-    uint16_t len = vsnprintf(msg, MSG_SZ, fmt, va);
+    ret = vsnprintf(msg, MSG_SZ, fmt, va);
     va_end(va);
 
+	if (ret < 0) {
+		len = 0;
+	} else {
+		len = ret;
+	}
 	if (len >= MSG_SZ) {
 		len = MSG_SZ - 1;
 	}
 	// remove trailing newline if any
-	if (msg[len - 1] == '\n') {
+	if (len > 0 && msg[len - 1] == '\n') {
 		msg[len - 1] = '\0';
 	}
 
