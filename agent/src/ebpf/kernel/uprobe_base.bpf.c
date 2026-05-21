@@ -689,6 +689,11 @@ static inline int kernel_clone_exit(bool is_kprobe, bool maybe_thread,
 	else
 		data.pid = pid;
 	data.maybe_thread = maybe_thread;
+#ifdef EXTENDED_AI_AGENT_FILE_IO
+	if (is_kprobe && ret > 0) {
+		ai_agent_on_fork(ctx, (__u32)tgid, (__u32)data.pid);
+	}
+#endif
 	bpf_get_current_comm(data.name, sizeof(data.name));
 	bpf_perf_event_output(ctx, &NAME(socket_data),
 			      BPF_F_CURRENT_CPU, &data, sizeof(data));

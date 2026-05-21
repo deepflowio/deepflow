@@ -681,6 +681,20 @@ static struct tracepoint *find_tracepoint_from_name(struct bpf_tracer *tracer,
 	return NULL;
 }
 
+static struct probe *find_probe_from_name(struct bpf_tracer *tracer,
+					  const char *name, bool isret)
+{
+	struct probe *p;
+
+	list_for_each_entry(p, &tracer->probes_head, list) {
+		if (p->type == KPROBE && p->isret == isret &&
+		    strcmp(p->name, name) == 0)
+			return p;
+	}
+
+	return NULL;
+}
+
 static struct kfunc *find_kfunc_from_name(struct bpf_tracer *tracer,
 					  const char *name)
 {
@@ -745,6 +759,190 @@ static struct kfunc *get_kfunc_from_tracer(struct bpf_tracer *tracer,
 	snprintf(p->name, sizeof(p->name), "%s", name);
 
 	return p;
+}
+
+static bool governance_tracepoint_fallback_probe_name(const char *tp_name,
+						      char *probe_name,
+						      size_t probe_name_sz,
+						      bool *isret)
+{
+	const char *const *symbols = NULL;
+	size_t symbols_nr = 0;
+
+	*isret = false;
+
+	if (!strcmp(tp_name, "tracepoint/syscalls/sys_enter_openat")) {
+		static const char *const candidates[] = {
+			"__x64_sys_openat", "__arm64_sys_openat", "sys_openat",
+		};
+		symbols = candidates;
+		symbols_nr = sizeof(candidates) / sizeof(candidates[0]);
+	} else if (!strcmp(tp_name, "tracepoint/syscalls/sys_enter_unlinkat")) {
+		static const char *const candidates[] = {
+			"__x64_sys_unlinkat", "__arm64_sys_unlinkat",
+			"sys_unlinkat",
+		};
+		symbols = candidates;
+		symbols_nr = sizeof(candidates) / sizeof(candidates[0]);
+	} else if (!strcmp(tp_name, "tracepoint/syscalls/sys_enter_unlink")) {
+		static const char *const candidates[] = {
+			"__x64_sys_unlink", "__arm64_sys_unlink", "sys_unlink",
+		};
+		symbols = candidates;
+		symbols_nr = sizeof(candidates) / sizeof(candidates[0]);
+	} else if (!strcmp(tp_name, "tracepoint/syscalls/sys_enter_fchmodat")) {
+		static const char *const candidates[] = {
+			"__x64_sys_fchmodat", "__arm64_sys_fchmodat",
+			"sys_fchmodat",
+		};
+		symbols = candidates;
+		symbols_nr = sizeof(candidates) / sizeof(candidates[0]);
+	} else if (!strcmp(tp_name, "tracepoint/syscalls/sys_enter_chmod")) {
+		static const char *const candidates[] = {
+			"__x64_sys_chmod", "__arm64_sys_chmod", "sys_chmod",
+		};
+		symbols = candidates;
+		symbols_nr = sizeof(candidates) / sizeof(candidates[0]);
+	} else if (!strcmp(tp_name, "tracepoint/syscalls/sys_enter_fchownat")) {
+		static const char *const candidates[] = {
+			"__x64_sys_fchownat", "__arm64_sys_fchownat",
+			"sys_fchownat",
+		};
+		symbols = candidates;
+		symbols_nr = sizeof(candidates) / sizeof(candidates[0]);
+	} else if (!strcmp(tp_name, "tracepoint/syscalls/sys_enter_chown")) {
+		static const char *const candidates[] = {
+			"__x64_sys_chown", "__arm64_sys_chown", "sys_chown",
+		};
+		symbols = candidates;
+		symbols_nr = sizeof(candidates) / sizeof(candidates[0]);
+	} else if (!strcmp(tp_name, "tracepoint/syscalls/sys_enter_setuid")) {
+		static const char *const candidates[] = {
+			"__x64_sys_setuid", "__arm64_sys_setuid", "sys_setuid",
+		};
+		symbols = candidates;
+		symbols_nr = sizeof(candidates) / sizeof(candidates[0]);
+	} else if (!strcmp(tp_name, "tracepoint/syscalls/sys_enter_setgid")) {
+		static const char *const candidates[] = {
+			"__x64_sys_setgid", "__arm64_sys_setgid", "sys_setgid",
+		};
+		symbols = candidates;
+		symbols_nr = sizeof(candidates) / sizeof(candidates[0]);
+	} else if (!strcmp(tp_name, "tracepoint/syscalls/sys_enter_setreuid")) {
+		static const char *const candidates[] = {
+			"__x64_sys_setreuid", "__arm64_sys_setreuid",
+			"sys_setreuid",
+		};
+		symbols = candidates;
+		symbols_nr = sizeof(candidates) / sizeof(candidates[0]);
+	} else if (!strcmp(tp_name, "tracepoint/syscalls/sys_enter_setregid")) {
+		static const char *const candidates[] = {
+			"__x64_sys_setregid", "__arm64_sys_setregid",
+			"sys_setregid",
+		};
+		symbols = candidates;
+		symbols_nr = sizeof(candidates) / sizeof(candidates[0]);
+	} else {
+		return false;
+	}
+
+	for (size_t i = 0; i < symbols_nr; i++) {
+		if (!kallsyms_lookup_name(symbols[i]))
+			continue;
+
+		if (snprintf(probe_name, probe_name_sz, "kprobe/%s",
+			     symbols[i]) < 0) {
+			ebpf_warning("snprintf governance fallback probe failed.\n");
+			return false;
+		}
+		return true;
+	}
+
+	return false;
+}
+
+static int governance_fallback_probe_attach(struct bpf_tracer *tracer,
+					    const char *probe_name, bool isret)
+{
+	struct probe *probe = find_probe_from_name(tracer, probe_name, isret);
+	bool created = false;
+
+	if (!probe) {
+		probe = create_probe(tracer, probe_name, isret, KPROBE, NULL, true);
+		if (!probe)
+			return ETR_INVAL;
+		created = true;
+	}
+
+	int err = probe_attach(probe);
+	if (created && err && err != ETR_EXIST)
+		free_probe_from_tracer(probe);
+
+	return err;
+}
+
+static int governance_fork_fallback_attach(struct bpf_tracer *tracer)
+{
+	const char *const fork_symbols[] = {
+		"__x64_sys_fork", "__arm64_sys_fork", "sys_fork",
+	};
+	const char *const clone_symbols[] = {
+		"__x64_sys_clone", "__arm64_sys_clone", "sys_clone",
+	};
+	const char *const *groups[] = { fork_symbols, clone_symbols };
+	const size_t group_sizes[] = {
+		sizeof(fork_symbols) / sizeof(fork_symbols[0]),
+		sizeof(clone_symbols) / sizeof(clone_symbols[0]),
+	};
+	int attached = 0;
+
+	if (!is_pure_kprobe_ebpf() || !access(SYSCALL_FORK_TP_PATH, F_OK) ||
+	    !access(SYSCALL_CLONE_TP_PATH, F_OK))
+		return ETR_INVAL;
+
+	for (size_t group = 0; group < sizeof(groups) / sizeof(groups[0]);
+	     group++) {
+		for (size_t i = 0; i < group_sizes[group]; i++) {
+			char probe_name[PROBE_NAME_SZ];
+			int err;
+
+			if (!kallsyms_lookup_name(groups[group][i]))
+				continue;
+
+			if (snprintf(probe_name, sizeof(probe_name),
+				     "kretprobe/%s", groups[group][i]) < 0) {
+				ebpf_warning
+				    ("snprintf governance fork fallback probe failed.\n");
+				return ETR_INVAL;
+			}
+
+			err = governance_fallback_probe_attach(tracer, probe_name,
+							      true);
+			if (err == ETR_OK || err == ETR_EXIST) {
+				attached++;
+				break;
+			}
+		}
+	}
+
+	return attached > 0 ? ETR_OK : ETR_INVAL;
+}
+
+static int governance_tracepoint_fallback_attach(struct bpf_tracer *tracer,
+						 const char *tp_name)
+{
+	char probe_name[PROBE_NAME_SZ];
+	bool isret;
+
+	if (!strcmp(tp_name, "tracepoint/sched/sched_process_fork"))
+		return governance_fork_fallback_attach(tracer);
+
+	if (!governance_tracepoint_fallback_probe_name(tp_name, probe_name,
+						       sizeof(probe_name),
+						       &isret))
+		return ETR_INVAL;
+
+	return governance_fallback_probe_attach(tracer, probe_name, isret);
 }
 
 void add_probe_to_tracer(struct probe *pb)
@@ -1180,6 +1378,17 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			continue;
 
 		if (error) {
+			if (type == HOOK_ATTACH) {
+				int fallback_err =
+				    governance_tracepoint_fallback_attach(tracer,
+									 tp->name);
+				if (fallback_err == ETR_OK ||
+				    fallback_err == ETR_EXIST) {
+				ebpf_info("attach tracepoint: '%s', fallback to governance kprobe succeed!",
+					  tp->name);
+				continue;
+				}
+			}
 			ebpf_info("%s tracepoint: '%s', failed!",
 				  type == HOOK_ATTACH ? "attach" : "detach",
 				  tp->name);
