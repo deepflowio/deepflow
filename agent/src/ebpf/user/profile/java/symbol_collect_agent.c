@@ -94,7 +94,7 @@ inline int send_msg(int sock_fd, const char *buf, size_t len)
 	int n = 0;		// Initialize n
 
 	do {
-		n = send(sock_fd, buf + send_bytes, len - send_bytes, 0);
+		n = send(sock_fd, buf + send_bytes, len - send_bytes, MSG_NOSIGNAL);
 		if (n == -1) {
 			if (errno == EINTR || errno == EAGAIN
 			    || errno == EWOULDBLOCK) {
@@ -126,11 +126,12 @@ jint df_open_socket(const char *path, int *ptr)
 
 	/*
 	 * The reason for setting non-blocking mode:
-	 * 1 To prevent Java threads from being blocked.
-	 * 2 When attempts to write data to a closed writing port of a pipe or
-	 *   socket, the operating system detects this situation and sends the
-	 *   SIGPIPE signal to Java process, which causes the program to exit.
-	 *   Use non-blocking mode to avoid this issue.
+	 * 1 To prevent Java threads from being blocked when writing to socket.
+	 * 2 Non-blocking mode allows send() to fail with EAGAIN/EWOULDBLOCK
+	 *   instead of blocking, enabling graceful error handling.
+	 *
+	 * Note: To avoid SIGPIPE signal (which terminates the process), use
+	 * MSG_NOSIGNAL flag in send() call or ignore SIGPIPE with signal().
 	 */
 	int flags = fcntl(s, F_GETFL, 0);
 	if (flags == -1) {
