@@ -243,6 +243,8 @@ controller:
         huawei_manageone:
           # 支持重复对接
           duplication_enabled: false
+          # 支持 lb 对接
+          lb_sync_enabled: true
       recorder:
         # recorder模块缓存自愈刷新时间间隔，单位：分钟，默认：60 * 24
         cache_refresh_interval: 1440
