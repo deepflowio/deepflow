@@ -150,6 +150,7 @@ jint df_open_socket(const char *path, int *ptr)
 	strncpy(remote.sun_path, path, UNIX_PATH_MAX - 1);
 	int len = sizeof(remote.sun_family) + strlen(remote.sun_path);
 	if (connect(s, (struct sockaddr *)&remote, len) == -1) {
+		close(s);
 		fprintf(stderr, "Call connect() failed: errno(%d)\n", errno);
 		return JNI_ERR;
 	}
