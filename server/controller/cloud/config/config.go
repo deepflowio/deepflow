@@ -31,6 +31,7 @@ type FusionComputeConfig struct {
 
 type HuaweiManageOneConfig struct {
 	DuplicationEnabled bool `default:"false" yaml:"duplication_enabled"` // 支持重复对接
+	LBSyncEnabled      bool `default:"true" yaml:"lb_sync_enabled"`
 }
 
 type CloudConfig struct {
