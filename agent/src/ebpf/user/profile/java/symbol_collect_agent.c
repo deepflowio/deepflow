@@ -95,6 +95,10 @@ inline int send_msg(int sock_fd, const char *buf, size_t len)
 	int n = 0;		// Initialize n
 
 	do {
+		/*
+		 * Note: To avoid SIGPIPE signal (which terminates the process), use
+		 * MSG_NOSIGNAL flag in send() call.
+		 */
 		n = send(sock_fd, buf + send_bytes, len - send_bytes, MSG_NOSIGNAL);
 		if (n == -1) {
 			if (errno == EINTR || errno == EAGAIN
@@ -130,9 +134,6 @@ jint df_open_socket(const char *path, int *ptr)
 	 * 1 To prevent Java threads from being blocked when writing to socket.
 	 * 2 Non-blocking mode allows send() to fail with EAGAIN/EWOULDBLOCK
 	 *   instead of blocking, enabling graceful error handling.
-	 *
-	 * Note: To avoid SIGPIPE signal (which terminates the process), use
-	 * MSG_NOSIGNAL flag in send() call or ignore SIGPIPE with signal().
 	 */
 	int flags = fcntl(s, F_GETFL, 0);
 	if (flags == -1) {
