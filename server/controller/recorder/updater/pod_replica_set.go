@@ -46,6 +46,10 @@ func (f *PodReplicaSetMessageFactory) CreateUpdatedFields() types.UpdatedFields 
 	return &message.UpdatedPodReplicaSetFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, &PodReplicaSetMessageFactory{})
+}
+
 type PodReplicaSet struct {
 	UpdaterBase[
 		cloudmodel.PodReplicaSet,
@@ -66,10 +70,6 @@ func NewPodReplicaSet(wholeCache *cache.Cache, cloudData []cloudmodel.PodReplica
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &PodReplicaSetMessageFactory{})
-	}
 
 	return updater
 }

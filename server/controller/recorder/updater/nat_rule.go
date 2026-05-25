@@ -46,6 +46,10 @@ func (f *NATRuleMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedNATRuleFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_NAT_RULE_EN, &NATRuleMessageFactory{})
+}
+
 type NATRule struct {
 	UpdaterBase[
 		cloudmodel.NATRule,
@@ -66,10 +70,6 @@ func NewNATRule(wholeCache *cache.Cache, cloudData []cloudmodel.NATRule) *NATRul
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &NATRuleMessageFactory{})
-	}
 
 	return updater
 }

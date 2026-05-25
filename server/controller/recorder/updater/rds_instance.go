@@ -46,6 +46,10 @@ func (f *RDSInstanceMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedRDSInstanceFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, &RDSInstanceMessageFactory{})
+}
+
 type RDSInstance struct {
 	UpdaterBase[
 		cloudmodel.RDSInstance,
@@ -66,10 +70,6 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance)
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &RDSInstanceMessageFactory{})
-	}
 
 	return updater
 }

@@ -50,6 +50,10 @@ func (f *VInterfaceMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedVInterfaceFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_VINTERFACE_EN, &VInterfaceMessageFactory{})
+}
+
 type VInterface struct {
 	UpdaterBase[
 		cloudmodel.VInterface,
@@ -71,10 +75,6 @@ func NewVInterface(wholeCache *cache.Cache, cloudData []cloudmodel.VInterface, d
 	}
 	updater.setDataGenerator(updater)
 	updater.setDomainToolDataSet(domainToolDataSet)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &VInterfaceMessageFactory{})
-	}
 
 	return updater
 }

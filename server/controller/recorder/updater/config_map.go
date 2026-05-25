@@ -50,6 +50,10 @@ func (f *ConfigMapMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedConfigMapFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_CONFIG_MAP_EN, &ConfigMapMessageFactory{})
+}
+
 type ConfigMap struct {
 	UpdaterBase[
 		cloudmodel.ConfigMap,
@@ -71,10 +75,6 @@ func NewConfigMap(wholeCache *cache.Cache, cloudData []cloudmodel.ConfigMap) *Co
 	}
 	updater.setDataGenerator(updater)
 	updater.toLoggable = true
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &ConfigMapMessageFactory{})
-	}
 
 	return updater
 }

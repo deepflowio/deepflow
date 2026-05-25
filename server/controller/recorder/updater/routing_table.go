@@ -46,6 +46,10 @@ func (f *RoutingTableMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedRoutingTableFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_ROUTING_TABLE_EN, &RoutingTableMessageFactory{})
+}
+
 type RoutingTable struct {
 	UpdaterBase[cloudmodel.RoutingTable,
 		*diffbase.RoutingTable,
@@ -65,10 +69,6 @@ func NewRoutingTable(wholeCache *cache.Cache, cloudData []cloudmodel.RoutingTabl
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &RoutingTableMessageFactory{})
-	}
 
 	return updater
 }
