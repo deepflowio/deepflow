@@ -68,6 +68,7 @@ int perf_map_log_socket_fd = -1;
 // Cache symbols for batch sending
 char g_symbol_buffer[STRING_BUFFER_SIZE * 4];
 int g_cached_bytes;
+static jint close_files_locked(void);
 jint close_files(void);
 
 #define _(e)                                                                \
@@ -101,12 +102,12 @@ inline int send_msg(int sock_fd, const char *buf, size_t len)
 				// Retry on interrupt or temporary failure
 				continue;
 			} else {
-				close_files();	// Example function call, define as needed
+				close_files_locked();	// Example function call, define as needed
 				break;
 			}
 		} else if (n == 0) {
 			// Connection closed by peer
-			close_files();	// Example function call, define as needed
+			close_files_locked();	// Example function call, define as needed
 			break;
 		}
 
@@ -216,18 +217,29 @@ jint df_agent_config(char *opts)
 	return JNI_OK;
 }
 
+static jint close_files_locked(void)
+{
+	int perf_fd = perf_map_socket_fd;
+	int log_fd = perf_map_log_socket_fd;
+
+	perf_map_socket_fd = -1;
+	perf_map_log_socket_fd = -1;
+
+	if (perf_fd > 0) {
+		close(perf_fd);
+	}
+	if (log_fd > 0) {
+		close(log_fd);
+	}
+
+	return JNI_OK;
+}
+
 jint close_files(void)
 {
-	if (perf_map_socket_fd > 0) {
-		close(perf_map_socket_fd);
-		perf_map_socket_fd = -1;
-	}
-
-	if (perf_map_log_socket_fd > 0) {
-		close(perf_map_log_socket_fd);
-		perf_map_log_socket_fd = -1;
-	}
-
+	pthread_mutex_lock(&g_df_lock);
+	close_files_locked();
+	pthread_mutex_unlock(&g_df_lock);
 	return JNI_OK;
 }
 
@@ -303,13 +315,16 @@ void deallocate(jvmtiEnv * jvmti, void *string)
 void df_send_symbol(enum event_type type, const void *code_addr,
 		    unsigned int code_size, const char *entry)
 {
-	if (perf_map_socket_fd < 0) {
-		return;
-	}
-
 	int send_bytes;
 	struct symbol_metadata *meta;
 	char symbol_str[STRING_BUFFER_SIZE];
+
+	pthread_mutex_lock(&g_df_lock);
+	if (perf_map_socket_fd < 0) {
+		pthread_mutex_unlock(&g_df_lock);
+		return;
+	}
+
 	if (type == METHOD_UNLOAD) {
 		snprintf(symbol_str + sizeof(*meta),
 			 sizeof(symbol_str) - sizeof(*meta), "%lx",
@@ -323,7 +338,6 @@ void df_send_symbol(enum event_type type, const void *code_addr,
 	meta->len = strlen(symbol_str + sizeof(*meta));
 	meta->type = type;
 	send_bytes = meta->len + sizeof(*meta);
-	pthread_mutex_lock(&g_df_lock);
 	if (replay_finish) {
 		send_msg(perf_map_socket_fd, symbol_str, send_bytes);
 	} else {
