@@ -192,7 +192,7 @@ fn fill_ai_agent_root_pid(event: &mut BoxedProcEvents) {
 #[cfg(feature = "enterprise")]
 #[allow(static_mut_refs)]
 fn emit_ai_agent_enforcement_audit_event(event: &BoxedProcEvents) {
-    use enterprise_utils::ai_agent_enforcement::EnforcementMode;
+    use enterprise_utils::ai_agent_enforcement::{EnforcementMode, KernelEventSource};
 
     if event.0.ai_agent_root_pid == 0 {
         return;
@@ -213,6 +213,17 @@ fn emit_ai_agent_enforcement_audit_event(event: &BoxedProcEvents) {
     };
     if hit.mode != EnforcementMode::AuditOnly {
         return;
+    }
+    match hit.kernel_event_source {
+        KernelEventSource::Lsm if AI_AGENT_EXEC_LSM_EVENTS_ACTIVE.load(Ordering::Relaxed) => {
+            return;
+        }
+        KernelEventSource::KprobeOverride
+            if AI_AGENT_EXEC_KPROBE_EVENTS_ACTIVE.load(Ordering::Relaxed) =>
+        {
+            return;
+        }
+        _ => {}
     }
     let Some(audit_event) = event
         .0
@@ -689,6 +700,10 @@ static AI_AGENT_EXEC_RULES_MAP_FD: AtomicI32 = AtomicI32::new(-1);
 static AI_AGENT_SYSCALL_RULES_MAP_FD: AtomicI32 = AtomicI32::new(-1);
 #[cfg(feature = "enterprise")]
 static AI_AGENT_POLICY_EPOCH_MAP_FD: AtomicI32 = AtomicI32::new(-1);
+#[cfg(feature = "enterprise")]
+static AI_AGENT_EXEC_LSM_EVENTS_ACTIVE: AtomicBool = AtomicBool::new(false);
+#[cfg(feature = "enterprise")]
+static AI_AGENT_EXEC_KPROBE_EVENTS_ACTIVE: AtomicBool = AtomicBool::new(false);
 #[cfg(feature = "enterprise")]
 const AI_AGENT_EXEC_RULES_BPF_MAX: usize = 256;
 #[cfg(feature = "enterprise")]
@@ -1716,6 +1731,8 @@ impl EbpfCollector {
         let max_syscall_records = config.max_rules.min(AI_AGENT_SYSCALL_RULES_BPF_MAX);
         if !config.enabled {
             set_global_exec_policy(None);
+            AI_AGENT_EXEC_LSM_EVENTS_ACTIVE.store(false, Ordering::Relaxed);
+            AI_AGENT_EXEC_KPROBE_EVENTS_ACTIVE.store(false, Ordering::Relaxed);
             Self::clear_ai_agent_exec_enforcement_bpf_maps(max_exec_records);
             Self::clear_ai_agent_syscall_enforcement_bpf_maps(max_syscall_records);
             return;
@@ -1750,6 +1767,8 @@ impl EbpfCollector {
             Err(e) => {
                 warn!("AI Agent enforcement: failed to compile policy: {}", e);
                 set_global_exec_policy(None);
+                AI_AGENT_EXEC_LSM_EVENTS_ACTIVE.store(false, Ordering::Relaxed);
+                AI_AGENT_EXEC_KPROBE_EVENTS_ACTIVE.store(false, Ordering::Relaxed);
                 Self::clear_ai_agent_exec_enforcement_bpf_maps(max_exec_records);
                 return;
             }
@@ -1775,10 +1794,16 @@ impl EbpfCollector {
                         set_global_exec_policy(None);
                     }
                 }
+                AI_AGENT_EXEC_LSM_EVENTS_ACTIVE.store(false, Ordering::Relaxed);
+                AI_AGENT_EXEC_KPROBE_EVENTS_ACTIVE.store(false, Ordering::Relaxed);
                 Self::clear_ai_agent_exec_enforcement_bpf_maps(max_exec_records);
                 return;
             }
+            AI_AGENT_EXEC_LSM_EVENTS_ACTIVE.store(lsm_allowed, Ordering::Relaxed);
+            AI_AGENT_EXEC_KPROBE_EVENTS_ACTIVE.store(kprobe_override_allowed, Ordering::Relaxed);
         } else {
+            AI_AGENT_EXEC_LSM_EVENTS_ACTIVE.store(false, Ordering::Relaxed);
+            AI_AGENT_EXEC_KPROBE_EVENTS_ACTIVE.store(false, Ordering::Relaxed);
             Self::clear_ai_agent_exec_enforcement_bpf_maps(max_exec_records);
         }
 

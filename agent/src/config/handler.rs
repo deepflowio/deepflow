@@ -6196,7 +6196,7 @@ mod tests {
         );
         assert_eq!(
             config.ai_agent_enforcement.allowed_mechanisms,
-            vec!["lsm", "kprobe_override", "sigkill", "seccomp"]
+            vec!["lsm", "kprobe_override"]
         );
         assert!(config.ai_agent_enforcement.rules.is_empty());
     }

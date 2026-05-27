@@ -402,8 +402,8 @@ if ENTERPRISE_AGENT.exists():
         "standalone exec override wrapper must define shared map symbols and include only exec override kprobes",
     )
     require(
-        "buf->arg.bytes,\n\t\t\t\t       AI_AGENT_EXEC_OVERRIDE_ARG_LEN" in exec_override_text,
-        "AI Agent exec override must emit argv cmdline with the 64-byte argv buffer size, not the 256-byte path size",
+        "buf->path,\n\t\t\t\t       AI_AGENT_EXEC_PATTERN_LEN" in exec_override_text,
+        "AI Agent exec override must report exec_path as cmdline placeholder instead of a partial argv slot",
     )
     syscall_override_bpf = ENTERPRISE_BPF / "ai_agent_syscall_override.bpf.c"
     require(

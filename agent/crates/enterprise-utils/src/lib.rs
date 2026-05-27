@@ -548,6 +548,14 @@ pub mod ai_agent_enforcement {
         pub rule_index: u32,
         pub rule_id: String,
         pub mode: EnforcementMode,
+        pub kernel_event_source: KernelEventSource,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum KernelEventSource {
+        None,
+        Lsm,
+        KprobeOverride,
     }
 
     #[derive(Clone, Debug, PartialEq, Eq)]
