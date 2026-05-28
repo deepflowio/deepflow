@@ -1708,7 +1708,7 @@ pub struct AgentComponents {
     pub pcap_batch_uniform_sender: UniformSenderThread<BoxedPcapBatch>,
     pub policy_setter: PolicySetter,
     pub policy_getter: PolicyGetter,
-    pub npb_bandwidth_watcher: Box<Arc<NpbBandwidthWatcher>>,
+    pub npb_bandwidth_watcher: Arc<NpbBandwidthWatcher>,
     pub npb_arp_table: Arc<NpbArpTable>,
     pub vector_component: VectorComponent,
     pub is_ce_version: bool, // Determine whether the current version is a ce version, CE-AGENT always set pcap-assembler disabled
@@ -2498,6 +2498,23 @@ impl AgentComponents {
             bpf_syntax_str,
         }));
 
+        let sender_config = config_handler.sender().load();
+        let (npb_bandwidth_watcher, npb_bandwidth_watcher_counter) = NpbBandwidthWatcher::new(
+            sender_config.bandwidth_probe_interval.as_secs(),
+            sender_config.npb_bps_threshold,
+            sender_config.server_tx_bandwidth_threshold,
+            sender_config.cpu_limit,
+            sender_config.memory_limit,
+            sender_config.npb_monitor.clone(),
+            npb_bps_limit.clone(),
+            exception_handler.clone(),
+        );
+        synchronizer.add_flow_acl_listener(Box::new(npb_bandwidth_watcher.clone()));
+        stats_collector.register_countable(
+            &stats::NoTagModule("npb_bandwidth_watcher"),
+            Countable::Ref(Arc::downgrade(&npb_bandwidth_watcher_counter) as Weak<dyn RefCountable>),
+        );
+
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let queue_size = config_handler.ebpf().load().queue_size;
         #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -2553,6 +2570,7 @@ impl AgentComponents {
                 toa_sender.clone(),
                 l4_flow_aggr_sender.clone(),
                 metrics_sender.clone(),
+                npb_bandwidth_watcher.clone(),
                 #[cfg(target_os = "linux")]
                 netns,
                 #[cfg(target_os = "linux")]
@@ -3025,19 +3043,6 @@ impl AgentComponents {
             Countable::Owned(Box::new(external_metrics_counter)),
         );
 
-        let sender_config = config_handler.sender().load();
-        let (npb_bandwidth_watcher, npb_bandwidth_watcher_counter) = NpbBandwidthWatcher::new(
-            sender_config.bandwidth_probe_interval.as_secs(),
-            sender_config.npb_bps_threshold,
-            sender_config.server_tx_bandwidth_threshold,
-            npb_bps_limit.clone(),
-            exception_handler.clone(),
-        );
-        synchronizer.add_flow_acl_listener(npb_bandwidth_watcher.clone());
-        stats_collector.register_countable(
-            &stats::NoTagModule("npb_bandwidth_watcher"),
-            Countable::Ref(Arc::downgrade(&npb_bandwidth_watcher_counter) as Weak<dyn RefCountable>),
-        );
         let vector_component = VectorComponent::new(
             user_config.inputs.vector.enabled,
             user_config.inputs.vector.config.clone(),
@@ -3256,8 +3261,8 @@ impl AgentComponents {
             join_handles.push(h);
         }
 
-        if let Some(h) = self.npb_bandwidth_watcher.notify_stop() {
-            join_handles.push(h);
+        if let Some(mut h) = self.npb_bandwidth_watcher.notify_stop() {
+            join_handles.append(&mut h);
         }
 
         if let Some(h) = self.npb_arp_table.notify_stop() {
@@ -3418,6 +3423,7 @@ fn build_dispatchers(
     toa_info_sender: DebugSender<Box<(SocketAddr, SocketAddr)>>,
     l4_flow_aggr_sender: DebugSender<BoxedTaggedFlow>,
     metrics_sender: DebugSender<BoxedDocument>,
+    npb_bandwidth_watcher: Arc<NpbBandwidthWatcher>,
     #[cfg(target_os = "linux")] netns: netns::NsFile,
     #[cfg(target_os = "linux")] kubernetes_poller: Arc<GenericPoller>,
     #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
@@ -3536,6 +3542,7 @@ fn build_dispatchers(
             npb_bps_limit.clone(),
             npb_arp_table.clone(),
             stats_collector.clone(),
+            npb_bandwidth_watcher.clone(),
         )),
     ]));
 

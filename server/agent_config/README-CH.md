@@ -10959,6 +10959,383 @@ outputs:
 
 设置 deepflow-agent 做 NPB 分发的最大吞吐率。
 
+### NPB (Network Packet Broker) {#outputs.npb.self_load_circuit_breaker}
+
+#### Enabled {#outputs.npb.self_load_circuit_breaker.enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.enabled`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+负载自监控开关
+
+#### 监控时间间隔 {#outputs.npb.self_load_circuit_breaker.monitoring_interval}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.monitoring_interval`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      monitoring_interval: 10s
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['1s', '60s'] |
+
+**详细描述**:
+
+监控时间间隔 
+
+#### 触发次数 {#outputs.npb.self_load_circuit_breaker.trigger_times}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.trigger_times`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      trigger_times: 5
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 60] |
+
+**详细描述**:
+
+当连续多次检测到负载超过触发阈值，deepflow-agent 会停止 NPB 功能来降低负载，其他功能可以正常使用。
+
+#### 恢复次数 {#outputs.npb.self_load_circuit_breaker.recovery_times}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.recovery_times`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      recovery_times: 5
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 60] |
+
+**详细描述**:
+
+当连续多次检测到负载低于恢复阈值，deepflow-agent 会开启 NPB 功能。
+
+#### CPU {#outputs.npb.self_load_circuit_breaker.cpu}
+
+##### Enabled {#outputs.npb.self_load_circuit_breaker.cpu.enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.cpu.enabled`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      cpu:
+        enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+CPU 负载监控开关
+
+##### 触发阈值 {#outputs.npb.self_load_circuit_breaker.cpu.trigger_threshold}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.cpu.trigger_threshold`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      cpu:
+        trigger_threshold: 90
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 100] |
+
+**详细描述**:
+
+当连续多次检测到负载超过该阈值，deepflow-agent 会停止 NPB 功能来降低负载，其他功能可以正常使用。
+
+##### 恢复阈值 {#outputs.npb.self_load_circuit_breaker.cpu.recovery_threshold}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.cpu.recovery_threshold`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      cpu:
+        recovery_threshold: 70
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 100] |
+
+**详细描述**:
+
+当连续多次检测到负载低于该阈值，deepflow-agent 会开启 NPB 功能。
+
+#### Memory {#outputs.npb.self_load_circuit_breaker.memory}
+
+##### Enabled {#outputs.npb.self_load_circuit_breaker.memory.enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.memory.enabled`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      memory:
+        enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+内存负载监控开关
+
+##### 触发阈值 {#outputs.npb.self_load_circuit_breaker.memory.trigger_threshold}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.memory.trigger_threshold`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      memory:
+        trigger_threshold: 90
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 100] |
+
+**详细描述**:
+
+当连续多次检测到负载超过该阈值，deepflow-agent 会停止 NPB 功能来降低负载，其他功能可以正常使用。
+
+##### 恢复阈值 {#outputs.npb.self_load_circuit_breaker.memory.recovery_threshold}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.memory.recovery_threshold`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      memory:
+        recovery_threshold: 70
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 100] |
+
+**详细描述**:
+
+当连续多次检测到负载低于该阈值，deepflow-agent 会开启 NPB 功能。
+
+#### Queue {#outputs.npb.self_load_circuit_breaker.queue}
+
+##### Enabled {#outputs.npb.self_load_circuit_breaker.queue.enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.queue.enabled`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      queue:
+        enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+队列负载监控开关
+
+##### 触发阈值 {#outputs.npb.self_load_circuit_breaker.queue.trigger_threshold}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.queue.trigger_threshold`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      queue:
+        trigger_threshold: 90
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 100] |
+
+**详细描述**:
+
+当连续多次检测到负载超过该阈值，deepflow-agent 会停止 NPB 功能来降低负载，其他功能可以正常使用。
+
+##### 恢复阈值 {#outputs.npb.self_load_circuit_breaker.queue.recovery_threshold}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.queue.recovery_threshold`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      queue:
+        recovery_threshold: 70
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 100] |
+
+**详细描述**:
+
+当连续多次检测到负载低于该阈值，deepflow-agent 会开启 NPB 功能。
+
 ## 压缩 {#outputs.compression}
 
 ### Application_Log {#outputs.compression.application_log}

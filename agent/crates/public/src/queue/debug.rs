@@ -60,6 +60,10 @@ impl<T: Debug> DebugSender<T> {
         self.send_debug(&msgs);
         self.sender.send_all(msgs)
     }
+
+    pub fn usage_rate_percent(&self) -> u8 {
+        self.sender.usage_rate_percent()
+    }
 }
 
 impl<T> Clone for DebugSender<T> {
