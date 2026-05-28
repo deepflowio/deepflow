@@ -65,6 +65,7 @@ func newIDManager(cfg RecorderConfig, orgID int) (*IDManager, error) {
 		ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN:  newIDPool[mysqlmodel.RedisInstance](mng.org, ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN:     newIDPool[mysqlmodel.NATGateway](mng.org, ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_LB_EN:              newIDPool[mysqlmodel.LB](mng.org, ctrlrcommon.RESOURCE_TYPE_LB_EN, cfg.ResourceMaxID1),
+		ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN:     newIDPool[mysqlmodel.LBListener](mng.org, ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN:        newIDPool[mysqlmodel.PodNode](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN:     newIDPool[mysqlmodel.PodService](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_EN, cfg.ResourceMaxID1),
 		ctrlrcommon.RESOURCE_TYPE_POD_EN:             newIDPool[mysqlmodel.Pod](mng.org, ctrlrcommon.RESOURCE_TYPE_POD_EN, cfg.ResourceMaxID1),

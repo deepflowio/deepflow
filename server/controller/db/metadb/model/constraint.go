@@ -53,7 +53,7 @@ type AssetResourceConstraint interface {
 type ResourceNeedBeAllocatedIDConstraint interface {
 	Region | AZ | SubDomain | Host | VM |
 		VPC | Network | VRouter | DHCPPort |
-		NATGateway | LB | CEN |
+		NATGateway | LB | LBListener | CEN |
 		PeerConnection | RDSInstance | RedisInstance | PodCluster |
 		PodNode | VMPodNodeConnection | PodNamespace | PodIngress |
 		PodService | PodGroup | PodReplicaSet |

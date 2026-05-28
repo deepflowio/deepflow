@@ -30,7 +30,7 @@ func NewLBListener() *LBListener {
 		newOperatorBase[*mysqlmodel.LBListener](
 			ctrlrcommon.RESOURCE_TYPE_LB_LISTENER_EN,
 			true,
-			false,
+			true,
 		),
 	}
 	operater.setFieldsNeededAfterCreate([]string{"id", "lcuuid", "name", "ips", "snat_ips", "port", "protocol"})
