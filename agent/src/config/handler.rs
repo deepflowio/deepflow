@@ -56,8 +56,8 @@ use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
         HttpEndpointMatchRule, Iso8583ParseConfig, OracleConfig, PcapStream, PortConfig,
-        ProcessorsFlowLogTunning, RequestLog, RequestLogTunning, SessionTimeout, TagFilterOperator,
-        Timeouts, UserConfig, GRPC_BUFFER_SIZE_MIN,
+        ProcessorsFlowLogTunning, RequestLog, RequestLogTunning, SelfLoadCircuitBreaker,
+        SessionTimeout, TagFilterOperator, Timeouts, UserConfig, GRPC_BUFFER_SIZE_MIN,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -304,6 +304,9 @@ pub struct SenderConfig {
     pub standalone_data_file_dir: String,
     pub server_tx_bandwidth_threshold: u64,
     pub bandwidth_probe_interval: Duration,
+    pub npb_monitor: SelfLoadCircuitBreaker,
+    pub cpu_limit: u32,
+    pub memory_limit: u64,
     pub enabled: bool,
 }
 
@@ -2101,6 +2104,9 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 standalone_data_file_size: conf.global.standalone_mode.max_data_file_size,
                 standalone_data_file_dir: conf.global.standalone_mode.data_file_dir.clone(),
                 enabled: conf.outputs.flow_metrics.enabled,
+                memory_limit: conf.global.limits.max_memory,
+                cpu_limit: conf.global.limits.max_millicpus,
+                npb_monitor: conf.outputs.npb.self_load_circuit_breaker,
             },
             npb: NpbConfig {
                 mtu: conf.outputs.npb.max_mtu,
@@ -2868,6 +2874,25 @@ impl ConfigHandler {
             d.ebpf_collector
                 .on_config_change(&handler.candidate_config.ebpf);
         }
+    }
+
+    fn set_npb_watcher_cpu_limit(handler: &ConfigHandler, components: &mut AgentComponents) {
+        let npb_watcher = &components.npb_bandwidth_watcher;
+        npb_watcher.set_cpu_limit(handler.candidate_config.sender.cpu_limit);
+    }
+
+    fn set_npb_watcher_memory_limit(handler: &ConfigHandler, components: &mut AgentComponents) {
+        let npb_watcher = &components.npb_bandwidth_watcher;
+        npb_watcher.set_memory_limit(handler.candidate_config.sender.memory_limit);
+    }
+
+    fn set_npb_watcher_self_load_circuit_breaker(
+        handler: &ConfigHandler,
+        components: &mut AgentComponents,
+    ) {
+        let npb_watcher = &components.npb_bandwidth_watcher;
+        npb_watcher
+            .set_self_load_circuit_breaker(handler.candidate_config.sender.npb_monitor.clone());
     }
 
     fn set_metric_server(handler: &ConfigHandler, components: &mut AgentComponents) {
@@ -4825,6 +4850,58 @@ impl ConfigHandler {
                     .set_npb_rate(new_config.sender.npb_bps_threshold);
             }
         }
+        let npb_circuit_breaker = &mut npb.self_load_circuit_breaker;
+        let new_npb_circuit_breaker = &mut new_npb.self_load_circuit_breaker;
+        if npb_circuit_breaker.enabled != new_npb_circuit_breaker.enabled {
+            info!(
+                "Update outputs.npb.self_load_circuit_breaker.enabled from {:?} to {:?}.",
+                npb_circuit_breaker.enabled, new_npb_circuit_breaker.enabled
+            );
+            npb_circuit_breaker.enabled = new_npb_circuit_breaker.enabled;
+        }
+        if npb_circuit_breaker.monitoring_interval != new_npb_circuit_breaker.monitoring_interval {
+            info!(
+                "Update outputs.npb.self_load_circuit_breaker.monitoring_interval from {:?} to {:?}.",
+                npb_circuit_breaker.monitoring_interval, new_npb_circuit_breaker.monitoring_interval
+            );
+            npb_circuit_breaker.monitoring_interval = new_npb_circuit_breaker.monitoring_interval;
+        }
+        if npb_circuit_breaker.trigger_times != new_npb_circuit_breaker.trigger_times {
+            info!(
+                "Update outputs.npb.self_load_circuit_breaker.trigger_times from {:?} to {:?}.",
+                npb_circuit_breaker.trigger_times, new_npb_circuit_breaker.trigger_times
+            );
+            npb_circuit_breaker.trigger_times = new_npb_circuit_breaker.trigger_times;
+        }
+        if npb_circuit_breaker.recovery_times != new_npb_circuit_breaker.recovery_times {
+            info!(
+                "Update outputs.npb.self_load_circuit_breaker.recovery_times from {:?} to {:?}.",
+                npb_circuit_breaker.recovery_times, new_npb_circuit_breaker.recovery_times
+            );
+            npb_circuit_breaker.recovery_times = new_npb_circuit_breaker.recovery_times;
+        }
+        if npb_circuit_breaker.cpu != new_npb_circuit_breaker.cpu {
+            info!(
+                "Update outputs.npb.self_load_circuit_breaker.cpu from {:?} to {:?}.",
+                npb_circuit_breaker.cpu, new_npb_circuit_breaker.cpu
+            );
+            npb_circuit_breaker.cpu = new_npb_circuit_breaker.cpu;
+        }
+        if npb_circuit_breaker.memory != new_npb_circuit_breaker.memory {
+            info!(
+                "Update outputs.npb.self_load_circuit_breaker.memory from {:?} to {:?}.",
+                npb_circuit_breaker.memory, new_npb_circuit_breaker.memory
+            );
+            npb_circuit_breaker.memory = new_npb_circuit_breaker.memory;
+        }
+        if npb_circuit_breaker.queue != new_npb_circuit_breaker.queue {
+            info!(
+                "Update outputs.npb.self_load_circuit_breaker.queue from {:?} to {:?}.",
+                npb_circuit_breaker.queue, new_npb_circuit_breaker.queue
+            );
+            npb_circuit_breaker.queue = new_npb_circuit_breaker.queue;
+        }
+
         if npb.raw_udp_vlan_tag != new_npb.raw_udp_vlan_tag {
             info!(
                 "Update outputs.npb.raw_udp_vlan_tag from {:?} to {:?}.",
@@ -5575,6 +5652,18 @@ impl ConfigHandler {
                         &new_config.sender.npb_dedup_enabled,
                     ));
                 }
+            }
+
+            if candidate_config.sender.cpu_limit != new_config.sender.cpu_limit {
+                callbacks.push(Self::set_npb_watcher_cpu_limit);
+            }
+
+            if candidate_config.sender.memory_limit != new_config.sender.memory_limit {
+                callbacks.push(Self::set_npb_watcher_memory_limit);
+            }
+
+            if candidate_config.sender.npb_monitor != new_config.sender.npb_monitor {
+                callbacks.push(Self::set_npb_watcher_self_load_circuit_breaker);
             }
 
             debug!(
