@@ -50,7 +50,9 @@ func InitCETables(dc *DBConfig) error {
 func InitTables(dc *DBConfig, rawSqlDir string) error {
 	log.Info(LogDBName(dc.Config.Database, "initialize %s tables", rawSqlDir))
 
-	for _, sqlFile := range GetSortedSQLFiles(rawSqlDir, false) {
+	sortedFiles := GetSortedSQLFiles(rawSqlDir, false)
+	log.Info(LogDBName(dc.Config.Database, "files to executed: %v", sortedFiles))
+	for _, sqlFile := range sortedFiles {
 		err := ReadAndExecuteSqlFile(dc, sqlFile)
 		if err != nil {
 			return err
@@ -59,7 +61,9 @@ func InitTables(dc *DBConfig, rawSqlDir string) error {
 
 	// 通过判断数据库名称后缀，判断数据库是否是 default 组织。
 	if !strings.HasSuffix(dc.Config.Database, common.NON_DEFAULT_ORG_DATABASE_SUFFIX) {
-		for _, sqlFile := range GetSortedSQLFiles(rawSqlDir, true) {
+		sortedFiles := GetSortedSQLFiles(rawSqlDir, true)
+		log.Info(LogDBName(dc.Config.Database, "files to be executed: %v", sortedFiles))
+		for _, sqlFile := range sortedFiles {
 			err := ReadAndExecuteSqlFile(dc, sqlFile)
 			if err != nil {
 				return err
