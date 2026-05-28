@@ -1090,7 +1090,7 @@ type CustomService struct {
 	OperatedTime     `gorm:"embedded" mapstructure:",squash"`
 	Name             string          `gorm:"column:name;type:varchar(128);default:''" json:"NAME" mapstructure:"NAME"`
 	Type             int             `gorm:"column:type;type:int;default:0" json:"TYPE" mapstructure:"TYPE"`
-	MatchType        int             `gorm:"column:match_type;type:int;default:1" json:"MATCH_TYPE" mapstructure:"MATCH_TYPE"`
+	MatchType        int             `gorm:"column:match_type;type:int;default:0" json:"MATCH_TYPE" mapstructure:"MATCH_TYPE"`
 	VPCIDs           AutoSplitedInts `gorm:"column:epc_ids;type:text;default:''" json:"EPC_IDS" mapstructure:"EPC_IDS"`
 	PodClusterIDs    AutoSplitedInts `gorm:"column:pod_cluster_ids;type:text;default:''" json:"POD_CLUSTER_IDS" mapstructure:"POD_CLUSTER_IDS"`
 	PodNamespaceIDs  AutoSplitedInts `gorm:"column:pod_namespace_ids;type:text;default:''" json:"POD_NAMESPACE_IDS" mapstructure:"POD_NAMESPACE_IDS"`
