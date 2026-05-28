@@ -40,6 +40,8 @@ fn main() {
 #[cfg(feature = "extended_observability")]
 pub mod memory_profile;
 
+#[cfg(feature = "enterprise")]
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::ptr::{self, null_mut};
 use std::slice;
@@ -47,6 +49,8 @@ use std::slice;
 use std::sync::atomic::AtomicI32;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
+#[cfg(feature = "enterprise")]
+use std::sync::{Mutex, OnceLock};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -236,6 +240,98 @@ fn emit_ai_agent_enforcement_audit_event(event: &BoxedProcEvents) {
         if let Some(sender) = PROC_EVENT_SENDER.as_mut() {
             if let Err(e) = sender.send(audit_event) {
                 warn!("ai agent enforcement audit event send error: {:?}", e);
+            }
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn kernel_block_event_cache() -> &'static Mutex<HashMap<KernelBlockMarkerKey, u64>> {
+    RECENT_KERNEL_BLOCK_EVENTS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[cfg(feature = "enterprise")]
+fn prune_kernel_block_event_cache(cache: &mut HashMap<KernelBlockMarkerKey, u64>, now: u64) {
+    cache.retain(|_, ts| now.saturating_sub(*ts) <= KERNEL_BLOCK_EVENT_CACHE_WINDOW_NS);
+}
+
+#[cfg(feature = "enterprise")]
+fn record_kernel_block_event(event: &BoxedProcEvents) {
+    let Some(info) = event.0.proc_block_info() else {
+        return;
+    };
+    if info.action != metric::EnforcementAction::Deny as u8 || info.exec_path.is_empty() {
+        return;
+    }
+    let mut cache = kernel_block_event_cache().lock().unwrap();
+    prune_kernel_block_event_cache(&mut cache, info.timestamp);
+    cache.insert(
+        KernelBlockMarkerKey {
+            pid: info.pid,
+            rule_id: info.rule_id.to_string(),
+            exec_path: info.exec_path.to_vec(),
+        },
+        info.timestamp,
+    );
+}
+
+#[cfg(feature = "enterprise")]
+fn consume_recent_kernel_block_event(pid: u32, rule_id: &str, exec_path: &[u8], now: u64) -> bool {
+    let mut cache = kernel_block_event_cache().lock().unwrap();
+    prune_kernel_block_event_cache(&mut cache, now);
+    cache
+        .remove(&KernelBlockMarkerKey {
+            pid,
+            rule_id: rule_id.to_string(),
+            exec_path: exec_path.to_vec(),
+        })
+        .map(|ts| now.saturating_sub(ts) <= KERNEL_BLOCK_EVENT_CACHE_WINDOW_NS)
+        .unwrap_or(false)
+}
+
+#[cfg(feature = "enterprise")]
+#[allow(static_mut_refs)]
+fn emit_ai_agent_enforcement_best_effort_event(event: &BoxedProcEvents) {
+    use enterprise_utils::ai_agent_enforcement::EnforcementMode;
+
+    if event.0.ai_agent_root_pid == 0 {
+        return;
+    }
+    let Some(exec_info) = event.0.proc_lifecycle_exec_info() else {
+        return;
+    };
+    if exec_info.exec_path.is_empty() {
+        return;
+    }
+    let Some(policy) = enterprise_utils::ai_agent_enforcement::global_exec_policy() else {
+        return;
+    };
+    let exec_path = String::from_utf8_lossy(exec_info.exec_path);
+    let cmdline = String::from_utf8_lossy(exec_info.cmdline);
+    let Some(hit) = policy.match_exec(&exec_path, &cmdline) else {
+        return;
+    };
+    if hit.mode != EnforcementMode::Block {
+        return;
+    }
+    if consume_recent_kernel_block_event(
+        exec_info.pid,
+        &hit.rule_id,
+        exec_info.exec_path,
+        exec_info.timestamp,
+    ) {
+        return;
+    }
+    let Some(best_effort_event) = event
+        .0
+        .new_proc_block_event_for_best_effort(&hit.rule_id, policy.epoch)
+    else {
+        return;
+    };
+    unsafe {
+        if let Some(sender) = PROC_EVENT_SENDER.as_mut() {
+            if let Err(e) = sender.send(best_effort_event) {
+                warn!("ai agent enforcement best_effort event send error: {:?}", e);
             }
         }
     }
@@ -705,9 +801,22 @@ static AI_AGENT_EXEC_LSM_EVENTS_ACTIVE: AtomicBool = AtomicBool::new(false);
 #[cfg(feature = "enterprise")]
 static AI_AGENT_EXEC_KPROBE_EVENTS_ACTIVE: AtomicBool = AtomicBool::new(false);
 #[cfg(feature = "enterprise")]
+static RECENT_KERNEL_BLOCK_EVENTS: OnceLock<Mutex<HashMap<KernelBlockMarkerKey, u64>>> =
+    OnceLock::new();
+#[cfg(feature = "enterprise")]
 const AI_AGENT_EXEC_RULES_BPF_MAX: usize = 256;
 #[cfg(feature = "enterprise")]
 const AI_AGENT_SYSCALL_RULES_BPF_MAX: usize = 32;
+#[cfg(feature = "enterprise")]
+const KERNEL_BLOCK_EVENT_CACHE_WINDOW_NS: u64 = 5_000_000_000;
+
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct KernelBlockMarkerKey {
+    pid: u32,
+    rule_id: String,
+    exec_path: Vec<u8>,
+}
 
 #[cfg(feature = "enterprise")]
 fn ai_agent_enforcement_mode_eq(value: &str, expected: &str) -> bool {
@@ -922,7 +1031,11 @@ impl EbpfCollector {
                 #[cfg(feature = "enterprise")]
                 fill_ai_agent_root_pid(&mut event);
                 #[cfg(feature = "enterprise")]
+                record_kernel_block_event(&event);
+                #[cfg(feature = "enterprise")]
                 emit_ai_agent_enforcement_audit_event(&event);
+                #[cfg(feature = "enterprise")]
+                emit_ai_agent_enforcement_best_effort_event(&event);
                 if let Err(e) = PROC_EVENT_SENDER.as_mut().unwrap().send(event) {
                     warn!("event send ebpf error: {:?}", e);
                 }

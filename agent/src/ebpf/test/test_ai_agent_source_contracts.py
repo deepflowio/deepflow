@@ -405,6 +405,20 @@ if ENTERPRISE_AGENT.exists():
         "buf->path,\n\t\t\t\t       AI_AGENT_EXEC_PATTERN_LEN" in exec_override_text,
         "AI Agent exec override must report exec_path as cmdline placeholder instead of a partial argv slot",
     )
+    file_io_bpf = ENTERPRISE_BPF / "ai_agent_file_io.bpf.c"
+    file_io_text = read_source(file_io_bpf)
+    require(
+        "for (__u32 attempt = 0; attempt < 3; attempt++)" in exec_override_standalone_text
+        and "ret = bpf_perf_event_output(" in exec_override_standalone_text
+        and "if (ret >= 0)" in exec_override_standalone_text,
+        "standalone exec override helper must retry perf event output up to 3 attempts",
+    )
+    require(
+        "for (__u32 attempt = 0; attempt < 3; attempt++)" in file_io_text
+        and "ret = bpf_perf_event_output(" in file_io_text
+        and "if (ret >= 0)" in file_io_text,
+        "shared AI Agent event helper must retry perf event output up to 3 attempts",
+    )
     syscall_override_bpf = ENTERPRISE_BPF / "ai_agent_syscall_override.bpf.c"
     require(
         syscall_override_bpf.exists(),

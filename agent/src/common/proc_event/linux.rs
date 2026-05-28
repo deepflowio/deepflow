@@ -319,8 +319,18 @@ pub struct ProcLifecycleExecInfo<'a> {
     pub parent_pid: u32,
     pub uid: u32,
     pub gid: u32,
+    pub timestamp: u64,
     pub comm: &'a [u8],
     pub cmdline: &'a [u8],
+    pub exec_path: &'a [u8],
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProcBlockInfo<'a> {
+    pub pid: u32,
+    pub action: u8,
+    pub timestamp: u64,
+    pub rule_id: &'a str,
     pub exec_path: &'a [u8],
 }
 
@@ -406,7 +416,9 @@ const PROC_BLOCK_CMDLINE_LEN: usize = 256;
 const PROC_BLOCK_EXEC_PATH_LEN: usize = 256;
 const ENFORCEMENT_TARGET_EXEC: u8 = 1;
 const ENFORCEMENT_ACTION_AUDIT: u8 = 1;
+const ENFORCEMENT_ACTION_DENY: u8 = 2;
 const ENFORCEMENT_MECHANISM_USER_SPACE_AUDIT: u8 = 5;
+const ENFORCEMENT_GUARANTEE_BEST_EFFORT: u8 = 2;
 const ENFORCEMENT_GUARANTEE_AUDIT_ONLY: u8 = 3;
 
 struct ProcBlockEventData {
@@ -725,11 +737,25 @@ impl ProcEvent {
                     parent_pid: data.parent_pid,
                     uid: data.uid,
                     gid: data.gid,
+                    timestamp: data.timestamp,
                     comm: &data.comm,
                     cmdline: &data.cmdline,
                     exec_path: &data.exec_path,
                 })
             }
+            _ => None,
+        }
+    }
+
+    pub fn proc_block_info(&self) -> Option<ProcBlockInfo<'_>> {
+        match &self.event_data {
+            EventData::ProcBlockEvent(data) => Some(ProcBlockInfo {
+                pid: data.pid,
+                action: data.action,
+                timestamp: data.timestamp,
+                rule_id: data.rule_id.as_str(),
+                exec_path: &data.exec_path,
+            }),
             _ => None,
         }
     }
@@ -759,6 +785,59 @@ impl ProcEvent {
                 .to_string(),
             guarantee: enforcement_guarantee_name(ENFORCEMENT_GUARANTEE_AUDIT_ONLY).to_string(),
             errno: 0,
+            pid: data.pid,
+            parent_pid: data.parent_pid,
+            ai_agent_root_pid: root_pid,
+            uid: data.uid,
+            gid: data.gid,
+            comm: process_kname.clone(),
+            cmdline: truncate_bytes(&data.cmdline, PROC_BLOCK_CMDLINE_LEN),
+            exec_path: truncate_bytes(&data.exec_path, PROC_BLOCK_EXEC_PATH_LEN),
+            syscall_name: String::new(),
+            syscall_id: 0,
+            timestamp: data.timestamp,
+            policy_epoch,
+        };
+
+        Some(BoxedProcEvents(Box::new(ProcEvent {
+            pid: data.pid,
+            pod_id: self.pod_id,
+            ai_agent_root_pid: root_pid,
+            thread_id: self.thread_id,
+            coroutine_id: self.coroutine_id,
+            process_kname,
+            start_time: self.start_time,
+            end_time: self.end_time,
+            event_type: EventType::ProcBlockEvent,
+            event_data: EventData::ProcBlockEvent(block_event),
+        })))
+    }
+
+    pub fn new_proc_block_event_for_best_effort(
+        &self,
+        rule_id: &str,
+        policy_epoch: u64,
+    ) -> Option<BoxedProcEvents> {
+        let data = match &self.event_data {
+            EventData::ProcLifecycleEvent(data) if data.lifecycle_type == PROC_LIFECYCLE_EXEC => {
+                data
+            }
+            _ => return None,
+        };
+        let process_kname = if data.comm.is_empty() {
+            self.process_kname.clone()
+        } else {
+            data.comm.clone()
+        };
+        let root_pid = self.ai_agent_root_pid;
+        let block_event = ProcBlockEventData {
+            rule_id: rule_id.chars().take(PROC_BLOCK_RULE_ID_LEN).collect(),
+            target_type: ENFORCEMENT_TARGET_EXEC,
+            action: ENFORCEMENT_ACTION_DENY,
+            mechanism: enforcement_mechanism_name(ENFORCEMENT_MECHANISM_USER_SPACE_AUDIT)
+                .to_string(),
+            guarantee: enforcement_guarantee_name(ENFORCEMENT_GUARANTEE_BEST_EFFORT).to_string(),
+            errno: 1,
             pid: data.pid,
             parent_pid: data.parent_pid,
             ai_agent_root_pid: root_pid,
@@ -1021,6 +1100,49 @@ mod tests {
         assert_eq!(block.action, metric::EnforcementAction::Audit as i32);
         assert_eq!(block.mechanism, "user_space_audit");
         assert_eq!(block.guarantee, "audit_only");
+        assert_eq!(block.ai_agent_root_pid, 100);
+        assert_eq!(block.exec_path, b"/sbin/reboot");
+    }
+
+    #[test]
+    fn test_new_proc_block_event_for_best_effort_encodes_proc_block_event() {
+        let proc_event = ProcEvent {
+            pid: 13,
+            pod_id: 7,
+            ai_agent_root_pid: 100,
+            thread_id: 13,
+            coroutine_id: 0,
+            process_kname: b"reboot".to_vec(),
+            start_time: 42,
+            end_time: 43,
+            event_type: EventType::ProcLifecycleEvent,
+            event_data: EventData::ProcLifecycleEvent(ProcLifecycleEventData {
+                lifecycle_type: PROC_LIFECYCLE_EXEC,
+                pid: 13,
+                parent_pid: 10,
+                uid: 1000,
+                gid: 1000,
+                timestamp: 42,
+                comm: b"reboot".to_vec(),
+                cmdline: b"reboot now".to_vec(),
+                exec_path: b"/sbin/reboot".to_vec(),
+            }),
+        };
+
+        let boxed = proc_event
+            .new_proc_block_event_for_best_effort("block-reboot", 99)
+            .unwrap();
+        let mut buf = Vec::new();
+        boxed.encode(&mut buf).unwrap();
+        let pb = metric::ProcEvent::decode(buf.as_slice()).unwrap();
+        let block = pb.proc_block_event_data.unwrap();
+
+        assert_eq!(pb.event_type, metric::EventType::ProcBlockEvent as i32);
+        assert_eq!(block.rule_id, "block-reboot");
+        assert_eq!(block.action, metric::EnforcementAction::Deny as i32);
+        assert_eq!(block.mechanism, "user_space_audit");
+        assert_eq!(block.guarantee, "best_effort");
+        assert_eq!(block.errno, 1);
         assert_eq!(block.ai_agent_root_pid, 100);
         assert_eq!(block.exec_path, b"/sbin/reboot");
     }
