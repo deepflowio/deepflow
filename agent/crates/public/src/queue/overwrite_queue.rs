@@ -90,6 +90,24 @@ impl<T> OverwriteQueue<T> {
         self.terminated.load(Ordering::Relaxed)
     }
 
+    pub fn usage_rate_percent(&self) -> u8 {
+        let start = self.start.load(Ordering::Acquire);
+        let raw_end = self.end.load(Ordering::Acquire);
+        // the value of end will be less than start if it was wrapped
+        // unwrap it for easy comparison
+        let end = if raw_end < start {
+            raw_end + 2 * self.size
+        } else {
+            raw_end
+        };
+        let pending = (end - start).min(self.size);
+        if pending == 0 {
+            0
+        } else {
+            (pending as f64 / self.size as f64 * 100.0) as u8
+        }
+    }
+
     unsafe fn raw_send(&self, msgs: *const T, count: usize) -> Result<(), Error<T>> {
         if self.terminated.load(Ordering::Acquire) {
             return Err(Error::Terminated(None, None));
@@ -312,6 +330,10 @@ impl<T> Sender<T> {
         }
     }
 
+    pub fn usage_rate_percent(&self) -> u8 {
+        self.counter().queue.usage_rate_percent()
+    }
+
     // This method clears the Vec on success, and leave it as it is on failure
     // The length of msgs cannot exceed queue size, or it will return Error::BatchTooLarge
     pub fn send_all(&self, msgs: &mut Vec<T>) -> Result<(), Error<T>> {
@@ -431,6 +453,10 @@ impl<T> Receiver<T> {
             .queue
             .total_overwritten_count
             .load(Ordering::Relaxed)
+    }
+
+    pub fn usage_rate_percent(&self) -> u8 {
+        self.counter().queue.usage_rate_percent()
     }
 }
 

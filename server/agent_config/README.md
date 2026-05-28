@@ -11212,6 +11212,391 @@ outputs:
 
 Maximum traffic rate allowed for npb sender.
 
+### NPB (Network Packet Broker) {#outputs.npb.self_load_circuit_breaker}
+
+#### Enabled {#outputs.npb.self_load_circuit_breaker.enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.enabled`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Load Self-Monitoring Switch
+
+#### Monitoring time interval {#outputs.npb.self_load_circuit_breaker.monitoring_interval}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.monitoring_interval`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      monitoring_interval: 10s
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['1s', '60s'] |
+
+**Description**:
+
+Monitoring time interval 
+
+#### Trigger Times {#outputs.npb.self_load_circuit_breaker.trigger_times}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.trigger_times`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      trigger_times: 5
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 60] |
+
+**Description**:
+
+When the load exceeds the trigger threshold multiple times consecutively, the deepflow-agent will stop 
+the NPB function to reduce the load, while other functions can be used normally.
+
+#### Recovery Times {#outputs.npb.self_load_circuit_breaker.recovery_times}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.recovery_times`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      recovery_times: 5
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 60] |
+
+**Description**:
+
+When the load is detected to be below the recovery threshold multiple times consecutively, the deepflow-agent
+will enable the NPB function.
+
+#### CPU {#outputs.npb.self_load_circuit_breaker.cpu}
+
+##### Enabled {#outputs.npb.self_load_circuit_breaker.cpu.enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.cpu.enabled`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      cpu:
+        enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+CPU Load Monitoring Switch 
+
+##### Trigger Threshold {#outputs.npb.self_load_circuit_breaker.cpu.trigger_threshold}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.cpu.trigger_threshold`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      cpu:
+        trigger_threshold: 90
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 100] |
+
+**Description**:
+
+When the load exceeds this threshold multiple times consecutively, the deepflow-agent will stop the NPB function
+to reduce the load, while other functions can be used normally.
+
+##### Recovery Threshold {#outputs.npb.self_load_circuit_breaker.cpu.recovery_threshold}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.cpu.recovery_threshold`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      cpu:
+        recovery_threshold: 70
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 100] |
+
+**Description**:
+
+When the load is detected to be below this threshold multiple times consecutively, the deepflow-agent will enable
+the NPB function.
+
+#### Memory {#outputs.npb.self_load_circuit_breaker.memory}
+
+##### Enabled {#outputs.npb.self_load_circuit_breaker.memory.enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.memory.enabled`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      memory:
+        enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Memory Load Monitoring Switch 
+
+##### Trigger Threshold {#outputs.npb.self_load_circuit_breaker.memory.trigger_threshold}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.memory.trigger_threshold`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      memory:
+        trigger_threshold: 90
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 100] |
+
+**Description**:
+
+When the load exceeds this threshold multiple times consecutively, the deepflow-agent will stop the NPB function
+to reduce the load, while other functions can be used normally.
+
+##### Recovery Threshold {#outputs.npb.self_load_circuit_breaker.memory.recovery_threshold}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.memory.recovery_threshold`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      memory:
+        recovery_threshold: 70
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 100] |
+
+**Description**:
+
+When the load is detected to be below this threshold multiple times consecutively, the deepflow-agent will enable
+the NPB function.
+
+#### Queue {#outputs.npb.self_load_circuit_breaker.queue}
+
+##### Enabled {#outputs.npb.self_load_circuit_breaker.queue.enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.queue.enabled`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      queue:
+        enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Queue Load Monitoring Switch 
+
+##### Trigger Threshold {#outputs.npb.self_load_circuit_breaker.queue.trigger_threshold}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.queue.trigger_threshold`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      queue:
+        trigger_threshold: 90
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 100] |
+
+**Description**:
+
+When the load exceeds this threshold multiple times consecutively, the deepflow-agent will stop the NPB function
+to reduce the load, while other functions can be used normally.
+
+##### Recovery Threshold {#outputs.npb.self_load_circuit_breaker.queue.recovery_threshold}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`outputs.npb.self_load_circuit_breaker.queue.recovery_threshold`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    self_load_circuit_breaker:
+      queue:
+        recovery_threshold: 70
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 100] |
+
+**Description**:
+
+When the load is detected to be below this threshold multiple times consecutively, the deepflow-agent will enable
+the NPB function.
+
 ## Compression {#outputs.compression}
 
 ### Application_Log {#outputs.compression.application_log}

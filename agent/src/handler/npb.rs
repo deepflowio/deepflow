@@ -38,6 +38,7 @@ use crate::common::{
 };
 use crate::config::NpbConfig;
 use crate::sender::npb_sender::{NpbArpTable, NpbPacketSender};
+use crate::utils::npb_bandwidth_watcher::NpbBandwidthWatcher;
 use crate::utils::stats::{self, QueueStats, StatsOption};
 use npb_handler::{NpbHandler, NpbHandlerCounter, NpbHeader, StatsNpbHandlerCounter, NOT_SUPPORT};
 use public::{
@@ -91,6 +92,14 @@ pub struct NpbBuilder {
 
     bps_limit: Arc<LeakyBucket>,
     stats_collector: Arc<stats::Collector>,
+    npb_bandwidth_watcher: Arc<NpbBandwidthWatcher>,
+}
+
+impl Drop for NpbBuilder {
+    fn drop(&mut self) {
+        self.stop();
+        self.npb_bandwidth_watcher.remove_npb_queue(self.id);
+    }
 }
 
 impl NpbBuilder {
@@ -240,7 +249,10 @@ impl NpbBuilder {
             Self::create_pseudo_tcp_packet(config),
         ];
         self.npb_packet_sender = Some(npb_packet_sender);
-        self.sender = sender;
+        self.sender = sender.clone();
+
+        let cb: Arc<dyn Fn() -> u8 + Send + Sync> = Arc::new(move || sender.usage_rate_percent());
+        self.npb_bandwidth_watcher.add_npb_queue(self.id, cb);
 
         if is_running {
             self.start();
@@ -254,6 +266,7 @@ impl NpbBuilder {
         npb_bps_limit: Arc<LeakyBucket>,
         arp: Arc<NpbArpTable>,
         stats_collector: Arc<stats::Collector>,
+        npb_bandwidth_watcher: Arc<NpbBandwidthWatcher>,
     ) -> Box<Self> {
         let queue_name = "1-packet-to-npb-sender";
         let (sender, receiver, counter) =
@@ -265,6 +278,11 @@ impl NpbBuilder {
             },
             Countable::Owned(Box::new(counter)),
         );
+
+        let cb_sender = sender.clone();
+        let cb: Arc<dyn Fn() -> u8 + Send + Sync> =
+            Arc::new(move || cb_sender.usage_rate_percent());
+        npb_bandwidth_watcher.add_npb_queue(id, cb);
 
         let builder = Box::new(Self {
             id,
@@ -293,6 +311,7 @@ impl NpbBuilder {
             thread_handle: Mutex::new(None),
             arp,
             stats_collector,
+            npb_bandwidth_watcher,
             bps_limit: npb_bps_limit,
         });
 
