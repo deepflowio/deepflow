@@ -408,16 +408,25 @@ func (e *AgentEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRe
 		syncResponse.NewGrpcBufferSize = &grpcBufferSize
 		return &syncResponse, nil
 	}
+	// When the controller determines that the agent needs to adjust `current_grpc_buffer_size`,
+	// this value is set to true. At this time, only the following fields in the message are valid:
+	// - status
+	// - user_config
+	// - revision
+	// - self_update_url
+	// - containers
+	// - dynamic_config
+	// - only_partial_fields
+	// - new_grpc_buffer_size
 	return &api.SyncResponse{
 		Status:            &STATUS_SUCCESS,
+		UserConfig:        proto.String(userConfigData),
+		Revision:          proto.String(upgradeRevision),
+		SelfUpdateUrl:     proto.String(selfUpdateURL),
+		Containers:        containers,
+		DynamicConfig:     dynamicConfig,
 		OnlyPartialFields: proto.Bool(true),
 		NewGrpcBufferSize: &grpcBufferSize,
-		UserConfig:        proto.String(userConfigData),
-		DynamicConfig:     dynamicConfig,
-		Containers:        containers,
-		SelfUpdateUrl:     proto.String(selfUpdateURL),
-		Revision:          proto.String(upgradeRevision),
-		CustomAppConfig:   &customAppConfig,
 	}, nil
 }
 
