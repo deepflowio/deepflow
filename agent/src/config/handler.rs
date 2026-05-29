@@ -55,9 +55,9 @@ use super::config::{Ebpf, EbpfFileIoEvent, ProcessMatcher, SymbolTable};
 use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
-        HttpEndpointMatchRule, Iso8583ParseConfig, OracleConfig, PcapStream, PortConfig,
-        ProcessorsFlowLogTunning, RequestLog, RequestLogTunning, SessionTimeout, TagFilterOperator,
-        Timeouts, UserConfig, GRPC_BUFFER_SIZE_MIN,
+        HttpEndpointMatchRule, Iso8583ParseConfig, OpenAiApiConfig, OracleConfig, PcapStream,
+        PortConfig, ProcessorsFlowLogTunning, RequestLog, RequestLogTunning, SessionTimeout,
+        TagFilterOperator, Timeouts, UserConfig, GRPC_BUFFER_SIZE_MIN,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -1111,6 +1111,7 @@ pub struct LogParserConfig {
     pub unconcerned_dns_nxdomain_trie: DomainNameTrie,
     pub mysql_decompress_payload: bool,
     pub mysql_endpoint_disabled: bool,
+    pub openai_api: OpenAiApiConfig,
     #[cfg(feature = "enterprise")]
     pub custom_protocol_config: ExtraCustomProtocolConfig,
 }
@@ -1133,6 +1134,7 @@ impl Default for LogParserConfig {
             unconcerned_dns_nxdomain_trie: DomainNameTrie::default(),
             mysql_decompress_payload: true,
             mysql_endpoint_disabled: true,
+            openai_api: OpenAiApiConfig::default(),
             #[cfg(feature = "enterprise")]
             custom_protocol_config: ExtraCustomProtocolConfig::default(),
         }
@@ -1181,7 +1183,8 @@ impl fmt::Debug for LogParserConfig {
                 &self.unconcerned_dns_nxdomain_trie,
             )
             .field("mysql_decompress_payload", &self.mysql_decompress_payload)
-            .field("mysql_endpoint_disabled", &self.mysql_endpoint_disabled);
+            .field("mysql_endpoint_disabled", &self.mysql_endpoint_disabled)
+            .field("openai_api_enabled", &self.openai_api.enabled);
 
         #[cfg(feature = "enterprise")]
         r.field("custom_protocol_config", &self.custom_protocol_config);
@@ -2280,6 +2283,13 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .protocol_special_config
                     .mysql
                     .endpoint_disabled,
+                openai_api: conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .protocol_special_config
+                    .openai_api
+                    .clone(),
                 #[cfg(feature = "enterprise")]
                 custom_protocol_config: ExtraCustomProtocolConfig::new(
                     &conf

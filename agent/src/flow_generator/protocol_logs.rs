@@ -345,15 +345,30 @@ impl AppProtoLogsBaseInfo {
         }
 
         // go http2 uprobe  may merge multi times, if not req and resp merge can not set to session
+        // Save whether this entry was already a Session before the merge so we can
+        // decide whether to recompute rrt below.
+        let was_already_session = self.head.msg_type == LogMessageType::Session;
         if self.head.msg_type != log.head.msg_type {
             self.head.msg_type = LogMessageType::Session;
         }
 
-        self.head.rrt = if self.end_time > self.start_time {
-            (self.end_time.as_micros() - self.start_time.as_micros()) as u64
-        } else {
-            0
-        };
+        // Freeze rrt after the first req→resp merge.
+        //
+        // On the initial merge (Request + Response → Session), end_time equals the
+        // first-response packet time, so `end_time - start_time` naturally gives
+        // first-response latency — the same semantics as non-streaming HTTP.
+        //
+        // For multi-merge protocols (SSE streaming, Go HTTP2 uprobe), each
+        // continuation packet would push end_time forward and make rrt equal to
+        // the total stream duration instead.  Skipping the recomputation once the
+        // entry is already a Session preserves the first-response latency value.
+        if !was_already_session {
+            self.head.rrt = if self.end_time > self.start_time {
+                (self.end_time.as_micros() - self.start_time.as_micros()) as u64
+            } else {
+                0
+            };
+        }
 
         if self.biz_type == 0 {
             self.biz_type = log.biz_type;
