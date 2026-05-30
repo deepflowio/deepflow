@@ -6202,6 +6202,35 @@ mod tests {
     }
 
     #[test]
+    fn test_ai_agent_enforcement_parses_cmdline_prefixes() {
+        let yaml = r#"
+ai_agent:
+  enforcement:
+    enabled: true
+    mode: block
+    rules:
+      - id: block-systemctl-reboot
+        scope: ai_agent_tree
+        target_type: exec
+        action:
+          type: deny
+        exec:
+          exact:
+            - /usr/bin/systemctl
+          cmdline_prefixes:
+            - systemctl reboot
+"#;
+        let proc: crate::config::config::Proc = serde_yaml::from_str(yaml).unwrap();
+        let enforcement = &proc.ai_agent.enforcement;
+        assert!(enforcement.enabled);
+        assert_eq!(enforcement.rules.len(), 1);
+        assert_eq!(
+            enforcement.rules[0].exec.cmdline_prefixes,
+            vec!["systemctl reboot".to_string()]
+        );
+    }
+
+    #[test]
     fn test_log_parser_debug_includes_ai_agent_enforcement() {
         let mut config = LogParserConfig::default();
         config.ai_agent_enforcement.enabled = true;

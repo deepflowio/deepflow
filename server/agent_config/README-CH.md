@@ -2648,9 +2648,9 @@ inputs:
 
 - 每个 `exec.exact` 会占用 1 条 exec BPF record。
 - 每个 `exec.suffix` 会占用 1 条 exec BPF record。
-- 如果配置了 `argv_matches`，还会按 `argv_matches` 数量放大。
-- 只审计规则如果最终会编译成 `exact` / `suffix` / `argv_matches` 形式的 exec record，也会计入这里。
-- 纯 `exec.prefix` / `exec.argv_contains_any` 审计规则只在用户态匹配，不消耗 exec BPF record。
+- 如果配置了 `argv_matches` 或 `cmdline_prefixes`，还会按选择器数量放大。
+- 只审计规则如果最终会编译成 `exact` / `suffix` / `argv_matches` / `cmdline_prefixes` 形式的 exec record，也会计入这里。
+- 纯 `exec.prefix` 审计规则只在用户态匹配，不消耗 exec BPF record。
 - 当前 exec 强阻断上限是 `256` 条编译后的 record。
 - direct syscall 路径使用单独的固定 map，并且支持的 syscall 集更小。
 
@@ -2693,7 +2693,7 @@ AI Agent 执行阻断规则。
 - `exec.exact` / `exec.suffix`：强阻断选择器
 - `exec.prefix`：仅用户态审计选择器；4.18 上不参与强阻断
 - `exec.argv_matches`：强阻断只支持 `index: 0..3`、`op: exact`，并且必须搭配 `exact` 或 `suffix`
-- `exec.argv_contains_any`：仅用户态审计选择器，不参与强阻断
+- `exec.cmdline_prefixes`：强阻断支持 256B 截断 `cmdline` 前缀匹配，并且必须搭配 `exact` 或 `suffix` 路径选择器。
 - `syscall.names` / `syscall.symbols`：当前 direct syscall 仅支持 `reboot`、`init_module`、`finit_module`、`delete_module`、`kexec_load`，并且无论阻断还是审计都依赖 `kprobe_override` 支持
 
 推荐示例：
@@ -2740,6 +2740,16 @@ inputs:
             - index: 1
               op: exact
               value: reboot
+        - id: block-systemctl-reboot-cmdline
+          scope: ai_agent_tree
+          target_type: exec
+          action:
+            type: deny
+          exec:
+            exact:
+            - /usr/bin/systemctl
+            cmdline_prefixes:
+            - systemctl reboot
         - id: block-direct-reboot
           scope: ai_agent_tree
           target_type: syscall

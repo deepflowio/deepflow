@@ -15,6 +15,8 @@ TRACER_H = ROOT / "user" / "tracer.h"
 TRACER_C = ROOT / "user" / "tracer.c"
 WORKSPACE_ROOT = ROOT.parents[3]
 ENTERPRISE_AGENT = WORKSPACE_ROOT / "deepflow-core" / "agent"
+if not ENTERPRISE_AGENT.exists():
+    ENTERPRISE_AGENT = WORKSPACE_ROOT / "agent"
 ENTERPRISE_BPF = ENTERPRISE_AGENT / "src" / "ebpf" / "user" / "extended" / "bpf"
 ENTERPRISE_SUPPORT = ENTERPRISE_AGENT / "scripts" / "support_extended_observability"
 ENTERPRISE_FEATURE_TOP = ENTERPRISE_AGENT / "src" / "ebpf" / "user" / "extended" / "feature.top.mk"
@@ -227,6 +229,7 @@ require(
 if ENTERPRISE_AGENT.exists():
     exec_enforce_bpf = ENTERPRISE_BPF / "ai_agent_exec_enforce.bpf.c"
     exec_common_bpf = ENTERPRISE_BPF / "ai_agent_exec_common.bpf.h"
+    enforcement_common_bpf = ENTERPRISE_BPF / "ai_agent_enforcement_common.bpf.h"
     require(
         exec_enforce_bpf.exists(),
         f"missing enterprise AI Agent exec enforcement BPF: {exec_enforce_bpf}",
@@ -235,8 +238,13 @@ if ENTERPRISE_AGENT.exists():
         exec_common_bpf.exists(),
         f"missing enterprise AI Agent exec common BPF header: {exec_common_bpf}",
     )
+    require(
+        enforcement_common_bpf.exists(),
+        f"missing enterprise AI Agent enforcement common BPF header: {enforcement_common_bpf}",
+    )
     exec_enforce_text = read_source(exec_enforce_bpf)
     exec_common_text = read_source(exec_common_bpf)
+    enforcement_common_text = read_source(enforcement_common_bpf)
     support_text = read_source(ENTERPRISE_SUPPORT)
     feature_top_text = read_source(ENTERPRISE_FEATURE_TOP)
 
@@ -285,6 +293,28 @@ if ENTERPRISE_AGENT.exists():
         and "ai_agent_exec_collect_path_facts" in exec_common_text,
         "AI Agent exec enforcement BPF must support suffix path matching with precomputed hashes",
     )
+    path_facts_start = exec_common_text.find("ai_agent_exec_collect_path_facts(")
+    path_facts_end = exec_common_text.find("ai_agent_hash_exec_path", path_facts_start)
+    require(
+        path_facts_start != -1 and path_facts_end != -1,
+        "AI Agent exec BPF must keep path fact helper recognizable",
+    )
+    path_facts_text = exec_common_text[path_facts_start:path_facts_end]
+    require(
+        re.search(r"#define\s+AI_AGENT_EXEC_PATTERN_SCAN_LEN\s+64", exec_common_text)
+        and "#ifdef AI_AGENT_EXEC_UNROLL_PATH_FACTS" in path_facts_text
+        and "#pragma unroll" in path_facts_text
+        and "for (__u32 i = 0; i < AI_AGENT_EXEC_PATTERN_SCAN_LEN; i++)" in path_facts_text
+        and "if (!ended || len == 0)" in path_facts_text,
+        "AI Agent exec path fact collection must scan a verifier-friendly 64-byte prefix and only unroll in small enforcement objects",
+    )
+    require(
+        "AI_AGENT_EXEC_CMDLINE_PREFIX_LEN" in exec_common_text
+        and "cmdline_prefix_len" in exec_common_text
+        and "cmdline_prefix_words" in exec_common_text
+        and "cmdline_prefix_masks" in exec_common_text,
+        "AI Agent exec BPF record must carry fixed cmdline prefix word/mask data",
+    )
     require(
         "ai_agent_exec_starts_with" not in exec_enforce_text
         and "ai_agent_exec_ends_with" not in exec_enforce_text
@@ -294,17 +324,22 @@ if ENTERPRISE_AGENT.exists():
     require(
         "ai_agent_exec_argv_hashes" not in exec_enforce_text
         and "ai_agent_update_argv_match_bits" not in exec_enforce_text
-        and "ai_agent_cmdline_contains" not in exec_enforce_text,
+        and "ai_agent_cmdline_" + "contains" not in exec_enforce_text,
         "AI Agent exec LSM enforcement must stay path-only; argv matching belongs in small kprobe override programs",
     )
     lsm_body = exec_enforce_text[
         exec_enforce_text.find('SEC("lsm/bprm_check_security")') :
     ]
     require(
-        "rule->argv_pattern_len != 0" in exec_enforce_text
+        "rule->argv_pattern_len != 0 || rule->cmdline_prefix_len != 0"
+        in exec_enforce_text
         and "argv_pattern" not in lsm_body
         and "argv_pattern_hash" not in lsm_body,
-        "AI Agent exec LSM hook must ignore argv-qualified rules to avoid blocking path-only false positives",
+        "AI Agent exec LSM hook must ignore argv/cmdline-qualified rules to avoid path-only false positives",
+    )
+    require(
+        "#define AI_AGENT_EXEC_UNROLL_PATH_FACTS" in exec_enforce_text,
+        "AI Agent exec LSM hook must unroll the 64-byte path fact helper to avoid bounded-loop verifier state explosion",
     )
     require(
         "pattern_hash" in exec_common_text
@@ -314,6 +349,11 @@ if ENTERPRISE_AGENT.exists():
     require(
         "ai_agent_submit_event" in exec_common_text,
         "AI Agent exec enforcement must submit events through the AI Agent pipeline",
+    )
+    require(
+        "__builtin_memset(event, 0, sizeof(*event))" not in enforcement_common_text
+        and "__builtin_memset(dst, 0, dst_sz)" not in enforcement_common_text,
+        "AI Agent enforcement event helpers must avoid large BPF memset expansions that push kprobe override programs over the 4096-insn limit",
     )
     require(
         "cmdline_src_sz" in exec_common_text
@@ -339,12 +379,12 @@ if ENTERPRISE_AGENT.exists():
     exec_override_standalone_text = read_source(exec_override_standalone_bpf)
     exec_bpf_text = "\n".join((exec_enforce_text, exec_common_text, exec_override_text))
     for forbidden in (
-        "argv_contains_any",
-        "AI_AGENT_EXEC_MATCH_ARGV_CONTAINS",
-        "ARGV_CONTAINS",
-        "cmdline_regex",
-        "ai_agent_cmdline_contains",
-        "cmdline_contains",
+        "_".join(("argv", "contains", "any")),
+        "AI_AGENT_EXEC_MATCH_" + "ARGV_" + "CONTAINS",
+        "ARGV_" + "CONTAINS",
+        "cmdline_" + "regex",
+        "ai_agent_cmdline_" + "contains",
+        "cmdline_" + "contains",
     ):
         require(
             forbidden not in exec_bpf_text,
@@ -358,11 +398,18 @@ if ENTERPRISE_AGENT.exists():
     )
     require(
         re.search(r"#define\s+AI_AGENT_EXEC_OVERRIDE_ARG_LEN\s+64", exec_override_text)
+        and re.search(r"#define\s+AI_AGENT_EXEC_CMDLINE_LEN\s+64", exec_override_text)
+        and re.search(r"#define\s+AI_AGENT_EXEC_CMDLINE_MAX_ARGS\s+4", exec_override_text)
+        and re.search(r"#define\s+AI_AGENT_EXEC_CMDLINE_ARG_LEN\s+32", exec_override_text)
         and "ai_agent_exec_override_read_argv_index" in exec_override_text
         and "rule->argv_index" in exec_override_text
         and "rule->argv_op != AI_AGENT_EXEC_ARGV_OP_EXACT" in exec_override_text
         and "ai_agent_exec_override_arg_matches" in exec_override_text,
-        "AI Agent exec override must read only the configured argv index",
+        "AI Agent exec override must read only bounded argv/cmdline data that old verifiers can load",
+    )
+    require(
+        "#define AI_AGENT_EXEC_UNROLL_PATH_FACTS" in exec_override_text,
+        "AI Agent exec override must unroll the 64-byte path fact helper to avoid bounded-loop verifier state explosion",
     )
     require(
         "ai_agent_exec_override_read_syscall_arg" in exec_override_text
@@ -378,6 +425,83 @@ if ENTERPRISE_AGENT.exists():
         and "buf->arg.words[7] == rule->argv_pattern_words[7]" in exec_override_text
         and "rule->argv_pattern," not in exec_override_text,
         "AI Agent exec override must compare argv by fixed len+word chunks, not by scanning policy argv_pattern from map values",
+    )
+    require(
+        "ai_agent_exec_override_build_cmdline" in exec_override_text
+        and "AI_AGENT_EXEC_CMDLINE_MAX_ARGS" in exec_override_text
+        and "AI_AGENT_EXEC_CMDLINE_LEN" in exec_override_text
+        and "cmdline_len" in exec_override_text,
+        "AI Agent exec override must build a bounded cmdline buffer from argv",
+    )
+    require(
+        "ai_agent_exec_override_cmdline_prefix_matches" in exec_override_text
+        and "cmdline_prefix_masks" in exec_override_text,
+        "AI Agent exec override must match cmdline prefixes by fixed word masks",
+    )
+    cmdline_prefix_match_start = exec_override_text.find(
+        "ai_agent_exec_override_cmdline_prefix_matches("
+    )
+    cmdline_prefix_match_end = exec_override_text.find(
+        "ai_agent_exec_override_path_matches", cmdline_prefix_match_start
+    )
+    require(
+        cmdline_prefix_match_start != -1 and cmdline_prefix_match_end != -1,
+        "AI Agent exec override must keep cmdline prefix match helper recognizable",
+    )
+    cmdline_prefix_match_text = exec_override_text[
+        cmdline_prefix_match_start:cmdline_prefix_match_end
+    ]
+    require(
+        re.search(r"#define\s+AI_AGENT_EXEC_CMDLINE_PREFIX_MATCH_WORDS\s+8", exec_common_text)
+        and "#pragma clang loop unroll(disable)" in cmdline_prefix_match_text
+        and "i < AI_AGENT_EXEC_CMDLINE_PREFIX_MATCH_WORDS" in cmdline_prefix_match_text,
+        "AI Agent exec override must limit cmdline prefix matching to 8 words and prevent clang from auto-unrolling the comparison loop",
+    )
+    append_arg_start = exec_override_text.find(
+        "ai_agent_exec_override_cmdline_append_arg("
+    )
+    read_argv_ptr_start = exec_override_text.find(
+        "ai_agent_exec_override_read_argv_ptr", append_arg_start
+    )
+    build_cmdline_start = exec_override_text.find(
+        "ai_agent_exec_override_build_cmdline("
+    )
+    read_argv_index_start = exec_override_text.find(
+        "ai_agent_exec_override_read_argv_index", build_cmdline_start
+    )
+    require(
+        append_arg_start != -1
+        and read_argv_ptr_start != -1
+        and build_cmdline_start != -1
+        and read_argv_index_start != -1,
+        "AI Agent exec override must keep cmdline build helpers recognizable",
+    )
+    cmdline_append_arg_text = exec_override_text[append_arg_start:read_argv_ptr_start]
+    build_cmdline_text = exec_override_text[build_cmdline_start:read_argv_index_start]
+    require(
+        "#pragma unroll" in cmdline_append_arg_text
+        and "#pragma unroll" not in build_cmdline_text
+        and "#pragma clang loop" not in build_cmdline_text,
+        "AI Agent exec override must unroll only the 32-byte arg copy loop and keep argv iteration bounded",
+    )
+    require(
+        "ai_agent_exec_override_arg_reset" in exec_override_text
+        and "__builtin_memset(buf, 0, sizeof(*buf))" not in exec_override_text
+        and "__builtin_memset(buf->arg.bytes" not in exec_override_text
+        and "__builtin_memset(buf->cmdline.bytes" not in exec_override_text
+        and "__builtin_memset(buf->cmdline_arg.bytes" not in exec_override_text,
+        "AI Agent exec override must avoid large scratch-buffer memset expansions; reset only fields that need deterministic contents",
+    )
+    require(
+        "cmdline.bytes[buf->cmdline_len]" not in exec_override_text,
+        "AI Agent exec override must not index cmdline with map-value cmdline_len directly; old verifiers reject the pointer arithmetic",
+    )
+    require(
+        exec_override_text.count(
+            "((__u32)buf->cmdline_len) & (AI_AGENT_EXEC_CMDLINE_LEN - 1)"
+        )
+        >= 2,
+        "AI Agent exec override must mask map-value cmdline_len before range checks so verifier sees a bounded non-negative index",
     )
     require(
         "df_K_ai_agent_exec_override_" in tracer_c_text
@@ -402,8 +526,9 @@ if ENTERPRISE_AGENT.exists():
         "standalone exec override wrapper must define shared map symbols and include only exec override kprobes",
     )
     require(
-        "buf->path,\n\t\t\t\t       AI_AGENT_EXEC_PATTERN_LEN" in exec_override_text,
-        "AI Agent exec override must report exec_path as cmdline placeholder instead of a partial argv slot",
+        "buf->cmdline.bytes,\n\t\t\t\t       AI_AGENT_EXEC_CMDLINE_LEN"
+        in exec_override_text,
+        "AI Agent exec override must report the real bounded cmdline instead of exec_path placeholder",
     )
     file_io_bpf = ENTERPRISE_BPF / "ai_agent_file_io.bpf.c"
     file_io_text = read_source(file_io_bpf)

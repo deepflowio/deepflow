@@ -903,7 +903,7 @@ fn ai_agent_exec_enforcement_inputs(
                         },
                     )
                     .collect(),
-                argv_contains_any: rule.exec.argv_contains_any.clone(),
+                cmdline_prefixes: rule.exec.cmdline_prefixes.clone(),
             }
         })
         .collect()

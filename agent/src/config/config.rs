@@ -705,7 +705,7 @@ pub struct AiAgentExecMatch {
     pub prefix: Vec<String>,
     pub suffix: Vec<String>,
     pub argv_matches: Vec<AiAgentExecArgvMatch>,
-    pub argv_contains_any: Vec<String>,
+    pub cmdline_prefixes: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]

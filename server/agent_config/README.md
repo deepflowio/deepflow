@@ -2681,9 +2681,9 @@ Notes:
 
 - Each `exec.exact` entry consumes 1 exec BPF record.
 - Each `exec.suffix` entry consumes 1 exec BPF record.
-- If `argv_matches` is present, the record count is multiplied by the number of `argv_matches`.
-- Audit-only rules still count when they compile into `exact` / `suffix` / `argv_matches`-backed exec records.
-- Pure `exec.prefix` / `exec.argv_contains_any` audit rules stay in user space and do not consume exec BPF records.
+- If `argv_matches` or `cmdline_prefixes` is present, the record count is multiplied by the selector count.
+- Audit-only rules still count when they compile into `exact` / `suffix` / `argv_matches` / `cmdline_prefixes`-backed exec records.
+- Pure `exec.prefix` audit rules stay in user space and do not consume exec BPF records.
 - Current exec strong-block cap is `256` compiled records.
 - The direct-syscall path uses a separate fixed map and a smaller supported syscall set.
 
@@ -2726,7 +2726,7 @@ Current effective rule fields:
 - `exec.exact` / `exec.suffix`: strong-block selectors.
 - `exec.prefix`: user-space audit-only selector; not used for strong block on 4.18.
 - `exec.argv_matches`: strong block supports only `index: 0..3`, `op: exact`, and it must be combined with `exact` or `suffix` path selectors.
-- `exec.argv_contains_any`: user-space audit-only selector; not accepted for strong block.
+- `exec.cmdline_prefixes`: strong block supports 256-byte truncated cmdline prefix matching, and it must be combined with `exact` or `suffix` path selectors.
 - `syscall.names` / `syscall.symbols`: current direct-syscall support is limited to `reboot`, `init_module`, `finit_module`, `delete_module`, and `kexec_load`, and both block and audit-only syscall handling still rely on `kprobe_override`.
 
 Recommended example:
@@ -2773,6 +2773,16 @@ inputs:
             - index: 1
               op: exact
               value: reboot
+        - id: block-systemctl-reboot-cmdline
+          scope: ai_agent_tree
+          target_type: exec
+          action:
+            type: deny
+          exec:
+            exact:
+            - /usr/bin/systemctl
+            cmdline_prefixes:
+            - systemctl reboot
         - id: block-direct-reboot
           scope: ai_agent_tree
           target_type: syscall

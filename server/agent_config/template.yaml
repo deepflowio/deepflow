@@ -1861,13 +1861,13 @@ inputs:
         # description:
         #   en: |-
         #     Maximum compiled exec BPF record count, not the number of top-level rule objects.
-        #     Each exact/suffix path selector consumes one exec record; if argv_matches is present, the record count is multiplied by the number of argv_matches.
-        #     Audit-only rules still count when they compile into exact/suffix/argv_matches-backed exec records; pure prefix/argv_contains_any audit rules stay in user space and do not consume exec BPF records.
+        #     Each exact/suffix path selector consumes one exec record; if argv_matches or cmdline_prefixes is present, the record count is multiplied by the selector count.
+        #     Audit-only rules still count when they compile into exact/suffix/argv_matches/cmdline_prefixes-backed exec records; pure prefix audit rules stay in user space and do not consume exec BPF records.
         #     Current exec strong-block cap is 256 compiled records. The direct-syscall path still uses a smaller fixed map and a fixed supported syscall set.
         #   ch: |-
         #     编译后的 exec BPF record 最大条数，不是顶层规则对象数量。
-        #     每个 exact/suffix 路径选择器会占用 1 条 exec record；如果配置了 argv_matches，还会按 argv_matches 数量再放大。
-        #     只审计规则如果会编译成 exact/suffix/argv_matches 形式的 exec record，也会计入这里；纯 prefix/argv_contains_any 审计规则留在用户态匹配，不消耗 exec BPF record。
+        #     每个 exact/suffix 路径选择器会占用 1 条 exec record；如果配置了 argv_matches 或 cmdline_prefixes，还会按选择器数量放大。
+        #     只审计规则如果会编译成 exact/suffix/argv_matches/cmdline_prefixes 形式的 exec record，也会计入这里；纯 prefix 审计规则留在用户态匹配，不消耗 exec BPF record。
         #     当前 exec 强阻断上限是 256 条编译后的 record；direct syscall 路径仍使用更小的固定 map 和固定 syscall 集。
         max_rules: 256
         # type: list
@@ -1891,7 +1891,7 @@ inputs:
         #       - exec.exact / exec.suffix: strong-block selectors
         #       - exec.prefix: user-space audit-only selector; not used for strong block on 4.18
         #       - exec.argv_matches: strong block supports index 0..3, op exact, and requires exact/suffix path selectors
-        #       - exec.argv_contains_any: user-space audit-only selector; not accepted for strong block
+        #       - exec.cmdline_prefixes: strong block supports 256-byte truncated cmdline prefix matching and requires exact/suffix path selectors
         #       - syscall.names / syscall.symbols: current direct-syscall support is limited to reboot, init_module, finit_module, delete_module and kexec_load, and both block/audit-only syscall handling still rely on kprobe_override support
         #   ch: |-
         #     AI Agent 执行阻断规则。
@@ -1904,7 +1904,7 @@ inputs:
         #       - exec.exact / exec.suffix：强阻断选择器
         #       - exec.prefix：仅用户态审计选择器；4.18 上不参与强阻断
         #       - exec.argv_matches：强阻断只支持 index 0..3、op exact，且必须搭配 exact/suffix 路径
-        #       - exec.argv_contains_any：仅用户态审计选择器，不参与强阻断
+        #       - exec.cmdline_prefixes：强阻断支持 256B 截断 cmdline 前缀匹配，且必须搭配 exact/suffix 路径
         #       - syscall.names / syscall.symbols：当前 direct syscall 仅支持 reboot、init_module、finit_module、delete_module、kexec_load，且无论阻断还是审计都依赖 kprobe_override 支持
         rules: []
     # type: section

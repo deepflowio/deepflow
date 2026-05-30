@@ -518,7 +518,7 @@ pub mod ai_agent_enforcement {
         pub prefix: Vec<String>,
         pub suffix: Vec<String>,
         pub argv_matches: Vec<ExecArgvMatchInput>,
-        pub argv_contains_any: Vec<String>,
+        pub cmdline_prefixes: Vec<String>,
     }
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
