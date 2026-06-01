@@ -694,6 +694,7 @@ impl KafkaInfo {
         swap_if!(self, resource, is_none, other);
         swap_if!(self, endpoint, is_none, other);
         swap_if!(self, command, is_none, other);
+        swap_if!(self, client_id, is_empty, other);
         if other.is_on_blacklist {
             self.is_on_blacklist = other.is_on_blacklist;
         }
@@ -744,6 +745,12 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             attributes.push(KeyVal {
                 key: "group_id".to_string(),
                 val: f.group_id,
+            });
+        }
+        if !f.client_id.is_empty() {
+            attributes.push(KeyVal {
+                key: "client_id".to_string(),
+                val: f.client_id,
             });
         }
         let log = L7ProtocolSendLog {
