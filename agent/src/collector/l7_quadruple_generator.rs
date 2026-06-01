@@ -187,6 +187,7 @@ impl SubQuadGen {
 
         self.batch_buffer.clear();
         for (_, mut flow_meters) in stash.meters.drain() {
+            flow_meters.retain(|meter| !meter.app_meter.is_empty());
             while flow_meters.len() >= QUEUE_BATCH_SIZE {
                 self.batch_buffer
                     .extend(flow_meters.drain(..QUEUE_BATCH_SIZE));
