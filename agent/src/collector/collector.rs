@@ -62,6 +62,7 @@ use public::{
 pub struct CollectorCounter {
     window_delay: AtomicI64,
     flow_delay: AtomicI64,
+    input: AtomicU64,
     out: AtomicU64,
     drop_before_window: AtomicU64,
     drop_inactive: AtomicU64,
@@ -85,6 +86,11 @@ impl RefCountable for CollectorCounter {
                 "flow-delay",
                 CounterType::Counted,
                 CounterValue::Signed(self.flow_delay.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "in",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.input.swap(0, Ordering::Relaxed)),
             ),
             (
                 "out",
@@ -506,6 +512,8 @@ impl Stash {
         directions: &[Direction; 2],
         config: &CollectorConfig,
     ) {
+        self.counter.input.fetch_add(1, Ordering::Relaxed);
+
         // edge_stats: If both ends of direction are None or not None, record the
         // statistical data with direction=0 (corresponding tap-side=rest)
         if Direction::from(directions) == Direction::None {
@@ -700,6 +708,8 @@ impl Stash {
         directions: &[Direction; 2],
         config: &CollectorConfig,
     ) {
+        self.counter.input.fetch_add(1, Ordering::Relaxed);
+
         let flow = &meter.flow;
         // edge_stats: If both ends of direction are None or not None, record the
         // statistical data with direction=0 (corresponding tap-side=rest)
