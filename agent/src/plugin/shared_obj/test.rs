@@ -208,7 +208,7 @@ fn test_parse() {
         assert!(info.resp.exception.is_empty());
         assert_eq!(info.resp.code.unwrap(), 0);
         assert_eq!(info.resp.result.as_str(), "110.242.68.66");
-        assert_eq!(info.resp.status, L7ResponseStatus::Ok);
+        assert_eq!(info.resp.status, Some(L7ResponseStatus::Ok));
 
         assert_eq!(
             info.trace.trace_ids.first().unwrap().as_str(),

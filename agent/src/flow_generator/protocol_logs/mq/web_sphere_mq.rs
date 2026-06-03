@@ -213,9 +213,9 @@ impl WebSphereMqInfo {
             self.response_code = code;
         }
 
-        if custom.resp.status != L7ResponseStatus::default() {
+        if let Some(status) = custom.resp.status {
             self.msg_type = LogMessageType::Response;
-            self.status = custom.resp.status;
+            self.status = status;
         }
 
         if !custom.resp.result.is_empty() {

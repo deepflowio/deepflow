@@ -184,7 +184,11 @@ impl From<(&CustomPolicyInfo, PacketDirection)> for CustomInfo {
                 endpoint: info.endpoint.clone(),
             },
             resp: CustomInfoResp {
-                status: L7ResponseStatus::from(info.response_status.as_str()),
+                status: if info.response_status.is_empty() {
+                    None
+                } else {
+                    Some(L7ResponseStatus::from(info.response_status.as_str()))
+                },
                 code: info.response_code.clone(),
                 exception: info.response_exception.clone(),
                 result: info.response_result.clone(),

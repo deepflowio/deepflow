@@ -60,7 +60,7 @@ pub struct CustomInfoRequest {
 
 #[derive(Debug, Default, Serialize, Clone)]
 pub struct CustomInfoResp {
-    pub status: L7ResponseStatus,
+    pub status: Option<L7ResponseStatus>,
     pub code: Option<i32>,
     pub exception: String,
     pub result: String,
@@ -269,11 +269,11 @@ impl CustomInfo {
                 // parse resp
                 let status = buf[off];
                 match status {
-                    0 => info.resp.status = L7ResponseStatus::Ok,
-                    2 => info.resp.status = L7ResponseStatus::Timeout,
-                    3 => info.resp.status = L7ResponseStatus::ServerError,
-                    4 => info.resp.status = L7ResponseStatus::ClientError,
-                    5 => info.resp.status = L7ResponseStatus::Unknown,
+                    0 => info.resp.status = Some(L7ResponseStatus::Ok),
+                    2 => info.resp.status = Some(L7ResponseStatus::Timeout),
+                    3 => info.resp.status = Some(L7ResponseStatus::ServerError),
+                    4 => info.resp.status = Some(L7ResponseStatus::ClientError),
+                    5 => info.resp.status = Some(L7ResponseStatus::Unknown),
                     _ => {
                         return Err(Error::WasmSerializeFail(
                             "recv unexpected status ".to_string(),
@@ -473,16 +473,16 @@ impl CustomInfo {
             Some(pb::app_info::Info::Resp(r)) => {
                 info.resp = CustomInfoResp {
                     status: match r.status.and_then(|s| pb::AppRespStatus::try_from(s).ok()) {
-                        Some(pb::AppRespStatus::RespOk) => L7ResponseStatus::Ok,
-                        Some(pb::AppRespStatus::RespTimeout) => L7ResponseStatus::Timeout,
-                        Some(pb::AppRespStatus::RespServerError) => L7ResponseStatus::ServerError,
-                        Some(pb::AppRespStatus::RespClientError) => L7ResponseStatus::ClientError,
-                        Some(pb::AppRespStatus::RespUnknown) => L7ResponseStatus::Unknown,
-                        _ => {
-                            return Err(Error::WasmSerializeFail(
-                                "unexpected resp status".to_string(),
-                            ))
+                        Some(pb::AppRespStatus::RespOk) => Some(L7ResponseStatus::Ok),
+                        Some(pb::AppRespStatus::RespTimeout) => Some(L7ResponseStatus::Timeout),
+                        Some(pb::AppRespStatus::RespServerError) => {
+                            Some(L7ResponseStatus::ServerError)
                         }
+                        Some(pb::AppRespStatus::RespClientError) => {
+                            Some(L7ResponseStatus::ClientError)
+                        }
+                        Some(pb::AppRespStatus::RespUnknown) => Some(L7ResponseStatus::Unknown),
+                        None => None,
                     },
                     code: r.code,
                     result: r.result.unwrap_or_default(),
@@ -580,7 +580,7 @@ impl L7ProtocolInfoInterface for CustomInfo {
             self.captured_request_byte += w.captured_request_byte;
 
             // resp merge
-            if self.resp.status == L7ResponseStatus::default() {
+            if self.resp.status.is_none() {
                 self.resp.status = w.resp.status;
             }
 
@@ -686,7 +686,7 @@ impl From<CustomInfo> for L7ProtocolSendLog {
                 },
             },
             resp: L7Response {
-                status: w.resp.status,
+                status: w.resp.status.unwrap_or_default(),
                 code: w.resp.code,
                 exception: w.resp.exception,
                 result: w.resp.result,
@@ -728,7 +728,7 @@ impl From<&CustomInfo> for LogCache {
     fn from(info: &CustomInfo) -> Self {
         LogCache {
             msg_type: info.msg_type,
-            resp_status: info.resp.status,
+            resp_status: info.resp.status.unwrap_or_default(),
             on_blacklist: info.is_on_blacklist,
             endpoint: info.get_endpoint(),
             ..Default::default()

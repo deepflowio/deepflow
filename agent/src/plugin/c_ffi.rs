@@ -274,8 +274,10 @@ impl TryFrom<ParseInfo> for CustomInfo {
                 (
                     CustomInfoRequest::default(),
                     CustomInfoResp {
-                        status: L7ResponseStatus::try_from(resp.status)
-                            .map_err(|e| e.to_string())?,
+                        status: Some(
+                            L7ResponseStatus::try_from(resp.status)
+                                .map_err(|e| e.to_string())?,
+                        ),
                         code: Some(resp.code),
                         exception: c_str_to_string(&resp.exception).unwrap_or_default(),
                         result: c_str_to_string(&resp.result).unwrap_or_default(),

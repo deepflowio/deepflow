@@ -482,8 +482,10 @@ impl HttpInfo {
                 self.status_code = Some(code as u16);
             }
 
-            if custom.resp.status != self.status {
-                self.status = custom.resp.status;
+            if let Some(status) = custom.resp.status {
+                if status != self.status {
+                    self.status = status;
+                }
             }
 
             if !custom.resp.result.is_empty() {

@@ -370,7 +370,7 @@ fn test_wasm_parse_payload_resp() {
         assert_eq!(ci.req_len.unwrap(), 999);
         assert_eq!(ci.resp_len.unwrap(), 9999);
         assert_eq!(ci.request_id.unwrap(), 666);
-        assert_eq!(ci.resp.status, L7ResponseStatus::Ok);
+        assert_eq!(ci.resp.status, Some(L7ResponseStatus::Ok));
         assert_eq!(ci.resp.code.unwrap(), 999);
         assert_eq!(ci.resp.result, "result");
         assert_eq!(ci.resp.exception, "exception");
@@ -399,7 +399,7 @@ fn test_wasm_parse_payload_resp() {
         assert_eq!(ci.req_len.unwrap(), 999);
         assert_eq!(ci.resp_len.unwrap(), 9999);
         assert_eq!(ci.request_id.unwrap(), 666);
-        assert_eq!(ci.resp.status, L7ResponseStatus::Ok);
+        assert_eq!(ci.resp.status, Some(L7ResponseStatus::Ok));
         assert_eq!(ci.resp.code.unwrap(), 999);
         assert_eq!(ci.resp.result, "result");
         assert_eq!(ci.resp.exception, "exception");

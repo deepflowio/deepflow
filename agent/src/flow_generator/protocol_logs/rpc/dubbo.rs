@@ -291,8 +291,10 @@ impl DubboInfo {
             self.status_code = Some(code);
         }
 
-        if custom.resp.status != self.resp_status {
-            self.resp_status = custom.resp.status;
+        if let Some(status) = custom.resp.status {
+            if status != self.resp_status {
+                self.resp_status = status;
+            }
         }
 
         if !custom.resp.result.is_empty() {
