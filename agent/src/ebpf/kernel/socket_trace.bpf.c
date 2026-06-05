@@ -1799,11 +1799,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		}
 	}
 
-	return __output_data_common(ctx, tracer_ctx, v_buff, args,
-				    conn_info->direction, (bool) vecs,
-				    tracer_ctx->data_limit_max, false,
-				    send_reasm_bytes);
-#else
+#endif
+
 	struct tail_calls_context *context =
 	    (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
@@ -1813,7 +1810,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	context->dir = conn_info->direction;
 
 	return SUBMIT_OK;
-#endif
 }
 
 static __inline int trace_io_event_common(void *ctx,
@@ -1957,9 +1953,19 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		ctx_map->tail_call.offset = offset;
 		return 0;
 #else
-		return __data_submit(ctx, conn_info, args, extra->vecs,
-				     bytes_count, offset, args->enter_ts,
-				     extra);
+		int ret = __data_submit(ctx, conn_info, args, extra->vecs,
+					bytes_count, offset, args->enter_ts,
+					extra);
+
+		if (ret == SUBMIT_OK) {
+			if (extra->source == DATA_SOURCE_SYSCALL) {
+				bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+					      PROG_OUTPUT_DATA_TP_IDX);
+			} else {
+				bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+					      PROG_OUTPUT_DATA_KP_IDX);	
+			}
+		}
 #endif
 	}
 
