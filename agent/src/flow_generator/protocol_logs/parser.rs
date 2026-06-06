@@ -34,7 +34,7 @@ use super::{AppProtoHead, AppProtoLogsBaseInfo, BoxAppProtoLogsData};
 use crate::{
     common::{
         ebpf::EbpfType,
-        flow::{L7Protocol, PacketDirection, SignalSource},
+        flow::{L7Protocol, PacketDirection, SignalSource, BIZ_TYPE_AI_AGENT},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         meta_packet::ProtocolData,
         MetaPacket, TaggedFlow, Timestamp,
@@ -85,6 +85,45 @@ impl fmt::Display for MetaAppProto {
         write!(f, "\t{:?}", self.l7_info)
     }
 }
+
+fn resolve_biz_type_from_processes<F>(
+    biz_type: u8,
+    process_id_0: u32,
+    process_id_1: u32,
+    is_ai_agent: F,
+) -> u8
+where
+    F: Fn(u32) -> bool,
+{
+    if biz_type != 0 {
+        return biz_type;
+    }
+
+    if (process_id_0 != 0 && is_ai_agent(process_id_0))
+        || (process_id_1 != 0 && is_ai_agent(process_id_1))
+    {
+        return BIZ_TYPE_AI_AGENT;
+    }
+
+    biz_type
+}
+
+#[cfg(feature = "enterprise")]
+fn enrich_ai_agent_biz_type(base_info: &mut AppProtoLogsBaseInfo) {
+    let Some(registry) = enterprise_utils::ai_agent::global_registry() else {
+        return;
+    };
+
+    base_info.biz_type = resolve_biz_type_from_processes(
+        base_info.biz_type,
+        base_info.process_id_0,
+        base_info.process_id_1,
+        |pid| registry.is_ai_agent(pid),
+    );
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn enrich_ai_agent_biz_type(_base_info: &mut AppProtoLogsBaseInfo) {}
 
 impl MetaAppProto {
     pub fn new(
@@ -197,6 +236,7 @@ impl MetaAppProto {
         if l7_info.is_reversed() {
             base_info.reverse()
         }
+        enrich_ai_agent_biz_type(&mut base_info);
 
         Some(Self {
             base_info,
@@ -735,5 +775,32 @@ impl SessionAggregator {
             let _ = thread.join();
         }
         info!("app protocol logs parser (id={}) stopped", self.id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_biz_type_from_processes;
+    use crate::common::flow::BIZ_TYPE_AI_AGENT;
+
+    #[test]
+    fn resolve_biz_type_from_processes_marks_src_ai_agent() {
+        assert_eq!(
+            resolve_biz_type_from_processes(0, 1001, 0, |pid| pid == 1001),
+            BIZ_TYPE_AI_AGENT
+        );
+    }
+
+    #[test]
+    fn resolve_biz_type_from_processes_marks_dst_ai_agent() {
+        assert_eq!(
+            resolve_biz_type_from_processes(0, 0, 2002, |pid| pid == 2002),
+            BIZ_TYPE_AI_AGENT
+        );
+    }
+
+    #[test]
+    fn resolve_biz_type_from_processes_preserves_existing_value() {
+        assert_eq!(resolve_biz_type_from_processes(7, 1001, 2002, |_| true), 7);
     }
 }
