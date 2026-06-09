@@ -213,6 +213,7 @@ func (p *Process) beforeAddPage(dbData []*metadbmodel.Process) ([]*metadbmodel.P
 			identifierToNewGID[identifier] = item.GID
 		}
 	}
+	log.Infof("%s identifier generation completed", p.resourceType, p.metadata.LogPrefixes)
 	var createdGIDs []uint32
 	if len(identifierToNewGID) > 0 {
 		// TODO combine with operator module

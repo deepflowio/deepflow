@@ -30,7 +30,7 @@ func NewProcess() *Process {
 		newOperatorBase[*mysqlmodel.Process](
 			ctrlrcommon.RESOURCE_TYPE_PROCESS_EN,
 			true,
-			true,
+			false,
 		),
 	}
 	return operator
