@@ -46,6 +46,8 @@
 * perf: modify materialized view local table without group by [#8576](https://github.com/deepflowio/deepflow/pull/8576) by [lzf575](https://github.com/lzf575)
 
 #### NEW FEATURE
+* feat: support match custom service without epc [#11753](https://github.com/deepflowio/deepflow/pull/11753) by [lzf575](https://github.com/lzf575)
+* feat: ip/port type biz service vpc is not required [#11747](https://github.com/deepflowio/deepflow/pull/11747) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 * feat: agent - Add musl compile flag [#9023](https://github.com/deepflowio/deepflow/pull/9023) by [yinjiping](https://github.com/yinjiping)
 * feat: updatae tunnel decap feature [#9020](https://github.com/deepflowio/deepflow/pull/9020) by [yuanchaoa](https://github.com/yuanchaoa)
 * feat: agent - eBPF Adaptation for TLinux 4.14.105-19-0019 [#9012](https://github.com/deepflowio/deepflow/pull/9012) by [yinjiping](https://github.com/yinjiping)
