@@ -19,7 +19,10 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
+	"github.com/deepflowio/deepflow/server/libs/logger"
 )
+
+var log = logger.MustGetLogger("db.metadb.query")
 
 // FindInBatches gets all data that meets the query conditions in batches
 func FindInBatches[T any](query *gorm.DB) ([]*T, error) {
@@ -28,6 +31,10 @@ func FindInBatches[T any](query *gorm.DB) ([]*T, error) {
 	pageCount := int(metadb.GetConfig().BatchSize0)
 	pageData := make([]*T, 0)
 	for pageIndex == 0 || len(pageData) == pageCount {
+		sql := query.Limit(pageCount).Offset(pageIndex * pageCount).ToSQL(func(tx *gorm.DB) *gorm.DB {
+			return tx.Find(&pageData)
+		})
+		log.Infof("TODO sql: %s", sql)
 		err := query.Limit(pageCount).Offset(pageIndex * pageCount).Find(&pageData).Error
 		if err != nil {
 			return []*T{}, err
