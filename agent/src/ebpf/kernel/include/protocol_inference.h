@@ -768,17 +768,24 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 
 	if (conn_info->prev_count == 4) {
 		len = *(__u32 *) conn_info->prev_buf & 0x00ffffff;
-		if (len == count) {
-			seq = conn_info->prev_buf[3];
-			count += 4;
-			com = buf[0];
-			point_1 = buf[2];
-			point_2 = buf[4];
-		}
+		seq = conn_info->prev_buf[3];
+		count += 4;
+		com = buf[0];
+		point_1 = buf[2];
+		point_2 = buf[4];
 	}
 
 	if (count < 5 || len == 0)
 		return MSG_UNKNOWN;
+
+	/*
+	 * To prevent stale data from a previous map value remaining in
+	 * the unused portion of `__infer_buf->data` when the current
+	 * syscall provides fewer than 9 bytes of actual data.
+	 */
+	if (count < 9) {
+		point_1 = point_2 = 0;
+	}
 
 	bool is_mysqld = is_current_comm("mysqld");
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
