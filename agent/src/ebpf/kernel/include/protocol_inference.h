@@ -783,6 +783,30 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 	bool is_mysqld = is_current_comm("mysqld");
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		/*
+		 * When MySQL reassembly is enabled, all related traffic must be forced into
+		 * the reassembly processing pipeline.
+		 *
+		 * Otherwise, under a single-packet-based protocol detection model, the
+		 * detection capability is limited, and consecutive same-direction packets may
+		 * be incorrectly identified as complete MySQL requests or responses.
+		 *
+		 * In such cases, these packets will continue to be parsed as valid MySQL
+		 * traffic, and MSG_UNKNOWN will not be returned, thus preventing entry into
+		 * the reassembly process.
+		 *
+		 * This leads to behavior inconsistent with expectations, since correct
+		 * reassembly logic relies on returning MSG_UNKNOWN for incomplete packets in
+		 * order to trigger reassembly.
+		 *
+		 * The goal of this design is to ensure that, when reassembly is enabled,
+		 * consecutive same-direction data is not reported as independent complete
+		 * MySQL messages (requests or responses).
+		 */
+		if (conn_info->enable_reasm) {
+			return MSG_UNKNOWN;
+		}
+
+		/*
 		 * Ensure the authentication response packet is captured
 		 * and distinguish it based on the 5th byte (Payload start):  
 		 *
