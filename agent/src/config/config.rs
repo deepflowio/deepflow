@@ -1465,6 +1465,7 @@ pub struct EbpfNetwork {
 pub struct EbpfSocketPreprocess {
     pub out_of_order_reassembly_cache_size: usize,
     pub out_of_order_reassembly_protocols: Vec<String>,
+    #[serde(with = "humantime_serde")]
     pub out_of_order_reassembly_timeout: Duration,
     pub segmentation_reassembly_protocols: Vec<String>,
 }
