@@ -130,6 +130,15 @@ func GetAggFunc(name string, args []string, alias string, derivativeArgs []strin
 	if isDerivative {
 		levelFlag = view.MODEL_METRICS_LEVEL_FLAG_LAYERED
 	}
+	// Aggregation functions on boolean COUNTER metrics (DBField ends with 1,0)
+	// Only SUM and AVG keep UNLAY; other aggregators go LAYERED because UNLAY
+	// produces meaningless row-level results on 0/1 values. Inner SUM groups by
+	// datasource_interval, outer applies the function on per-window counts.
+	if metricStruct.Type == metrics.METRICS_TYPE_COUNTER &&
+		strings.Contains(metricStruct.DBField, ",1,0)") &&
+		name != view.FUNCTION_SUM && name != view.FUNCTION_AVG {
+		levelFlag = view.MODEL_METRICS_LEVEL_FLAG_LAYERED
+	}
 	return &AggFunction{
 		Metrics:           metricStruct,
 		Name:              name,
