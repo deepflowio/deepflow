@@ -608,6 +608,26 @@ var (
 		db:     "event",
 		input:  "SELECT Count(row), alert_policy, alert_policy_id, event_level, auto_service_0, auto_service_type_0, auto_service_type, auto_service FROM alert_event where auto_service='abc' AND auto_service_type_1=1 GROUP BY alert_policy, alert_policy_id, event_level, auto_service_0, auto_service_type_0, auto_service_type, auto_service LIMIT 1",
 		output: []string{"SELECT dictGet('flow_tag.alarm_policy_map', 'name', (toUInt64(policy_id))) AS `alert_policy`, policy_id AS `alert_policy_id`, event_level, tag_string_values[indexOf(tag_string_names,'auto_service_0')] AS `auto_service_0`, tag_int_values[indexOf(tag_int_names,'auto_service_type_0')] AS `auto_service_type_0`, tag_int_values[indexOf(tag_int_names,'auto_service_type')] AS `auto_service_type`, tag_string_values[indexOf(tag_string_names,'auto_service')] AS `auto_service`, COUNT(1) AS `Count(row)` FROM event.`alert_event` FINAL WHERE if(indexOf(tag_string_names,'auto_service')=0 AND indexOf(tag_string_names,'auto_service_0')=0 AND indexOf(tag_string_names,'auto_service_1')=0,1!=1,(tag_string_values[indexOf(tag_string_names,'auto_service')] = 'abc' OR tag_string_values[indexOf(tag_string_names,'auto_service_0')] = 'abc' OR tag_string_values[indexOf(tag_string_names,'auto_service_1')] = 'abc')) AND if(indexOf(tag_int_names,'auto_service_type_1')=0,NULL,tag_int_values[indexOf(tag_int_names,'auto_service_type_1')]) = 1 GROUP BY dictGet('flow_tag.alarm_policy_map', 'name', (toUInt64(policy_id))) AS `alert_policy`, policy_id AS `alert_policy_id`, `event_level`, tag_string_values[indexOf(tag_string_names,'auto_service_0')] AS `auto_service_0`, tag_int_values[indexOf(tag_int_names,'auto_service_type_0')] AS `auto_service_type_0`, tag_int_values[indexOf(tag_int_names,'auto_service_type')] AS `auto_service_type`, tag_string_values[indexOf(tag_string_names,'auto_service')] AS `auto_service` LIMIT 1"},
+	}, {
+		// boolean COUNTER metric: Max on new_flow → LAYERED (MAX(SUM(...)))
+		input:  "select Max(new_flow) as max_new_flow from l4_flow_log limit 1",
+		output: []string{"SELECT MAX(`_sum_if(is_new_flow=1,1,0)`) AS `max_new_flow` FROM (SELECT SUM(if(is_new_flow=1,1,0)) AS `_sum_if(is_new_flow=1,1,0)` FROM flow_log.`l4_flow_log`) LIMIT 1"},
+	}, {
+		// boolean COUNTER metric: Min on new_flow → LAYERED (MIN(SUM(...)))
+		input:  "select Min(new_flow) as min_new_flow from l4_flow_log limit 1",
+		output: []string{"WITH if(count(`_sum_if(is_new_flow=1,1,0)`)=1, min(`_sum_if(is_new_flow=1,1,0)`), 0) AS `min_fillnullaszero__sum_if(is_new_flow=1,1,0)` SELECT `min_fillnullaszero__sum_if(is_new_flow=1,1,0)` AS `min_new_flow` FROM (SELECT SUM(if(is_new_flow=1,1,0)) AS `_sum_if(is_new_flow=1,1,0)` FROM flow_log.`l4_flow_log`) LIMIT 1"},
+	}, {
+		// boolean COUNTER metric: AAvg on new_flow → LAYERED (AVG(SUM(...)))
+		input:  "select AAvg(new_flow) as aavg_new_flow from l4_flow_log limit 1",
+		output: []string{"SELECT AVG(`_sum_if(is_new_flow=1,1,0)`) AS `aavg_new_flow` FROM (SELECT SUM(if(is_new_flow=1,1,0)) AS `_sum_if(is_new_flow=1,1,0)` FROM flow_log.`l4_flow_log`) LIMIT 1"},
+	}, {
+		// control: Sum on new_flow → UNLAY (no change)
+		input:  "select Sum(new_flow) as sum_new_flow from l4_flow_log limit 1",
+		output: []string{"SELECT SUM(if(is_new_flow=1,1,0)) AS `sum_new_flow` FROM flow_log.`l4_flow_log` LIMIT 1"},
+	}, {
+		// boolean COUNTER metric: Max with time grouping → 1s SUM then 120s MAX
+		input:  "select Max(new_flow) as max_new_flow, time(time,120) as time_120 from l4_flow_log group by time_120 limit 1",
+		output: []string{"WITH toStartOfInterval(_time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS `_time_120` SELECT toUnixTimestamp(`_time_120`) AS `time_120`, MAX(`_sum_if(is_new_flow=1,1,0)`) AS `max_new_flow` FROM (WITH toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT _time, SUM(if(is_new_flow=1,1,0)) AS `_sum_if(is_new_flow=1,1,0)` FROM flow_log.`l4_flow_log` GROUP BY `_time`) GROUP BY `time_120` LIMIT 1"},
 	}}
 )
 
