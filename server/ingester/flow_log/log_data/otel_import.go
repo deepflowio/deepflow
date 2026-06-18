@@ -211,7 +211,7 @@ func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue
 					h.Protocol = uint8(layers.IPProtocolUDP)
 				}
 			// https://github.com/open-telemetry/opentelemetry-go/blob/db7fd1bb51ce6ed1171cac15eeecb6871dbbb80a/semconv/internal/http.go#L79
-			case "net.peer.ip", "network.peer.address":
+			case "net.peer.ip", "network.peer.address", "net.sock.peer.addr":
 				if hasPeerAddress {
 					continue
 				}
