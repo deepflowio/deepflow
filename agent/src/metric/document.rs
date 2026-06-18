@@ -441,7 +441,14 @@ impl From<Tagger> for metric::MiniTag {
                 (IpAddr::V6(ip6), IpAddr::V6(ip61)) => {
                     (ip6.octets().to_vec(), ip61.octets().to_vec())
                 }
-                _ => panic!("{:?} ip, ip1 type mismatch", &t),
+                (IpAddr::V4(ip4), IpAddr::V6(ip61)) => (
+                    ip4.to_ipv6_mapped().octets().to_vec(),
+                    ip61.octets().to_vec(),
+                ),
+                (IpAddr::V6(ip6), IpAddr::V4(ip41)) => (
+                    ip6.octets().to_vec(),
+                    ip41.to_ipv6_mapped().octets().to_vec(),
+                ),
             }
         } else {
             match t.ip {
