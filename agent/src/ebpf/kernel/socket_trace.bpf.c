@@ -1959,8 +1959,13 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 
 		if (ret == SUBMIT_OK) {
 			if (extra->source == DATA_SOURCE_SYSCALL) {
+#ifdef SUPPORTS_KPROBE_ONLY
+				bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+					      PROG_OUTPUT_DATA_KP_IDX);
+#else
 				bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
 					      PROG_OUTPUT_DATA_TP_IDX);
+#endif
 			} else {
 				bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
 					      PROG_OUTPUT_DATA_KP_IDX);	
