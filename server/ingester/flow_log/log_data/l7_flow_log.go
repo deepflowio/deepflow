@@ -633,7 +633,32 @@ func ReleaseL7FlowLog(l *L7FlowLog) {
 	if l.SubReferenceCount() {
 		return
 	}
+	ip60 := l.IP60[:0]
+	ip61 := l.IP61[:0]
+	encodedSpan := l.EncodedSpan[:0]
+	for i := range l.AttributeNames {
+		l.AttributeNames[i] = ""
+	}
+	attributeNames := l.AttributeNames[:0]
+	for i := range l.AttributeValues {
+		l.AttributeValues[i] = ""
+	}
+	attributeValues := l.AttributeValues[:0]
+	for i := range l.MetricsNames {
+		l.MetricsNames[i] = ""
+	}
+	metricsNames := l.MetricsNames[:0]
+	metricsValues := l.MetricsValues[:0]
+
 	*l = L7FlowLog{}
+	l.IP60 = ip60
+	l.IP61 = ip61
+	l.EncodedSpan = encodedSpan
+	l.AttributeNames = attributeNames
+	l.AttributeValues = attributeValues
+	l.MetricsNames = metricsNames
+	l.MetricsValues = metricsValues
+
 	poolL7FlowLog.Put(l)
 }
 

@@ -255,8 +255,17 @@ var emptyUniversalTag = flow_metrics.UniversalTag{}
 
 func ReleaseExtMetrics(m *ExtMetrics) {
 	m.UniversalTag = emptyUniversalTag
+	for i := range m.TagNames {
+		m.TagNames[i] = ""
+	}
 	m.TagNames = m.TagNames[:0]
+	for i := range m.TagValues {
+		m.TagValues[i] = ""
+	}
 	m.TagValues = m.TagValues[:0]
+	for i := range m.MetricsFloatNames {
+		m.MetricsFloatNames[i] = ""
+	}
 	m.MetricsFloatNames = m.MetricsFloatNames[:0]
 	m.MetricsFloatValues = m.MetricsFloatValues[:0]
 	extMetricsPool.Put(m)
