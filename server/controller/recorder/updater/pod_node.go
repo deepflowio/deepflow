@@ -46,6 +46,10 @@ func (f *PodNodeMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedPodNodeFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_POD_NODE_EN, &PodNodeMessageFactory{})
+}
+
 type PodNode struct {
 	UpdaterBase[
 		cloudmodel.PodNode,
@@ -66,10 +70,6 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode) *PodNod
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &PodNodeMessageFactory{})
-	}
 
 	return updater
 }

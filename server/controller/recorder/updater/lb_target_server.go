@@ -46,6 +46,10 @@ func (f *LBTargetServerMessageFactory) CreateUpdatedFields() types.UpdatedFields
 	return &message.UpdatedLBTargetServerFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_LB_TARGET_SERVER_EN, &LBTargetServerMessageFactory{})
+}
+
 type LBTargetServer struct {
 	UpdaterBase[
 		cloudmodel.LBTargetServer,
@@ -66,10 +70,6 @@ func NewLBTargetServer(wholeCache *cache.Cache, cloudData []cloudmodel.LBTargetS
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &LBTargetServerMessageFactory{})
-	}
 
 	return updater
 }

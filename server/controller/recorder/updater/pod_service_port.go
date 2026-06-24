@@ -46,6 +46,10 @@ func (f *PodServicePortMessageFactory) CreateUpdatedFields() types.UpdatedFields
 	return &message.UpdatedPodServicePortFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_POD_SERVICE_PORT_EN, &PodServicePortMessageFactory{})
+}
+
 type PodServicePort struct {
 	UpdaterBase[
 		cloudmodel.PodServicePort,
@@ -66,10 +70,6 @@ func NewPodServicePort(wholeCache *cache.Cache, cloudData []cloudmodel.PodServic
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &PodServicePortMessageFactory{})
-	}
 
 	return updater
 }

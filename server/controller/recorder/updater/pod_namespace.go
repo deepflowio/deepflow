@@ -49,6 +49,10 @@ func (f *PodNamespaceMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedPodNamespaceFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, &PodNamespaceMessageFactory{})
+}
+
 type PodNamespace struct {
 	UpdaterBase[
 		cloudmodel.PodNamespace,
@@ -69,10 +73,6 @@ func NewPodNamespace(wholeCache *cache.Cache, cloudData []cloudmodel.PodNamespac
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &PodNamespaceMessageFactory{})
-	}
 
 	return updater
 }

@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
@@ -109,6 +110,41 @@ static_always_inline void safe_buf_copy(void *dst, int dst_len,
 
 	memset(dst, 0, dst_len);
 	memcpy(dst, src, copy_count);
+}
+
+static_always_inline size_t safe_vsnprintf(char *buf, int64_t cap,
+					   const char *fmt, va_list ap)
+{
+	int ret;
+	size_t actual;
+	size_t ucap;
+
+	if (buf == NULL || fmt == NULL || cap <= 0)
+		return 0;
+
+	ucap = (size_t)cap;
+	ret = vsnprintf(buf, ucap, fmt, ap);
+	if (ret < 0)
+		return 0;
+
+	actual = (size_t)ret;
+	if (actual >= ucap)
+		actual = ucap - 1;
+
+	return actual;
+}
+
+static inline size_t safe_snprintf(char *buf, int64_t cap,
+				   const char *fmt, ...)
+{
+	va_list ap;
+	size_t actual;
+
+	va_start(ap, fmt);
+	actual = safe_vsnprintf(buf, cap, fmt, ap);
+	va_end(ap);
+
+	return actual;
 }
 
 #if defined(__x86_64__)

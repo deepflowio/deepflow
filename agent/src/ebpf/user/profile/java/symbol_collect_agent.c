@@ -39,6 +39,7 @@
 #include <jvmticmlr.h>
 
 #include "../../config.h"
+#include "../../utils.h"
 #include "config.h"
 
 #define LOG_BUF_SZ 512
@@ -67,6 +68,7 @@ int perf_map_log_socket_fd = -1;
 // Cache symbols for batch sending
 char g_symbol_buffer[STRING_BUFFER_SIZE * 4];
 int g_cached_bytes;
+static jint close_files_locked(void);
 jint close_files(void);
 
 #define _(e)                                                                \
@@ -80,7 +82,7 @@ jint close_files(void);
   do {                                            \
 	if (perf_map_log_socket_fd > 0) { \
 		char str_buf[LOG_BUF_SZ]; \
-		int n = snprintf(str_buf, sizeof(str_buf), format, ##__VA_ARGS__); \
+		size_t n = safe_snprintf(str_buf, sizeof(str_buf), format, ##__VA_ARGS__); \
 	        pthread_mutex_lock(&g_df_lock);	 \
 	        send_msg(perf_map_log_socket_fd, str_buf, n); \
 	        pthread_mutex_unlock(&g_df_lock); \
@@ -93,19 +95,23 @@ inline int send_msg(int sock_fd, const char *buf, size_t len)
 	int n = 0;		// Initialize n
 
 	do {
-		n = send(sock_fd, buf + send_bytes, len - send_bytes, 0);
+		/*
+		 * Note: To avoid SIGPIPE signal (which terminates the process), use
+		 * MSG_NOSIGNAL flag in send() call.
+		 */
+		n = send(sock_fd, buf + send_bytes, len - send_bytes, MSG_NOSIGNAL);
 		if (n == -1) {
 			if (errno == EINTR || errno == EAGAIN
 			    || errno == EWOULDBLOCK) {
 				// Retry on interrupt or temporary failure
 				continue;
 			} else {
-				close_files();	// Example function call, define as needed
+				close_files_locked();	// Example function call, define as needed
 				break;
 			}
 		} else if (n == 0) {
 			// Connection closed by peer
-			close_files();	// Example function call, define as needed
+			close_files_locked();	// Example function call, define as needed
 			break;
 		}
 
@@ -125,11 +131,9 @@ jint df_open_socket(const char *path, int *ptr)
 
 	/*
 	 * The reason for setting non-blocking mode:
-	 * 1 To prevent Java threads from being blocked.
-	 * 2 When attempts to write data to a closed writing port of a pipe or
-	 *   socket, the operating system detects this situation and sends the
-	 *   SIGPIPE signal to Java process, which causes the program to exit.
-	 *   Use non-blocking mode to avoid this issue.
+	 * 1 To prevent Java threads from being blocked when writing to socket.
+	 * 2 Non-blocking mode allows send() to fail with EAGAIN/EWOULDBLOCK
+	 *   instead of blocking, enabling graceful error handling.
 	 */
 	int flags = fcntl(s, F_GETFL, 0);
 	if (flags == -1) {
@@ -147,6 +151,7 @@ jint df_open_socket(const char *path, int *ptr)
 	strncpy(remote.sun_path, path, UNIX_PATH_MAX - 1);
 	int len = sizeof(remote.sun_family) + strlen(remote.sun_path);
 	if (connect(s, (struct sockaddr *)&remote, len) == -1) {
+		close(s);
 		fprintf(stderr, "Call connect() failed: errno(%d)\n", errno);
 		return JNI_ERR;
 	}
@@ -214,18 +219,29 @@ jint df_agent_config(char *opts)
 	return JNI_OK;
 }
 
+static jint close_files_locked(void)
+{
+	int perf_fd = perf_map_socket_fd;
+	int log_fd = perf_map_log_socket_fd;
+
+	perf_map_socket_fd = -1;
+	perf_map_log_socket_fd = -1;
+
+	if (perf_fd > 0) {
+		close(perf_fd);
+	}
+	if (log_fd > 0) {
+		close(log_fd);
+	}
+
+	return JNI_OK;
+}
+
 jint close_files(void)
 {
-	if (perf_map_socket_fd > 0) {
-		close(perf_map_socket_fd);
-		perf_map_socket_fd = -1;
-	}
-
-	if (perf_map_log_socket_fd > 0) {
-		close(perf_map_log_socket_fd);
-		perf_map_log_socket_fd = -1;
-	}
-
+	pthread_mutex_lock(&g_df_lock);
+	close_files_locked();
+	pthread_mutex_unlock(&g_df_lock);
 	return JNI_OK;
 }
 
@@ -301,13 +317,16 @@ void deallocate(jvmtiEnv * jvmti, void *string)
 void df_send_symbol(enum event_type type, const void *code_addr,
 		    unsigned int code_size, const char *entry)
 {
-	if (perf_map_socket_fd < 0) {
-		return;
-	}
-
 	int send_bytes;
 	struct symbol_metadata *meta;
 	char symbol_str[STRING_BUFFER_SIZE];
+
+	pthread_mutex_lock(&g_df_lock);
+	if (perf_map_socket_fd < 0) {
+		pthread_mutex_unlock(&g_df_lock);
+		return;
+	}
+
 	if (type == METHOD_UNLOAD) {
 		snprintf(symbol_str + sizeof(*meta),
 			 sizeof(symbol_str) - sizeof(*meta), "%lx",
@@ -321,13 +340,7 @@ void df_send_symbol(enum event_type type, const void *code_addr,
 	meta->len = strlen(symbol_str + sizeof(*meta));
 	meta->type = type;
 	send_bytes = meta->len + sizeof(*meta);
-	pthread_mutex_lock(&g_df_lock);
 	if (replay_finish) {
-		if (g_cached_bytes > 0) {
-			send_msg(perf_map_socket_fd, g_symbol_buffer,
-				 g_cached_bytes);
-			g_cached_bytes = 0;
-		}
 		send_msg(perf_map_socket_fd, symbol_str, send_bytes);
 	} else {
 		int buff_remain_bytes =
@@ -377,9 +390,30 @@ void generate_single_entry(enum event_type type, jvmtiEnv * jvmti,
 		} else {
 			memcpy(class_name, csig, sizeof(class_name) - 1);
 		}
-		snprintf(output, noutput, "%s::%s%s", class_name,
-			 method_name, method_signature);
 
+		char *source_file = NULL;
+		jvmtiError err =
+		    (*jvmti)->GetSourceFileName(jvmti, class, &source_file);
+		if (err != JVMTI_ERROR_NONE) {
+			source_file = NULL;
+		}
+
+		jint entry_count = 0;
+		jvmtiLineNumberEntry *table = NULL;
+		int line_number = -1;
+		err =
+		    (*jvmti)->GetLineNumberTable(jvmti, method, &entry_count,
+						 &table);
+		if (err == JVMTI_ERROR_NONE && entry_count > 0 && table != NULL) {
+			line_number = table[0].line_number;
+		}
+
+		snprintf(output, noutput, "%s::%s%s[%s:%d]", class_name,
+			 method_name, method_signature,
+			 source_file == NULL ? "" : source_file, line_number);
+
+		deallocate(jvmti, (unsigned char *)table);
+		deallocate(jvmti, (unsigned char *)source_file);
 		deallocate(jvmti, (unsigned char *)csig);
 	}
 
@@ -545,7 +579,16 @@ enable_replay:
 	if (g_jvmti == NULL)
 		g_jvmti = jvmti;
 	_(replay_callbacks(jvmti));
+	pthread_mutex_lock(&g_df_lock);
+	if (g_cached_bytes > 0) {
+		if (perf_map_socket_fd >= 0) {
+			send_msg(perf_map_socket_fd, g_symbol_buffer,
+				 g_cached_bytes);
+		}
+		g_cached_bytes = 0;
+	}
 	replay_finish = true;
+	pthread_mutex_unlock(&g_df_lock);
 	df_log
 	    ("- JVMTI symbolization agent startup sequence complete. Replay count %d\n",
 	     replay_count);

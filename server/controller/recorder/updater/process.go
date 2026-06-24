@@ -50,6 +50,10 @@ func (f *ProcessMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedProcessFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_PROCESS_EN, &ProcessMessageFactory{})
+}
+
 type Process struct {
 	UpdaterBase[cloudmodel.Process, *diffbase.Process, *metadbmodel.Process, metadbmodel.Process]
 }
@@ -65,10 +69,6 @@ func NewProcess(wholeCache *cache.Cache, cloudData []cloudmodel.Process) *Proces
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &ProcessMessageFactory{})
-	}
 
 	updater.hookers[hookerBeforeDBAddPage] = updater
 	updater.hookers[hookerAfterDBDeletePage] = updater

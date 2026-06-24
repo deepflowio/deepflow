@@ -46,6 +46,10 @@ func (f *NATGatewayMessageFactory) CreateUpdatedFields() types.UpdatedFields {
 	return &message.UpdatedNATGatewayFields{}
 }
 
+func init() {
+	RegisterMessageFactory(ctrlrcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, &NATGatewayMessageFactory{})
+}
+
 type NATGateway struct {
 	UpdaterBase[
 		cloudmodel.NATGateway,
@@ -66,10 +70,6 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway) *
 		),
 	}
 	updater.setDataGenerator(updater)
-
-	if !hasMessageFactory(updater.resourceType) {
-		RegisterMessageFactory(updater.resourceType, &NATGatewayMessageFactory{})
-	}
 
 	return updater
 }

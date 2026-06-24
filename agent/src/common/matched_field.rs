@@ -223,13 +223,13 @@ impl<const N: usize> MatchedFieldN<N> {
         for b in bits {
             let b = *b;
             if b < 8 * N {
-                self.src_ip[b >> 3] = 1 << (b & 7);
+                self.src_ip[b >> 3] |= 1 << (b & 7);
             } else if b < 8 * 2 * N {
                 let b = b - 8 * N;
-                self.dst_ip[b >> 3] = 1 << (b & 7);
+                self.dst_ip[b >> 3] |= 1 << (b & 7);
             } else if b < 8 * (2 * N + 10) {
                 let b = b - 8 * 2 * N;
-                self.others[b >> 3] = 1 << (b & 7);
+                self.others[b >> 3] |= 1 << (b & 7);
             } else {
                 panic!("bits({:?}) out of bounds", bits)
             }
