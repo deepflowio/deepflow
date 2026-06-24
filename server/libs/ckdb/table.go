@@ -361,7 +361,7 @@ func isUnsummable(column *Column) bool {
 
 func getAggr(column *Column) string {
 	if isUnsummable(column) {
-		return "avg"
+		return "max"
 	}
 	return "sum"
 }
@@ -389,12 +389,61 @@ func (t *Table) IsAggrTableWrong(createTableSQL string) bool {
 	return len(orderKeys) != t.OrderKeysCount()
 }
 
+// IsAggrMaxColumnWrong reports whether an existing aggregate table still
+// aggregates unsummable(`_max`) columns with `avg` instead of `max`. Such
+// tables only need their aggregate columns altered in place (see
+// MakeAggrMaxColumnAlterSQLs), not a full rebuild, so historical 1h/1d data
+// is preserved.
+func (t *Table) IsAggrMaxColumnWrong(createTableSQL string) bool {
+	return strings.Contains(createTableSQL, "_max__agg` AggregateFunction(avg")
+}
+
+// MakeAggrMaxColumnAlterSQLs returns the ALTER statements that migrate the
+// unsummable aggregate columns of an existing aggregate table from the old
+// `avg` aggregation to `max`. Each column is dropped and re-added as a
+// `max` AggregateFunction column; only the data of these specific columns is
+// lost, all other columns and rows are kept.
+func (t *Table) MakeAggrMaxColumnAlterSQLs(orgID uint16, aggrInterval AggregationInterval) []string {
+	tableAgg := t.AggrTable(orgID, aggrInterval)
+	sqls := []string{}
+	for _, c := range t.Columns {
+		// ignore fields starting with '_', such as _tid, _id
+		if strings.HasPrefix(c.Name, "_") || c.IgnoredInAggrTable || c.GroupBy {
+			continue
+		}
+		// only columns that fall into the default branch of
+		// MakeAggrTableCreateSQL are created via getAggr(); those are the
+		// ones whose aggregation switched from avg to max.
+		if c.Aggr != AggrNone || !isUnsummable(c) {
+			continue
+		}
+		aggrColumn := fmt.Sprintf("%s__agg", c.Name)
+		sqls = append(sqls,
+			fmt.Sprintf("ALTER TABLE %s DROP COLUMN IF EXISTS `%s`", tableAgg, aggrColumn),
+			fmt.Sprintf("ALTER TABLE %s ADD COLUMN IF NOT EXISTS `%s` AggregateFunction(max, %s)", tableAgg, aggrColumn, c.Type.String()),
+		)
+	}
+	return sqls
+}
+
+func (t *Table) MakeAggrMaxColumnAlterSQL1H(orgID uint16) []string {
+	return t.MakeAggrMaxColumnAlterSQLs(orgID, AggregationHour)
+}
+
+func (t *Table) MakeAggrMaxColumnAlterSQL1D(orgID uint16) []string {
+	return t.MakeAggrMaxColumnAlterSQLs(orgID, AggregationDay)
+}
+
 func (t *Table) IsLocalTableWrong(createTableSql string) bool {
 	return strings.Contains(createTableSql, "mem-inuse")
 }
 
 func (t *Table) AggrTable(orgID uint16, aggrInterval AggregationInterval) string {
 	return fmt.Sprintf("%s.`%s.%s_agg`", t.OrgDatabase(orgID), t.tableAggrPrefix(), aggrInterval.String())
+}
+
+func (t *Table) MvTable(orgID uint16, aggrInterval AggregationInterval) string {
+	return fmt.Sprintf("%s.`%s.%s_mv`", t.OrgDatabase(orgID), t.tableAggrPrefix(), aggrInterval.String())
 }
 
 func (t *Table) AggrTable1S(orgID uint16) string {
@@ -434,6 +483,14 @@ func (t *Table) AggrTable1H(orgID uint16) string {
 	return t.AggrTable(orgID, AggregationHour)
 }
 
+func (t *Table) MvTable1H(orgID uint16) string {
+	return t.MvTable(orgID, AggregationHour)
+}
+
+func (t *Table) MakeAggrMvTableDropSQL1H(orgID uint16) string {
+	return fmt.Sprintf("DROP TABLE IF EXISTS %s", t.MvTable1H(orgID))
+}
+
 func (t *Table) MakeAggrTableRenameSQL1H(orgID uint16) string {
 	table := t.AggrTable1H(orgID)
 	return fmt.Sprintf("RENAME TABLE %s to %s_%d`", table, table[:len(table)-1], time.Now().Unix())
@@ -457,6 +514,14 @@ func (t *Table) MakeAggrGlobalTableCreateSQL1H(orgID uint16) string {
 
 func (t *Table) AggrTable1D(orgID uint16) string {
 	return t.AggrTable(orgID, AggregationDay)
+}
+
+func (t *Table) MvTable1D(orgID uint16) string {
+	return t.MvTable(orgID, AggregationDay)
+}
+
+func (t *Table) MakeAggrMvTableDropSQL1D(orgID uint16) string {
+	return fmt.Sprintf("DROP TABLE IF EXISTS %s", t.MvTable1D(orgID))
 }
 
 func (t *Table) MakeAggrTableRenameSQL1D(orgID uint16) string {

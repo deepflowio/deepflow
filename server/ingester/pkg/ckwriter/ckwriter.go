@@ -247,6 +247,18 @@ func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint1
 			if err := ExecSQL(conn, t.MakeAggrTableRenameSQL1H(orgID)); err != nil {
 				log.Warningf("drop 1h agg table failed: %s", err)
 			}
+		} else if t.IsAggrMaxColumnWrong(aggrTableCreateSQL) {
+			// the aggregation of unsummable(_max) columns changed from avg to max;
+			// alter the columns in place to keep the 1h aggregated history. the mv is
+			// dropped first so it stops writing avgState and is recreated with maxState below.
+			if err := ExecSQL(conn, t.MakeAggrMvTableDropSQL1H(orgID)); err != nil {
+				log.Warningf("drop 1h mv table failed: %s", err)
+			}
+			for _, sql := range t.MakeAggrMaxColumnAlterSQL1H(orgID) {
+				if err := ExecSQL(conn, sql); err != nil {
+					log.Warningf("alter 1h agg max column failed: %s", err)
+				}
+			}
 		}
 
 		if err := ExecSQL(conn, t.MakeAggrTableCreateSQL1H(orgID)); err != nil {
@@ -269,6 +281,18 @@ func initTable(conn clickhouse.Conn, timeZone string, t *ckdb.Table, orgID uint1
 		if t.IsAggrTableWrong(aggrTableCreateSQL) {
 			if err := ExecSQL(conn, t.MakeAggrTableRenameSQL1D(orgID)); err != nil {
 				log.Warningf("drop 1d agg table failed: %s", err)
+			}
+		} else if t.IsAggrMaxColumnWrong(aggrTableCreateSQL) {
+			// the aggregation of unsummable(_max) columns changed from avg to max;
+			// alter the columns in place to keep the 1d aggregated history. the mv is
+			// dropped first so it stops writing avgState and is recreated with maxState below.
+			if err := ExecSQL(conn, t.MakeAggrMvTableDropSQL1D(orgID)); err != nil {
+				log.Warningf("drop 1d mv table failed: %s", err)
+			}
+			for _, sql := range t.MakeAggrMaxColumnAlterSQL1D(orgID) {
+				if err := ExecSQL(conn, sql); err != nil {
+					log.Warningf("alter 1d agg max column failed: %s", err)
+				}
 			}
 		}
 		if err := ExecSQL(conn, t.MakeAggrTableCreateSQL1D(orgID)); err != nil {
