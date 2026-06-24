@@ -227,13 +227,18 @@ impl fmt::Display for CaptureNetworkType {
 pub enum IfType {
     Other = 1,
     Ethernet = 6,
-    TokenRing = 9,
+    TokenRing = 7,
+    Man = 9,
     Ppp = 23,
     Loopback = 24,
     Atm = 37,
-    Ieee80211 = 71,
-    Tunnel = 131,
+    Ieee80211 = 53,
+    Tunnel = 62,
+    Wwanpp = 71,
+    Tunnel2 = 131,
     Ieee1394 = 144,
+    Wman = 161,
+    Ieee802154 = 237,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
