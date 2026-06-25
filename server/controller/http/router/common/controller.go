@@ -58,6 +58,7 @@ func ForwardMasterController(c *gin.Context, masterControllerName string, port i
 		c.Abort()
 		return
 	}
+	defer resp.Body.Close()
 
 	c.DataFromReader(resp.StatusCode, resp.ContentLength, resp.Header.Get("Content-Type"), resp.Body, make(map[string]string))
 }
