@@ -33,6 +33,14 @@ var log = logging.MustGetLogger("server_common")
 
 const QUEUE_SIZE = 1 << 16
 
+type IngesterStatus uint8
+
+const (
+	IngesterOk IngesterStatus = iota
+	IngesterAbnormal
+	IngesterInitializing
+)
+
 type ControllerIngesterShared struct {
 	ResourceEventQueue *queue.OverwriteQueue
 	TraceTreeQueue     *queue.OverwriteQueue
@@ -83,15 +91,16 @@ func ExportersEnabled(configPath string) bool {
 	return false
 }
 
-type OrgHanderInterface interface {
+type OrgHandlerInterface interface {
 	DropOrg(orgId uint16) error
 	UpdateNativeTag(nativetag.NativeTagOP, uint16, *nativetag.NativeTag) error
+	IsHealthy() bool
 }
 
-var ingesterOrgHanders []OrgHanderInterface
+var ingesterOrgHandlers []OrgHandlerInterface
 
-func SetOrgHandler(orgHandler OrgHanderInterface) {
-	ingesterOrgHanders = append(ingesterOrgHanders, orgHandler)
+func SetOrgHandler(orgHandler OrgHandlerInterface) {
+	ingesterOrgHandlers = append(ingesterOrgHandlers, orgHandler)
 }
 
 /*
@@ -115,11 +124,11 @@ func SetOrgHandler(orgHandler OrgHanderInterface) {
  */
 func DropOrg(orgId uint16) error {
 	log.Info("drop org id:", orgId)
-	if ingesterOrgHanders == nil {
-		return fmt.Errorf("ingesterOrgHanders is nil, drop org id %d failed", orgId)
+	if ingesterOrgHandlers == nil {
+		return fmt.Errorf("ingesterOrgHandlers is nil, drop org id %d failed", orgId)
 	}
-	for _, ingesterOrgHander := range ingesterOrgHanders {
-		err := ingesterOrgHander.DropOrg(orgId)
+	for _, orgHandler := range ingesterOrgHandlers {
+		err := orgHandler.DropOrg(orgId)
 		if err != nil {
 			return err
 		}
@@ -142,13 +151,13 @@ func PushNativeTags(orgId uint16, nativeTags []nativetag.NativeTag) {
 // When adding or removing native_tag, you need to call the interface
 func UpdateNativeTag(op nativetag.NativeTagOP, orgId uint16, nativeTag *nativetag.NativeTag) error {
 	log.Infof("orgId %d %s native tag: %+v", orgId, op, nativeTag)
-	if ingesterOrgHanders == nil {
+	if ingesterOrgHandlers == nil {
 		err := fmt.Errorf("ingester is not ready, update native tag failed")
 		log.Error(err)
 		return err
 	}
-	for _, ingesterOrgHander := range ingesterOrgHanders {
-		err := ingesterOrgHander.UpdateNativeTag(op, orgId, nativeTag)
+	for _, orgHandler := range ingesterOrgHandlers {
+		err := orgHandler.UpdateNativeTag(op, orgId, nativeTag)
 		if err != nil {
 			log.Error(err)
 			return err
@@ -156,4 +165,19 @@ func UpdateNativeTag(op nativetag.NativeTagOP, orgId uint16, nativeTag *nativeta
 	}
 	nativetag.UpdateNativeTag(op, orgId, nativeTag)
 	return nil
+}
+
+func CheckIngesterStatus() IngesterStatus {
+	if ingesterOrgHandlers == nil {
+		log.Infof("ingester is initializing")
+		return IngesterInitializing
+	}
+	for _, orgHandler := range ingesterOrgHandlers {
+		// Treat the ingester as abnormal only after a handler has observed write failures without any successful writes.
+		if !orgHandler.IsHealthy() {
+			log.Errorf("ingester is abnormal")
+			return IngesterAbnormal
+		}
+	}
+	return IngesterOk
 }
