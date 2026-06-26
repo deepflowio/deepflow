@@ -1496,6 +1496,7 @@ impl Default for Integration {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct Vector {
     pub enabled: bool,
     pub config: serde_yaml::Value,
