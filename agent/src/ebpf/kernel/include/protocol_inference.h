@@ -1715,6 +1715,26 @@ static __inline bool is_include_crlf(const char *buf)
 	return true;
 }
 
+static __inline bool is_redis_error_response(const char *buf)
+{
+	/*
+	 * Common Redis error prefixes:
+	 * ASK, BUSY, CLUSTERDOWN, ERR, LOADING, MISCONF, MOVED,
+	 * NOAUTH, NOPERM, OOM, READONLY, TRYAGAIN, WRONGTYPE,
+	 * WRONGPASS, WRONGTYPE.
+	 *
+	 * Use relaxed range checks to reduce eBPF verifier branches:
+	 * buf[1]: A, B, C, E, L, M, N, O, R, T, W -> A ~ W
+	 * buf[2]: E, I, L, O, R, S, U -> E ~ U
+	 */
+	if (buf[1] < 'A' || buf[1] > 'W')
+		return false;
+	if (buf[2] < 'E' || buf[2] > 'U')
+		return false;
+
+	return true;
+}
+
 // ref:
 //  http://redisdoc.com/topic/protocol.html
 //  https://redis.io/docs/reference/protocol-spec/
@@ -1769,10 +1789,8 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	if (first_byte != '-' && !is_include_crlf(buf))
 		return MSG_UNKNOWN;
 
-	//-ERR unknown command 'foobar'
-	//-WRONGTYPE Operation against a key holding the wrong kind of value
-	if (first_byte == '-'
-	    && ((buf[1] != 'E' && buf[1] != 'W') || buf[2] != 'R'))
+	/* Check common Redis Simple Error responses. */
+	if (first_byte == '-' && !is_redis_error_response(buf))
 		return MSG_UNKNOWN;
 
 	return MSG_REQUEST;
