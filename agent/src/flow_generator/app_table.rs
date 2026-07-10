@@ -19,6 +19,7 @@ use std::{
     num::NonZeroUsize,
 };
 
+use log::debug;
 use lru::LruCache;
 use public::l7_protocol::{L7Protocol, L7ProtocolEnum};
 
@@ -232,6 +233,13 @@ impl AppTable {
     ) -> Option<(L7ProtocolEnum, u16, u32, u64)> {
         #[cfg(any(target_os = "linux", target_os = "android"))]
         if self.is_whitelist(packet) {
+            debug!(
+                "app table whitelist match process({}@{}) port: {}>{}",
+                String::from_utf8_lossy(&packet.process_kname),
+                packet.process_id,
+                packet.lookup_key.src_port,
+                packet.lookup_key.dst_port
+            );
             return None;
         }
 
@@ -430,6 +438,11 @@ impl AppTable {
         local_epc: i32,
         remote_epc: i32,
     ) -> bool {
+        #[cfg(unix)]
+        if self.is_whitelist(packet) {
+            return false;
+        }
+
         let is_c2s = packet.lookup_key.direction == PacketDirection::ClientToServer;
 
         let (ip, port);

@@ -1712,8 +1712,8 @@ pub struct InferenceWhitelist {
 impl InferenceWhitelist {
     fn format_name(name: &[u8]) -> &[u8] {
         for i in (0..name.len()).rev() {
-            if name[i] == 0 {
-                return &name[..i];
+            if name[i] != 0 {
+                return &name[..i + 1];
             }
         }
 
