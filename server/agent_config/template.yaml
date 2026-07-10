@@ -4146,7 +4146,7 @@ processors:
       #   en: Inference Maximum Retries
       #   ch: 推断重试最大次数
       # unit:
-      # range: [0, 10000]
+      # range: [0, 100000]
       # enum_options: []
       # modification: agent_restart
       # ee_feature: false
