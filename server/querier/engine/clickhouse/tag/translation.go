@@ -765,9 +765,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		tagResourceMap[osAPPSuffix] = map[string]*Tag{
 			"default": NewTag(
 				"dictGet('flow_tag.os_app_tag_map', 'value', (toUInt64("+processIDSuffix+"),'%s'))",
-				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE key='%s')",
-				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE value %s %s and key='%s')",
-				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT pid FROM flow_tag.os_app_tag_map WHERE %s(value,%s) and key='%s')",
+				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.os_app_tag_map WHERE key='%s')",
+				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.os_app_tag_map WHERE value %s %s and key='%s')",
+				"toUInt64("+processIDSuffix+") GLOBAL IN (SELECT id FROM flow_tag.os_app_tag_map WHERE %s(value,%s) and key='%s')",
 			),
 		}
 	}
