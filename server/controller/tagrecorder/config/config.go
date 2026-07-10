@@ -17,7 +17,7 @@
 package config
 
 type TagRecorderConfig struct {
-	Interval                  int `default:"60" yaml:"timeout"`
+	Interval                  int `default:"60" yaml:"interval"`
 	MySQLBatchSize            int `default:"1000" yaml:"mysql_batch_size"`
 	DictionaryRefreshInterval int `default:"60" yaml:"dictionary_refresh_interval"`
 	LiveViewRefreshSecond     int `default:"60" yaml:"live_view_refresh_second"`
