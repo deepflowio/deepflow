@@ -291,7 +291,7 @@ impl DubboInfo {
             self.status_code = Some(code);
         }
 
-        if custom.resp.status != self.resp_status {
+        if custom.resp.status != L7ResponseStatus::default() {
             self.resp_status = custom.resp.status;
         }
 
