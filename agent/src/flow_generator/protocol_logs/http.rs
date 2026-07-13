@@ -482,7 +482,7 @@ impl HttpInfo {
                 self.status_code = Some(code as u16);
             }
 
-            if custom.resp.status != self.status {
+            if custom.resp.status != L7ResponseStatus::default() {
                 self.status = custom.resp.status;
             }
 
