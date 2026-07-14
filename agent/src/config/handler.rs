@@ -322,6 +322,7 @@ pub struct OsProcScanConfig;
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PlatformConfig {
     pub sync_interval: Duration,
+    pub process_gpid_sync_interval: Duration,
     pub kubernetes_cluster_id: String,
     pub libvirt_xml_path: PathBuf,
     pub kubernetes_poller_type: KubernetesPollerType,
@@ -2132,6 +2133,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
             pcap: conf.processors.packet.pcap_stream,
             platform: PlatformConfig {
                 sync_interval: conf.inputs.resources.push_interval,
+                process_gpid_sync_interval: conf.inputs.proc.process_gpid_sync_interval,
                 kubernetes_cluster_id: static_config.kubernetes_cluster_id.clone(),
                 libvirt_xml_path: conf
                     .inputs
@@ -3860,6 +3862,13 @@ impl ConfigHandler {
                 proc.socket_info_sync_interval, new_proc.socket_info_sync_interval
             );
             proc.socket_info_sync_interval = new_proc.socket_info_sync_interval;
+        }
+        if proc.process_gpid_sync_interval != new_proc.process_gpid_sync_interval {
+            info!(
+                "Update inputs.proc.process_gpid_sync_interval from {:?} to {:?}.",
+                proc.process_gpid_sync_interval, new_proc.process_gpid_sync_interval
+            );
+            proc.process_gpid_sync_interval = new_proc.process_gpid_sync_interval;
         }
 
         let tag = &mut proc.tag_extraction;

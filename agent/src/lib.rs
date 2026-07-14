@@ -35,6 +35,7 @@ mod monitor;
 mod platform;
 mod plugin;
 mod policy;
+mod process_gpid;
 pub mod rpc;
 mod sender;
 pub mod trident;

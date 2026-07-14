@@ -182,6 +182,12 @@ impl Policy {
             return;
         }
 
+        let fill_if_empty = |target: &mut u32, gpid| {
+            if *target == 0 {
+                *target = gpid;
+            }
+        };
+
         let mut direction = packet.lookup_key.direction;
 
         // We consider the direction (role) in GpidEntry to be the ground truth because
@@ -207,8 +213,8 @@ impl Policy {
                     // 用于客户端处采集的流量，流量服务端IP为NAT IP，需要通过客户端信息查询流量真实的服务端IP
                     match gpid_entry.role_real {
                         RoleType::RoleServer => {
-                            packet.gpid_0 = gpid_entry.pid_0;
-                            packet.gpid_1 = gpid_entry.pid_real;
+                            fill_if_empty(&mut packet.gpid_0, gpid_entry.pid_0);
+                            fill_if_empty(&mut packet.gpid_1, gpid_entry.pid_real);
                             // NAT_SOURCE_RTOA高于当前优先级会更新数据
                             if TapPort::NAT_SOURCE_RTOA > packet.lookup_key.dst_nat_source {
                                 packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_RTOA;
@@ -218,7 +224,7 @@ impl Policy {
                             }
                         }
                         RoleType::RoleClient => {
-                            packet.gpid_0 = gpid_entry.pid_real;
+                            fill_if_empty(&mut packet.gpid_0, gpid_entry.pid_real);
                             // NAT_SOURCE_TOA高于当前优先级会更新数据
                             if TapPort::NAT_SOURCE_TOA > packet.lookup_key.src_nat_source {
                                 packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_TOA;
@@ -226,16 +232,16 @@ impl Policy {
                                 packet.lookup_key.src_nat_ip =
                                     IpAddr::V4(Ipv4Addr::from(gpid_entry.ip_real));
                             }
-                            packet.gpid_1 = gpid_entry.pid_1;
+                            fill_if_empty(&mut packet.gpid_1, gpid_entry.pid_1);
                         }
                         RoleType::RoleNone => {
-                            packet.gpid_0 = gpid_entry.pid_0;
-                            packet.gpid_1 = gpid_entry.pid_1;
+                            fill_if_empty(&mut packet.gpid_0, gpid_entry.pid_0);
+                            fill_if_empty(&mut packet.gpid_1, gpid_entry.pid_1);
                         }
                     }
                 } else {
-                    packet.gpid_0 = gpid_entry.pid_0;
-                    packet.gpid_1 = gpid_entry.pid_1;
+                    fill_if_empty(&mut packet.gpid_0, gpid_entry.pid_0);
+                    fill_if_empty(&mut packet.gpid_1, gpid_entry.pid_1);
                 }
             }
             PacketDirection::ServerToClient => {
@@ -243,7 +249,7 @@ impl Policy {
                     // 用于客户端处采集的流量，流量服务端IP为NAT IP，需要通过客户端信息查询流量真实的服务端IP
                     match gpid_entry.role_real {
                         RoleType::RoleServer => {
-                            packet.gpid_0 = gpid_entry.pid_real;
+                            fill_if_empty(&mut packet.gpid_0, gpid_entry.pid_real);
                             // NNAT_SOURCE_RTOA高于当前优先级会更新数据
                             if TapPort::NAT_SOURCE_RTOA > packet.lookup_key.src_nat_source {
                                 packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_RTOA;
@@ -251,11 +257,11 @@ impl Policy {
                                 packet.lookup_key.src_nat_ip =
                                     IpAddr::V4(Ipv4Addr::from(gpid_entry.ip_real));
                             }
-                            packet.gpid_1 = gpid_entry.pid_0;
+                            fill_if_empty(&mut packet.gpid_1, gpid_entry.pid_0);
                         }
                         RoleType::RoleClient => {
-                            packet.gpid_0 = gpid_entry.pid_1;
-                            packet.gpid_1 = gpid_entry.pid_real;
+                            fill_if_empty(&mut packet.gpid_0, gpid_entry.pid_1);
+                            fill_if_empty(&mut packet.gpid_1, gpid_entry.pid_real);
                             // NAT_SOURCE_RTOA高于当前优先级会更新数据
                             if TapPort::NAT_SOURCE_TOA > packet.lookup_key.dst_nat_source {
                                 packet.lookup_key.dst_nat_source = TapPort::NAT_SOURCE_TOA;
@@ -265,13 +271,13 @@ impl Policy {
                             }
                         }
                         RoleType::RoleNone => {
-                            packet.gpid_0 = gpid_entry.pid_1;
-                            packet.gpid_1 = gpid_entry.pid_0;
+                            fill_if_empty(&mut packet.gpid_0, gpid_entry.pid_1);
+                            fill_if_empty(&mut packet.gpid_1, gpid_entry.pid_0);
                         }
                     }
                 } else {
-                    packet.gpid_0 = gpid_entry.pid_1;
-                    packet.gpid_1 = gpid_entry.pid_0;
+                    fill_if_empty(&mut packet.gpid_0, gpid_entry.pid_1);
+                    fill_if_empty(&mut packet.gpid_1, gpid_entry.pid_0);
                 }
             }
         }
@@ -871,5 +877,25 @@ mod test {
             assert_eq!(2, e.src_info.l3_epc_id);
             assert_eq!(10, e.dst_info.l3_epc_id);
         }
+    }
+
+    #[test]
+    fn legacy_gpid_only_fills_empty_side() {
+        let mut packet = MetaPacket::default();
+        packet.lookup_key.direction = PacketDirection::ClientToServer;
+        packet.lookup_key.dst_ip = Ipv4Addr::UNSPECIFIED.into();
+        packet.lookup_key.dst_port = 2;
+        packet.gpid_0 = 100;
+        let entry = GpidEntry {
+            port_0: 1,
+            pid_0: 10,
+            port_1: 2,
+            pid_1: 20,
+            ..Default::default()
+        };
+
+        Policy::fill_gpid_entry(&mut packet, &entry);
+        assert_eq!(packet.gpid_0, 100);
+        assert_eq!(packet.gpid_1, 20);
     }
 }

@@ -1231,6 +1231,25 @@ inputs:
     socket_info_sync_interval: 0ns
     # type: duration
     # name:
+    #   en: Process GPID Synchronization Interval
+    #   ch: 进程 GPID 同步间隔
+    # unit:
+    # range: [0ns, 1h]
+    # enum_options: []
+    # modification: hot_update
+    # ee_feature: false
+    # description:
+    #   en: |-
+    #     Synchronization interval for the process GPID mapping table.
+    #
+    #     '0ns' means disabled. Do not configure a value less than `1s` except for `0ns`.
+    #   ch: |-
+    #     进程 GPID 映射表的同步周期。
+    #
+    #     '0ns' 表示不开启，除 '0ns' 外不要配置小于 `1s` 的值。
+    process_gpid_sync_interval: 10s
+    # type: duration
+    # name:
     #   en: Minimal Lifetime
     #   ch: 最小活跃时间
     # unit:
