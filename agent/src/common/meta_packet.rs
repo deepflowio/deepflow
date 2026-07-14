@@ -184,6 +184,12 @@ pub struct SubPacket {
     tcp_seq: u32,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct TraceInfo {
+    pub pid: u32,
+    pub agent_id: u32,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct MetaPacket<'a> {
     // 主机序, 不因L2End1而颠倒, 端口会在查询策略时被修改
@@ -268,6 +274,7 @@ pub struct MetaPacket<'a> {
     /********** for GPID **********/
     pub gpid_0: u32,
     pub gpid_1: u32,
+    pub trace_info: Option<TraceInfo>,
 
     pub ip_id: u16,
 }
@@ -445,6 +452,19 @@ impl<'a> MetaPacket<'a> {
                             &packet[offset + TCP_TOA_IP_OFFSET..],
                         )));
                         self.tap_port.set_nat_source(TapPort::NAT_SOURCE_TOA);
+                    }
+                    offset += assume_length;
+                }
+                TcpOptionNumber(TCP_OPT_TRACING) => {
+                    if assume_length == TCP_TOT_LEN
+                        && offset + TCP_TOT_LEN <= payload_offset
+                        && read_u16_be(&packet[offset + TCP_TOT_MAGIC_OFFSET..]) == TCP_TOT_MAGIC
+                        && self.trace_info.is_none()
+                    {
+                        self.trace_info = Some(TraceInfo {
+                            pid: read_u32_be(&packet[offset + TCP_TOT_PID_OFFSET..]),
+                            agent_id: read_u32_be(&packet[offset + TCP_TOT_AGENT_ID_OFFSET..]),
+                        });
                     }
                     offset += assume_length;
                 }
@@ -1490,6 +1510,20 @@ impl Default for ProtocolData {
 mod tests {
     use super::*;
 
+    fn parse_tcp_options(options: &[u8]) -> MetaPacket<'static> {
+        let option_offset = HeaderType::Ipv4Tcp.min_packet_size();
+        let mut packet = vec![0; option_offset + options.len()];
+        packet[option_offset..].copy_from_slice(options);
+
+        let mut meta_packet = MetaPacket {
+            header_type: HeaderType::Ipv4Tcp,
+            l4_opt_size: options.len() as u32,
+            ..Default::default()
+        };
+        meta_packet.update_tcp_opt(&packet);
+        meta_packet
+    }
+
     #[test]
     fn get_pkt_size() {
         let pkt = MetaPacket {
@@ -1511,6 +1545,129 @@ mod tests {
             65535,
             "packet size incorrect for\n{}",
             pkt
+        );
+    }
+
+    #[test]
+    fn parse_tcp_trace_option() {
+        let meta_packet = parse_tcp_options(&[
+            2,
+            4,
+            0x05,
+            0xb4, // MSS 1460
+            TCP_OPT_TRACING,
+            TCP_TOT_LEN as u8,
+            0xde,
+            0xea,
+            0x01,
+            0x23,
+            0x45,
+            0x67,
+            0x89,
+            0xab,
+            0xcd,
+            0xef,
+        ]);
+
+        assert_eq!(
+            meta_packet.trace_info,
+            Some(TraceInfo {
+                pid: 0x01234567,
+                agent_id: 0x89abcdef,
+            })
+        );
+        let ProtocolData::TcpHeader(tcp_data) = meta_packet.protocol_data else {
+            panic!("expected TCP protocol data");
+        };
+        assert_eq!(tcp_data.mss, 1460);
+    }
+
+    #[test]
+    fn ignore_invalid_tcp_trace_options() {
+        let invalid_options = [
+            // v1 format
+            vec![
+                TCP_OPT_TRACING,
+                16,
+                0xde,
+                0xe9,
+                0x01,
+                0x23,
+                0x45,
+                0x67,
+                0x0a,
+                0x00,
+                0x00,
+                0x01,
+                0x00,
+                0x00,
+                0x00,
+                0x01,
+            ],
+            // Incorrect magic.
+            vec![
+                TCP_OPT_TRACING,
+                TCP_TOT_LEN as u8,
+                0xde,
+                0xeb,
+                0x01,
+                0x23,
+                0x45,
+                0x67,
+                0x89,
+                0xab,
+                0xcd,
+                0xef,
+            ],
+            // Incorrect length.
+            vec![TCP_OPT_TRACING, 8, 0xde, 0xea, 0, 0, 0, 1],
+            // Declared length exceeds the captured option bytes.
+            vec![TCP_OPT_TRACING, TCP_TOT_LEN as u8, 0xde, 0xea, 0, 0, 0, 1],
+        ];
+
+        for options in invalid_options {
+            assert_eq!(parse_tcp_options(&options).trace_info, None);
+        }
+    }
+
+    #[test]
+    fn keep_first_tcp_trace_option() {
+        let mut options = Vec::new();
+        options.extend_from_slice(&[
+            TCP_OPT_TRACING,
+            TCP_TOT_LEN as u8,
+            0xde,
+            0xea,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            2,
+        ]);
+        options.extend_from_slice(&[
+            TCP_OPT_TRACING,
+            TCP_TOT_LEN as u8,
+            0xde,
+            0xea,
+            0,
+            0,
+            0,
+            3,
+            0,
+            0,
+            0,
+            4,
+        ]);
+
+        assert_eq!(
+            parse_tcp_options(&options).trace_info,
+            Some(TraceInfo {
+                pid: 1,
+                agent_id: 2,
+            })
         );
     }
 }
