@@ -88,6 +88,7 @@ use crate::{
     flow_generator::AppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
     policy::PolicyGetter,
+    process_gpid::ProcessGpidTable,
     utils::{
         environment::get_mac_by_name,
         stats::{self, Collector},
@@ -755,6 +756,7 @@ pub struct DispatcherBuilder {
     collector_config: Option<CollectorAccess>,
     dispatcher_config: Option<DispatcherAccess>,
     policy_getter: Option<PolicyGetter>,
+    process_gpid_table: Option<ProcessGpidTable>,
     #[cfg(target_os = "linux")]
     platform_poller: Option<Arc<crate::platform::GenericPoller>>,
     exception_handler: Option<ExceptionHandler>,
@@ -892,6 +894,11 @@ impl DispatcherBuilder {
 
     pub fn policy_getter(mut self, v: PolicyGetter) -> Self {
         self.policy_getter = Some(v);
+        self
+    }
+
+    pub fn process_gpid_table(mut self, v: ProcessGpidTable) -> Self {
+        self.process_gpid_table = Some(v);
         self
     }
 
@@ -1099,6 +1106,10 @@ impl DispatcherBuilder {
             policy_getter: self
                 .policy_getter
                 .ok_or(Error::ConfigIncomplete("no policy".into()))?,
+            process_gpid_table: self
+                .process_gpid_table
+                .take()
+                .ok_or(Error::ConfigIncomplete("no process GPID table".into()))?,
             #[cfg(target_os = "linux")]
             platform_poller: platform_poller.clone(),
             exception_handler: self

@@ -553,6 +553,7 @@ impl MirrorModeDispatcher {
             Some(base.flow_output_queue.clone()),
             base.l7_stats_output_queue.clone(),
             base.policy_getter,
+            base.process_gpid_table.clone(),
             base.log_output_queue.clone(),
             base.ntp_diff.clone(),
             &base.flow_map_config.load(),
@@ -570,6 +571,7 @@ impl MirrorModeDispatcher {
         }
 
         while !base.terminated.load(Ordering::Relaxed) {
+            flow_map.refresh_process_gpid();
             let config = Config {
                 flow: &base.flow_map_config.load(),
                 log_parser: &base.log_parser_config.load(),

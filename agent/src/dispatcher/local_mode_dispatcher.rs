@@ -214,6 +214,7 @@ impl LocalModeDispatcher {
             Some(base.flow_output_queue.clone()),
             base.l7_stats_output_queue.clone(),
             base.policy_getter,
+            base.process_gpid_table.clone(),
             base.log_output_queue.clone(),
             base.ntp_diff.clone(),
             &base.flow_map_config.load(),
@@ -228,6 +229,7 @@ impl LocalModeDispatcher {
         let mut collector_config = base.collector_config.load().clone();
 
         while !base.terminated.load(Ordering::Relaxed) {
+            flow_map.refresh_process_gpid();
             if base.need_reload_config.swap(false, Ordering::Relaxed) {
                 info!("dispatcher reload config");
                 flow_config = base.flow_map_config.load().clone();

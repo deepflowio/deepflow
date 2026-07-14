@@ -55,6 +55,7 @@ use crate::{
     flow_generator::AppProto,
     handler::PacketHandlerBuilder,
     policy::PolicyGetter,
+    process_gpid::ProcessGpidTable,
     rpc::get_timestamp,
     utils::{bytes::read_u16_be, stats::Collector},
 };
@@ -120,6 +121,7 @@ pub(super) struct InternalState {
     pub(super) platform_poller: Arc<crate::platform::GenericPoller>,
 
     pub(super) policy_getter: PolicyGetter,
+    pub(super) process_gpid_table: ProcessGpidTable,
     pub(super) exception_handler: ExceptionHandler,
     pub(super) ntp_diff: Arc<AtomicI64>,
 
