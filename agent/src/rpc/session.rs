@@ -43,7 +43,7 @@ use public::{
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 pub const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
 
-const GRPC_CALL_ENDPOINTS: [&str; 10] = [
+const GRPC_CALL_ENDPOINTS: [&str; 11] = [
     "push",
     "ntp",
     "upgrade",
@@ -52,6 +52,7 @@ const GRPC_CALL_ENDPOINTS: [&str; 10] = [
     "kubernetes_api_sync",
     "get_kubernetes_cluster_id",
     "gpid_sync",
+    "process_gpid_sync",
     "plugin",
     "prometheus_api_sync",
 ];
@@ -64,7 +65,8 @@ const GENESIS_SYNC_ENDPOINT: usize = 4;
 const KUBERNETES_API_SYNC_ENDPOINT: usize = 5;
 const GET_KUBERNETES_CLUSTER_ID_ENDPOINT: usize = 6;
 const GPID_SYNC_ENDPOINT: usize = 7;
-const PLUGIN_ENDPOINT: usize = 8;
+const PROCESS_GPID_SYNC_ENDPOINT: usize = 8;
+const PLUGIN_ENDPOINT: usize = 9;
 
 macro_rules! response_size {
     (push, $($_:ident),*) => {
@@ -431,6 +433,13 @@ impl Session {
         request: agent::GpidSyncRequest,
     ) -> Result<tonic::Response<agent::GpidSyncResponse>, tonic::Status> {
         sync_grpc_call_unary!(self, gpid_sync, request, GPID_SYNC_ENDPOINT)
+    }
+
+    pub async fn grpc_process_gpid_sync(
+        &self,
+        request: agent::ProcessGpidSyncRequest,
+    ) -> Result<tonic::Response<agent::ProcessGpidSyncResponse>, tonic::Status> {
+        sync_grpc_call_unary!(self, process_gpid_sync, request, PROCESS_GPID_SYNC_ENDPOINT)
     }
 
     pub async fn grpc_plugin(

@@ -99,6 +99,7 @@ impl LocalPlusModeDispatcher {
         let flow_output_queue = base.flow_output_queue.clone();
         let l7_stats_output_queue = base.l7_stats_output_queue.clone();
         let policy_getter = base.policy_getter;
+        let process_gpid_table = base.process_gpid_table.clone();
         let log_output_queue = base.log_output_queue.clone();
         let ntp_diff = base.ntp_diff.clone();
         let flow_map_config = base.flow_map_config.clone();
@@ -127,6 +128,7 @@ impl LocalPlusModeDispatcher {
                         Some(flow_output_queue),
                         l7_stats_output_queue,
                         policy_getter,
+                        process_gpid_table,
                         log_output_queue,
                         ntp_diff,
                         &flow_map_config.load(),
@@ -142,6 +144,7 @@ impl LocalPlusModeDispatcher {
                     }
 
                     while !terminated.load(Ordering::Relaxed) {
+                        flow_map.refresh_process_gpid();
                         let config = Config {
                             flow: &flow_map_config.load(),
                             log_parser: &log_parser_config.load(),

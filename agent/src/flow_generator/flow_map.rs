@@ -80,6 +80,7 @@ use crate::{
     metric::document::TapSide,
     plugin::wasm::WasmVm,
     policy::{Policy, PolicyGetter},
+    process_gpid::{ProcessGpidLookup, ProcessGpidTable},
     rpc::get_timestamp,
     utils::stats::{self, Countable, StatsOption},
 };
@@ -210,6 +211,7 @@ pub struct FlowMap {
     service_table: ServiceTable,
     app_table: AppTable,
     policy_getter: PolicyGetter,
+    process_gpid: ProcessGpidLookup,
     start_time: Duration,    // 时间桶中的最早时间
     start_time_in_unit: u64, // 时间桶中的最早时间，以TIME_SLOT_UNIT为单位
     hash_slots: usize,
@@ -255,11 +257,29 @@ pub struct FlowMap {
 
 impl FlowMap {
     const MICROS_IN_SECONDS: u64 = 1_000_000;
+
+    pub fn refresh_process_gpid(&mut self) {
+        self.process_gpid.refresh();
+    }
+
+    #[inline]
+    fn lookup_policy(
+        &mut self,
+        meta_packet: &mut MetaPacket,
+        local_epc_id: i32,
+        local_agent_id: u32,
+    ) {
+        self.process_gpid.lookup(meta_packet, local_agent_id);
+        self.policy_getter
+            .lookup(meta_packet, self.id as usize, local_epc_id);
+    }
+
     pub fn new(
         id: u32,
         output_queue: Option<DebugSender<Arc<BatchedBox<TaggedFlow>>>>,
         l7_stats_output_queue: DebugSender<BatchedBox<L7Stats>>,
         policy_getter: PolicyGetter,
+        process_gpid_table: ProcessGpidTable,
         app_proto_log_queue: DebugSender<AppProto>,
         ntp_diff: Arc<AtomicI64>,
         config: &FlowConfig,
@@ -309,6 +329,7 @@ impl FlowMap {
                 config.l7_protocol_inference_whitelist.clone(),
             ),
             policy_getter,
+            process_gpid: process_gpid_table.new_lookup(id, &stats_collector),
             start_time,
             start_time_in_unit: start_time.as_secs(),
             hash_slots: config.hash_slots as usize,
@@ -724,7 +745,7 @@ impl FlowMap {
         };
         #[cfg(target_os = "windows")]
         let local_epc_id = 0;
-        (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
+        self.lookup_policy(meta_packet, local_epc_id, config.flow.agent_id as u32);
     }
 
     pub fn inject_meta_packet(&mut self, config: &Config, meta_packet: &mut MetaPacket) {
@@ -1371,7 +1392,7 @@ impl FlowMap {
         let local_epc_id = 0;
 
         // tag
-        (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
+        self.lookup_policy(meta_packet, local_epc_id, config.flow.agent_id as u32);
         self.init_endpoint_and_policy_data(&mut node, meta_packet);
         node.tagged_flow.flow.need_to_store = (self.pseq_output.is_some()
             && meta_packet.lookup_key.proto == IpProtocol::TCP)
@@ -1561,7 +1582,7 @@ impl FlowMap {
                 meta_packet.lookup_key.src_nat_port = metric.nat_real_port;
                 meta_packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_TOA;
             }
-            (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
+            self.lookup_policy(meta_packet, local_epc_id, config.flow.agent_id as u32);
             self.update_endpoint_and_policy_data(node, meta_packet);
             // Currently, only virtual traffic's tap_side is counted
             node.tagged_flow
@@ -1654,7 +1675,7 @@ impl FlowMap {
             #[cfg(target_os = "windows")]
             let local_epc_id = 0;
 
-            (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
+            self.lookup_policy(meta_packet, local_epc_id, config.flow.agent_id as u32);
         }
     }
 
@@ -2756,6 +2777,7 @@ pub fn _new_flow_map_and_receiver(
         Some(output_queue_sender),
         l7_stats_output_queue_sender,
         policy_getter,
+        ProcessGpidTable::default(),
         app_proto_log_queue,
         Arc::new(AtomicI64::new(0)),
         &config.flow,

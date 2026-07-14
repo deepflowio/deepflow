@@ -84,6 +84,7 @@ use crate::{
     monitor::Monitor,
     platform::synchronizer::Synchronizer as PlatformSynchronizer,
     policy::{Policy, PolicyGetter, PolicySetter},
+    process_gpid::{ProcessGpidSynchronizer, ProcessGpidTable},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{
         npb_sender::NpbArpTable,
@@ -1325,6 +1326,7 @@ fn component_on_config_change(
                     components.npb_arp_table.clone(),
                     components.rx_leaky_bucket.clone(),
                     components.policy_getter,
+                    components.process_gpid_table.clone(),
                     components.exception_handler.clone(),
                     components.bpf_options.clone(),
                     components.packet_sequence_uniform_output.clone(),
@@ -1446,6 +1448,7 @@ fn component_on_config_change(
                     components.npb_arp_table.clone(),
                     components.rx_leaky_bucket.clone(),
                     components.policy_getter,
+                    components.process_gpid_table.clone(),
                     components.exception_handler.clone(),
                     components.bpf_options.clone(),
                     components.packet_sequence_uniform_output.clone(),
@@ -1804,6 +1807,8 @@ pub struct AgentComponents {
     pub kubernetes_poller: Arc<GenericPoller>,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub socket_synchronizer: SocketSynchronizer,
+    pub process_gpid_synchronizer: ProcessGpidSynchronizer,
+    pub process_gpid_table: ProcessGpidTable,
     pub debugger: Debugger,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub ebpf_dispatcher_component: Option<EbpfDispatcherComponent>,
@@ -2404,6 +2409,15 @@ impl AgentComponents {
             process_listener.clone(),
         );
 
+        let process_gpid_table = ProcessGpidTable::default();
+        let process_gpid_synchronizer = ProcessGpidSynchronizer::new(
+            runtime.clone(),
+            config_handler.platform(),
+            synchronizer.agent_id.clone(),
+            session.clone(),
+            process_gpid_table.clone(),
+        );
+
         let rx_leaky_bucket = Arc::new(LeakyBucket::new(match candidate_config.capture_mode {
             PacketCaptureType::Analyzer => None,
             _ => Some(
@@ -2665,6 +2679,7 @@ impl AgentComponents {
                 npb_arp_table.clone(),
                 rx_leaky_bucket.clone(),
                 policy_getter,
+                process_gpid_table.clone(),
                 exception_handler.clone(),
                 bpf_options.clone(),
                 packet_sequence_uniform_output.clone(),
@@ -2918,6 +2933,7 @@ impl AgentComponents {
                 config_handler.flow(),
                 config_handler.collector(),
                 policy_getter,
+                process_gpid_table.clone(),
                 dpdk_ebpf_senders,
                 log_sender,
                 l7_stats_sender,
@@ -3180,6 +3196,8 @@ impl AgentComponents {
             kubernetes_poller,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             socket_synchronizer,
+            process_gpid_synchronizer,
+            process_gpid_table,
             debugger,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             ebpf_dispatcher_component,
@@ -3242,6 +3260,7 @@ impl AgentComponents {
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
         self.socket_synchronizer.start();
+        self.process_gpid_synchronizer.start();
         #[cfg(target_os = "linux")]
         if crate::utils::environment::is_tt_pod(self.config.agent_type) {
             self.kubernetes_poller.start();
@@ -3318,6 +3337,7 @@ impl AgentComponents {
 
         #[cfg(any(target_os = "linux", target_os = "android"))]
         self.socket_synchronizer.stop();
+        self.process_gpid_synchronizer.stop();
         #[cfg(target_os = "linux")]
         self.kubernetes_poller.stop();
 
@@ -3524,6 +3544,7 @@ fn build_dispatchers(
     npb_arp_table: Arc<NpbArpTable>,
     rx_leaky_bucket: Arc<LeakyBucket>,
     policy_getter: PolicyGetter,
+    process_gpid_table: ProcessGpidTable,
     exception_handler: ExceptionHandler,
     bpf_options: Arc<Mutex<BpfOptions>>,
     packet_sequence_uniform_output: DebugSender<BoxedPacketSequenceBlock>,
@@ -3752,6 +3773,7 @@ fn build_dispatchers(
         .collector_config(config_handler.collector())
         .dispatcher_config(config_handler.dispatcher())
         .policy_getter(policy_getter)
+        .process_gpid_table(process_gpid_table)
         .exception_handler(exception_handler.clone())
         .ntp_diff(synchronizer.ntp_diff())
         .src_interface(

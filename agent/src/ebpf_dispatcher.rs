@@ -71,6 +71,7 @@ use crate::flow_generator::{flow_map::Config, AppProto, FlowMap};
 use crate::integration_collector::Profile;
 use crate::platform::ProcessData;
 use crate::policy::PolicyGetter;
+use crate::process_gpid::ProcessGpidTable;
 use crate::rpc::get_timestamp;
 use crate::utils::{process::ProcessListener, stats};
 
@@ -347,6 +348,7 @@ struct EbpfDispatcher {
 
     // 策略查询
     policy_getter: PolicyGetter,
+    process_gpid_table: ProcessGpidTable,
 
     // GRPC配置
     log_parser_config: LogParserAccess,
@@ -471,6 +473,7 @@ impl EbpfDispatcher {
             None,
             self.l7_stats_output.clone(),
             self.policy_getter,
+            self.process_gpid_table.clone(),
             self.output.clone(),
             self.time_diff.clone(),
             &self.flow_map_config.load(),
@@ -489,6 +492,7 @@ impl EbpfDispatcher {
         let mut last_packet_timestamp = 0;
 
         while unsafe { SWITCH } {
+            flow_map.refresh_process_gpid();
             if need_reload_config.swap(false, Ordering::Relaxed) {
                 info!("ebpf dispatcher reload config");
                 flow_config = self.flow_map_config.load().clone();
@@ -1356,6 +1360,7 @@ impl EbpfCollector {
         flow_map_config: FlowAccess,
         collector_config: CollectorAccess,
         policy_getter: PolicyGetter,
+        process_gpid_table: ProcessGpidTable,
         dpdk_senders: Vec<DebugSender<Box<packet::Packet<'static>>>>,
         output: DebugSender<AppProto>,
         l7_stats_output: DebugSender<BatchedBox<L7Stats>>,
@@ -1420,6 +1425,7 @@ impl EbpfCollector {
                 time_diff,
                 receiver: Arc::new(receiver),
                 policy_getter,
+                process_gpid_table,
                 config,
                 log_parser_config,
                 output,
