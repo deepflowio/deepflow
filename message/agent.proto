@@ -14,6 +14,7 @@ service Synchronizer {
     rpc KubernetesAPISync(KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
     rpc GetKubernetesClusterID(KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
     rpc GPIDSync(GPIDSyncRequest) returns (GPIDSyncResponse) {}
+    rpc ProcessGPIDSync(ProcessGPIDSyncRequest) returns (ProcessGPIDSyncResponse) {}
     rpc ShareGPIDLocalData(ShareGPIDSyncRequests) returns (ShareGPIDSyncRequests) {}
     rpc Plugin(PluginRequest) returns (stream PluginResponse) {}
     // because gRPC cannot be initiated by server, the req/resp of this rpc is reversed
@@ -672,6 +673,35 @@ message GPIDSyncRequest {
 message GPIDSyncResponse {
     optional GPIDSyncCompressAlgorithm entries_compress_algorithm = 1 [default = COMPRESS_ALRO_NONE];
     repeated GPIDSyncEntry entries = 2;
+}
+
+message ProcessGPIDEntry {
+    optional uint32 agent_id = 1;
+    optional uint32 pid = 2;
+    optional uint32 gprocess_id = 3;
+}
+
+message ProcessGPIDEntries {
+    repeated ProcessGPIDEntry entries = 1;
+}
+
+enum ProcessGPIDCompressAlgorithm {
+    // gprocess_infos contains serialized ProcessGPIDEntries.
+    PROCESS_GPID_COMPRESS_ALGO_NONE = 0;
+    // gprocess_infos contains ZSTD-compressed serialized ProcessGPIDEntries.
+    PROCESS_GPID_COMPRESS_ALGO_ZSTD = 1;
+}
+
+message ProcessGPIDSyncRequest {
+    optional AgentId agent_id = 1;
+    optional uint64 process_gpid_version = 2 [default = 0];
+}
+
+message ProcessGPIDSyncResponse {
+    optional uint64 process_gpid_version = 1;
+    optional ProcessGPIDCompressAlgorithm compress_algorithm = 2 [default = PROCESS_GPID_COMPRESS_ALGO_NONE];
+    // Serialized ProcessGPIDEntries, compressed according to compress_algorithm.
+    optional bytes gprocess_infos = 3;
 }
 
 message GlobalGPIDEntry {
