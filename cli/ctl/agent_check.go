@@ -154,6 +154,13 @@ func agentRegiterCommand() []*cobra.Command {
 			AgpidAgentRequest(cmd)
 		},
 	}
+	processGPIDSyncCmd := &cobra.Command{
+		Use:   "process-gpid-sync",
+		Short: "process-gpid-sync from deepflow-server",
+		Run: func(cmd *cobra.Command, args []string) {
+			ProcessGPIDSync(cmd)
+		},
+	}
 	realGlobalCmd := &cobra.Command{
 		Use:   "realclient-to-realserver",
 		Short: "get realclient-to-realserver from deepflow-server",
@@ -189,7 +196,7 @@ func agentRegiterCommand() []*cobra.Command {
 
 	commands := []*cobra.Command{agentCacheCmd, platformDataCmd, ipGroupsCmd,
 		flowAclsCmd, configCmd, grpcBufferSizeCmd, tapTypesCmd, segmentsCmd, containersCmd,
-		skipInterfaceCmd, gpidAgentResponseCmd, gpidGlobalTableCmd,
+		skipInterfaceCmd, gpidAgentResponseCmd, gpidGlobalTableCmd, processGPIDSyncCmd,
 		gpidAgentRequestCmd, realGlobalCmd, ripToVipCmd, pluginCmd, allCmd}
 	return commands
 }
@@ -343,6 +350,50 @@ func AformatEntries(entry *agent.GPIDSyncEntry) string {
 		entry.GetEpcId_0(), utils.IpFromUint32(entry.GetIpv4_0()).String(), entry.GetPort_0(), entry.GetPid_0(), entry.GetEpcIdReal(),
 		utils.IpFromUint32(entry.GetIpv4Real()).String(), entry.GetPortReal(), entry.GetPidReal(), entry.GetRoleReal(), entry.GetNetnsIdx()),
 	)
+	return buffer.String()
+}
+
+func ProcessGPIDSync(cmd *cobra.Command) {
+	conn := agentGetConn(cmd)
+	if conn == nil {
+		return
+	}
+	defer conn.Close()
+	fmt.Printf("request trisolaris(%s), params(%+v)\n", conn.Target(), agentParamData)
+	c := agent.NewSynchronizerClient(conn)
+	reqData := &agent.ProcessGPIDSyncRequest{
+		AgentId: &agent.AgentId{
+			Ip:     &agentParamData.CtrlIP,
+			Mac:    &agentParamData.CtrlMac,
+			TeamId: &agentParamData.TeamID,
+		},
+	}
+	response, err := c.ProcessGPIDSync(context.Background(), reqData)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println("ProcessGPIDSync:")
+	fmt.Printf("process gpid version: %d\n", response.GetProcessGpidVersion())
+	gProcessInfos := agent.ProcessGPIDEntries{}
+	gProcessInfosByte := response.GetGprocessInfos()
+	if gProcessInfosByte == nil {
+		fmt.Println("process gpid info is nil")
+		return
+	}
+	if err := gProcessInfos.Unmarshal(gProcessInfosByte); err != nil {
+		fmt.Println("unmarshal process gpid info failed")
+		return
+	}
+	for index, entry := range gProcessInfos.Entries {
+		AJsonFormat(index+1, FormatProcessGPIDEntry(entry))
+	}
+}
+
+func FormatProcessGPIDEntry(entry *agent.ProcessGPIDEntry) string {
+	buffer := bytes.Buffer{}
+	format := "{ agent_id: %d, pid: %d, gprocess_id: %d }"
+	buffer.WriteString(fmt.Sprintf(format, entry.GetAgentId(), entry.GetPid(), entry.GetGprocessId()))
 	return buffer.String()
 }
 

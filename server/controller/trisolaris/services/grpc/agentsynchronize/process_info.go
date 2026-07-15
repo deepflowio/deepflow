@@ -17,6 +17,8 @@
 package agentsynchronize
 
 import (
+	"fmt"
+
 	context "golang.org/x/net/context"
 
 	api "github.com/deepflowio/deepflow/message/agent"
@@ -77,6 +79,55 @@ func (e *ProcessInfoEvent) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest
 		len(resp.GetEntries()), in.GetCtrlIp(), in.GetCtrlMac(), in.GetAgentId(), in.GetTeamId(), logger.NewORGPrefix(orgID))
 	statsd.AddGPIDSendCounter(uint64(len(resp.GetEntries())))
 	return resp, nil
+}
+
+func (e *ProcessInfoEvent) ProcessGPIDSync(ctx context.Context, in *api.ProcessGPIDSyncRequest) (*api.ProcessGPIDSyncResponse, error) {
+	vtapCacheKey := fmt.Sprintf("%s-%s", in.AgentId.GetIp(), in.AgentId.GetMac())
+	teamIDStr := in.AgentId.GetTeamId()
+	orgID := trisolaris.GetOrgIDByTeamID(teamIDStr)
+	if orgID == 0 {
+		log.Warningf("receive process gpid sync from vtap (%s), invalid team short id:%s", in.AgentId.GetIp(), teamIDStr)
+		return &api.ProcessGPIDSyncResponse{}, nil
+	}
+
+	gVTapInfo := trisolaris.GetORGVTapInfo(orgID)
+	if gVTapInfo == nil {
+		log.Warningf("receive process gpid sync from vtap (%s) team (%s), not found org (%d) vtap info", in.AgentId.GetIp(), teamIDStr, orgID)
+		return &api.ProcessGPIDSyncResponse{}, nil
+	}
+
+	vtapCache := gVTapInfo.GetVTapCache(vtapCacheKey)
+	if vtapCache == nil {
+		log.Infof("receive process gpid sync from vtap (%s) team (%s), vtap is not cache", vtapCacheKey, teamIDStr, logger.NewORGPrefix(orgID))
+		return &api.ProcessGPIDSyncResponse{}, nil
+	}
+
+	metadata := trisolaris.GetMetaData(orgID)
+	if metadata == nil {
+		log.Warningf("receive process gpid sync from vtap (%s) team (%s), not found org (%d) metadata", in.AgentId.GetIp(), teamIDStr, orgID)
+		return &api.ProcessGPIDSyncResponse{}, nil
+	}
+
+	agentMetaData := metadata.GetAgentMetaData()
+	if agentMetaData == nil {
+		log.Warningf("receive process gpid sync from vtap (%s) team (%s), not found org (%d) agent metadata", in.AgentId.GetIp(), teamIDStr, orgID)
+		return &api.ProcessGPIDSyncResponse{}, nil
+	}
+
+	agentVersion := in.GetProcessGpidVersion()
+	version, processGPIDBytes := agentMetaData.GetProcessGPID(agentVersion)
+	log.Infof("receive process gpid sync from vtap (%s) team (%s) version (%d=>%d)", vtapCacheKey, teamIDStr, agentVersion, version, logger.NewORGPrefix(orgID))
+	result := &api.ProcessGPIDSyncResponse{
+		ProcessGpidVersion: &version,
+		GprocessInfos:      processGPIDBytes,
+	}
+	syncBytesSize := uint64(proto.Size(result))
+	currentBufferSize := vtapCache.GetGRPCBufferFromLastProcessGPIDSync(syncBytesSize)
+	if exceedsGRPCBuffer(currentBufferSize, syncBytesSize) {
+		log.Warningf("agent (%s) need sync process gpid size: %d more than max buffer size: %d, stop sync", vtapCacheKey, syncBytesSize, currentBufferSize, logger.NewORGPrefix(orgID))
+		return &api.ProcessGPIDSyncResponse{}, nil
+	}
+	return result, nil
 }
 
 func (e *ProcessInfoEvent) ShareGPIDLocalData(ctx context.Context, in *api.ShareGPIDSyncRequests) (*api.ShareGPIDSyncRequests, error) {

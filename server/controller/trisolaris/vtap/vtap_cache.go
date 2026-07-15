@@ -267,10 +267,11 @@ type VTapCache struct {
 	pushVersionGroups       uint64
 
 	// grpc buffer size
-	grpcBufferSize    uint64
-	lastSyncBytes     uint64
-	lastPushBytes     uint64
-	lastGPIDSyncBytes uint64
+	grpcBufferSize           uint64
+	lastSyncBytes            uint64
+	lastPushBytes            uint64
+	lastGPIDSyncBytes        uint64
+	lastProcessGPIDSyncBytes uint64
 
 	// auto grpc buffer size interval
 	autoGRPCBufferSizeInterval   float64
@@ -1497,7 +1498,7 @@ func (c *VTapCache) GetAgentRemoteSegments() []*agent.Segment {
 }
 
 func (c *VTapCache) maxGRPCBytes() uint64 {
-	return max(c.lastSyncBytes, c.lastPushBytes, c.lastGPIDSyncBytes)
+	return max(c.lastSyncBytes, c.lastPushBytes, c.lastGPIDSyncBytes, c.lastProcessGPIDSyncBytes)
 }
 
 func (c *VTapCache) GetGRPCBufferFromLastSync(bytes uint64) uint64 {
@@ -1518,6 +1519,13 @@ func (c *VTapCache) GetGRPCBufferFromLastGPIDSync(bytes uint64) uint64 {
 	c.lastGPIDSyncBytes = bytes
 	c.grpcBufferSize = c.maxGRPCBytes()
 	log.Infof(c.vTapInfo.Logf("agent (%s-%s) update last gpid sync size: %d, current max buffer: %d", c.GetCtrlIP(), c.GetCtrlMac(), bytes, c.grpcBufferSize))
+	return c.calculateGRPCBytes()
+}
+
+func (c *VTapCache) GetGRPCBufferFromLastProcessGPIDSync(bytes uint64) uint64 {
+	c.lastProcessGPIDSyncBytes = bytes
+	c.grpcBufferSize = c.maxGRPCBytes()
+	log.Infof(c.vTapInfo.Logf("agent (%s-%s) update last process gpid sync size: %d, current max buffer: %d", c.GetCtrlIP(), c.GetCtrlMac(), bytes, c.grpcBufferSize))
 	return c.calculateGRPCBytes()
 }
 
