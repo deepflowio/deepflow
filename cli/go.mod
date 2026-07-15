@@ -6,7 +6,7 @@ toolchain go1.24.4
 
 require (
 	github.com/bitly/go-simplejson v0.5.0
-	github.com/deepflowio/deepflow/message v0.0.0-20251229081021-e71e8eb3b9c1
+	github.com/deepflowio/deepflow/message v0.0.0-20260714071933-000b5bdc846c
 	github.com/deepflowio/deepflow/server v1.6.66-0.20251229081021-e71e8eb3b9c1
 	github.com/golang/protobuf v1.5.4
 	github.com/mattn/go-runewidth v0.0.14
