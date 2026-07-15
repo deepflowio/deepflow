@@ -34,6 +34,7 @@ var log = logger.MustGetLogger("trisolaris.agentmetadata")
 
 type MetaData struct {
 	dbDataCache          *atomic.Value // *DBDataCache 数据库缓存
+	processGPID          *ProcessGPID
 	platformDataOP       *PlatformDataOP
 	groupDataOP          *GroupDataOP
 	policyDataOP         *PolicyDataOP
@@ -57,6 +58,7 @@ func NewMetaData(db *gorm.DB, cfg *config.Config, orgID int) *MetaData {
 	metaData.platformDataOP = newPlatformDataOP(db, metaData)
 	metaData.groupDataOP = newGroupDataOP(metaData)
 	metaData.policyDataOP = newPolicyDaTaOP(metaData, cfg.BillingMethod)
+	metaData.processGPID = NewProcessGPID()
 	return metaData
 
 }
@@ -66,6 +68,7 @@ func (m *MetaData) GetDBDataCache() *DBDataCache {
 }
 
 func (m *MetaData) UpdateDBDataCache(d *DBDataCache) {
+	m.processGPID.Update(d.GetProcesses())
 	m.dbDataCache.Store(d)
 }
 
@@ -103,6 +106,10 @@ func (m *MetaData) GetAgentPolicyString(agentID int, functions mapset.Set) []byt
 
 func (m *MetaData) GetPlatformVips() []string {
 	return m.config.PlatformVips
+}
+
+func (m *MetaData) GetProcessGPID(version uint64) (uint64, []byte) {
+	return m.processGPID.GetProcessGPIDByte(version)
 }
 
 func (m *MetaData) GetStartTime() int64 {

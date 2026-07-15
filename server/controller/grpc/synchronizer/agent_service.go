@@ -123,6 +123,14 @@ func (s *AgentService) GPIDSync(ctx context.Context, in *api.GPIDSyncRequest) (*
 	return s.processInfoEvent.GPIDSync(ctx, in)
 }
 
+func (s *AgentService) ProcessGPIDSync(ctx context.Context, in *api.ProcessGPIDSyncRequest) (*api.ProcessGPIDSyncResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.ProcessGPIDSync, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
+	return s.processInfoEvent.ProcessGPIDSync(ctx, in)
+}
+
 func (s *AgentService) ShareGPIDLocalData(ctx context.Context, in *api.ShareGPIDSyncRequests) (*api.ShareGPIDSyncRequests, error) {
 	return s.processInfoEvent.ShareGPIDLocalData(ctx, in)
 }

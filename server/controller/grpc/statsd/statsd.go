@@ -77,6 +77,7 @@ const (
 	GPIDSync
 	GetPrometheusLabelIDs
 	GetPrometheusTargets
+	ProcessGPIDSync
 	MaxApiType
 )
 
@@ -92,6 +93,7 @@ var ApiTypeToName = map[ApiType]string{
 	GetPrometheusLabelIDs:  "GetPrometheusLabelIDs",
 	GetPrometheusTargets:   "GetPrometheusTargets",
 	GPIDSync:               "GPIDSync",
+	ProcessGPIDSync:        "ProcessGPIDSync",
 }
 
 var grpcCounters [MaxApiType]*GrpcCounter
