@@ -38,9 +38,9 @@ use public::{
 };
 
 use crate::{
-    common::{flow::PacketDirection, MetaPacket},
+    common::meta_packet::TraceInfo,
     config::handler::PlatformAccess,
-    rpc::Session,
+    rpc::{Session, DEFAULT_TIMEOUT},
     trident::AgentId,
     utils::stats,
 };
@@ -48,7 +48,6 @@ use crate::{
 const PROCESS_GPID_LRU_CAPACITY: usize = 4096;
 const MAX_PROCESS_GPID_ENTRIES: usize = 1_000_000;
 const MAX_PROCESS_GPID_MESSAGE_SIZE: usize = 32 << 20;
-const SOCKET_ROLE_SERVER: u8 = 2;
 
 #[derive(Default)]
 struct VersionedTable {
@@ -87,6 +86,11 @@ impl ProcessGpidTable {
         self.inner.version.store(version, Ordering::Release);
     }
 
+    #[cfg(test)]
+    pub(crate) fn update_for_test(&self, version: u64, entries: AHashMap<u64, u32>) {
+        self.update(version, entries);
+    }
+
     fn clear(&self) {
         self.update(0, AHashMap::new());
     }
@@ -96,22 +100,12 @@ impl ProcessGpidTable {
     }
 }
 
-#[derive(Clone, Copy)]
-enum LookupRole {
-    Client,
-    Server,
-}
-
 #[derive(Default)]
 struct ProcessGpidCounter {
     client_lru_hit: AtomicU64,
     client_lru_negative_hit: AtomicU64,
     client_table_hit: AtomicU64,
     client_table_miss: AtomicU64,
-    server_lru_hit: AtomicU64,
-    server_lru_negative_hit: AtomicU64,
-    server_table_hit: AtomicU64,
-    server_table_miss: AtomicU64,
     table_reload: AtomicU64,
 }
 
@@ -132,10 +126,6 @@ impl RefCountable for ProcessGpidCounter {
             counted!("client_lru_negative_hit", client_lru_negative_hit),
             counted!("client_table_hit", client_table_hit),
             counted!("client_table_miss", client_table_miss),
-            counted!("server_lru_hit", server_lru_hit),
-            counted!("server_lru_negative_hit", server_lru_negative_hit),
-            counted!("server_table_hit", server_table_hit),
-            counted!("server_table_miss", server_table_miss),
             counted!("table_reload", table_reload),
         ]
     }
@@ -177,73 +167,45 @@ impl ProcessGpidLookup {
         self.counter.table_reload.fetch_add(1, Ordering::Relaxed);
     }
 
-    fn query(&mut self, agent_id: u32, pid: u32, role: LookupRole) -> u32 {
+    pub(crate) fn lookup(&mut self, trace_info: TraceInfo) -> u32 {
+        let agent_id = trace_info.agent_id;
+        let pid = trace_info.pid;
         if agent_id == 0 || pid == 0 {
             return 0;
         }
         let key = make_key(agent_id, pid);
         if let Some(gpid) = self.lru.get(&key).copied() {
-            let counter = match (role, gpid == 0) {
-                (LookupRole::Client, false) => &self.counter.client_lru_hit,
-                (LookupRole::Client, true) => &self.counter.client_lru_negative_hit,
-                (LookupRole::Server, false) => &self.counter.server_lru_hit,
-                (LookupRole::Server, true) => &self.counter.server_lru_negative_hit,
+            let counter = match gpid == 0 {
+                false => &self.counter.client_lru_hit,
+                true => &self.counter.client_lru_negative_hit,
             };
             counter.fetch_add(1, Ordering::Relaxed);
             return gpid;
         }
 
         let gpid = self.table.entries.get(&key).copied().unwrap_or_default();
-        let counter = match (role, gpid == 0) {
-            (LookupRole::Client, false) => &self.counter.client_table_hit,
-            (LookupRole::Client, true) => &self.counter.client_table_miss,
-            (LookupRole::Server, false) => &self.counter.server_table_hit,
-            (LookupRole::Server, true) => &self.counter.server_table_miss,
+        let counter = match gpid == 0 {
+            false => &self.counter.client_table_hit,
+            true => &self.counter.client_table_miss,
         };
         counter.fetch_add(1, Ordering::Relaxed);
         self.lru.put(key, gpid);
         gpid
     }
-
-    pub fn lookup(&mut self, packet: &mut MetaPacket, local_agent_id: u32) {
-        let client_is_src = packet.lookup_key.direction == PacketDirection::ClientToServer;
-        let client_gpid_is_empty = if client_is_src {
-            packet.gpid_0 == 0
-        } else {
-            packet.gpid_1 == 0
-        };
-        if client_gpid_is_empty {
-            if let Some(trace_info) = packet.trace_info {
-                let gpid = self.query(trace_info.agent_id, trace_info.pid, LookupRole::Client);
-                if client_is_src {
-                    packet.gpid_0 = gpid;
-                } else {
-                    packet.gpid_1 = gpid;
-                }
-            }
-        }
-
-        let server_gpid_is_empty = if client_is_src {
-            packet.gpid_1 == 0
-        } else {
-            packet.gpid_0 == 0
-        };
-        if server_gpid_is_empty
-            && packet.socket_role == SOCKET_ROLE_SERVER
-            && packet.process_id != 0
-        {
-            let gpid = self.query(local_agent_id, packet.process_id, LookupRole::Server);
-            if client_is_src {
-                packet.gpid_1 = gpid;
-            } else {
-                packet.gpid_0 = gpid;
-            }
-        }
-    }
 }
 
 fn make_key(agent_id: u32, pid: u32) -> u64 {
     ((agent_id as u64) << 32) | pid as u64
+}
+
+async fn rpc_with_timeout<F>(
+    timeout: Duration,
+    future: F,
+) -> Result<F::Output, tokio::time::error::Elapsed>
+where
+    F: std::future::Future,
+{
+    tokio::time::timeout(timeout, future).await
 }
 
 pub struct ProcessGpidSynchronizer {
@@ -376,9 +338,13 @@ impl ProcessGpidSynchronizer {
                 }),
                 process_gpid_version: Some(table.version()),
             };
-            match runtime.block_on(session.grpc_process_gpid_sync(request)) {
-                Err(e) => error!("process GPID sync failed: {e}"),
-                Ok(response) => {
+            match runtime.block_on(rpc_with_timeout(
+                DEFAULT_TIMEOUT,
+                session.grpc_process_gpid_sync(request),
+            )) {
+                Err(_) => error!("process GPID sync timed out after {:?}", DEFAULT_TIMEOUT),
+                Ok(Err(e)) => error!("process GPID sync failed: {e}"),
+                Ok(Ok(response)) => {
                     let response = response.into_inner();
                     let version = response.process_gpid_version.unwrap_or_default();
                     if version != table.version() {
@@ -464,6 +430,18 @@ mod tests {
     use public::proto::agent::ProcessGpidEntry;
 
     #[test]
+    fn rpc_timeout_bounds_wait() {
+        let runtime = Runtime::new().unwrap();
+        let timeout = Duration::from_millis(10);
+        let start = Instant::now();
+
+        let result = runtime.block_on(rpc_with_timeout(timeout, std::future::pending::<()>()));
+
+        assert!(result.is_err());
+        assert!(start.elapsed() < Duration::from_secs(1));
+    }
+
+    #[test]
     fn decode_process_gpid_entries() {
         let entries = ProcessGpidEntries {
             entries: vec![
@@ -513,93 +491,50 @@ mod tests {
     }
 
     #[test]
-    fn lookup_client_and_server_with_lru_and_reload() {
+    fn lookup_with_lru_and_reload() {
         let table = ProcessGpidTable::default();
-        table.update(
-            1,
-            AHashMap::from_iter([(make_key(10, 20), 30), (make_key(40, 50), 60)]),
-        );
+        table.update(1, AHashMap::from_iter([(make_key(10, 20), 30)]));
         let stats = stats::Collector::new("", Arc::new(AtomicI64::new(0)));
         let mut lookup = table.new_lookup(1, &stats);
-
-        let mut packet = MetaPacket::default();
-        packet.lookup_key.direction = PacketDirection::ClientToServer;
-        packet.trace_info = Some(TraceInfo {
+        let trace_info = TraceInfo {
             agent_id: 10,
             pid: 20,
-        });
-        packet.socket_role = SOCKET_ROLE_SERVER;
-        packet.process_id = 50;
-        lookup.lookup(&mut packet, 40);
-        assert_eq!((packet.gpid_0, packet.gpid_1), (30, 60));
+        };
+
+        assert_eq!(lookup.lookup(trace_info), 30);
         assert_eq!(lookup.counter.client_table_hit.load(Ordering::Relaxed), 1);
-        assert_eq!(lookup.counter.server_table_hit.load(Ordering::Relaxed), 1);
 
-        let mut cached_packet = packet.clone();
-        cached_packet.gpid_0 = 0;
-        cached_packet.gpid_1 = 0;
-        lookup.lookup(&mut cached_packet, 40);
+        assert_eq!(lookup.lookup(trace_info), 30);
         assert_eq!(lookup.counter.client_lru_hit.load(Ordering::Relaxed), 1);
-        assert_eq!(lookup.counter.server_lru_hit.load(Ordering::Relaxed), 1);
 
-        table.update(
-            2,
-            AHashMap::from_iter([(make_key(10, 20), 31), (make_key(40, 50), 61)]),
-        );
+        table.update(2, AHashMap::from_iter([(make_key(10, 20), 31)]));
         lookup.refresh();
         assert_eq!(lookup.counter.table_reload.load(Ordering::Relaxed), 1);
 
-        let mut reverse_packet = MetaPacket::default();
-        reverse_packet.lookup_key.direction = PacketDirection::ServerToClient;
-        reverse_packet.trace_info = packet.trace_info;
-        reverse_packet.socket_role = SOCKET_ROLE_SERVER;
-        reverse_packet.process_id = 50;
-        lookup.lookup(&mut reverse_packet, 40);
-        assert_eq!((reverse_packet.gpid_0, reverse_packet.gpid_1), (61, 31));
+        assert_eq!(lookup.lookup(trace_info), 31);
     }
 
     #[test]
-    fn lookup_preserves_existing_gpid_and_caches_misses() {
+    fn lookup_caches_misses() {
         let table = ProcessGpidTable::default();
         let stats = stats::Collector::new("", Arc::new(AtomicI64::new(0)));
         let mut lookup = table.new_lookup(1, &stats);
-        let mut packet = MetaPacket::default();
-        packet.trace_info = Some(TraceInfo {
+        let trace_info = TraceInfo {
             agent_id: 10,
             pid: 20,
-        });
-        packet.gpid_0 = 100;
-        packet.socket_role = SOCKET_ROLE_SERVER;
-        packet.process_id = 50;
+        };
 
-        lookup.lookup(&mut packet, 40);
-        assert_eq!(packet.gpid_0, 100);
-        assert_eq!(lookup.counter.client_table_miss.load(Ordering::Relaxed), 0);
-        assert_eq!(lookup.counter.server_table_miss.load(Ordering::Relaxed), 1);
+        assert_eq!(lookup.lookup(trace_info), 0);
+        assert_eq!(lookup.counter.client_table_miss.load(Ordering::Relaxed), 1);
 
-        lookup.lookup(&mut packet, 40);
+        assert_eq!(lookup.lookup(trace_info), 0);
         assert_eq!(
             lookup
                 .counter
-                .server_lru_negative_hit
+                .client_lru_negative_hit
                 .load(Ordering::Relaxed),
             1
         );
-    }
-
-    #[test]
-    fn lookup_ignores_process_id_for_non_server_socket() {
-        let table = ProcessGpidTable::default();
-        table.update(1, AHashMap::from_iter([(make_key(40, 50), 60)]));
-        let stats = stats::Collector::new("", Arc::new(AtomicI64::new(0)));
-        let mut lookup = table.new_lookup(1, &stats);
-        let mut packet = MetaPacket::default();
-        packet.socket_role = 1;
-        packet.process_id = 50;
-
-        lookup.lookup(&mut packet, 40);
-        assert_eq!((packet.gpid_0, packet.gpid_1), (0, 0));
-        assert_eq!(lookup.counter.server_table_hit.load(Ordering::Relaxed), 0);
     }
 
     #[test]
@@ -608,15 +543,12 @@ mod tests {
         table.update(7, AHashMap::from_iter([(make_key(10, 20), 30)]));
         let stats = stats::Collector::new("", Arc::new(AtomicI64::new(0)));
         let mut lookup = table.new_lookup(1, &stats);
-        let trace_info = Some(TraceInfo {
+        let trace_info = TraceInfo {
             agent_id: 10,
             pid: 20,
-        });
+        };
 
-        let mut packet = MetaPacket::default();
-        packet.trace_info = trace_info;
-        lookup.lookup(&mut packet, 0);
-        assert_eq!(packet.gpid_0, 30);
+        assert_eq!(lookup.lookup(trace_info), 30);
 
         let old_version = table.version();
         table.clear();
@@ -624,10 +556,7 @@ mod tests {
         assert_ne!(table.version(), old_version);
         lookup.refresh();
 
-        let mut packet = MetaPacket::default();
-        packet.trace_info = trace_info;
-        lookup.lookup(&mut packet, 0);
-        assert_eq!(packet.gpid_0, 0);
+        assert_eq!(lookup.lookup(trace_info), 0);
         assert_eq!(lookup.counter.table_reload.load(Ordering::Relaxed), 1);
         assert_eq!(lookup.counter.client_table_miss.load(Ordering::Relaxed), 1);
     }
