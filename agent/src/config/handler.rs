@@ -100,6 +100,39 @@ use public::l7_protocol::L7Protocol;
 use public::proto::agent::{self, AgentType, PacketCaptureType};
 use public::utils::{bitmap::parse_range_list_to_bitmap, net::MacAddr};
 
+#[cfg(target_os = "linux")]
+fn update_tot_agent_id_with<F>(old_agent_id: u16, new_agent_id: u16, setter: F)
+where
+    F: FnOnce(u32) -> std::io::Result<()>,
+{
+    if old_agent_id == new_agent_id {
+        return;
+    }
+
+    match setter(u32::from(new_agent_id)) {
+        Ok(()) => info!(
+            "updated TOT agent ID from {} to {}",
+            old_agent_id, new_agent_id
+        ),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            debug!("skip updating TOT agent ID: /dev/tot not found")
+        }
+        Err(e) => warn!(
+            "failed to update TOT agent ID from {} to {}: {}",
+            old_agent_id, new_agent_id, e
+        ),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn update_tot_agent_id(old_agent_id: u16, new_agent_id: u16) {
+    update_tot_agent_id_with(
+        old_agent_id,
+        new_agent_id,
+        crate::utils::tcp_option_tracing::set_agent_id,
+    );
+}
+
 cfg_if::cfg_if! {
 if #[cfg(feature = "enterprise")] {
         use crate::common::{
@@ -5414,9 +5447,14 @@ impl ConfigHandler {
                 "collector config change from {:#?} to {:#?}",
                 candidate_config.collector, new_config.collector
             );
-            let restart_value = candidate_config.collector.agent_id
-                != new_config.collector.agent_id
-                && new_config.collector.enabled;
+            let agent_id_changed =
+                candidate_config.collector.agent_id != new_config.collector.agent_id;
+            #[cfg(target_os = "linux")]
+            update_tot_agent_id(
+                candidate_config.collector.agent_id,
+                new_config.collector.agent_id,
+            );
+            let restart_value = agent_id_changed && new_config.collector.enabled;
             restart_dispatcher |= restart_value;
             if restart_value {
                 dispatcher_restart_reasons.insert(changed_reason(
@@ -5727,6 +5765,43 @@ impl ModuleConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn tot_agent_id_is_updated_only_when_changed() {
+        update_tot_agent_id_with(7, 7, |_| panic!("setter must not be called"));
+
+        let updated = std::cell::Cell::new(None);
+        update_tot_agent_id_with(7, u16::MAX, |agent_id| {
+            updated.set(Some(agent_id));
+            Ok(())
+        });
+        assert_eq!(updated.get(), Some(u32::from(u16::MAX)));
+
+        let updated = std::cell::Cell::new(None);
+        update_tot_agent_id_with(7, 0, |agent_id| {
+            updated.set(Some(agent_id));
+            Ok(())
+        });
+        assert_eq!(updated.get(), Some(0));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn tot_agent_id_update_errors_are_non_fatal() {
+        update_tot_agent_id_with(1, 2, |_| {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "TOT is not installed",
+            ))
+        });
+        update_tot_agent_id_with(1, 2, |_| {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "missing CAP_NET_ADMIN",
+            ))
+        });
+    }
 
     #[test]
     fn map_beacon_enabled_to_debug_config() {
