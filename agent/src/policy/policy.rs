@@ -17,7 +17,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    Arc, RwLock,
 };
 
 use ahash::AHashMap;
@@ -95,6 +95,7 @@ pub struct Policy {
     nats: [Vec<AHashMap<u128, GpidEntry>>; super::MAX_QUEUE_COUNT],
     nats_flags: [AtomicBool; super::MAX_QUEUE_COUNT],
     nats_caches: [Option<Vec<AHashMap<u128, GpidEntry>>>; super::MAX_QUEUE_COUNT],
+    otel_nats: RwLock<Vec<AHashMap<u128, GpidEntry>>>,
 
     first_hit: usize,
     fast_hit: usize,
@@ -109,7 +110,8 @@ impl Policy {
     const ARRAY_REPEAT_FALSE: AtomicBool = AtomicBool::new(false);
 
     pub fn new(
-        queue_count: usize,
+        cbpf_queue_count: usize,
+        ebpf_queue_count: usize,
         level: usize,
         map_size: usize,
         forward_capacity: usize,
@@ -124,16 +126,18 @@ impl Policy {
         let policy = Box::into_raw(Box::new(Policy {
             labeler: Labeler::default(),
             table: FirstPath::new(
-                queue_count,
+                cbpf_queue_count,
+                ebpf_queue_count,
                 level,
                 map_size,
                 fast_disable,
                 memory_check_disable,
             ),
-            forward: Forward::new(queue_count, forward_capacity),
+            forward: Forward::new(forward_capacity),
             nats,
             nats_flags: [Self::ARRAY_REPEAT_FALSE; super::MAX_QUEUE_COUNT],
             nats_caches: [Self::ARRAY_REPEAT_NONE; super::MAX_QUEUE_COUNT],
+            otel_nats: RwLock::new(vec![AHashMap::new(), AHashMap::new()]),
             first_hit: 0,
             fast_hit: 0,
             monitor: None,
@@ -407,6 +411,7 @@ impl Policy {
         };
 
         if let Some(endpoints) = self.table.endpoint_fast_get(
+            key.fast_index,
             table_type,
             key.src_ip,
             key.dst_ip,
@@ -414,7 +419,11 @@ impl Policy {
             l3_epc_id_1,
             key.l2_end_0,
         ) {
-            let entry = self.lookup_gpid_entry(key, &endpoints);
+            let entry = if table_type == EndpointTableType::Otel {
+                self.lookup_gpid_entry_from_otel(key, &endpoints)
+            } else {
+                self.lookup_gpid_entry(key, &endpoints)
+            };
             self.send_ebpf(
                 key.src_ip,
                 key.dst_ip,
@@ -435,6 +444,7 @@ impl Policy {
             key.l2_end_0,
         );
         let endpoints = self.table.endpoint_fast_add(
+            key.fast_index,
             table_type,
             key.src_ip,
             key.dst_ip,
@@ -442,7 +452,11 @@ impl Policy {
             l3_epc_id_1,
             endpoints,
         );
-        let entry = self.lookup_gpid_entry(key, &endpoints);
+        let entry = if table_type == EndpointTableType::Otel {
+            self.lookup_gpid_entry_from_otel(key, &endpoints)
+        } else {
+            self.lookup_gpid_entry(key, &endpoints)
+        };
         self.send_ebpf(
             key.src_ip,
             key.dst_ip,
@@ -511,16 +525,7 @@ impl Policy {
         Ok(())
     }
 
-    #[inline]
-    fn lookup_gpid_entry(
-        &mut self,
-        packet: &mut LookupKey,
-        _endpoints: &EndpointData,
-    ) -> GpidEntry {
-        if !packet.is_ipv4() || (packet.proto != IpProtocol::UDP && packet.proto != IpProtocol::TCP)
-        {
-            return GpidEntry::default();
-        }
+    fn generate_gpid_key(&mut self, packet: &mut LookupKey) -> (usize, u128) {
         let protocol = u8::from(GpidProtocol::try_from(packet.proto).unwrap()) as usize;
         // FIXME: Support epc id
         let epc_id_0 = 0;
@@ -551,7 +556,21 @@ impl Policy {
 
         let key_0 = gpid_key(ip_0, epc_id_0, port_0);
         let key_1 = gpid_key(ip_1, epc_id_1, port_1);
-        let key = (key_0 as u128) << 64 | key_1 as u128;
+
+        (protocol, (key_0 as u128) << 64 | key_1 as u128)
+    }
+
+    #[inline]
+    fn lookup_gpid_entry(
+        &mut self,
+        packet: &mut LookupKey,
+        _endpoints: &EndpointData,
+    ) -> GpidEntry {
+        if !packet.is_ipv4() || (packet.proto != IpProtocol::UDP && packet.proto != IpProtocol::TCP)
+        {
+            return GpidEntry::default();
+        }
+        let (protocol, key) = self.generate_gpid_key(packet);
 
         if self.nats_flags[packet.fast_index].load(Ordering::Acquire) {
             self.nats[packet.fast_index] = self.nats_caches[packet.fast_index].take().unwrap();
@@ -559,6 +578,21 @@ impl Policy {
         }
 
         *self.nats[packet.fast_index][protocol]
+            .get(&key)
+            .unwrap_or(&GpidEntry::default())
+    }
+
+    fn lookup_gpid_entry_from_otel(
+        &mut self,
+        packet: &mut LookupKey,
+        _endpoints: &EndpointData,
+    ) -> GpidEntry {
+        if !packet.is_ipv4() || (packet.proto != IpProtocol::UDP && packet.proto != IpProtocol::TCP)
+        {
+            return GpidEntry::default();
+        }
+        let (protocol, key) = self.generate_gpid_key(packet);
+        *self.otel_nats.read().unwrap()[protocol]
             .get(&key)
             .unwrap_or(&GpidEntry::default())
     }
@@ -591,6 +625,7 @@ impl Policy {
                 self.nats_flags[i].store(true, Ordering::Release);
             }
         }
+        *self.otel_nats.write().unwrap() = table;
     }
 
     pub fn get_acls(&self) -> &Vec<Arc<Acl>> {
@@ -613,8 +648,8 @@ impl Policy {
         self.table.set_memory_limit(limit);
     }
 
-    pub fn reset_queue_size(&mut self, queue_count: usize) {
-        self.table.reset_queue_size(queue_count);
+    pub fn reset_queue(&mut self) {
+        self.table.reset_queue();
     }
 }
 
@@ -797,8 +832,8 @@ impl PolicySetter {
         self.policy().set_memory_limit(limit)
     }
 
-    pub fn reset_queue_size(&self, queue_count: usize) {
-        self.policy().reset_queue_size(queue_count);
+    pub fn reset_queue(&self) {
+        self.policy().reset_queue();
     }
 }
 
@@ -816,7 +851,7 @@ mod test {
 
     #[test]
     fn test_policy_normal() {
-        let (mut setter, mut getter) = Policy::new(10, 0, 1024, 1024, false, false);
+        let (mut setter, mut getter) = Policy::new(10, 0, 0, 1024, 1024, false, false);
         let interface: PlatformData = PlatformData {
             mac: 0x002233445566,
             ips: vec![IpSubnet {

@@ -244,6 +244,8 @@ pub struct FirstPath {
 
     level: usize,
     current_level: usize,
+    cbpf_queue_count: usize,
+    ebpf_queue_count: usize,
 
     fast: FastPath,
 
@@ -263,7 +265,8 @@ impl FirstPath {
     const MEMORY_LIMIT: u64 = 1 << 20;
 
     pub fn new(
-        queue_count: usize,
+        cbpf_queue_count: usize,
+        ebpf_queue_count: usize,
         level: usize,
         map_size: usize,
         fast_disable: bool,
@@ -286,10 +289,12 @@ impl FirstPath {
             level,
             current_level: level,
 
-            fast: FastPath::new(queue_count, map_size),
+            fast: FastPath::new(cbpf_queue_count, ebpf_queue_count, map_size),
             fast_disable,
             memory_check_disable,
             memory_limit: AtomicU64::new(0),
+            cbpf_queue_count,
+            ebpf_queue_count,
         }
     }
 
@@ -730,6 +735,7 @@ impl FirstPath {
 
     pub fn endpoint_fast_get(
         &mut self,
+        index: usize,
         table_type: EndpointTableType,
         ip_src: IpAddr,
         ip_dst: IpAddr,
@@ -741,12 +747,20 @@ impl FirstPath {
             return None;
         }
 
-        self.fast
-            .get_endpoints(table_type, ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst, l2_end_0)
+        self.fast.get_endpoints(
+            index,
+            table_type,
+            ip_src,
+            ip_dst,
+            l3_epc_id_src,
+            l3_epc_id_dst,
+            l2_end_0,
+        )
     }
 
     pub fn endpoint_fast_add(
         &mut self,
+        index: usize,
         table_type: EndpointTableType,
         ip_src: IpAddr,
         ip_dst: IpAddr,
@@ -755,6 +769,7 @@ impl FirstPath {
         endpoints: EndpointData,
     ) -> Arc<EndpointData> {
         self.fast.add_endpoints(
+            index,
             table_type,
             ip_src,
             ip_dst,
@@ -793,8 +808,8 @@ impl FirstPath {
         self.memory_limit.store(limit, Ordering::Relaxed);
     }
 
-    pub fn reset_queue_size(&mut self, queue_count: usize) {
-        self.fast.reset_queue_size(queue_count);
+    pub fn reset_queue(&mut self) {
+        self.fast.reset_queue();
     }
 }
 
@@ -846,7 +861,7 @@ mod tests {
     }
 
     fn generate_table() -> PResult<FirstPath> {
-        let mut first = FirstPath::new(1, 8, 1 << 16, false, false);
+        let mut first = FirstPath::new(1, 0, 8, 1 << 16, false, false);
         let acl = Acl::new(
             1,
             vec![10],

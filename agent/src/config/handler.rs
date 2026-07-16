@@ -1286,6 +1286,7 @@ pub struct EbpfConfig {
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
     pub l7_protocol_ports: std::collections::HashMap<String, String>,
     pub queue_size: usize,
+    pub queue_count: usize,
     pub ebpf: Ebpf,
     pub symbol_table: SymbolTable,
     pub process_matcher: Vec<ProcessMatcher>,
@@ -1322,6 +1323,7 @@ impl fmt::Debug for EbpfConfig {
                 &self.l7_protocol_enabled_bitmap,
             )
             .field("queue_size", &self.queue_size)
+            .field("queue_count", &self.queue_count)
             .field("l7_protocol_ports", &self.l7_protocol_ports)
             .field("ebpf", &self.ebpf)
             .field("dpdk_enabled", &self.dpdk_enabled)
@@ -2425,6 +2427,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 l7_protocol_parse_port_bitmap: Arc::new(conf.get_protocol_port_parse_bitmap()),
                 l7_protocol_ports: conf.get_protocol_port(),
                 queue_size: conf.inputs.ebpf.tunning.collector_queue_size,
+                queue_count: conf.inputs.ebpf.tunning.collector_queue_count,
                 ebpf: conf.inputs.ebpf.clone(),
                 symbol_table: conf.inputs.proc.symbol_table,
                 process_matcher: conf.inputs.proc.process_matcher.clone(),
@@ -3683,6 +3686,11 @@ impl ConfigHandler {
                     tunning.collector_queue_size,
                     new_tunning.collector_queue_size,
                     "inputs.ebpf.tunning.collector_queue_size"
+                ),
+                (
+                    tunning.collector_queue_count,
+                    new_tunning.collector_queue_count,
+                    "inputs.ebpf.tunning.collector_queue_count"
                 ),
                 (
                     tunning.kernel_ring_size,

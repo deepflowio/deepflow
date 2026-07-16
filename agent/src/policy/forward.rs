@@ -118,8 +118,7 @@ pub struct Forward {
 }
 
 impl Forward {
-    pub fn new(queue_count: usize, capacity: usize) -> Self {
-        assert!(queue_count < super::MAX_QUEUE_COUNT && queue_count > 0);
+    pub fn new(capacity: usize) -> Self {
         Self {
             mac_ip_tables: RwLock::new(TableLruCache::new(NonZeroUsize::new(capacity).unwrap())),
             vip_device_tables: RwLock::new(AHashMap::new()),
@@ -335,7 +334,7 @@ mod tests {
 
     #[test]
     fn test_forward() {
-        let mut forward = Forward::new(3, 1024);
+        let mut forward = Forward::new(1024);
         let interfaces = datalink::interfaces();
         let mut platforms = Vec::new();
         platforms.push(Arc::new(PlatformData {

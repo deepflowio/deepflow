@@ -342,7 +342,7 @@ struct EbpfDispatcher {
     dispatcher_id: usize,
     time_diff: Arc<AtomicI64>,
 
-    receiver: Arc<Receiver<Box<MetaPacket<'static>>>>,
+    receiver_queues: Arc<Vec<Receiver<Box<MetaPacket<'static>>>>>,
 
     pause: Arc<AtomicBool>,
 
@@ -436,9 +436,11 @@ impl EbpfDispatcher {
 
     fn run(
         &self,
+        id: usize,
         counter: Arc<EbpfCounter>,
         exception_handler: ExceptionHandler,
         need_reload_config: Arc<AtomicBool>,
+        leaky_bucket: Arc<LeakyBucket>,
     ) {
         let ebpf_config = self.config.load();
         let out_of_order_reassembly_bitmap = L7ProtocolBitmap::from(
@@ -451,7 +453,7 @@ impl EbpfDispatcher {
         );
         let reorder_counter = Arc::new(ReorderCounter::default());
         self.stats_collector.register_countable(
-            &stats::NoTagModule("ebpf-collector-reorder"),
+            &stats::SingleTagModule("ebpf-collector-reorder", "index", id),
             Countable::Owned(Box::new(StatsReorderCounter::new(reorder_counter.clone()))),
         );
         let mut reorder = Reorder::new(
@@ -469,7 +471,7 @@ impl EbpfDispatcher {
                 .out_of_order_reassembly_timeout,
         );
         let mut flow_map = FlowMap::new(
-            self.dispatcher_id as u32,
+            (self.dispatcher_id + id) as u32,
             None,
             self.l7_stats_output.clone(),
             self.policy_getter,
@@ -481,7 +483,6 @@ impl EbpfDispatcher {
             self.stats_collector.clone(),
             true, // from_ebpf
         );
-        let leaky_bucket = LeakyBucket::new(Some(ebpf_config.ebpf.socket.tunning.max_capture_rate));
         const QUEUE_BATCH_SIZE: usize = 1024;
         let mut batch = Vec::with_capacity(QUEUE_BATCH_SIZE);
 
@@ -507,8 +508,7 @@ impl EbpfDispatcher {
                 ebpf: Some(&ebpf_config),
             };
 
-            if self
-                .receiver
+            if self.receiver_queues[id]
                 .recv_all(&mut batch, Some(Duration::from_secs(1)))
                 .is_err()
             {
@@ -575,18 +575,14 @@ impl FlowAclListener for SyncEbpfDispatcher {
     }
 }
 
-#[derive(Default)]
-struct ConfigHandle;
-
 pub struct EbpfCollector {
     thread_dispatcher: EbpfDispatcher,
-    thread_handle: Option<JoinHandle<()>>,
-
-    config_handle: ConfigHandle,
+    thread_handle: Option<Vec<JoinHandle<()>>>,
+    thread_count: usize,
 
     counter: Arc<EbpfCounter>,
     stats_collector: Arc<stats::Collector>,
-    need_reload_config: Arc<AtomicBool>,
+    need_reload_config: Vec<Arc<AtomicBool>>,
 
     exception_handler: ExceptionHandler,
     process_listener: Arc<ProcessListener>,
@@ -600,7 +596,7 @@ const BATCH_SIZE: usize = 64;
 #[allow(static_mut_refs)]
 static mut SWITCH: bool = false;
 #[allow(static_mut_refs)]
-static mut SENDER: Option<DebugSender<Box<MetaPacket>>> = None;
+static mut SENDER: Option<Vec<DebugSender<Box<MetaPacket>>>> = None;
 #[allow(static_mut_refs)]
 static mut DPDK_SENDERS: Option<Vec<DebugSender<Box<packet::Packet>>>> = None;
 #[allow(static_mut_refs)]
@@ -699,16 +695,24 @@ impl EbpfCollector {
                 }
                 return 0;
             }
-            let packet = MetaPacket::from_ebpf(sd);
-            if packet.is_err() {
-                warn!("meta packet parse from ebpf error: {}", packet.unwrap_err());
+
+            let Some(senders) = SENDER.as_mut() else {
+                error!("ebpf sender is not initialized, deepflow-agent restart...");
+                crate::utils::clean_and_exit(1);
                 return 0;
-            }
-            let mut packet = packet.unwrap();
+            };
+            let mut packet = match MetaPacket::from_ebpf(sd) {
+                Ok(packet) => packet,
+                Err(e) => {
+                    warn!("meta packet parse from ebpf error: {}", e);
+                    return 0;
+                }
+            };
             if let Some(policy) = POLICY_GETTER.as_ref() {
                 packet.pod_id = policy.lookup_pod_id(&container_id);
             }
-            if let Err(e) = SENDER.as_mut().unwrap().send(Box::new(packet)) {
+            let index = packet.generate_ebpf_flow_id() as usize % senders.len();
+            if let Err(e) = senders[index].send(Box::new(packet)) {
                 warn!("meta packet send ebpf error: {:?}", e);
             }
         }
@@ -796,7 +800,7 @@ impl EbpfCollector {
 
     fn ebpf_init(
         config: &EbpfConfig,
-        sender: DebugSender<Box<MetaPacket<'static>>>,
+        sender_queues: Vec<DebugSender<Box<MetaPacket<'static>>>>,
         dpdk_senders: Vec<DebugSender<Box<packet::Packet<'static>>>>,
         proc_event_sender: DebugSender<BoxedProcEvents>,
         ebpf_profile_sender: DebugSender<Profile>,
@@ -805,21 +809,21 @@ impl EbpfCollector {
         stats_collector: &stats::Collector,
         process_listener: &ProcessListener,
         #[cfg(feature = "extended_observability")] memory_context: memory_profile::MemoryContext,
-    ) -> Result<ConfigHandle> {
+    ) -> Result<()> {
         // ebpf和ebpf collector通信配置初始化
         #[allow(static_mut_refs)]
         unsafe {
             let dpdk_sender_count = dpdk_senders.len();
-            let handle = Self::ebpf_core_init(
+            Self::ebpf_core_init(
                 process_listener,
                 #[cfg(feature = "extended_observability")]
                 memory_context,
                 config,
                 stats_collector,
-            );
+            )?;
             // initialize communication between core and ebpf collector
             SWITCH = false;
-            SENDER = Some(sender);
+            SENDER = Some(sender_queues);
             DPDK_SENDERS = Some(dpdk_senders);
             DPDK_SENDER_BUFFERS = Vec::with_capacity(dpdk_sender_count);
             for _ in 0..dpdk_sender_count {
@@ -831,8 +835,9 @@ impl EbpfCollector {
             ON_CPU_PROFILE_FREQUENCY = config.ebpf.profile.on_cpu.sampling_frequency as u32;
             PROFILE_STACK_COMPRESSION = config.ebpf.profile.preprocess.stack_compression;
             TIME_DIFF = Some(time_diff);
-            handle
         }
+
+        Ok(())
     }
 
     #[allow(unused)]
@@ -841,9 +846,8 @@ impl EbpfCollector {
         #[cfg(feature = "extended_observability")] memory_context: memory_profile::MemoryContext,
         config: &EbpfConfig,
         stats_collector: &stats::Collector,
-    ) -> Result<ConfigHandle> {
+    ) -> Result<()> {
         // ebpf core modules init
-        let mut handle = ConfigHandle::default();
         let is_uprobe_meltdown = crate::utils::guard::is_kernel_ebpf_uprobe_meltdown();
         ebpf::set_uprobe_golang_enabled(
             !is_uprobe_meltdown && config.ebpf.socket.uprobe.golang.enabled,
@@ -986,11 +990,10 @@ impl EbpfCollector {
         }
 
         if let Err(e) = config.ebpf.tunning.validate() {
-            warn!(
-                "skip setting kick thread nice value to {}: {}",
-                config.ebpf.tunning.kick_kern_nice, e
-            );
-        } else if ebpf::set_kick_kern_nice(config.ebpf.tunning.kick_kern_nice) != 0 {
+            warn!("ebpf invalid configuration: {:?}", e);
+            return Err(Error::EbpfInitError);
+        }
+        if ebpf::set_kick_kern_nice(config.ebpf.tunning.kick_kern_nice) != 0 {
             warn!(
                 "failed to set kick thread nice value to {}",
                 config.ebpf.tunning.kick_kern_nice
@@ -1294,7 +1297,7 @@ impl EbpfCollector {
 
         ebpf::bpf_tracer_finish();
 
-        Ok(handle)
+        Ok(())
     }
 
     fn ebpf_on_config_change(l7_log_packet_size: usize) {
@@ -1375,7 +1378,7 @@ impl EbpfCollector {
         let is_ebpf_meltdown = crate::utils::guard::is_kernel_ebpf_meltdown();
         let is_uprobe_meltdown = crate::utils::guard::is_kernel_ebpf_uprobe_meltdown();
 
-        if ebpf_config.ebpf.disabled || is_ebpf_meltdown {
+        if ebpf_config.ebpf.disabled || is_ebpf_meltdown || ebpf_config.queue_count == 0 {
             info!("ebpf collector disabled.");
             return Err(Error::EbpfDisabled);
         }
@@ -1383,16 +1386,24 @@ impl EbpfCollector {
             "ebpf collector init... uprobe_meltdown: {}",
             is_uprobe_meltdown
         );
+        let mut sender_queues = vec![];
+        let mut receiver_queues = vec![];
+        let mut need_reload_config = vec![];
         let queue_name = "0-ebpf-to-ebpf-collector";
-        let (sender, receiver, counter) =
-            bounded_with_debug(ebpf_config.queue_size, queue_name, queue_debugger);
-        stats_collector.register_countable(
-            &stats::QueueStats {
-                id: 0,
-                module: queue_name,
-            },
-            Countable::Owned(Box::new(counter)),
-        );
+        for i in 0..ebpf_config.queue_count {
+            let (sender, receiver, counter) =
+                bounded_with_debug(ebpf_config.queue_size, queue_name, queue_debugger);
+            stats_collector.register_countable(
+                &stats::QueueStats {
+                    id: i,
+                    module: queue_name,
+                },
+                Countable::Owned(Box::new(counter)),
+            );
+            sender_queues.push(sender);
+            receiver_queues.push(receiver);
+            need_reload_config.push(Default::default());
+        }
 
         #[cfg(feature = "extended_observability")]
         let memory_profiler = memory_profile::MemoryProfiler::new(
@@ -1404,9 +1415,9 @@ impl EbpfCollector {
             &stats_collector,
         );
 
-        let config_handle = Self::ebpf_init(
+        Self::ebpf_init(
             &ebpf_config,
-            sender,
+            sender_queues,
             dpdk_senders,
             proc_event_output,
             ebpf_profile_sender,
@@ -1423,7 +1434,7 @@ impl EbpfCollector {
             thread_dispatcher: EbpfDispatcher {
                 dispatcher_id,
                 time_diff,
-                receiver: Arc::new(receiver),
+                receiver_queues: Arc::new(receiver_queues),
                 policy_getter,
                 process_gpid_table,
                 config,
@@ -1436,13 +1447,13 @@ impl EbpfCollector {
                 pause: Arc::new(AtomicBool::new(true)),
             },
             thread_handle: None,
-            config_handle,
+            thread_count: ebpf_config.queue_count,
             counter: Arc::new(EbpfCounter {
                 rx: AtomicU64::new(0),
                 time_backtrack_max: AtomicU64::new(0),
                 get_token_failed: AtomicU64::new(0),
             }),
-            need_reload_config: Default::default(),
+            need_reload_config,
             stats_collector,
             exception_handler,
             process_listener: process_listener.clone(),
@@ -1464,7 +1475,9 @@ impl EbpfCollector {
     }
 
     pub fn notify_reload_config(&self) {
-        self.need_reload_config.store(true, Ordering::Relaxed);
+        for i in &self.need_reload_config {
+            i.store(true, Ordering::Relaxed);
+        }
     }
 
     pub fn on_config_change(&mut self, config: &EbpfConfig) {
@@ -1500,17 +1513,14 @@ impl EbpfCollector {
                             as *mut memory_profile::MemoryContext,
                     ));
                 }
-                if let Ok(handle) = Self::ebpf_core_init(
+                if let Err(_) = Self::ebpf_core_init(
                     &self.process_listener,
                     #[cfg(feature = "extended_observability")]
                     self.memory_profiler.context(),
                     config,
                     &self.stats_collector,
                 ) {
-                    self.config_handle = handle;
-                } else {
                     warn!("ebpf start_continuous_profiler error.");
-                    self.config_handle = Default::default();
                     return;
                 }
             }
@@ -1533,16 +1543,33 @@ impl EbpfCollector {
             SWITCH = true;
         }
 
-        let sync_counter = self.counter.clone();
-        let exception_handler = self.exception_handler.clone();
-        let need_reload_config = self.need_reload_config.clone();
-        let dispatcher = self.thread_dispatcher.clone();
-        self.thread_handle = Some(
-            thread::Builder::new()
-                .name("ebpf-collector".to_owned())
-                .spawn(move || dispatcher.run(sync_counter, exception_handler, need_reload_config))
-                .unwrap(),
-        );
+        let ebpf_config = self.thread_dispatcher.config.load();
+        let leaky_bucket = Arc::new(LeakyBucket::new(Some(
+            ebpf_config.ebpf.socket.tunning.max_capture_rate,
+        )));
+        let mut thread_handle = vec![];
+        for i in 0..self.thread_count {
+            let sync_counter = self.counter.clone();
+            let exception_handler = self.exception_handler.clone();
+            let need_reload_config = self.need_reload_config[i].clone();
+            let dispatcher = self.thread_dispatcher.clone();
+            let pps_leaky_bucket = leaky_bucket.clone();
+            thread_handle.push(
+                thread::Builder::new()
+                    .name(format!("ebpf-collector-{}", i))
+                    .spawn(move || {
+                        dispatcher.run(
+                            i,
+                            sync_counter,
+                            exception_handler,
+                            need_reload_config,
+                            pps_leaky_bucket,
+                        )
+                    })
+                    .unwrap(),
+            );
+        }
+        self.thread_handle = Some(thread_handle);
 
         #[cfg(feature = "extended_observability")]
         self.memory_profiler.start();
@@ -1552,7 +1579,7 @@ impl EbpfCollector {
         info!("ebpf collector started");
     }
 
-    pub fn notify_stop(&mut self) -> Option<JoinHandle<()>> {
+    pub fn notify_stop(&mut self) -> Option<Vec<JoinHandle<()>>> {
         unsafe {
             if !SWITCH {
                 info!("ebpf collector stopped.");
@@ -1583,8 +1610,8 @@ impl EbpfCollector {
         self.memory_profiler.stop();
 
         info!("ebpf collector stopping thread.");
-        if let Some(handler) = self.thread_handle.take() {
-            let _ = handler.join();
+        for handle in self.thread_handle.take().unwrap_or_default() {
+            let _ = handle.join();
         }
         info!("ebpf collector stopped.");
     }

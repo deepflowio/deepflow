@@ -1168,9 +1168,6 @@ impl Trident {
                         vm_mac_addrs,
                         gateway_vmac_addrs,
                         tap_types,
-                        &synchronizer,
-                        #[cfg(target_os = "linux")]
-                        libvirt_xml_extractor.clone(),
                     );
                     for callback in callbacks {
                         callback(&config_handler, components);
@@ -1276,24 +1273,17 @@ fn component_on_config_change(
     vm_mac_addrs: Vec<MacAddr>,
     gateway_vmac_addrs: Vec<MacAddr>,
     tap_types: Vec<agent::CaptureNetworkType>,
-    synchronizer: &Arc<Synchronizer>,
-    #[cfg(target_os = "linux")] libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
 ) {
     let conf = &config_handler.candidate_config.dispatcher;
     match conf.capture_mode {
         PacketCaptureType::Local => {
             let if_mac_source = conf.if_mac_source;
-            components.dispatcher_components.retain_mut(|d| {
+            components.dispatcher_components.iter_mut().for_each(|d| {
                 let links = get_listener_links(
                     conf,
                     #[cfg(target_os = "linux")]
                     d.dispatcher_listener.netns(),
                 );
-                if links.is_empty() && !conf.inner_interface_capture_enabled {
-                    info!("No interfaces found, stopping dispatcher {}", d.id);
-                    d.stop();
-                    return false;
-                }
                 d.dispatcher_listener.on_tap_interface_change(
                     &links,
                     if_mac_source,
@@ -1302,7 +1292,6 @@ fn component_on_config_change(
                 );
                 d.dispatcher_listener
                     .on_vm_change(&vm_mac_addrs, &gateway_vmac_addrs);
-                true
             });
 
             if components.dispatcher_components.is_empty() {
@@ -1311,58 +1300,13 @@ fn component_on_config_change(
                     #[cfg(target_os = "linux")]
                     &netns::NsFile::Root,
                 );
-                if links.is_empty() && !conf.inner_interface_capture_enabled {
-                    return;
-                }
-                match build_dispatchers(
-                    components.last_dispatcher_component_id + 1,
-                    links,
-                    components.stats_collector.clone(),
-                    config_handler,
-                    components.debugger.clone_queue(),
-                    components.is_ce_version,
-                    synchronizer,
-                    components.npb_bps_limit.clone(),
-                    components.npb_arp_table.clone(),
-                    components.rx_leaky_bucket.clone(),
-                    components.policy_getter,
-                    components.process_gpid_table.clone(),
-                    components.exception_handler.clone(),
-                    components.bpf_options.clone(),
-                    components.packet_sequence_uniform_output.clone(),
-                    components.proto_log_sender.clone(),
-                    components.pcap_batch_sender.clone(),
-                    components.tap_typer.clone(),
-                    vm_mac_addrs.clone(),
-                    gateway_vmac_addrs.clone(),
-                    components.toa_info_sender.clone(),
-                    components.l4_flow_aggr_sender.clone(),
-                    components.metrics_sender.clone(),
-                    #[cfg(target_os = "linux")]
-                    netns::NsFile::Root,
-                    #[cfg(target_os = "linux")]
-                    components.kubernetes_poller.clone(),
-                    #[cfg(target_os = "linux")]
-                    libvirt_xml_extractor.clone(),
-                    #[cfg(target_os = "linux")]
-                    None,
-                    #[cfg(target_os = "linux")]
-                    false,
-                ) {
-                    Ok(mut d) => {
-                        d.start();
-                        components.dispatcher_components.push(d);
-                        components.last_dispatcher_component_id += 1;
-                    }
-                    Err(e) => {
-                        warn!(
-                            "build dispatcher_component failed: {}, deepflow-agent restart...",
-                            e
-                        );
-                        crate::utils::clean_and_exit(1);
-                    }
+                if !links.is_empty() {
+                    warn!("Regular matching interface changes, agent restart...");
+                    crate::utils::clean_and_exit(1);
                 }
             }
+
+            components.policy_setter.reset_queue();
         }
         PacketCaptureType::Mirror | PacketCaptureType::Analyzer => {
             for d in components.dispatcher_components.iter_mut() {
@@ -1411,81 +1355,8 @@ fn component_on_config_change(
             if current_interfaces == components.tap_interfaces {
                 return;
             }
-            info!("Regular matching interface changes, dispatcher restart...");
-
-            // By comparing current_interfaces and components.tap_interfaces, we can determine which
-            // dispatcher_components should be closed and which dispatcher_components should be built
-            let interfaces_to_build: Vec<_> = current_interfaces
-                .iter()
-                .filter(|i| !components.tap_interfaces.contains(i))
-                .cloned()
-                .collect();
-
-            components.dispatcher_components.retain_mut(|d| {
-                let retain = current_interfaces.contains(&d.src_link);
-                if !retain {
-                    d.stop();
-                }
-                retain
-            });
-
-            let mut id = components.last_dispatcher_component_id;
-            components
-                .policy_setter
-                .reset_queue_size(id + interfaces_to_build.len() + 1);
-            let debugger_queue = components.debugger.clone_queue();
-            for i in interfaces_to_build {
-                id += 1;
-                match build_dispatchers(
-                    id,
-                    vec![i],
-                    components.stats_collector.clone(),
-                    config_handler,
-                    debugger_queue.clone(),
-                    components.is_ce_version,
-                    synchronizer,
-                    components.npb_bps_limit.clone(),
-                    components.npb_arp_table.clone(),
-                    components.rx_leaky_bucket.clone(),
-                    components.policy_getter,
-                    components.process_gpid_table.clone(),
-                    components.exception_handler.clone(),
-                    components.bpf_options.clone(),
-                    components.packet_sequence_uniform_output.clone(),
-                    components.proto_log_sender.clone(),
-                    components.pcap_batch_sender.clone(),
-                    components.tap_typer.clone(),
-                    vm_mac_addrs.clone(),
-                    gateway_vmac_addrs.clone(),
-                    components.toa_info_sender.clone(),
-                    components.l4_flow_aggr_sender.clone(),
-                    components.metrics_sender.clone(),
-                    #[cfg(target_os = "linux")]
-                    netns::NsFile::Root,
-                    #[cfg(target_os = "linux")]
-                    components.kubernetes_poller.clone(),
-                    #[cfg(target_os = "linux")]
-                    libvirt_xml_extractor.clone(),
-                    #[cfg(target_os = "linux")]
-                    None,
-                    #[cfg(target_os = "linux")]
-                    false,
-                ) {
-                    Ok(mut d) => {
-                        d.start();
-                        components.dispatcher_components.push(d);
-                    }
-                    Err(e) => {
-                        warn!(
-                            "build dispatcher_component failed: {}, deepflow-agent restart...",
-                            e
-                        );
-                        crate::utils::clean_and_exit(1);
-                    }
-                }
-            }
-            components.last_dispatcher_component_id = id;
-            components.tap_interfaces = current_interfaces;
+            warn!("Regular matching interface changes, agent restart...");
+            crate::utils::clean_and_exit(1);
         }
 
         _ => {}
@@ -1726,7 +1597,7 @@ impl EbpfDispatcherComponent {
     pub fn stop(&mut self) {
         self.session_aggregator.stop();
         self.l7_collector.stop();
-        self.ebpf_collector.notify_stop();
+        self.ebpf_collector.stop();
     }
 }
 
@@ -1842,7 +1713,6 @@ pub struct AgentComponents {
     pub is_ce_version: bool, // Determine whether the current version is a ce version, CE-AGENT always set pcap-assembler disabled
     pub tap_interfaces: Vec<Link>,
     pub bpf_options: Arc<Mutex<BpfOptions>>,
-    pub last_dispatcher_component_id: usize,
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub process_listener: Arc<ProcessListener>,
     max_memory: u64,
@@ -2297,18 +2167,9 @@ impl AgentComponents {
         }
 
         info!("Agent run with feature-flags: {:?}.", feature_flags);
-        // Currently, only loca-mode + ebpf collector is supported, and ebpf collector is not
-        // applicable to fastpath, so the number of queues is 1
-        // =================================================================================
-        // 目前仅支持local-mode + ebpf-collector，ebpf-collector不适用fastpath, 所以队列数为1
         let (policy_setter, policy_getter) = Policy::new(
-            1.max(
-                if candidate_config.capture_mode != PacketCaptureType::Local {
-                    interfaces_and_ns.len()
-                } else {
-                    1
-                },
-            ),
+            interfaces_and_ns.len(),
+            user_config.inputs.ebpf.tunning.collector_queue_count,
             user_config.processors.packet.policy.max_first_path_level,
             user_config.get_fast_path_map_size(candidate_config.dispatcher.max_memory),
             user_config.processors.packet.policy.forward_table_capacity,
@@ -2995,7 +2856,8 @@ impl AgentComponents {
             sender_leaky_bucket.clone(),
         );
 
-        let otel_dispatcher_id = ebpf_dispatcher_id + 1;
+        let otel_dispatcher_id =
+            ebpf_dispatcher_id + user_config.inputs.ebpf.tunning.collector_queue_count + 1;
 
         let (l7_stats_sender, l7_stats_receiver, counter) = queue::bounded_with_debug(
             user_config
@@ -3238,7 +3100,6 @@ impl AgentComponents {
             dispatcher_components,
             is_ce_version: version_info.name != env!("AGENT_NAME"),
             tap_interfaces,
-            last_dispatcher_component_id: otel_dispatcher_id,
             bpf_options,
             #[cfg(any(target_os = "linux", target_os = "android"))]
             process_listener,
@@ -3330,7 +3191,7 @@ impl AgentComponents {
 
         let mut join_handles = vec![];
 
-        self.policy_setter.reset_queue_size(0);
+        self.policy_setter.reset_queue();
         for d in self.dispatcher_components.iter_mut() {
             d.stop();
         }
