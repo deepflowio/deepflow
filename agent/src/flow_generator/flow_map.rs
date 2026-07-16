@@ -263,15 +263,17 @@ impl FlowMap {
     }
 
     #[inline]
-    fn lookup_policy(
-        &mut self,
-        meta_packet: &mut MetaPacket,
-        local_epc_id: i32,
-        local_agent_id: u32,
-    ) {
-        self.process_gpid.lookup(meta_packet, local_agent_id);
-        self.policy_getter
-            .lookup(meta_packet, self.id as usize, local_epc_id);
+    fn lookup_process_gpid(&mut self, meta_packet: &MetaPacket, node: &mut FlowNode) {
+        if meta_packet.signal_source != SignalSource::Packet {
+            return;
+        }
+        let Some(trace_info) = meta_packet.trace_info else {
+            return;
+        };
+        let client = &mut node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
+        if client.gpid == 0 {
+            client.gpid = self.process_gpid.lookup(trace_info);
+        }
     }
 
     pub fn new(
@@ -745,7 +747,7 @@ impl FlowMap {
         };
         #[cfg(target_os = "windows")]
         let local_epc_id = 0;
-        self.lookup_policy(meta_packet, local_epc_id, config.flow.agent_id as u32);
+        (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
     }
 
     pub fn inject_meta_packet(&mut self, config: &Config, meta_packet: &mut MetaPacket) {
@@ -969,6 +971,8 @@ impl FlowMap {
                 count += self.collect_metric(config, node, meta_packet, direction, false);
             }
         }
+
+        self.lookup_process_gpid(meta_packet, node);
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF && count > 0 {
@@ -1392,7 +1396,7 @@ impl FlowMap {
         let local_epc_id = 0;
 
         // tag
-        self.lookup_policy(meta_packet, local_epc_id, config.flow.agent_id as u32);
+        (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         self.init_endpoint_and_policy_data(&mut node, meta_packet);
         node.tagged_flow.flow.need_to_store = (self.pseq_output.is_some()
             && meta_packet.lookup_key.proto == IpProtocol::TCP)
@@ -1582,7 +1586,7 @@ impl FlowMap {
                 meta_packet.lookup_key.src_nat_port = metric.nat_real_port;
                 meta_packet.lookup_key.src_nat_source = TapPort::NAT_SOURCE_TOA;
             }
-            self.lookup_policy(meta_packet, local_epc_id, config.flow.agent_id as u32);
+            (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
             self.update_endpoint_and_policy_data(node, meta_packet);
             // Currently, only virtual traffic's tap_side is counted
             node.tagged_flow
@@ -1675,7 +1679,7 @@ impl FlowMap {
             #[cfg(target_os = "windows")]
             let local_epc_id = 0;
 
-            self.lookup_policy(meta_packet, local_epc_id, config.flow.agent_id as u32);
+            (self.policy_getter).lookup(meta_packet, self.id as usize, local_epc_id);
         }
     }
 
@@ -1936,6 +1940,8 @@ impl FlowMap {
                 node.residual_request -= count;
             }
         }
+
+        self.lookup_process_gpid(meta_packet, &mut node);
 
         // Enterprise Edition Feature: packet-sequence
         if let Some(output) = self.pseq_output.as_mut() {
@@ -2748,6 +2754,20 @@ pub fn _new_flow_map_and_receiver(
     flow_timeout: Option<FlowTimeout>,
     ignore_idc_vlan: bool,
 ) -> (ModuleConfig, FlowMap, Receiver<Arc<BatchedBox<TaggedFlow>>>) {
+    _new_flow_map_and_receiver_with_process_gpid(
+        agent_type,
+        flow_timeout,
+        ignore_idc_vlan,
+        ProcessGpidTable::default(),
+    )
+}
+
+fn _new_flow_map_and_receiver_with_process_gpid(
+    agent_type: AgentType,
+    flow_timeout: Option<FlowTimeout>,
+    ignore_idc_vlan: bool,
+    process_gpid_table: ProcessGpidTable,
+) -> (ModuleConfig, FlowMap, Receiver<Arc<BatchedBox<TaggedFlow>>>) {
     let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, 1 << 14, false, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
@@ -2777,7 +2797,7 @@ pub fn _new_flow_map_and_receiver(
         Some(output_queue_sender),
         l7_stats_output_queue_sender,
         policy_getter,
-        ProcessGpidTable::default(),
+        process_gpid_table,
         app_proto_log_queue,
         Arc::new(AtomicI64::new(0)),
         &config.flow,
@@ -2860,6 +2880,7 @@ mod tests {
             enums::EthernetType,
             flow::CloseType,
             l7_protocol_log::{LogCache, LogCacheKey, ParseParam},
+            meta_packet::TraceInfo,
             tap_port::TapPort,
         },
         flow_generator::protocol_logs::L7ResponseStatus,
@@ -2875,6 +2896,82 @@ mod tests {
             self.start_time = d;
             self.start_time_in_unit = (d.as_nanos() / TIME_UNIT.as_nanos()) as u64;
         }
+    }
+
+    #[test]
+    fn process_gpid_updates_only_packet_client_peer() {
+        const CLIENT_AGENT_ID: u32 = 10;
+        const CLIENT_PID: u32 = 20;
+        const CLIENT_GPID: u32 = 30;
+
+        let process_gpid_table = ProcessGpidTable::default();
+        process_gpid_table.update_for_test(
+            1,
+            AHashMap::from_iter([(
+                ((CLIENT_AGENT_ID as u64) << 32) | CLIENT_PID as u64,
+                CLIENT_GPID,
+            )]),
+        );
+        let (mut module_config, mut flow_map, _) = _new_flow_map_and_receiver_with_process_gpid(
+            AgentType::TtProcess,
+            None,
+            false,
+            process_gpid_table,
+        );
+        module_config.flow.collector_enabled = false;
+        let config = Config {
+            flow: &module_config.flow,
+            log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            ebpf: None,
+        };
+
+        // TraceInfo identifies the client even when the first packet is a SYN-ACK and the
+        // packet direction has to be reversed before creating the flow.
+        let mut packet = _new_meta_packet();
+        packet.signal_source = SignalSource::Packet;
+        packet.trace_info = Some(TraceInfo {
+            agent_id: CLIENT_AGENT_ID,
+            pid: CLIENT_PID,
+        });
+        if let ProtocolData::TcpHeader(tcp_data) = &mut packet.protocol_data {
+            tcp_data.flags = TcpFlags::SYN_ACK;
+        }
+        let server_ip = packet.lookup_key.src_ip;
+        let client_ip = packet.lookup_key.dst_ip;
+
+        let node = flow_map.new_tcp_node(&config, &mut packet);
+
+        assert_eq!(packet.lookup_key.direction, PacketDirection::ServerToClient);
+        assert_eq!((packet.gpid_0, packet.gpid_1), (0, 0));
+        assert_eq!(node.tagged_flow.flow.flow_key.ip_src, client_ip);
+        assert_eq!(node.tagged_flow.flow.flow_key.ip_dst, server_ip);
+        assert_eq!(
+            node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid,
+            CLIENT_GPID
+        );
+        assert_eq!(
+            node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid,
+            0
+        );
+
+        let mut existing_node = FlowNode::default();
+        existing_node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid = 100;
+        flow_map.lookup_process_gpid(&packet, &mut existing_node);
+        assert_eq!(
+            existing_node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid,
+            100
+        );
+
+        let mut ebpf_packet = packet.clone();
+        ebpf_packet.signal_source = SignalSource::EBPF;
+        let mut ebpf_node = FlowNode::default();
+        flow_map.lookup_process_gpid(&ebpf_packet, &mut ebpf_node);
+        assert_eq!(
+            ebpf_node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid,
+            0
+        );
     }
 
     #[test]
