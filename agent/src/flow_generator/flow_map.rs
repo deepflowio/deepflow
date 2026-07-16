@@ -270,9 +270,10 @@ impl FlowMap {
         let Some(trace_info) = meta_packet.trace_info else {
             return;
         };
-        let client = &mut node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
-        if client.gpid == 0 {
-            client.gpid = self.process_gpid.lookup(trace_info);
+        let source = &mut node.tagged_flow.flow.flow_metrics_peers
+            [meta_packet.lookup_key.direction as usize];
+        if source.gpid == 0 {
+            source.gpid = self.process_gpid.lookup(trace_info);
         }
     }
 
@@ -2899,18 +2900,27 @@ mod tests {
     }
 
     #[test]
-    fn process_gpid_updates_only_packet_client_peer() {
+    fn process_gpid_updates_packet_source_peer() {
         const CLIENT_AGENT_ID: u32 = 10;
         const CLIENT_PID: u32 = 20;
         const CLIENT_GPID: u32 = 30;
+        const SERVER_AGENT_ID: u32 = 40;
+        const SERVER_PID: u32 = 50;
+        const SERVER_GPID: u32 = 60;
 
         let process_gpid_table = ProcessGpidTable::default();
         process_gpid_table.update_for_test(
             1,
-            AHashMap::from_iter([(
-                ((CLIENT_AGENT_ID as u64) << 32) | CLIENT_PID as u64,
-                CLIENT_GPID,
-            )]),
+            AHashMap::from_iter([
+                (
+                    ((CLIENT_AGENT_ID as u64) << 32) | CLIENT_PID as u64,
+                    CLIENT_GPID,
+                ),
+                (
+                    ((SERVER_AGENT_ID as u64) << 32) | SERVER_PID as u64,
+                    SERVER_GPID,
+                ),
+            ]),
         );
         let (mut module_config, mut flow_map, _) = _new_flow_map_and_receiver_with_process_gpid(
             AgentType::TtProcess,
@@ -2927,13 +2937,13 @@ mod tests {
             ebpf: None,
         };
 
-        // TraceInfo identifies the client even when the first packet is a SYN-ACK and the
-        // packet direction has to be reversed before creating the flow.
+        // TraceInfo identifies the MetaPacket source. When the first packet is a SYN-ACK,
+        // direction correction makes the server the flow's destination peer.
         let mut packet = _new_meta_packet();
         packet.signal_source = SignalSource::Packet;
         packet.trace_info = Some(TraceInfo {
-            agent_id: CLIENT_AGENT_ID,
-            pid: CLIENT_PID,
+            agent_id: SERVER_AGENT_ID,
+            pid: SERVER_PID,
         });
         if let ProtocolData::TcpHeader(tcp_data) = &mut packet.protocol_data {
             tcp_data.flags = TcpFlags::SYN_ACK;
@@ -2941,7 +2951,7 @@ mod tests {
         let server_ip = packet.lookup_key.src_ip;
         let client_ip = packet.lookup_key.dst_ip;
 
-        let node = flow_map.new_tcp_node(&config, &mut packet);
+        let mut node = flow_map.new_tcp_node(&config, &mut packet);
 
         assert_eq!(packet.lookup_key.direction, PacketDirection::ServerToClient);
         assert_eq!((packet.gpid_0, packet.gpid_1), (0, 0));
@@ -2949,27 +2959,50 @@ mod tests {
         assert_eq!(node.tagged_flow.flow.flow_key.ip_dst, server_ip);
         assert_eq!(
             node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid,
+            0
+        );
+        assert_eq!(
+            node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid,
+            SERVER_GPID
+        );
+
+        let mut client_packet = packet.clone();
+        client_packet.lookup_key.direction = PacketDirection::ClientToServer;
+        client_packet.trace_info = Some(TraceInfo {
+            agent_id: CLIENT_AGENT_ID,
+            pid: CLIENT_PID,
+        });
+        flow_map.lookup_process_gpid(&client_packet, &mut node);
+        assert_eq!(
+            node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid,
             CLIENT_GPID
         );
         assert_eq!(
             node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid,
-            0
+            SERVER_GPID
         );
 
-        let mut existing_node = FlowNode::default();
-        existing_node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid = 100;
-        flow_map.lookup_process_gpid(&packet, &mut existing_node);
+        // Do not overwrite a GPID already set on the packet's source peer.
+        client_packet.trace_info = Some(TraceInfo {
+            agent_id: SERVER_AGENT_ID,
+            pid: SERVER_PID,
+        });
+        flow_map.lookup_process_gpid(&client_packet, &mut node);
         assert_eq!(
-            existing_node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid,
-            100
+            node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid,
+            CLIENT_GPID
         );
 
-        let mut ebpf_packet = packet.clone();
+        let mut ebpf_packet = client_packet;
         ebpf_packet.signal_source = SignalSource::EBPF;
         let mut ebpf_node = FlowNode::default();
         flow_map.lookup_process_gpid(&ebpf_packet, &mut ebpf_node);
         assert_eq!(
             ebpf_node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid,
+            0
+        );
+        assert_eq!(
+            ebpf_node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid,
             0
         );
     }
