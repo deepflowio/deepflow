@@ -592,7 +592,7 @@ pub struct Proc {
     pub proc_dir_path: String,
     #[serde(deserialize_with = "deser_humantime_with_zero")]
     pub socket_info_sync_interval: Duration,
-    #[serde(deserialize_with = "deser_humantime_with_zero")]
+    #[serde(deserialize_with = "deser_process_gpid_sync_interval")]
     pub process_gpid_sync_interval: Duration,
     #[serde(with = "humantime_serde")]
     pub min_lifetime: Duration,
@@ -3655,6 +3655,27 @@ where
     }
 }
 
+fn deser_process_gpid_sync_interval<'de: 'a, 'a, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = <&'a str>::deserialize(deserializer)?;
+    let interval = if value == "0" {
+        Duration::ZERO
+    } else {
+        humantime::parse_duration(value)
+            .map_err(|_| de::Error::invalid_value(de::Unexpected::Str(value), &"a duration"))?
+    };
+    if !interval.is_zero()
+        && (interval < Duration::from_secs(1) || interval > Duration::from_secs(60 * 60))
+    {
+        return Err(de::Error::custom(format!(
+            "process_gpid_sync_interval {interval:?} not in [1s, 1h] or 0"
+        )));
+    }
+    Ok(interval)
+}
+
 fn deser_to_sorted_strings<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where
     D: Deserializer<'de>,
@@ -3703,6 +3724,18 @@ mod tests {
 
         let _: UserConfig = serde_yaml::from_str(&yaml_content)
             .expect("Failed to parse template.yaml to UserConfig");
+    }
+
+    #[test]
+    fn validate_process_gpid_sync_interval() {
+        for interval in ["0", "0ns", "1s", "1h"] {
+            let yaml = format!("process_gpid_sync_interval: {interval}");
+            assert!(serde_yaml::from_str::<Proc>(&yaml).is_ok(), "{interval}");
+        }
+        for interval in ["1ns", "999ms", "3601s"] {
+            let yaml = format!("process_gpid_sync_interval: {interval}");
+            assert!(serde_yaml::from_str::<Proc>(&yaml).is_err(), "{interval}");
+        }
     }
 
     #[test]
