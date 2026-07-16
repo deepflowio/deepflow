@@ -2487,7 +2487,7 @@ inputs:
 
 **标签**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -2522,7 +2522,7 @@ Calico:        cali.*
 Cilium         lxc.*
 Kube-OVN       [0-9a-f]+_h$
 ```
-未配置时，表示未采集网卡流量
+未配置时，表示未采集网卡流量，仅当配置导致收包线程数发生变动才会导致 agent 重启。
 
 #### 内网络命名空间采集开关 {#inputs.cbpf.af_packet.inner_interface_capture_enabled}
 
@@ -5100,6 +5100,35 @@ inputs:
 - 0-ebpf-to-ebpf-collector
 - 1-proc-event-to-sender
 - 1-profile-to-sender
+
+#### 采集队列个数 {#inputs.ebpf.tunning.collector_queue_count}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.tunning.collector_queue_count`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    tunning:
+      collector_queue_count: 1
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 16] |
+
+**详细描述**:
+
+以下 deepflow-agent 的 eBPF 数据采集队列个数：
+- 0-ebpf-to-ebpf-collector
 
 #### 用户态工作线程数 {#inputs.ebpf.tunning.userspace_worker_threads}
 

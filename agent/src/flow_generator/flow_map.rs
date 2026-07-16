@@ -2769,7 +2769,7 @@ fn _new_flow_map_and_receiver_with_process_gpid(
     ignore_idc_vlan: bool,
     process_gpid_table: ProcessGpidTable,
 ) -> (ModuleConfig, FlowMap, Receiver<Arc<BatchedBox<TaggedFlow>>>) {
-    let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, 1 << 14, false, false);
+    let (_, mut policy_getter) = Policy::new(1, 0, 0, 1 << 10, 1 << 14, false, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
     let (output_queue_sender, output_queue_receiver, _) =

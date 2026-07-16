@@ -1903,7 +1903,7 @@ inputs:
       # unit:
       # range: []
       # enum_options: []
-      # modification: hot_update
+      # modification: agent_restart 
       # ee_feature: false
       # description:
       #   en: |-
@@ -1920,7 +1920,9 @@ inputs:
       #     Kube-OVN       [0-9a-f]+_h$
       #     ```
       #     When it is not configured, it indicates
-      #     that network card traffic is not being collected
+      #     that network card traffic is not being collected, The agent
+      #     will only restart when the configuration causes a change in
+      #     the number of dispatcher threads.
       #   ch: |-
       #     需要采集流量的网络接口的正则表达式。
       #
@@ -1934,7 +1936,7 @@ inputs:
       #     Cilium         lxc.*
       #     Kube-OVN       [0-9a-f]+_h$
       #     ```
-      #     未配置时，表示未采集网卡流量
+      #     未配置时，表示未采集网卡流量，仅当配置导致收包线程数发生变动才会导致 agent 重启。
       # upgrade_from: tap_interface_regex
       interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[osipx].*|lxc.*|lo|[0-9a-f]+_h)$
       # type: bool
@@ -3817,6 +3819,23 @@ inputs:
       #     - 1-profile-to-sender
       # upgrade_from: static_config.ebpf-collector-queue-size
       collector_queue_size: 65535
+      # type: int
+      # name:
+      #   en: Collector Queue Count
+      #   ch: 采集队列个数
+      # unit:
+      # range: [1, 16]
+      # enum_options: []
+      # modification: agent_restart
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     The number of the following queues:
+      #     - 0-ebpf-to-ebpf-collector
+      #   ch: |-
+      #     以下 deepflow-agent 的 eBPF 数据采集队列个数：
+      #     - 0-ebpf-to-ebpf-collector
+      collector_queue_count: 1
       # type: int
       # name:
       #   en: Userspace Worker Threads

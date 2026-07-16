@@ -2531,7 +2531,7 @@ switch mirroring.
 
 **Tags**:
 
-`hot_update`
+<mark>agent_restart</mark>
 
 **FQCN**:
 
@@ -2567,7 +2567,9 @@ Cilium         lxc.*
 Kube-OVN       [0-9a-f]+_h$
 ```
 When it is not configured, it indicates
-that network card traffic is not being collected
+that network card traffic is not being collected, The agent
+will only restart when the configuration causes a change in
+the number of dispatcher threads.
 
 #### Inner Net Namespace Capture Enabled {#inputs.cbpf.af_packet.inner_interface_capture_enabled}
 
@@ -5233,6 +5235,35 @@ The length of the following queues:
 - 0-ebpf-to-ebpf-collector
 - 1-proc-event-to-sender
 - 1-profile-to-sender
+
+#### Collector Queue Count {#inputs.ebpf.tunning.collector_queue_count}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.tunning.collector_queue_count`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    tunning:
+      collector_queue_count: 1
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [1, 16] |
+
+**Description**:
+
+The number of the following queues:
+- 0-ebpf-to-ebpf-collector
 
 #### Userspace Worker Threads {#inputs.ebpf.tunning.userspace_worker_threads}
 

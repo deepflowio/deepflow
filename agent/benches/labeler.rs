@@ -140,7 +140,7 @@ fn bench_labeler(c: &mut Criterion) {
 
 fn bench_policy(c: &mut Criterion) {
     fn generate_table() -> FirstPath {
-        let mut first = FirstPath::new(1, 8, 1 << 16, false, false);
+        let mut first = FirstPath::new(1, 1, 8, 1 << 16, false, false);
         let acl = Acl::new(
             1,
             vec![10],
@@ -237,6 +237,7 @@ fn bench_policy(c: &mut Criterion) {
             src_port: 80,
             dst_port: 100,
             feature_flag: FeatureFlags::NONE,
+            fast_index: 1,
             ..Default::default()
         };
 
@@ -252,6 +253,7 @@ fn bench_policy(c: &mut Criterion) {
         };
 
         first.endpoint_fast_add(
+            1,
             EndpointTableType::Ebpf,
             key.src_ip,
             key.dst_ip,
@@ -262,7 +264,15 @@ fn bench_policy(c: &mut Criterion) {
         b.iter_custom(|iters| {
             let start = Instant::now();
             for _ in 0..iters {
-                first.endpoint_fast_get(EndpointTableType::Ebpf, key.src_ip, key.dst_ip, 2, 0);
+                first.endpoint_fast_get(
+                    1,
+                    EndpointTableType::Ebpf,
+                    key.src_ip,
+                    key.dst_ip,
+                    2,
+                    0,
+                    true,
+                );
             }
             start.elapsed()
         })

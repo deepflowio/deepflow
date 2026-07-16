@@ -1183,6 +1183,7 @@ pub struct EbpfProfile {
 #[serde(default)]
 pub struct EbpfTunning {
     pub collector_queue_size: usize,
+    pub collector_queue_count: usize,
     pub userspace_worker_threads: i32,
     pub kick_kern_nice: i32,
     pub perf_pages_count: u32,
@@ -1196,6 +1197,7 @@ impl Default for EbpfTunning {
     fn default() -> Self {
         Self {
             collector_queue_size: 65535,
+            collector_queue_count: 1,
             userspace_worker_threads: 1,
             kick_kern_nice: 0,
             perf_pages_count: 128,
@@ -1213,6 +1215,12 @@ impl EbpfTunning {
             return Err(format!(
                 "kick_kern_nice {} not in [-20, 19]",
                 self.kick_kern_nice
+            ));
+        }
+        if !(1..=16).contains(&self.collector_queue_count) {
+            return Err(format!(
+                "collector_queue_count {} not in [1, 16]",
+                self.collector_queue_count
             ));
         }
 
