@@ -87,6 +87,10 @@ impl ProcessGpidTable {
         self.inner.version.store(version, Ordering::Release);
     }
 
+    fn clear(&self) {
+        self.update(0, AHashMap::new());
+    }
+
     pub fn new_lookup(&self, id: u32, stats_collector: &stats::Collector) -> ProcessGpidLookup {
         ProcessGpidLookup::new(self.inner.clone(), id, stats_collector)
     }
@@ -332,9 +336,15 @@ impl ProcessGpidSynchronizer {
     ) {
         let mut last_interval = Duration::ZERO;
         let mut next_sync = Instant::now();
+        let mut disabled = false;
         loop {
             let interval = config.load().process_gpid_sync_interval;
             if interval.is_zero() {
+                if !disabled {
+                    table.clear();
+                    disabled = true;
+                    info!("process GPID synchronization disabled and lookup table cleared");
+                }
                 last_interval = Duration::ZERO;
                 next_sync = Instant::now();
                 if !wait_for_running(&running, &stop_notify, Duration::from_secs(1)) {
@@ -342,6 +352,7 @@ impl ProcessGpidSynchronizer {
                 }
                 continue;
             }
+            disabled = false;
             if interval != last_interval {
                 last_interval = interval;
                 next_sync = Instant::now();
@@ -589,5 +600,35 @@ mod tests {
         lookup.lookup(&mut packet, 40);
         assert_eq!((packet.gpid_0, packet.gpid_1), (0, 0));
         assert_eq!(lookup.counter.server_table_hit.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn clear_invalidates_lookup_table_and_lru() {
+        let table = ProcessGpidTable::default();
+        table.update(7, AHashMap::from_iter([(make_key(10, 20), 30)]));
+        let stats = stats::Collector::new("", Arc::new(AtomicI64::new(0)));
+        let mut lookup = table.new_lookup(1, &stats);
+        let trace_info = Some(TraceInfo {
+            agent_id: 10,
+            pid: 20,
+        });
+
+        let mut packet = MetaPacket::default();
+        packet.trace_info = trace_info;
+        lookup.lookup(&mut packet, 0);
+        assert_eq!(packet.gpid_0, 30);
+
+        let old_version = table.version();
+        table.clear();
+        assert_eq!(table.version(), 0);
+        assert_ne!(table.version(), old_version);
+        lookup.refresh();
+
+        let mut packet = MetaPacket::default();
+        packet.trace_info = trace_info;
+        lookup.lookup(&mut packet, 0);
+        assert_eq!(packet.gpid_0, 0);
+        assert_eq!(lookup.counter.table_reload.load(Ordering::Relaxed), 1);
+        assert_eq!(lookup.counter.client_table_miss.load(Ordering::Relaxed), 1);
     }
 }
