@@ -28,6 +28,8 @@ pub mod stats;
 
 #[cfg(target_os = "linux")]
 pub(crate) mod pid_file;
+#[cfg(target_os = "linux")]
+pub(crate) mod tcp_option_tracing;
 
 pub use public::bytes;
 
