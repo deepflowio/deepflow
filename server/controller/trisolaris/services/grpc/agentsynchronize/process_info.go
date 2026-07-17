@@ -24,6 +24,7 @@ import (
 	api "github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/server/controller/grpc/statsd"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 	"github.com/gogo/protobuf/proto"
 )
@@ -115,11 +116,12 @@ func (e *ProcessInfoEvent) ProcessGPIDSync(ctx context.Context, in *api.ProcessG
 	}
 
 	agentVersion := in.GetProcessGpidVersion()
-	version, processGPIDBytes := agentMetaData.GetProcessGPID(agentVersion)
+	version, processGPIDBytes := agentMetaData.GetCompressProcessGPID(agentVersion)
 	log.Infof("receive process gpid sync from vtap (%s) team (%s) version (%d=>%d)", vtapCacheKey, teamIDStr, agentVersion, version, logger.NewORGPrefix(orgID))
 	result := &api.ProcessGPIDSyncResponse{
-		ProcessGpidVersion: &version,
 		GprocessInfos:      processGPIDBytes,
+		ProcessGpidVersion: proto.Uint64(version),
+		CompressAlgorithm:  &common.PROCESS_GPID_COMPRESS_ALGO_ZSTD,
 	}
 	syncBytesSize := uint64(proto.Size(result))
 	currentBufferSize := vtapCache.GetGRPCBufferFromLastProcessGPIDSync(syncBytesSize)
