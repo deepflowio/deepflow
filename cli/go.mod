@@ -9,6 +9,7 @@ require (
 	github.com/deepflowio/deepflow/message v0.0.0-20260714071933-000b5bdc846c
 	github.com/deepflowio/deepflow/server v1.6.66-0.20251229081021-e71e8eb3b9c1
 	github.com/golang/protobuf v1.5.4
+	github.com/klauspost/compress v1.18.0
 	github.com/mattn/go-runewidth v0.0.14
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/spf13/cobra v1.5.0
@@ -68,7 +69,6 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible // indirect

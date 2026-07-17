@@ -17,6 +17,7 @@
 package agentmetadata
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"math/rand"
@@ -26,14 +27,16 @@ import (
 
 	"github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/common"
+	"github.com/klauspost/compress/zstd"
 	"google.golang.org/protobuf/proto"
 )
 
 type ProcessGPID struct {
-	mu          sync.RWMutex
-	version     atomic.Uint64
-	entriesByte []byte
-	md5         string
+	mu              sync.RWMutex
+	version         atomic.Uint64
+	compressEntries []byte
+	md5             string
 }
 
 func NewProcessGPID() *ProcessGPID {
@@ -51,11 +54,27 @@ func (p *ProcessGPID) Update(processes []*model.Process) error {
 			Pid:        proto.Uint32(uint32(process.PID)),
 		})
 	}
+
 	entriesByte, err := entries.Marshal()
 	if err != nil {
 		return err
 	}
-	hash := md5.Sum(entriesByte)
+
+	var compressEntries bytes.Buffer
+	encoder, err := zstd.NewWriter(&compressEntries)
+	if err != nil {
+		return err
+	}
+	_, err = encoder.Write(entriesByte)
+	if err != nil {
+		return err
+	}
+	err = encoder.Close()
+	if err != nil {
+		return err
+	}
+
+	hash := md5.Sum(compressEntries.Bytes())
 	newMD5 := hex.EncodeToString(hash[:])
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -63,17 +82,17 @@ func (p *ProcessGPID) Update(processes []*model.Process) error {
 		return nil
 	}
 	p.md5 = newMD5
-	p.version.Add(1)
-	p.entriesByte = entriesByte
+	p.version.Add(common.VERSION_OFFSET)
+	p.compressEntries = compressEntries.Bytes()
 	return nil
 }
 
-func (p *ProcessGPID) GetProcessGPIDByte(version uint64) (uint64, []byte) {
+func (p *ProcessGPID) GetCompressProcessGPIDByte(version uint64) (uint64, []byte) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	curVersion := p.version.Load()
 	if version == curVersion {
 		return version, []byte{}
 	}
-	return curVersion, p.entriesByte
+	return curVersion, p.compressEntries
 }
