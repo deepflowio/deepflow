@@ -32,6 +32,7 @@ import (
 	"github.com/deepflowio/deepflow/message/agent"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/golang/protobuf/proto"
+	"github.com/klauspost/compress/zstd"
 	"github.com/spf13/cobra"
 	_ "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -380,6 +381,21 @@ func ProcessGPIDSync(cmd *cobra.Command) {
 	if gProcessInfosByte == nil {
 		fmt.Println("process gpid info is nil")
 		return
+	}
+	if response.GetCompressAlgorithm() == agent.ProcessGPIDCompressAlgorithm_PROCESS_GPID_COMPRESS_ALGO_ZSTD {
+		var decompressed bytes.Buffer
+		decoder, err := zstd.NewReader(bytes.NewBuffer(gProcessInfosByte))
+		if err != nil {
+			fmt.Println("zstd new reader failed")
+			return
+		}
+		_, err = io.Copy(&decompressed, decoder)
+		if err != nil {
+			fmt.Println("zstd decompress failed")
+			return
+		}
+		decoder.Close()
+		gProcessInfosByte = decompressed.Bytes()
 	}
 	if err := gProcessInfos.Unmarshal(gProcessInfosByte); err != nil {
 		fmt.Println("unmarshal process gpid info failed")

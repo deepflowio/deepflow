@@ -108,8 +108,8 @@ func (m *MetaData) GetPlatformVips() []string {
 	return m.config.PlatformVips
 }
 
-func (m *MetaData) GetProcessGPID(version uint64) (uint64, []byte) {
-	return m.processGPID.GetProcessGPIDByte(version)
+func (m *MetaData) GetCompressProcessGPID(version uint64) (uint64, []byte) {
+	return m.processGPID.GetCompressProcessGPIDByte(version)
 }
 
 func (m *MetaData) GetStartTime() int64 {

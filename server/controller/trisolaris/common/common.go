@@ -116,6 +116,8 @@ const (
 	DISABLED = 0
 	ENABLED  = 1
 
+	VERSION_OFFSET = 10000
+
 	MEGA_BYTE = 1024 * 1024
 
 	HALF_MEGA_BYTE = MEGA_BYTE / 2
@@ -149,6 +151,11 @@ var (
 	AGENT_KWP_NORMAL         = agent.KubernetesWatchPolicy_KWP_NORMAL
 	AGENT_KWP_WATCH_ONLY     = agent.KubernetesWatchPolicy_KWP_WATCH_ONLY
 	AGENT_KWP_WATCH_DISABLED = agent.KubernetesWatchPolicy_KWP_WATCH_DISABLED
+)
+
+var (
+	PROCESS_GPID_COMPRESS_ALGO_NONE = agent.ProcessGPIDCompressAlgorithm_PROCESS_GPID_COMPRESS_ALGO_NONE
+	PROCESS_GPID_COMPRESS_ALGO_ZSTD = agent.ProcessGPIDCompressAlgorithm_PROCESS_GPID_COMPRESS_ALGO_ZSTD
 )
 
 type UpgradeData struct {
