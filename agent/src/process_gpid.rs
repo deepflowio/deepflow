@@ -102,10 +102,10 @@ impl ProcessGpidTable {
 
 #[derive(Default)]
 struct ProcessGpidCounter {
-    client_lru_hit: AtomicU64,
-    client_lru_negative_hit: AtomicU64,
-    client_table_hit: AtomicU64,
-    client_table_miss: AtomicU64,
+    lru_hit: AtomicU64,
+    lru_negative_hit: AtomicU64,
+    table_hit: AtomicU64,
+    table_miss: AtomicU64,
     table_reload: AtomicU64,
 }
 
@@ -122,10 +122,10 @@ impl RefCountable for ProcessGpidCounter {
         }
 
         vec![
-            counted!("client_lru_hit", client_lru_hit),
-            counted!("client_lru_negative_hit", client_lru_negative_hit),
-            counted!("client_table_hit", client_table_hit),
-            counted!("client_table_miss", client_table_miss),
+            counted!("lru_hit", lru_hit),
+            counted!("lru_negative_hit", lru_negative_hit),
+            counted!("table_hit", table_hit),
+            counted!("table_miss", table_miss),
             counted!("table_reload", table_reload),
         ]
     }
@@ -176,8 +176,8 @@ impl ProcessGpidLookup {
         let key = make_key(agent_id, pid);
         if let Some(gpid) = self.lru.get(&key).copied() {
             let counter = match gpid == 0 {
-                false => &self.counter.client_lru_hit,
-                true => &self.counter.client_lru_negative_hit,
+                false => &self.counter.lru_hit,
+                true => &self.counter.lru_negative_hit,
             };
             counter.fetch_add(1, Ordering::Relaxed);
             return gpid;
@@ -185,8 +185,8 @@ impl ProcessGpidLookup {
 
         let gpid = self.table.entries.get(&key).copied().unwrap_or_default();
         let counter = match gpid == 0 {
-            false => &self.counter.client_table_hit,
-            true => &self.counter.client_table_miss,
+            false => &self.counter.table_hit,
+            true => &self.counter.table_miss,
         };
         counter.fetch_add(1, Ordering::Relaxed);
         self.lru.put(key, gpid);
@@ -502,10 +502,10 @@ mod tests {
         };
 
         assert_eq!(lookup.lookup(trace_info), 30);
-        assert_eq!(lookup.counter.client_table_hit.load(Ordering::Relaxed), 1);
+        assert_eq!(lookup.counter.table_hit.load(Ordering::Relaxed), 1);
 
         assert_eq!(lookup.lookup(trace_info), 30);
-        assert_eq!(lookup.counter.client_lru_hit.load(Ordering::Relaxed), 1);
+        assert_eq!(lookup.counter.lru_hit.load(Ordering::Relaxed), 1);
 
         table.update(2, AHashMap::from_iter([(make_key(10, 20), 31)]));
         lookup.refresh();
@@ -525,16 +525,10 @@ mod tests {
         };
 
         assert_eq!(lookup.lookup(trace_info), 0);
-        assert_eq!(lookup.counter.client_table_miss.load(Ordering::Relaxed), 1);
+        assert_eq!(lookup.counter.table_miss.load(Ordering::Relaxed), 1);
 
         assert_eq!(lookup.lookup(trace_info), 0);
-        assert_eq!(
-            lookup
-                .counter
-                .client_lru_negative_hit
-                .load(Ordering::Relaxed),
-            1
-        );
+        assert_eq!(lookup.counter.lru_negative_hit.load(Ordering::Relaxed), 1);
     }
 
     #[test]
@@ -558,6 +552,6 @@ mod tests {
 
         assert_eq!(lookup.lookup(trace_info), 0);
         assert_eq!(lookup.counter.table_reload.load(Ordering::Relaxed), 1);
-        assert_eq!(lookup.counter.client_table_miss.load(Ordering::Relaxed), 1);
+        assert_eq!(lookup.counter.table_miss.load(Ordering::Relaxed), 1);
     }
 }
