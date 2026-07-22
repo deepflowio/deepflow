@@ -1024,6 +1024,21 @@ global:
       #   ch: 禁用 / 启用 deepflow-agent 的诊断功能。
       # upgrade_from: debug_enabled
       enabled: true
+      # type: bool
+      # name:
+      #   en: Beacon Enabled
+      #   ch: 启用 Beacon
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Whether deepflow-agent periodically sends beacon packets.
+      #   ch: |-
+      #     是否允许 deepflow-agent 周期性发送 Beacon 报文。
+      beacon_enabled: true
       # type: int
       # name:
       #   en: Local UDP Port

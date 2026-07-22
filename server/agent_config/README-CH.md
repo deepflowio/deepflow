@@ -1448,6 +1448,33 @@ global:
 
 禁用 / 启用 deepflow-agent 的诊断功能。
 
+#### 启用 Beacon {#global.self_monitoring.debug.beacon_enabled}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.self_monitoring.debug.beacon_enabled`
+
+**默认值**:
+```yaml
+global:
+  self_monitoring:
+    debug:
+      beacon_enabled: true
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+是否允许 deepflow-agent 周期性发送 Beacon 报文。
+
 #### 本地 UDP 端口号 {#global.self_monitoring.debug.local_udp_port}
 
 **标签**:

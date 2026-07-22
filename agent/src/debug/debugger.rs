@@ -153,6 +153,10 @@ impl Debugger {
                             }
                             interval_counter = 0;
 
+                            if !conf.load().beacon_enabled {
+                                continue;
+                            }
+
                             let Some(hostname) = override_os_hostname.as_ref().clone().or_else(
                                 || match get_hostname() {
                                     Ok(hostname) => Some(hostname),
@@ -307,6 +311,10 @@ impl Debugger {
                                 continue;
                             }
                             interval_counter = 0;
+
+                            if !conf.load().beacon_enabled {
+                                continue;
+                            }
 
                             let Some(hostname) = override_os_hostname.as_ref().clone().or_else(
                                 || match get_hostname() {

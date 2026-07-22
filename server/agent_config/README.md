@@ -1472,6 +1472,33 @@ global:
 
 Disabled / Enabled the debug function of the deepflow-agent.
 
+#### Beacon Enabled {#global.self_monitoring.debug.beacon_enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.self_monitoring.debug.beacon_enabled`
+
+**Default value**:
+```yaml
+global:
+  self_monitoring:
+    debug:
+      beacon_enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether deepflow-agent periodically sends beacon packets.
+
 #### Local UDP Port {#global.self_monitoring.debug.local_udp_port}
 
 **Tags**:
