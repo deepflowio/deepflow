@@ -1472,6 +1472,36 @@ global:
 
 Disabled / Enabled the debug function of the deepflow-agent.
 
+#### Beacon Enabled {#global.self_monitoring.debug.beacon_enabled}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`global.self_monitoring.debug.beacon_enabled`
+
+**Default value**:
+```yaml
+global:
+  self_monitoring:
+    debug:
+      beacon_enabled: true
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Whether deepflow-agent periodically sends beacon packets to the configured Controller addresses.
+Each packet contains the Agent ID and hostname, and its UDP source address identifies the diagnostic endpoint.
+The `deepflow-agent-ctl list` command uses these packets to discover Agents available for diagnostics.
+Disabling this option only stops proactive discovery; set `global.self_monitoring.debug.enabled` to `false` to disable diagnostics.
+
 #### Local UDP Port {#global.self_monitoring.debug.local_udp_port}
 
 **Tags**:

@@ -1024,6 +1024,27 @@ global:
       #   ch: 禁用 / 启用 deepflow-agent 的诊断功能。
       # upgrade_from: debug_enabled
       enabled: true
+      # type: bool
+      # name:
+      #   en: Beacon Enabled
+      #   ch: 启用 Beacon
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Whether deepflow-agent periodically sends beacon packets to the configured Controller addresses.
+      #     Each packet contains the Agent ID and hostname, and its UDP source address identifies the diagnostic endpoint.
+      #     The `deepflow-agent-ctl list` command uses these packets to discover Agents available for diagnostics.
+      #     Disabling this option only stops proactive discovery; set `global.self_monitoring.debug.enabled` to `false` to disable diagnostics.
+      #   ch: |-
+      #     是否允许 deepflow-agent 向配置的 Controller 地址周期性发送 Beacon 报文。
+      #     每个报文包含 Agent ID 和主机名，其 UDP 源地址用于标识诊断端点。
+      #     `deepflow-agent-ctl list` 命令通过这些报文发现可供诊断的 Agent。
+      #     关闭此配置仅停止主动发现；如需关闭诊断功能，请将 `global.self_monitoring.debug.enabled` 设置为 `false`。
+      beacon_enabled: true
       # type: int
       # name:
       #   en: Local UDP Port

@@ -90,6 +90,100 @@ pub struct ConstructDebugCtx {
     pub policy_setter: PolicySetter,
 }
 
+#[derive(Clone)]
+struct DebugSockets {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    socket: Arc<UdpSocket>,
+    #[cfg(target_os = "windows")]
+    ipv4: Arc<UdpSocket>,
+    #[cfg(target_os = "windows")]
+    ipv6: Arc<UdpSocket>,
+}
+
+impl DebugSockets {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    fn bind(listen_port: u16) -> io::Result<Self> {
+        let ipv6_addr: SocketAddr = (IpAddr::from(Ipv6Addr::UNSPECIFIED), listen_port).into();
+        let socket = UdpSocket::bind(ipv6_addr).or_else(|_| {
+            let ipv4_addr: SocketAddr = (IpAddr::from(Ipv4Addr::UNSPECIFIED), listen_port).into();
+            UdpSocket::bind(ipv4_addr)
+        })?;
+        Ok(Self {
+            socket: Arc::new(socket),
+        })
+    }
+
+    #[cfg(target_os = "windows")]
+    fn bind(listen_port: u16) -> io::Result<Self> {
+        // [Issue #34202]: https://github.com/rust-lang/rust/issues/34202
+        // A socket cannot send to an address returned by ToSocketAddrs when their IP
+        // versions differ, so Windows needs separate IPv4 and IPv6 sockets.
+        let ipv4_addr: SocketAddr = (IpAddr::from(Ipv4Addr::UNSPECIFIED), listen_port).into();
+        let ipv6_addr: SocketAddr = (IpAddr::from(Ipv6Addr::UNSPECIFIED), listen_port).into();
+        Ok(Self {
+            ipv4: Arc::new(UdpSocket::bind(ipv4_addr)?),
+            ipv6: Arc::new(UdpSocket::bind(ipv6_addr)?),
+        })
+    }
+
+    fn set_timeouts(&self, timeout: Duration) {
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        Self::set_socket_timeouts(&self.socket, "", timeout);
+        #[cfg(target_os = "windows")]
+        {
+            Self::set_socket_timeouts(&self.ipv4, " ipv4", timeout);
+            Self::set_socket_timeouts(&self.ipv6, " ipv6", timeout);
+        }
+    }
+
+    fn set_socket_timeouts(socket: &UdpSocket, label: &str, timeout: Duration) {
+        if let Err(e) = socket.set_read_timeout(Some(timeout)) {
+            warn!("debugger{} set read timeout error: {:?}", label, e);
+        }
+        if let Err(e) = socket.set_write_timeout(Some(timeout)) {
+            warn!("debugger{} set write timeout error: {:?}", label, e);
+        }
+    }
+
+    fn local_addrs(&self) -> Vec<SocketAddr> {
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        return self.socket.local_addr().into_iter().collect();
+        #[cfg(target_os = "windows")]
+        return [self.ipv4.local_addr(), self.ipv6.local_addr()]
+            .into_iter()
+            .filter_map(Result::ok)
+            .collect();
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    fn receive_sockets(&self, _controller_ips: &[IpAddr]) -> Vec<Arc<UdpSocket>> {
+        vec![self.socket.clone()]
+    }
+
+    #[cfg(target_os = "windows")]
+    fn receive_sockets(&self, controller_ips: &[IpAddr]) -> Vec<Arc<UdpSocket>> {
+        let mut sockets = Vec::with_capacity(2);
+        if controller_ips.iter().any(IpAddr::is_ipv4) {
+            sockets.push(self.ipv4.clone());
+        }
+        if controller_ips.iter().any(IpAddr::is_ipv6) {
+            sockets.push(self.ipv6.clone());
+        }
+        sockets
+    }
+
+    fn send_to(&self, payload: &[u8], ip: IpAddr, port: u16) -> io::Result<usize> {
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        return self.socket.send_to(payload, (ip, port));
+        #[cfg(target_os = "windows")]
+        if ip.is_ipv4() {
+            self.ipv4.send_to(payload, (ip, port))
+        } else {
+            self.ipv6.send_to(payload, (ip, port))
+        }
+    }
+}
+
 impl Debugger {
     const TIMEOUT: Duration = Duration::from_millis(500);
 
@@ -103,335 +197,35 @@ impl Debugger {
         let conf = self.config.clone();
         let override_os_hostname = self.override_os_hostname.clone();
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
         let thread = thread::Builder::new()
             .name("debugger".to_owned())
             .spawn(move || {
-                let addr: SocketAddr =
-                    (IpAddr::from(Ipv6Addr::UNSPECIFIED), conf.load().listen_port).into();
-                let sock = match UdpSocket::bind(addr) {
-                    Ok(s) => Arc::new(s),
-                    Err(_) => {
-                        let ipv4_addr: SocketAddr =
-                            (IpAddr::from(Ipv4Addr::UNSPECIFIED), conf.load().listen_port).into();
-                        match UdpSocket::bind(ipv4_addr) {
-                            Ok(s) => Arc::new(s),
-                            Err(e) => {
-                                error!(
-                                    "failed to create debugger socket with addr={:?} error: {}",
-                                    ipv4_addr, e
-                                );
-                                return;
-                            }
-                        }
+                let sockets = match DebugSockets::bind(conf.load().listen_port) {
+                    Ok(sockets) => sockets,
+                    Err(e) => {
+                        error!("failed to create debugger socket: {}", e);
+                        return;
                     }
                 };
-                info!("debugger listening on: {:?}", sock.local_addr().unwrap());
-                if let Err(e) = sock.set_read_timeout(Some(Self::TIMEOUT)) {
-                    warn!("debugger set read timeout error: {:?}", e);
-                }
-                if let Err(e) = sock.set_write_timeout(Some(Self::TIMEOUT)) {
-                    warn!("debugger set write timeout error: {:?}", e);
-                }
-                let sock_clone = sock.clone();
-                let running_clone = running.clone();
+                info!("debugger listening on: {:?}", sockets.local_addrs());
+                sockets.set_timeouts(Self::TIMEOUT);
+
                 let serialize_conf = config::standard();
                 #[cfg(target_os = "linux")]
                 let agent_mode = conf.load().agent_mode;
-                let beacon_port = conf.load().controller_port;
-                let beacon_thread = thread::Builder::new()
-                    .name("debugger-beacon".to_owned())
-                    .spawn(move || {
-                        let interval_counter_max =
-                            BEACON_INTERVAL.as_secs() / BEACON_INTERVAL_MIN.as_secs();
-                        let mut interval_counter = 0;
-                        while running_clone.load(Ordering::Relaxed) {
-                            thread::sleep(BEACON_INTERVAL_MIN);
-                            interval_counter += 1;
-                            if interval_counter < interval_counter_max {
-                                continue;
-                            }
-                            interval_counter = 0;
-
-                            let Some(hostname) = override_os_hostname.as_ref().clone().or_else(
-                                || match get_hostname() {
-                                    Ok(hostname) => Some(hostname),
-                                    Err(e) => {
-                                        warn!("get hostname failed: {}", e);
-                                        None
-                                    }
-                                },
-                            ) else {
-                                continue;
-                            };
-
-                            let beacon = Beacon {
-                                agent_id: conf.load().agent_id,
-                                hostname,
-                            };
-
-                            let serialized_beacon = match encode_to_vec(beacon, serialize_conf) {
-                                Ok(v) => v,
-                                Err(_) => continue,
-                            };
-                            for &ip in conf.load().controller_ips.iter() {
-                                if let Err(e) = sock_clone.send_to(
-                                    [
-                                        DEEPFLOW_AGENT_BEACON.as_bytes(),
-                                        serialized_beacon.as_slice(),
-                                    ]
-                                    .concat()
-                                    .as_slice(),
-                                    (ip, beacon_port),
-                                ) {
-                                    warn!("write beacon to client error: {}", e);
-                                }
-                            }
-                        }
-                    })
-                    .unwrap();
+                let receive_sockets = sockets.receive_sockets(&conf.load().controller_ips);
+                let beacon_thread =
+                    Self::spawn_beacon_thread(running.clone(), conf, override_os_hostname, sockets);
 
                 while running.load(Ordering::Relaxed) {
-                    let mut buf = [0u8; MAX_BUF_SIZE];
-                    let mut addr = None;
-                    match sock.recv_from(&mut buf) {
-                        Ok((n, a)) => {
-                            if n == 0 {
-                                continue;
-                            }
-                            if addr.is_none() {
-                                addr.replace(a);
-                            }
-                            Self::dispatch(
-                                (&sock, addr.unwrap()),
-                                &buf,
-                                &debuggers,
-                                serialize_conf,
-                                #[cfg(target_os = "linux")]
-                                agent_mode,
-                            )
-                            .unwrap_or_else(|e| warn!("handle client request error: {}", e));
-                        }
-                        Err(e) => {
-                            match e.kind() {
-                                ErrorKind::WouldBlock => {}
-                                _ => {
-                                    warn!(
-                                        "receive udp packet error: kind=({:?}) detail={}",
-                                        e.kind(),
-                                        e
-                                    );
-                                }
-                            }
-                            continue;
-                        }
-                    }
-                }
-                let _ = beacon_thread.join();
-            })
-            .unwrap();
-
-        #[cfg(target_os = "windows")]
-        let thread = thread::Builder::new()
-            .name("debugger".to_owned())
-            .spawn(move || {
-                let (mut has_ipv4, mut has_ipv6) = (false, false);
-                for &ip in conf.load().controller_ips.iter() {
-                    if ip.is_ipv4() {
-                        has_ipv4 = true;
-                    } else if ip.is_ipv6() {
-                        has_ipv6 = true;
-                    }
-                }
-
-                // [Issue #34202]: https://github.com/rust-lang/rust/issues/34202
-                // This will return an error when the IP version of the local socket does not match that returned from [`ToSocketAddrs`]
-                // So it needs to bind to ipv4 addr's socket and ipv6 addr's socket on Windows
-                let addr_v4: SocketAddr =
-                    (IpAddr::from(Ipv4Addr::UNSPECIFIED), conf.load().listen_port).into();
-                let addr_v6: SocketAddr =
-                    (IpAddr::from(Ipv6Addr::UNSPECIFIED), conf.load().listen_port).into();
-                let sock_v4 = match UdpSocket::bind(addr_v4) {
-                    Ok(s) => Arc::new(s),
-                    Err(e) => {
-                        error!(
-                            "failed to create debugger socket with addr_v4={:?} error: {}",
-                            addr_v4, e
+                    for socket in receive_sockets.iter() {
+                        Self::receive_and_dispatch(
+                            socket,
+                            &debuggers,
+                            serialize_conf,
+                            #[cfg(target_os = "linux")]
+                            agent_mode,
                         );
-                        return;
-                    }
-                };
-
-                let sock_v6 = match UdpSocket::bind(addr_v6) {
-                    Ok(s) => Arc::new(s),
-                    Err(e) => {
-                        error!(
-                            "failed to create debugger socket with addr_v6={:?} error: {}",
-                            addr_v6, e
-                        );
-                        return;
-                    }
-                };
-                info!(
-                    "debugger listening on: {:?} and {:?}",
-                    sock_v4.local_addr().unwrap(),
-                    sock_v6.local_addr().unwrap()
-                );
-                if let Err(e) = sock_v4.set_read_timeout(Some(Self::TIMEOUT)) {
-                    warn!("debugger ipv4 set read timeout error: {:?}", e);
-                }
-                if let Err(e) = sock_v4.set_write_timeout(Some(Self::TIMEOUT)) {
-                    warn!("debugger ipv4 set write timeout error: {:?}", e);
-                }
-                if let Err(e) = sock_v6.set_read_timeout(Some(Self::TIMEOUT)) {
-                    warn!("debugger ipv6 set read timeout error: {:?}", e);
-                }
-                if let Err(e) = sock_v6.set_write_timeout(Some(Self::TIMEOUT)) {
-                    warn!("debugger ipv6 set write timeout error: {:?}", e);
-                }
-                let sock_v4_clone = sock_v4.clone();
-                let sock_v6_clone = sock_v6.clone();
-                let running_clone = running.clone();
-                let serialize_conf = config::standard();
-                let beacon_port = conf.load().controller_port;
-                let beacon_thread = thread::Builder::new()
-                    .name("debugger-beacon".to_owned())
-                    .spawn(move || {
-                        let interval_counter_max =
-                            BEACON_INTERVAL.as_secs() / BEACON_INTERVAL_MIN.as_secs();
-                        let mut interval_counter = 0;
-                        while running_clone.load(Ordering::Relaxed) {
-                            thread::sleep(BEACON_INTERVAL_MIN);
-                            interval_counter += 1;
-                            if interval_counter < interval_counter_max {
-                                continue;
-                            }
-                            interval_counter = 0;
-
-                            let Some(hostname) = override_os_hostname.as_ref().clone().or_else(
-                                || match get_hostname() {
-                                    Ok(hostname) => Some(hostname),
-                                    Err(e) => {
-                                        warn!("get hostname failed: {}", e);
-                                        None
-                                    }
-                                },
-                            ) else {
-                                continue;
-                            };
-
-                            let beacon = Beacon {
-                                agent_id: conf.load().agent_id,
-                                hostname,
-                            };
-
-                            let serialized_beacon = match encode_to_vec(beacon, serialize_conf) {
-                                Ok(v) => v,
-                                Err(_) => continue,
-                            };
-                            for &ip in conf.load().controller_ips.iter() {
-                                if has_ipv4 {
-                                    if let Err(e) = sock_v4_clone.send_to(
-                                        [
-                                            DEEPFLOW_AGENT_BEACON.as_bytes(),
-                                            serialized_beacon.as_slice(),
-                                        ]
-                                        .concat()
-                                        .as_slice(),
-                                        (ip, beacon_port),
-                                    ) {
-                                        warn!("write beacon to client error: {}", e);
-                                    }
-                                } else if has_ipv6 {
-                                    if let Err(e) = sock_v6_clone.send_to(
-                                        [
-                                            DEEPFLOW_AGENT_BEACON.as_bytes(),
-                                            serialized_beacon.as_slice(),
-                                        ]
-                                        .concat()
-                                        .as_slice(),
-                                        (ip, beacon_port),
-                                    ) {
-                                        warn!("write beacon to client error: {}", e);
-                                    }
-                                }
-                            }
-                        }
-                    })
-                    .unwrap();
-
-                while running.load(Ordering::Relaxed) {
-                    if has_ipv4 {
-                        let mut buf_v4 = [0u8; MAX_BUF_SIZE];
-                        let mut addr_v4 = None;
-                        match sock_v4.recv_from(&mut buf_v4) {
-                            Ok((n, a)) => {
-                                if n == 0 {
-                                    continue;
-                                }
-                                if addr_v4.is_none() {
-                                    addr_v4.replace(a);
-                                }
-                                Self::dispatch(
-                                    (&sock_v4, addr_v4.unwrap()),
-                                    &buf_v4,
-                                    &debuggers,
-                                    serialize_conf,
-                                )
-                                .unwrap_or_else(|e| warn!("handle client request error: {}", e));
-                            }
-                            Err(e) => {
-                                match e.kind() {
-                                    ErrorKind::ConnectionReset => {} // It's a bug of Windows, https://stackoverflow.com/questions/34242622/windows-udp-sockets-recvfrom-fails-with-error-10054
-                                    ErrorKind::WouldBlock => {}
-                                    ErrorKind::TimedOut => {}
-                                    _ => {
-                                        warn!(
-                                            "receive udp packet error: kind=({:?}) detail={}",
-                                            e.kind(),
-                                            e
-                                        );
-                                    }
-                                }
-                                continue;
-                            }
-                        }
-                    }
-                    if has_ipv6 {
-                        let mut buf_v6 = [0u8; MAX_BUF_SIZE];
-                        let mut addr_v6 = None;
-                        match sock_v6.recv_from(&mut buf_v6) {
-                            Ok((n, a)) => {
-                                if n == 0 {
-                                    continue;
-                                }
-                                if addr_v6.is_none() {
-                                    addr_v6.replace(a);
-                                }
-                                Self::dispatch(
-                                    (&sock_v6, addr_v6.unwrap()),
-                                    &buf_v6,
-                                    &debuggers,
-                                    serialize_conf,
-                                )
-                                .unwrap_or_else(|e| warn!("handle client request error: {}", e));
-                            }
-                            Err(e) => {
-                                match e.kind() {
-                                    ErrorKind::ConnectionReset => {} // It's a bug of Windows, https://stackoverflow.com/questions/34242622/windows-udp-sockets-recvfrom-fails-with-error-10054
-                                    ErrorKind::WouldBlock => {}
-                                    ErrorKind::TimedOut => {}
-                                    _ => {
-                                        warn!(
-                                            "receive udp packet error: kind=({:?}) detail={}",
-                                            e.kind(),
-                                            e
-                                        );
-                                    }
-                                }
-                                continue;
-                            }
-                        }
                     }
                 }
                 let _ = beacon_thread.join();
@@ -439,6 +233,109 @@ impl Debugger {
             .unwrap();
         self.thread.lock().unwrap().replace(thread);
         info!("debugger started");
+    }
+
+    fn spawn_beacon_thread(
+        running: Arc<AtomicBool>,
+        conf: DebugAccess,
+        override_os_hostname: Arc<Option<String>>,
+        sockets: DebugSockets,
+    ) -> JoinHandle<()> {
+        thread::Builder::new()
+            .name("debugger-beacon".to_owned())
+            .spawn(move || {
+                let interval_counter_max =
+                    BEACON_INTERVAL.as_secs() / BEACON_INTERVAL_MIN.as_secs();
+                let mut interval_counter = 0;
+                let serialize_conf = config::standard();
+                while running.load(Ordering::Relaxed) {
+                    thread::sleep(BEACON_INTERVAL_MIN);
+                    interval_counter += 1;
+                    if interval_counter < interval_counter_max {
+                        continue;
+                    }
+                    interval_counter = 0;
+
+                    let (agent_id, controller_ips, controller_port) = {
+                        let conf = conf.load();
+                        if !conf.beacon_enabled {
+                            continue;
+                        }
+                        (
+                            conf.agent_id,
+                            conf.controller_ips.clone(),
+                            conf.controller_port,
+                        )
+                    };
+                    let Some(hostname) =
+                        override_os_hostname
+                            .as_ref()
+                            .clone()
+                            .or_else(|| match get_hostname() {
+                                Ok(hostname) => Some(hostname),
+                                Err(e) => {
+                                    warn!("get hostname failed: {}", e);
+                                    None
+                                }
+                            })
+                    else {
+                        continue;
+                    };
+                    let beacon = Beacon { agent_id, hostname };
+                    let serialized_beacon = match encode_to_vec(beacon, serialize_conf) {
+                        Ok(v) => v,
+                        Err(_) => continue,
+                    };
+                    let payload = [
+                        DEEPFLOW_AGENT_BEACON.as_bytes(),
+                        serialized_beacon.as_slice(),
+                    ]
+                    .concat();
+                    for ip in controller_ips {
+                        if let Err(e) = sockets.send_to(&payload, ip, controller_port) {
+                            warn!("write beacon to client error: {}", e);
+                        }
+                    }
+                }
+            })
+            .unwrap()
+    }
+
+    fn receive_and_dispatch(
+        socket: &Arc<UdpSocket>,
+        debuggers: &ModuleDebuggers,
+        serialize_conf: Configuration,
+        #[cfg(target_os = "linux")] agent_mode: crate::trident::RunningMode,
+    ) {
+        let mut buf = [0u8; MAX_BUF_SIZE];
+        match socket.recv_from(&mut buf) {
+            Ok((0, _)) => {}
+            Ok((_, addr)) => Self::dispatch(
+                (socket, addr),
+                &buf,
+                debuggers,
+                serialize_conf,
+                #[cfg(target_os = "linux")]
+                agent_mode,
+            )
+            .unwrap_or_else(|e| warn!("handle client request error: {}", e)),
+            Err(e) => {
+                if e.kind() == ErrorKind::WouldBlock {
+                    return;
+                }
+                #[cfg(target_os = "windows")]
+                // Windows may report WSAECONNRESET after receiving an ICMP port-unreachable
+                // response for an earlier UDP packet.
+                if matches!(e.kind(), ErrorKind::ConnectionReset | ErrorKind::TimedOut) {
+                    return;
+                }
+                warn!(
+                    "receive udp packet error: kind=({:?}) detail={}",
+                    e.kind(),
+                    e
+                );
+            }
+        }
     }
 
     fn dispatch(
