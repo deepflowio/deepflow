@@ -1473,7 +1473,10 @@ global:
 
 **详细描述**:
 
-是否允许 deepflow-agent 周期性发送 Beacon 报文。
+是否允许 deepflow-agent 向配置的 Controller 地址周期性发送 Beacon 报文。
+每个报文包含 Agent ID 和主机名，其 UDP 源地址用于标识诊断端点。
+`deepflow-agent-ctl list` 命令通过这些报文发现可供诊断的 Agent。
+关闭此配置仅停止主动发现；如需关闭诊断功能，请将 `global.self_monitoring.debug.enabled` 设置为 `false`。
 
 #### 本地 UDP 端口号 {#global.self_monitoring.debug.local_udp_port}
 
