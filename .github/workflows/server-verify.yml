@@ -48,6 +48,9 @@ jobs:
           go fmt ./...
           git diff
           go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
+
+          mkdir -p $(go env GOPATH)/src/github.com/gogo
+          ln -sf $(go env GOMODCACHE)/github.com/gogo/protobuf@v1.3.2 $(go env GOPATH)/src/github.com/gogo/protobuf
           make
           cd querier/engine/clickhouse
           go test

@@ -1,5 +1,7 @@
 MESSAGE = github.com/deepflowio/deepflow/message
+MSG = ../message/
 LIBS = github.com/deepflowio/deepflow/server/libs
+SERVER_LIBS = ../server/libs
 SERVER = github.com/deepflowio/deepflow/server
 REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
@@ -14,18 +16,21 @@ BINARY_SUFFIX :=
 all: cli
 
 vendor:
+	cp ${MSG}/metric.proto ${SERVER_LIBS}/zerodoc/pb
+	cp ${MSG}/flow_log.proto ${SERVER_LIBS}/datatype/pb
+	cp ${MSG}/stats.proto ${SERVER_LIBS}/stats/pb
+	sed -i '6,10s/^...//' ${SERVER_LIBS}/zerodoc/pb/metric.proto
+	sed -i '6,10s/^...//' ${SERVER_LIBS}/datatype/pb/flow_log.proto
+	sed -i '6,10s/^...//' ${SERVER_LIBS}/stats/pb/stats.proto
+	cd ${MSG} && go generate ./...
+	cd ${SERVER_LIBS}/ && go generate ./...
 	go mod tidy && go mod download && go mod vendor
-	cp -r ../message/* vendor/${MESSAGE}/
-	cp -r ../server/go.* vendor/${SERVER}/
-	find vendor -type d -exec chmod +w {} \;
-	cp vendor/${MESSAGE}/metric.proto vendor/${LIBS}/zerodoc/pb
-	cp vendor/${MESSAGE}/flow_log.proto vendor/${LIBS}/datatype/pb
-	cp vendor/${MESSAGE}/stats.proto vendor/${LIBS}/stats/pb
+	cp ${MSG}/metric.proto vendor/${LIBS}/zerodoc/pb
+	cp ${MSG}/flow_log.proto vendor/${LIBS}/datatype/pb
+	cp ${MSG}/stats.proto vendor/${LIBS}/stats/pb
 	sed -i '6,10s/^...//' vendor/${LIBS}/zerodoc/pb/metric.proto
 	sed -i '6,10s/^...//' vendor/${LIBS}/datatype/pb/flow_log.proto
 	sed -i '6,10s/^...//' vendor/${LIBS}/stats/pb/stats.proto
-	cd vendor/${MESSAGE} && go generate ./...
-	cd vendor/${LIBS} && go generate ./...
 
 .PHONY: cli
 cli: vendor
