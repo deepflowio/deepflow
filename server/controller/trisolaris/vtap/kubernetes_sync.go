@@ -198,7 +198,8 @@ func (k *KubernetesCluster) loadAndCheck(clearTime int) {
 // 查询内存中的kubernetes_cluster_id字典
 // - 如果内存中没有查到对应的cluster_id
 //   - 往数据库插入一条数据，无相关cluster_id数据则插入,有则不做操作(MySQL INSERT IGNORE)
-//     - 根据cluster_id查询最近一条数据，将查到的cluster_id与ctrl_ip + ctrl_mac的对应关系添加到内存中
+//   - 根据cluster_id查询最近一条数据，将查到的cluster_id与ctrl_ip + ctrl_mac的对应关系添加到内存中
+//
 // - 根据内存查到的对应关系，决定kubernetes_cluster_id的下发值
 func (k *KubernetesCluster) getClusterID(clusterID string, value string) string {
 	result := k.getValue(clusterID)

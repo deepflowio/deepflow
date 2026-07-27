@@ -38,11 +38,13 @@ jobs:
           go install github.com/gogo/protobuf/protoc-gen-gogo
           go install github.com/gogo/protobuf/gogoproto
           go install github.com/golang/protobuf/protoc-gen-go
-          go install golang.org/x/tools/cmd/stringer
+          go install golang.org/x/tools/cmd/stringer@latest
 
-          cd cli
           go mod tidy
           go fmt ./...
           git diff
           go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
+
+          mkdir -p $(go env GOPATH)/src/github.com/gogo
+          ln -sf $(go env GOMODCACHE)/github.com/gogo/protobuf@v1.3.2 $(go env GOPATH)/src/github.com/gogo/protobuf
           make
