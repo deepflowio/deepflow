@@ -33,7 +33,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@master
         with:
-          go-version: 1.18.x
+          go-version: 1.25.x
 
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
@@ -45,13 +45,14 @@ jobs:
         run: |
           sudo apt-get install tmpl
           pip install ujson
-          GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gofast
-          GO111MODULE="off" go get github.com/gogo/protobuf/proto
-          GO111MODULE="off" go get github.com/gogo/protobuf/jsonpb
-          GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gogo
-          GO111MODULE="off" go get github.com/gogo/protobuf/gogoproto
-          GO111MODULE="off" go get github.com/golang/protobuf/protoc-gen-go
-          GO111MODULE="off" go get golang.org/x/tools/cmd/stringer
+          cd cli
+          go install github.com/gogo/protobuf/protoc-gen-gofast
+          go install github.com/gogo/protobuf/proto
+          go install github.com/gogo/protobuf/jsonpb
+          go install github.com/gogo/protobuf/protoc-gen-gogo
+          go install github.com/gogo/protobuf/gogoproto
+          go install github.com/golang/protobuf/protoc-gen-go
+          go install golang.org/x/tools/cmd/stringer
 
           cd cli
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make -e BINARY_SUFFIX=.linux-amd64 -e BRANCH=${{ github.ref_name }}
