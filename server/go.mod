@@ -1,8 +1,6 @@
 module github.com/deepflowio/deepflow/server
 
-go 1.24.0
-
-toolchain go1.24.4
+go 1.25.0
 
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.103.0
@@ -76,7 +74,7 @@ require (
 	github.com/mark3labs/mcp-go v0.32.0
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
-	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
+	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
 	github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
 	github.com/pebbe/zmq4 v1.2.9
 	github.com/pkg/errors v0.9.1
@@ -296,9 +294,9 @@ require (
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20231121144256-b99613f794b6 // indirect
 	golang.org/x/crypto v0.42.0
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.17.0
+	golang.org/x/sync v0.21.0
 	golang.org/x/term v0.35.0 // indirect
-	golang.org/x/text v0.29.0 // indirect
+	golang.org/x/text v0.39.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	google.golang.org/protobuf v1.36.5
 	gopkg.in/inf.v0 v0.9.1 // indirect
