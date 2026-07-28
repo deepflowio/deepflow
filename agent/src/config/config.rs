@@ -609,7 +609,7 @@ impl Default for Proc {
             enabled: true,
             proc_dir_path: "/proc".to_string(),
             socket_info_sync_interval: Duration::from_secs(0),
-            process_gpid_sync_interval: Duration::from_secs(10),
+            process_gpid_sync_interval: Duration::ZERO,
             min_lifetime: Duration::from_secs(3),
             tag_extraction: TagExtraction::default(),
             process_blacklist: vec![
