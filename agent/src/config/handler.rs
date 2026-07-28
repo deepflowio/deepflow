@@ -1238,6 +1238,7 @@ impl LogParserConfig {
 pub struct DebugConfig {
     pub agent_id: u16,
     pub enabled: bool,
+    pub beacon_enabled: bool,
     pub controller_ips: Vec<IpAddr>,
     pub controller_port: u16,
     pub listen_port: u16,
@@ -2328,6 +2329,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
             debug: DebugConfig {
                 agent_id: conf.global.common.agent_id as u16,
                 enabled: conf.global.self_monitoring.debug.enabled,
+                beacon_enabled: conf.global.self_monitoring.debug.beacon_enabled,
                 controller_ips: static_config
                     .controller_ips
                     .iter()
@@ -4339,6 +4341,13 @@ impl ConfigHandler {
             );
             debug.enabled = debug.enabled;
         }
+        if debug.beacon_enabled != new_debug.beacon_enabled {
+            info!(
+                "Update global.self_monitoring.debug.beacon_enabled from {:?} to {:?}.",
+                debug.beacon_enabled, new_debug.beacon_enabled
+            );
+            debug.beacon_enabled = new_debug.beacon_enabled;
+        }
         update_fields_with_restart_reason!(
             restart_agent,
             !first_run,
@@ -5792,6 +5801,19 @@ mod tests {
                 "missing CAP_NET_ADMIN",
             ))
         });
+    }
+
+    #[test]
+    fn map_beacon_enabled_to_debug_config() {
+        let mut user_config = UserConfig::default();
+        user_config.global.self_monitoring.debug.beacon_enabled = false;
+        let static_config = Config {
+            controller_ips: vec!["127.0.0.1".to_string()],
+            ..Default::default()
+        };
+
+        let module_config = ModuleConfig::try_from((static_config, user_config)).unwrap();
+        assert!(!module_config.debug.beacon_enabled);
     }
 
     #[test]

@@ -2464,14 +2464,16 @@ pub struct Profile {
 #[serde(default)]
 pub struct Debug {
     pub enabled: bool,
+    pub beacon_enabled: bool,
     pub local_udp_port: u16,
 }
 
 impl Default for Debug {
     fn default() -> Self {
         Self {
-            local_udp_port: 0,
             enabled: true,
+            beacon_enabled: true,
+            local_udp_port: 0,
         }
     }
 }
@@ -3752,6 +3754,15 @@ mod tests {
         assert_eq!(parsed_config.plugins, defaults.plugins);
         assert_eq!(parsed_config.dev, defaults.dev);
         assert_eq!(parsed_config, defaults);
+    }
+
+    #[test]
+    fn parse_beacon_enabled() {
+        let default_debug: Debug = serde_yaml::from_str("{}").unwrap();
+        assert!(default_debug.beacon_enabled);
+
+        let disabled_debug: Debug = serde_yaml::from_str("beacon_enabled: false").unwrap();
+        assert!(!disabled_debug.beacon_enabled);
     }
 
     #[test]
