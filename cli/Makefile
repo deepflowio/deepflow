@@ -17,6 +17,11 @@ vendor:
 	go mod tidy && go mod download && go mod vendor
 	cp -r ../message/* vendor/${MESSAGE}/
 	cp -r ../server/go.* vendor/${SERVER}/
+	for d in vendor/${MESSAGE}/*/; do \
+		pkg="${MESSAGE}/$$(basename $$d)"; \
+		grep -qxF "$$pkg" vendor/modules.txt 2>/dev/null || \
+			sed -i "\|^# ${MESSAGE} |a $$pkg" vendor/modules.txt; \
+	done
 	find vendor -type d -exec chmod +w {} \;
 	cp vendor/${MESSAGE}/metric.proto vendor/${LIBS}/zerodoc/pb
 	cp vendor/${MESSAGE}/flow_log.proto vendor/${LIBS}/datatype/pb
