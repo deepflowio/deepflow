@@ -1733,6 +1733,35 @@ Note: When enabling this feature, the specific process list must also be specifi
 i.e., `proc.socket_list` must be included in `inputs.proc.process_matcher.[*].enabled_features`.
 Additionally, ensure `inputs.proc.enabled` is configured to **true**.
 
+### Process GPID Synchronization Interval {#inputs.proc.process_gpid_sync_interval}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.proc.process_gpid_sync_interval`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    process_gpid_sync_interval: 0ns
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['0ns', '1h'] |
+
+**Description**:
+
+Synchronization interval for the process GPID mapping table.
+
+'0ns' means disabled. Do not configure a value less than `1s` except for `0ns`.
+
 ### Minimal Lifetime {#inputs.proc.min_lifetime}
 
 **Tags**:
