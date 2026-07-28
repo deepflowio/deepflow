@@ -1247,7 +1247,7 @@ inputs:
     #     进程 GPID 映射表的同步周期。
     #
     #     '0ns' 表示不开启，除 '0ns' 外不要配置小于 `1s` 的值。
-    process_gpid_sync_interval: 10s
+    process_gpid_sync_interval: 0ns
     # type: duration
     # name:
     #   en: Minimal Lifetime

@@ -1735,6 +1735,35 @@ inputs:
 即 `inputs.proc.process_matcher.[*].enabled_features` 中需要包含 `proc.socket_list`。
 另外，也要注意确认 `inputs.proc.enabled` 已配置为 **true**。
 
+### 进程 GPID 同步间隔 {#inputs.proc.process_gpid_sync_interval}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.proc.process_gpid_sync_interval`
+
+**默认值**:
+```yaml
+inputs:
+  proc:
+    process_gpid_sync_interval: 0ns
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | duration |
+| Range | ['0ns', '1h'] |
+
+**详细描述**:
+
+进程 GPID 映射表的同步周期。
+
+'0ns' 表示不开启，除 '0ns' 外不要配置小于 `1s` 的值。
+
 ### 最小活跃时间 {#inputs.proc.min_lifetime}
 
 **标签**:
