@@ -10738,6 +10738,33 @@ outputs:
 
 这个配置默认会或上0b1000_0000，所以不能配置为 0b1000_0000。
 
+### Underlay 网络是否携带 direction 标志 {#outputs.npb.underlay_direction_flags}
+
+**标签**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`outputs.npb.underlay_direction_flags`
+
+**默认值**:
+```yaml
+outputs:
+  npb:
+    underlay_direction_flags: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+开启后会隧道头中会携带方向字段。
+
 ### Overlay VLAN 头剥离 {#outputs.npb.overlay_vlan_header_trimming}
 
 **标签**:

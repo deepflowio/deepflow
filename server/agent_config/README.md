@@ -10981,6 +10981,33 @@ Attention: To ensure that the VNI bit is set, the value configured here will
 be used after |= 0b1000_0000. Therefore, this value cannot be directly
 configured as 0b1000_0000.
 
+### Underlay direction flags {#outputs.npb.underlay_direction_flags}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`outputs.npb.underlay_direction_flags`
+
+**Default value**:
+```yaml
+outputs:
+  npb:
+    underlay_direction_flags: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+After turning it on, the tunnel header will carry a direction field.
+
 ### Overlay VLAN Header Trimming {#outputs.npb.overlay_vlan_header_trimming}
 
 **Tags**:

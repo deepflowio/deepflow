@@ -101,6 +101,7 @@ impl NpbHandler {
         _mtu: usize,
         _pseudo_tunnel_header: [Vec<u8>; NpbTunnelType::Max as usize],
         _underlay_vlan_header_size: usize,
+        _underlay_direction_flags: bool,
         _overlay_vlan_mode: VlanMode,
         _ignore_overlay_vlan: bool,
         _bps_limit: Arc<LeakyBucket>,
