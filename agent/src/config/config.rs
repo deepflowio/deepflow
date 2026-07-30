@@ -1043,8 +1043,65 @@ impl Default for EbpfSocketTunning {
 pub struct EbpfSocket {
     pub uprobe: EbpfSocketUprobe,
     pub kprobe: EbpfSocketKprobe,
+    pub sock_ops: EbpfSocketSockOps,
     pub tunning: EbpfSocketTunning,
     pub preprocess: EbpfSocketPreprocess,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfSocketSockOps {
+    pub tcp_option_trace: EbpfTcpOptionTrace,
+}
+
+impl Default for EbpfSocketSockOps {
+    fn default() -> Self {
+        Self {
+            tcp_option_trace: EbpfTcpOptionTrace::default(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct EbpfTcpOptionTrace {
+    pub enabled: bool,
+    pub version: TcpOptionTraceVersion,
+    pub sampling_window_bytes: u32,
+}
+
+impl Default for EbpfTcpOptionTrace {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            version: TcpOptionTraceVersion::default(),
+            sampling_window_bytes: 16 * 1024,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u32)]
+pub enum TcpOptionTraceVersion {
+    V1 = 1,
+    #[default]
+    V2 = 2,
+}
+
+impl<'de> Deserialize<'de> for TcpOptionTraceVersion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match u8::deserialize(deserializer)? {
+            1 => Ok(Self::V1),
+            2 => Ok(Self::V2),
+            other => Err(de::Error::invalid_value(
+                Unexpected::Unsigned(other as u64),
+                &"1 or 2",
+            )),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -3745,6 +3802,29 @@ mod tests {
         for interval in ["1ns", "999ms", "3601s"] {
             let yaml = format!("process_gpid_sync_interval: {interval}");
             assert!(serde_yaml::from_str::<Proc>(&yaml).is_err(), "{interval}");
+        }
+    }
+
+    #[test]
+    fn validate_tcp_option_trace_version() {
+        let default = serde_yaml::from_str::<EbpfTcpOptionTrace>("{}").unwrap();
+        assert_eq!(default.version, TcpOptionTraceVersion::V2);
+
+        for (version, expected) in [
+            (1, TcpOptionTraceVersion::V1),
+            (2, TcpOptionTraceVersion::V2),
+        ] {
+            let yaml = format!("version: {version}");
+            assert_eq!(
+                serde_yaml::from_str::<EbpfTcpOptionTrace>(&yaml)
+                    .unwrap()
+                    .version,
+                expected
+            );
+        }
+        for version in [0, 3] {
+            let yaml = format!("version: {version}");
+            assert!(serde_yaml::from_str::<EbpfTcpOptionTrace>(&yaml).is_err());
         }
     }
 

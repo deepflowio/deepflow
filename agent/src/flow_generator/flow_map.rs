@@ -2941,7 +2941,7 @@ mod tests {
         // direction correction makes the server the flow's destination peer.
         let mut packet = _new_meta_packet();
         packet.signal_source = SignalSource::Packet;
-        packet.trace_info = Some(TraceInfo {
+        packet.trace_info = Some(TraceInfo::V2 {
             agent_id: SERVER_AGENT_ID,
             pid: SERVER_PID,
         });
@@ -2968,7 +2968,7 @@ mod tests {
 
         let mut client_packet = packet.clone();
         client_packet.lookup_key.direction = PacketDirection::ClientToServer;
-        client_packet.trace_info = Some(TraceInfo {
+        client_packet.trace_info = Some(TraceInfo::V2 {
             agent_id: CLIENT_AGENT_ID,
             pid: CLIENT_PID,
         });
@@ -2983,7 +2983,7 @@ mod tests {
         );
 
         // Do not overwrite a GPID already set on the packet's source peer.
-        client_packet.trace_info = Some(TraceInfo {
+        client_packet.trace_info = Some(TraceInfo::V2 {
             agent_id: SERVER_AGENT_ID,
             pid: SERVER_PID,
         });
@@ -2993,7 +2993,7 @@ mod tests {
             CLIENT_GPID
         );
 
-        let mut ebpf_packet = client_packet;
+        let mut ebpf_packet = client_packet.clone();
         ebpf_packet.signal_source = SignalSource::EBPF;
         let mut ebpf_node = FlowNode::default();
         flow_map.lookup_process_gpid(&ebpf_packet, &mut ebpf_node);
@@ -3003,6 +3003,17 @@ mod tests {
         );
         assert_eq!(
             ebpf_node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].gpid,
+            0
+        );
+        let mut v1_packet = client_packet;
+        v1_packet.trace_info = Some(TraceInfo::V1 {
+            pid: CLIENT_PID,
+            source_ip: Ipv4Addr::LOCALHOST,
+        });
+        let mut v1_node = FlowNode::default();
+        flow_map.lookup_process_gpid(&v1_packet, &mut v1_node);
+        assert_eq!(
+            v1_node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid,
             0
         );
     }
