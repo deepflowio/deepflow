@@ -298,7 +298,10 @@ impl StateMachine {
 
         // for FlowState::Closed
         let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Closed, false));
-        m[FlowState::Closed as usize][TcpFlags::ACK.bits() as usize] = Some(s);
+        m[FlowState::Closed as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Closed as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::Closed as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Closed as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
 
         // for FlowState::Reset
         let s = Rc::new(StateValue::new(t.exception, FlowState::Reset, false));
@@ -624,7 +627,10 @@ impl StateMachine {
 
         // for FlowState::Closed
         let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Closed, false));
-        m[FlowState::Closed as usize][TcpFlags::ACK.bits() as usize] = Some(s);
+        m[FlowState::Closed as usize][TcpFlags::ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Closed as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
+        m[FlowState::Closed as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
+        m[FlowState::Closed as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
 
         // for FlowState::Reset
 

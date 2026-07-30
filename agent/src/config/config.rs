@@ -2785,7 +2785,7 @@ impl Default for Npb {
             target_port: 4789,
             custom_vxlan_flags: 0b1111_1111,
             overlay_vlan_header_trimming: false,
-            underlay_direction_flags: false,
+            underlay_direction_flags: true,
             max_tx_throughput: 1000 << 20,
         }
     }
