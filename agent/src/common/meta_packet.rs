@@ -184,10 +184,19 @@ pub struct SubPacket {
     tcp_seq: u32,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct TraceInfo {
-    pub pid: u32,
-    pub agent_id: u32,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TraceInfo {
+    V1 { pid: u32, source_ip: Ipv4Addr },
+    V2 { pid: u32, agent_id: u32 },
+}
+
+impl Default for TraceInfo {
+    fn default() -> Self {
+        Self::V2 {
+            pid: 0,
+            agent_id: 0,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -456,15 +465,24 @@ impl<'a> MetaPacket<'a> {
                     offset += assume_length;
                 }
                 TcpOptionNumber(TCP_OPT_TRACING) => {
-                    if assume_length == TCP_TOT_LEN
-                        && offset + TCP_TOT_LEN <= payload_offset
-                        && read_u16_be(&packet[offset + TCP_TOT_MAGIC_OFFSET..]) == TCP_TOT_MAGIC
-                        && self.trace_info.is_none()
-                    {
-                        self.trace_info = Some(TraceInfo {
-                            pid: read_u32_be(&packet[offset + TCP_TOT_PID_OFFSET..]),
-                            agent_id: read_u32_be(&packet[offset + TCP_TOT_AGENT_ID_OFFSET..]),
-                        });
+                    if assume_length == TCP_TOT_LEN && offset + TCP_TOT_LEN <= payload_offset {
+                        let magic = read_u16_be(&packet[offset + TCP_TOT_MAGIC_OFFSET..]);
+                        let pid = read_u32_be(&packet[offset + TCP_TOT_PID_OFFSET..]);
+                        if magic == TCP_TOT_V2_MAGIC
+                            && !matches!(self.trace_info, Some(TraceInfo::V2 { .. }))
+                        {
+                            self.trace_info = Some(TraceInfo::V2 {
+                                pid,
+                                agent_id: read_u32_be(&packet[offset + TCP_TOT_AGENT_ID_OFFSET..]),
+                            });
+                        } else if magic == TCP_TOT_V1_MAGIC && self.trace_info.is_none() {
+                            self.trace_info = Some(TraceInfo::V1 {
+                                pid,
+                                source_ip: Ipv4Addr::from(read_u32_be(
+                                    &packet[offset + TCP_TOT_SOURCE_IP_OFFSET..],
+                                )),
+                            });
+                        }
                     }
                     offset += assume_length;
                 }
@@ -1524,6 +1542,16 @@ mod tests {
         meta_packet
     }
 
+    fn tcp_trace_option(magic: u16, pid: u32, metadata: u32) -> [u8; TCP_TOT_LEN] {
+        let mut option = [0; TCP_TOT_LEN];
+        option[0] = TCP_OPT_TRACING;
+        option[1] = TCP_TOT_LEN as u8;
+        option[2..4].copy_from_slice(&magic.to_be_bytes());
+        option[4..8].copy_from_slice(&pid.to_be_bytes());
+        option[8..12].copy_from_slice(&metadata.to_be_bytes());
+        option
+    }
+
     #[test]
     fn get_pkt_size() {
         let pkt = MetaPacket {
@@ -1571,7 +1599,7 @@ mod tests {
 
         assert_eq!(
             meta_packet.trace_info,
-            Some(TraceInfo {
+            Some(TraceInfo::V2 {
                 pid: 0x01234567,
                 agent_id: 0x89abcdef,
             })
@@ -1583,9 +1611,23 @@ mod tests {
     }
 
     #[test]
+    fn parse_v1_tcp_trace_option() {
+        let meta_packet =
+            parse_tcp_options(&tcp_trace_option(TCP_TOT_V1_MAGIC, 0x01234567, 0x0a000001));
+
+        assert_eq!(
+            meta_packet.trace_info,
+            Some(TraceInfo::V1 {
+                pid: 0x01234567,
+                source_ip: Ipv4Addr::new(10, 0, 0, 1),
+            })
+        );
+    }
+
+    #[test]
     fn ignore_invalid_tcp_trace_options() {
         let invalid_options = [
-            // v1 format
+            // Incorrect v1 length.
             vec![
                 TCP_OPT_TRACING,
                 16,
@@ -1631,40 +1673,30 @@ mod tests {
     }
 
     #[test]
-    fn keep_first_tcp_trace_option() {
+    fn prefer_v2_tcp_trace_option() {
+        let v1 = tcp_trace_option(TCP_TOT_V1_MAGIC, 1, 0x0a000001);
+        let v2 = tcp_trace_option(TCP_TOT_V2_MAGIC, 2, 3);
+
+        for options in [[v1, v2].concat(), [v2, v1].concat()] {
+            assert_eq!(
+                parse_tcp_options(&options).trace_info,
+                Some(TraceInfo::V2 {
+                    pid: 2,
+                    agent_id: 3,
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn keep_first_v2_tcp_trace_option() {
         let mut options = Vec::new();
-        options.extend_from_slice(&[
-            TCP_OPT_TRACING,
-            TCP_TOT_LEN as u8,
-            0xde,
-            0xea,
-            0,
-            0,
-            0,
-            1,
-            0,
-            0,
-            0,
-            2,
-        ]);
-        options.extend_from_slice(&[
-            TCP_OPT_TRACING,
-            TCP_TOT_LEN as u8,
-            0xde,
-            0xea,
-            0,
-            0,
-            0,
-            3,
-            0,
-            0,
-            0,
-            4,
-        ]);
+        options.extend_from_slice(&tcp_trace_option(TCP_TOT_V2_MAGIC, 1, 2));
+        options.extend_from_slice(&tcp_trace_option(TCP_TOT_V2_MAGIC, 3, 4));
 
         assert_eq!(
             parse_tcp_options(&options).trace_info,
-            Some(TraceInfo {
+            Some(TraceInfo::V2 {
                 pid: 1,
                 agent_id: 2,
             })

@@ -168,8 +168,9 @@ impl ProcessGpidLookup {
     }
 
     pub(crate) fn lookup(&mut self, trace_info: TraceInfo) -> u32 {
-        let agent_id = trace_info.agent_id;
-        let pid = trace_info.pid;
+        let TraceInfo::V2 { agent_id, pid } = trace_info else {
+            return 0;
+        };
         if agent_id == 0 || pid == 0 {
             return 0;
         }
@@ -496,7 +497,7 @@ mod tests {
         table.update(1, AHashMap::from_iter([(make_key(10, 20), 30)]));
         let stats = stats::Collector::new("", Arc::new(AtomicI64::new(0)));
         let mut lookup = table.new_lookup(1, &stats);
-        let trace_info = TraceInfo {
+        let trace_info = TraceInfo::V2 {
             agent_id: 10,
             pid: 20,
         };
@@ -519,7 +520,7 @@ mod tests {
         let table = ProcessGpidTable::default();
         let stats = stats::Collector::new("", Arc::new(AtomicI64::new(0)));
         let mut lookup = table.new_lookup(1, &stats);
-        let trace_info = TraceInfo {
+        let trace_info = TraceInfo::V2 {
             agent_id: 10,
             pid: 20,
         };
@@ -537,7 +538,7 @@ mod tests {
         table.update(7, AHashMap::from_iter([(make_key(10, 20), 30)]));
         let stats = stats::Collector::new("", Arc::new(AtomicI64::new(0)));
         let mut lookup = table.new_lookup(1, &stats);
-        let trace_info = TraceInfo {
+        let trace_info = TraceInfo::V2 {
             agent_id: 10,
             pid: 20,
         };

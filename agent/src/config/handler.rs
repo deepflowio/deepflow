@@ -3553,6 +3553,34 @@ impl ConfigHandler {
             ]
         );
 
+        let sock_ops = &mut ebpf.socket.sock_ops;
+        let new_sock_ops = &mut new_ebpf.socket.sock_ops;
+        if sock_ops.tcp_option_trace.enabled != new_sock_ops.tcp_option_trace.enabled {
+            info!(
+                "Update inputs.ebpf.socket.sock_ops.tcp_option_trace.enabled from {:?} to {:?}.",
+                sock_ops.tcp_option_trace.enabled, new_sock_ops.tcp_option_trace.enabled
+            );
+            sock_ops.tcp_option_trace.enabled = new_sock_ops.tcp_option_trace.enabled;
+        }
+        if sock_ops.tcp_option_trace.version != new_sock_ops.tcp_option_trace.version {
+            info!(
+                "Update inputs.ebpf.socket.sock_ops.tcp_option_trace.version from {:?} to {:?}.",
+                sock_ops.tcp_option_trace.version, new_sock_ops.tcp_option_trace.version
+            );
+            sock_ops.tcp_option_trace.version = new_sock_ops.tcp_option_trace.version;
+        }
+        if sock_ops.tcp_option_trace.sampling_window_bytes
+            != new_sock_ops.tcp_option_trace.sampling_window_bytes
+        {
+            info!(
+                "Update inputs.ebpf.socket.sock_ops.tcp_option_trace.sampling_window_bytes from {:?} to {:?}.",
+                sock_ops.tcp_option_trace.sampling_window_bytes,
+                new_sock_ops.tcp_option_trace.sampling_window_bytes
+            );
+            sock_ops.tcp_option_trace.sampling_window_bytes =
+                new_sock_ops.tcp_option_trace.sampling_window_bytes;
+        }
+
         let uprobe = &mut ebpf.socket.uprobe;
         let new_uprobe = &mut new_ebpf.socket.uprobe;
         update_fields_with_restart_reason!(

@@ -474,6 +474,8 @@ static enum bpf_prog_type get_prog_type(struct sec_desc *desc)
 		prog_type = BPF_PROG_TYPE_TRACING;
 	} else if (!memcmp(desc->name, "socket/", 7)) {
 		prog_type = BPF_PROG_TYPE_SOCKET_FILTER;
+	} else if (!strncmp(desc->name, "sockops", 7)) {
+		prog_type = BPF_PROG_TYPE_SOCK_OPS;
 	} else {
 		prog_type = BPF_PROG_TYPE_UNSPEC;
 	}

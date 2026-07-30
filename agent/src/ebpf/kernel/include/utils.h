@@ -22,7 +22,11 @@
 #ifndef DF_UTILS_H
 #define DF_UTILS_H
 
+#if defined(DF_BPF_NO_ARPA_INET)
+#include <linux/in.h>
+#else
 #include <arpa/inet.h>
+#endif
 #include "../../user/common_utils.h"
 
 #undef __inline

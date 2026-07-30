@@ -228,9 +228,11 @@ pub const TCP_TOA_IP_OFFSET: usize = 4;
 // YunShan https://github.com/deepflowio/tcp-option-tracing
 pub const TCP_OPT_TRACING: u8 = 253;
 pub const TCP_TOT_LEN: usize = 12;
-pub const TCP_TOT_MAGIC: u16 = 0xdeea;
+pub const TCP_TOT_V1_MAGIC: u16 = 0xdee9;
+pub const TCP_TOT_V2_MAGIC: u16 = 0xdeea;
 pub const TCP_TOT_MAGIC_OFFSET: usize = 2;
 pub const TCP_TOT_PID_OFFSET: usize = 4;
+pub const TCP_TOT_SOURCE_IP_OFFSET: usize = 8;
 pub const TCP_TOT_AGENT_ID_OFFSET: usize = 8;
 
 pub const VLAN_ID_MASK: u16 = 0xfff;
