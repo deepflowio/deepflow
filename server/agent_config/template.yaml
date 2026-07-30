@@ -8032,6 +8032,21 @@ outputs:
     custom_vxlan_flags: 0b1111_1111
     # type: bool
     # name:
+    #   en: Underlay direction flags 
+    #   ch: Underlay 网络是否携带 direction 标志
+    # unit:
+    # range: []
+    # enum_options: []
+    # modification: agent_restart
+    # ee_feature: true
+    # description:
+    #   en: |-
+    #     After turning it on, the tunnel header will carry a direction field.
+    #   ch: |-
+    #     开启后会隧道头中会携带方向字段。
+    underlay_direction_flags: false
+    # type: bool
+    # name:
     #   en: Overlay VLAN Header Trimming
     #   ch: Overlay VLAN 头剥离
     # unit:

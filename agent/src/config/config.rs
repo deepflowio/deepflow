@@ -2770,6 +2770,7 @@ pub struct Npb {
     #[serde(deserialize_with = "parse_maybe_binary_u8")]
     pub custom_vxlan_flags: u8,
     pub overlay_vlan_header_trimming: bool,
+    pub underlay_direction_flags: bool,
     #[serde(deserialize_with = "deser_u64_with_mega_unit")]
     pub max_tx_throughput: u64,
 }
@@ -2784,6 +2785,7 @@ impl Default for Npb {
             target_port: 4789,
             custom_vxlan_flags: 0b1111_1111,
             overlay_vlan_header_trimming: false,
+            underlay_direction_flags: false,
             max_tx_throughput: 1000 << 20,
         }
     }

@@ -326,6 +326,7 @@ pub struct NpbConfig {
     pub vlan_mode: agent::VlanMode,
     pub socket_type: agent::SocketType,
     pub ignore_overlay_vlan: bool,
+    pub underlay_direction_flags: bool,
     pub queue_size: usize,
 }
 
@@ -2105,6 +2106,7 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                 npb_port: conf.outputs.npb.target_port,
                 vxlan_flags: conf.outputs.npb.custom_vxlan_flags,
                 ignore_overlay_vlan: conf.outputs.npb.overlay_vlan_header_trimming,
+                underlay_direction_flags: conf.outputs.npb.underlay_direction_flags,
                 enable_qos_bypass: conf.outputs.socket.raw_udp_qos_bypass,
                 output_vlan: conf.outputs.npb.raw_udp_vlan_tag,
                 vlan_mode: conf.outputs.npb.extra_vlan_header,
@@ -4748,6 +4750,11 @@ impl ConfigHandler {
                     npb.overlay_vlan_header_trimming,
                     new_npb.overlay_vlan_header_trimming,
                     "outputs.npb.overlay_vlan_header_trimming"
+                ),
+                (
+                    npb.underlay_direction_flags,
+                    new_npb.underlay_direction_flags,
+                    "outputs.npb.underlay_direction_flags"
                 ),
                 (
                     npb.custom_vxlan_flags,
