@@ -8044,7 +8044,7 @@ outputs:
     #     After turning it on, the tunnel header will carry a direction field.
     #   ch: |-
     #     开启后会隧道头中会携带方向字段。
-    underlay_direction_flags: false
+    underlay_direction_flags: true 
     # type: bool
     # name:
     #   en: Overlay VLAN Header Trimming

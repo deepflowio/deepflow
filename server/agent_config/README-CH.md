@@ -10753,7 +10753,7 @@ outputs:
 ```yaml
 outputs:
   npb:
-    underlay_direction_flags: false
+    underlay_direction_flags: true
 ```
 
 **模式**:

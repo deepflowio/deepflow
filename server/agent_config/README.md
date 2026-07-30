@@ -10996,7 +10996,7 @@ configured as 0b1000_0000.
 ```yaml
 outputs:
   npb:
-    underlay_direction_flags: false
+    underlay_direction_flags: true
 ```
 
 **Schema**:
