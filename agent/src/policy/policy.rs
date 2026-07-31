@@ -410,30 +410,28 @@ impl Policy {
             (0, local_epc_id)
         };
 
-        if let Some(endpoints) = self.table.endpoint_fast_get(
-            key.fast_index,
-            table_type,
-            key.src_ip,
-            key.dst_ip,
-            l3_epc_id_0,
-            l3_epc_id_1,
-            key.l2_end_0,
-        ) {
-            let entry = if table_type == EndpointTableType::Otel {
-                self.lookup_gpid_entry_from_otel(key, &endpoints)
-            } else {
-                self.lookup_gpid_entry(key, &endpoints)
-            };
-            self.send_ebpf(
+        if table_type != EndpointTableType::Otel {
+            if let Some(endpoints) = self.table.endpoint_fast_get(
+                key.fast_index,
+                table_type,
                 key.src_ip,
                 key.dst_ip,
-                key.src_port,
-                key.dst_port,
-                endpoints.src_info.l3_epc_id,
-                endpoints.dst_info.l3_epc_id,
-                &entry,
-            );
-            return (endpoints, entry);
+                l3_epc_id_0,
+                l3_epc_id_1,
+                key.l2_end_0,
+            ) {
+                let entry = self.lookup_gpid_entry(key, &endpoints);
+                self.send_ebpf(
+                    key.src_ip,
+                    key.dst_ip,
+                    key.src_port,
+                    key.dst_port,
+                    endpoints.src_info.l3_epc_id,
+                    endpoints.dst_info.l3_epc_id,
+                    &entry,
+                );
+                return (endpoints, entry);
+            }
         }
 
         let endpoints = self.labeler.get_endpoint_data_by_epc(
@@ -443,19 +441,22 @@ impl Policy {
             l3_epc_id_1,
             key.l2_end_0,
         );
-        let endpoints = self.table.endpoint_fast_add(
-            key.fast_index,
-            table_type,
-            key.src_ip,
-            key.dst_ip,
-            l3_epc_id_0,
-            l3_epc_id_1,
-            endpoints,
-        );
-        let entry = if table_type == EndpointTableType::Otel {
-            self.lookup_gpid_entry_from_otel(key, &endpoints)
+        let (endpoints, entry) = if table_type == EndpointTableType::Otel {
+            let endpoints = Arc::new(endpoints);
+            let entry = self.lookup_gpid_entry_from_otel(key, &endpoints);
+            (endpoints, entry)
         } else {
-            self.lookup_gpid_entry(key, &endpoints)
+            let endpoints = self.table.endpoint_fast_add(
+                key.fast_index,
+                table_type,
+                key.src_ip,
+                key.dst_ip,
+                l3_epc_id_0,
+                l3_epc_id_1,
+                endpoints,
+            );
+            let entry = self.lookup_gpid_entry(key, &endpoints);
+            (endpoints, entry)
         };
         self.send_ebpf(
             key.src_ip,
