@@ -235,9 +235,7 @@ pub struct FastPath {
     // Multi threaded access has thread safety issues, the ebpf
     // table must be accessed by an ebpf dispatcher thread.
     ebpf_table: LruCache<u128, Arc<EndpointData>>,
-    // Multi threaded access has thread safety issues, the otel
-    // table must be accessed by an otel dispatcher thread
-    otel_table: LruCache<u128, Arc<EndpointData>>,
+    otel_table: RwLock<LruCache<u128, Arc<EndpointData>>>,
 
     // Use the first 16 bits of the IPv4 address to query the table and obtain the corresponding netmask.
     netmask_table: RwLock<Vec<u32>>,
@@ -254,7 +252,7 @@ pub struct FastPath {
     map_size: usize,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum EndpointTableType {
     Ebpf,
     Otel,
@@ -502,23 +500,13 @@ impl FastPath {
             }
             EndpointTableType::Otel => {
                 if self.otel_table_flush_flag.swap(false, Ordering::Relaxed) {
-                    self.otel_table.clear();
+                    self.otel_table.write().unwrap().clear();
 
                     true
                 } else {
                     false
                 }
             }
-        }
-    }
-
-    fn get_endpoint_table(
-        &mut self,
-        table_type: EndpointTableType,
-    ) -> &mut LruCache<u128, Arc<EndpointData>> {
-        match table_type {
-            EndpointTableType::Ebpf => &mut self.ebpf_table,
-            EndpointTableType::Otel => &mut self.otel_table,
         }
     }
 
@@ -540,12 +528,22 @@ impl FastPath {
         );
         let key = (key_0 as u128) << 64 | key_1 as u128;
         let endpoints = Arc::new(endpoints);
-        let table = self.get_endpoint_table(table_type);
-        table.put(key, endpoints.clone());
-
-        // NOTE: key_0 and key_1 cannot be the same.
-        let key = (key_1 as u128) << 64 | key_0 as u128;
-        table.put(key, Arc::new(endpoints.reversed()));
+        match table_type {
+            EndpointTableType::Ebpf => {
+                let table = &mut self.ebpf_table;
+                table.put(key, endpoints.clone());
+                // NOTE: key_0 and key_1 cannot be the same.
+                let key = (key_1 as u128) << 64 | key_0 as u128;
+                table.put(key, Arc::new(endpoints.reversed()));
+            }
+            EndpointTableType::Otel => {
+                let mut table = self.otel_table.write().unwrap();
+                table.put(key, endpoints.clone());
+                // NOTE: key_0 and key_1 cannot be the same.
+                let key = (key_1 as u128) << 64 | key_0 as u128;
+                table.put(key, Arc::new(endpoints.reversed()));
+            }
+        }
 
         return endpoints;
     }
@@ -567,9 +565,16 @@ impl FastPath {
             self.generate_endpoints_map_key(ip_src, ip_dst, l3_epc_id_src, l3_epc_id_dst, l2_end_0);
         let key = (key_0 as u128) << 64 | key_1 as u128;
 
-        self.get_endpoint_table(table_type)
-            .get(&key)
-            .and_then(|x| Some(x.clone()))
+        match table_type {
+            EndpointTableType::Ebpf => {
+                let table = &mut self.ebpf_table;
+                table.get(&key).and_then(|x| Some(x.clone()))
+            }
+            EndpointTableType::Otel => {
+                let mut table = self.otel_table.write().unwrap();
+                table.get(&key).and_then(|x| Some(x.clone()))
+            }
+        }
     }
 
     fn generate_endpoints_map_key(
@@ -623,7 +628,7 @@ impl FastPath {
                 table
             },
             ebpf_table: LruCache::new(map_size.try_into().unwrap()),
-            otel_table: LruCache::new(map_size.try_into().unwrap()),
+            otel_table: RwLock::new(LruCache::new(map_size.try_into().unwrap())),
 
             policy_table_flush_flags: [FLUSH_FLAGS; super::MAX_QUEUE_COUNT + 1],
             caches: [ARRAY_REPEAT_NONE; super::MAX_QUEUE_COUNT + 1],
