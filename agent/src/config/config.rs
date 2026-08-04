@@ -152,6 +152,10 @@ pub struct Config {
     pub pid_file: String,
     pub team_id: String,
     pub cgroups_disabled: bool,
+    #[cfg(target_os = "windows")]
+    pub ctrl_ip: String,
+    #[cfg(target_os = "windows")]
+    pub ctrl_mac: String,
 }
 
 impl Config {
@@ -314,6 +318,10 @@ impl Default for Config {
             pid_file: Default::default(),
             team_id: "".into(),
             cgroups_disabled: false,
+            #[cfg(target_os = "windows")]
+            ctrl_ip: Default::default(),
+            #[cfg(target_os = "windows")]
+            ctrl_mac: Default::default(),
         }
     }
 }
