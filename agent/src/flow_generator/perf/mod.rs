@@ -647,7 +647,11 @@ impl FlowLog {
         checker: &L7ProtocolChecker,
     ) -> Result<L7ParseResult> {
         if let Some(l4) = self.l4.as_mut() {
-            l4.parse(packet, is_first_packet_direction)?;
+            if let Err(e) = l4.parse(packet, is_first_packet_direction) {
+                if let Error::RetransPacket = e {
+                    return Err(e);
+                }
+            }
         }
 
         if l7_performance_enabled || l7_log_parse_enabled {
