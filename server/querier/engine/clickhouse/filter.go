@@ -131,7 +131,7 @@ func TransWhereTagFunction(db, table string, name string, args []string) (filter
 			filter = strings.Join([]string{"epc_id", suffix, "!=0"}, "")
 		} else if common.IsValueInSliceString(resourceNoID, tag.TAG_RESOURCE_TYPE_AUTO) {
 			if common.IsValueInSliceString(resourceNoID, []string{"resource_gl0", "auto_instance"}) {
-				filter = strings.Join([]string{"auto_instance_type", suffix, " not in (101,102)"}, "")
+				filter = strings.Join([]string{"auto_instance_type", suffix, " not in (102)"}, "")
 			} else {
 				filter = strings.Join([]string{"auto_service_type", suffix, " not in (10)"}, "")
 			}
