@@ -157,13 +157,15 @@ const (
 
 )
 
-func GetAutoInstance(podID, gpID, podNodeID, l3DeviceID, subnetID uint32, l3DeviceType uint8, l3EpcID int32) (uint32, uint8) {
+func GetAutoInstance(podID, gpID, podNodeID, podGroupID, l3DeviceID, subnetID uint32, l3DeviceType, podGroupType uint8, l3EpcID int32) (uint32, uint8) {
 	if podID > 0 {
 		return podID, PodType
 	} else if gpID > 0 {
 		return gpID, ProcessType
 	} else if podNodeID > 0 {
 		return podNodeID, PodNodeType
+	} else if podGroupID > 0 {
+		return podGroupID, podGroupType
 	} else if l3DeviceID > 0 {
 		return l3DeviceID, l3DeviceType
 	} else if l3EpcID == datatype.EPC_FROM_INTERNET {
