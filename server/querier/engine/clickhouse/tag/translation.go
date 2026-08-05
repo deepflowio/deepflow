@@ -401,7 +401,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", tagAutoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, tagAutoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
 			deviceTypeFilter := ""
 			if strings.HasPrefix(autoNameSuffix, "resource_gl0") || strings.HasPrefix(autoNameSuffix, "auto_instance") {
-				deviceTypeFilter = "devicetype not in (101,102)"
+				deviceTypeFilter = "devicetype not in (102)"
 			} else {
 				deviceTypeFilter = "devicetype not in (10)"
 			}

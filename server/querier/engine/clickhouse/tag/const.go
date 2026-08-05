@@ -70,7 +70,14 @@ var AutoMap = map[string]int{
 }
 
 var AutoPodMap = map[string]int{
-	"pod": VIF_DEVICE_TYPE_POD,
+	"pod":                    VIF_DEVICE_TYPE_POD,
+	"pod_group":              VIF_DEVICE_TYPE_POD_GROUP,
+	"deployment":             VIF_DEVICE_TYPE_POD_GROUP_DEPLOYMENT,
+	"stateful_set":           VIF_DEVICE_TYPE_POD_GROUP_STATEFULSET,
+	"replication_controller": VIF_DEVICE_TYPE_POD_GROUP_RC,
+	"daemon_set":             VIF_DEVICE_TYPE_POD_GROUP_DAEMON_SET,
+	"replica_set_controller": VIF_DEVICE_TYPE_POD_GROUP_REPLICASET_CONTROLLER,
+	"clone_set":              VIF_DEVICE_TYPE_POD_GROUP_CLONESET,
 }
 
 var AutoPodGroupMap = map[string]int{
