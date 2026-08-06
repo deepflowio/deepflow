@@ -28,7 +28,9 @@ import (
 
 // Kubernetes平台直接使用对应kubernetesgather的resource作为cloud的resource
 func (c *Cloud) getKubernetesData() model.Resource {
+	c.mutex.RLock()
 	k8sGatherTask, ok := c.kubernetesGatherTaskMap[c.basicInfo.Lcuuid]
+	c.mutex.RUnlock()
 	if !ok {
 		log.Warningf("domain (%s) no related kubernetes_gather_task", c.basicInfo.Name, logger.NewORGPrefix(c.orgID))
 		return model.Resource{

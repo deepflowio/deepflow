@@ -195,6 +195,12 @@ controller:
     #   # if current time - vtap lost time >= lost_time_max, vtap will be deleted
     #   # uint: s
     #   lost_time_max: 3600
+    ## automatically delete vtap whose associated resources no longer exist.
+    # vtap_delete_on_resource_deleted:
+    #   enabled: true
+    #   # if current time - related resource deleted time >= deleted_time_max, vtap will be deleted
+    #   # uint: s
+    #   deleted_time_max: 60
     # warrant
     warrant:
       host: warrant

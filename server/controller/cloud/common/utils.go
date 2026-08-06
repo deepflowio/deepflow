@@ -238,7 +238,11 @@ func GetHostNics(orgID int, hosts []model.Host, domainName, uuidGenerate, portNa
 		return []model.Subnet{}, []model.VInterface{}, []model.IP{}, map[string][]model.Subnet{}, err
 	}
 	vtaps := []mysqlmodel.VTap{}
-	db.Select("launch_server", "ctrl_ip").Find(&vtaps)
+	err = db.Select("launch_server", "ctrl_ip").Find(&vtaps).Error
+	if err != nil {
+		log.Error("get vtap failed", logger.NewORGPrefix(orgID))
+		return []model.Subnet{}, []model.VInterface{}, []model.IP{}, map[string][]model.Subnet{}, err
+	}
 
 	vtapLaunchServerToCtrlIP := make(map[string]string)
 	for _, vtap := range vtaps {

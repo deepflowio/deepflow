@@ -278,7 +278,13 @@ func (c *Cloud) GetSubDomainResource(lcuuid string) model.Resource {
 }
 
 func (c *Cloud) GetKubernetesGatherTaskMap() map[string]*KubernetesGatherTask {
-	return c.kubernetesGatherTaskMap
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	taskMap := make(map[string]*KubernetesGatherTask, len(c.kubernetesGatherTaskMap))
+	for lcuuid, task := range c.kubernetesGatherTaskMap {
+		taskMap[lcuuid] = task
+	}
+	return taskMap
 }
 
 func (c *Cloud) GetStatter() statsd.StatsdStatter {
@@ -460,7 +466,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 		// Kubernetes平台，只会有一个KubernetesGatherTask
 		// - 如果已存在KubernetesGatherTask，则无需启动新的Task
 		// Kubernetes平台，无需考虑KubernetesGatherTask的更新/删除，会在Cloud层面统一处理
-		if len(c.kubernetesGatherTaskMap) != 0 {
+		if len(c.GetKubernetesGatherTaskMap()) != 0 {
 			return
 		}
 		kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, c.db, &domain, nil, c.cfg, false)
@@ -475,29 +481,33 @@ func (c *Cloud) runKubernetesGatherTask() {
 	} else {
 		// 附属容器集群的处理
 		var subDomains []mysqlmodel.SubDomain
-		var oldSubDomains = mapset.NewSet()
-		var newSubDomains = mapset.NewSet()
-		var delSubDomains = mapset.NewSet()
-		var addSubDomains = mapset.NewSet()
-		var intersectSubDomains = mapset.NewSet()
-
-		for lcuuid := range c.kubernetesGatherTaskMap {
-			oldSubDomains.Add(lcuuid)
+		err = c.db.DB.Where(map[string]interface{}{"domain": c.basicInfo.Lcuuid}).Find(&subDomains).Error
+		if err != nil {
+			log.Errorf("get subdomains of domain (%s) failed: %s", c.basicInfo.Name, err.Error(), logger.NewORGPrefix(c.orgID))
+			return
 		}
-
-		c.db.DB.Where(map[string]interface{}{"domain": c.basicInfo.Lcuuid}).Find(&subDomains)
+		var newSubDomains = mapset.NewSet()
 		lcuuidToSubDomain := make(map[string]*mysqlmodel.SubDomain)
 		for index, subDomain := range subDomains {
 			lcuuidToSubDomain[subDomain.Lcuuid] = &subDomains[index]
 			newSubDomains.Add(subDomain.Lcuuid)
 		}
 
+		var oldSubDomains = mapset.NewSet()
+		var delSubDomains = mapset.NewSet()
+		var addSubDomains = mapset.NewSet()
+		var intersectSubDomains = mapset.NewSet()
+
+		for lcuuid := range c.GetKubernetesGatherTaskMap() {
+			oldSubDomains.Add(lcuuid)
+		}
+
 		// 对于删除的subDomain，停止Task，并移除管理
 		delSubDomains = oldSubDomains.Difference(newSubDomains)
 		for _, subDomain := range delSubDomains.ToSlice() {
 			lcuuid := subDomain.(string)
-			c.kubernetesGatherTaskMap[lcuuid].Stop()
 			c.mutex.Lock()
+			c.kubernetesGatherTaskMap[lcuuid].Stop()
 			delete(c.kubernetesGatherTaskMap, lcuuid)
 			c.mutex.Unlock()
 			kGatherQueue, ok := c.subDomainRefreshSignals.Get(lcuuid)
@@ -505,6 +515,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 				kGatherQueue.Close()
 				c.subDomainRefreshSignals.Remove(lcuuid)
 			}
+			log.Infof("sub domain (%s) deleted", lcuuid, logger.NewORGPrefix(c.orgID))
 		}
 
 		// 对于新增的subDomain，启动Task，并纳入Manger管理
@@ -522,6 +533,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 			c.kubernetesGatherTaskMap[lcuuid] = kubernetesGatherTask
 			c.kubernetesGatherTaskMap[lcuuid].Start(gatherQueue)
 			c.mutex.Unlock()
+			log.Infof("sub domain (%s) added", lcuuid, logger.NewORGPrefix(c.orgID))
 		}
 
 		// 检查已有subDomain是否存在配置修改
@@ -532,9 +544,9 @@ func (c *Cloud) runKubernetesGatherTask() {
 			oldSubDomain := c.kubernetesGatherTaskMap[lcuuid]
 			newSubDomain := lcuuidToSubDomain[lcuuid]
 			if oldSubDomain.SubDomainConfig != newSubDomain.Config || oldSubDomain.kubernetesGather.Name != newSubDomain.Name || oldSubDomain.kubernetesGather.TeamID != newSubDomain.TeamID {
-				log.Infof("oldSubDomainConfig: %s", oldSubDomain.SubDomainConfig, logger.NewORGPrefix(c.orgID))
-				log.Infof("newSubDomainConfig: %s", newSubDomain.Config, logger.NewORGPrefix(c.orgID))
+				c.mutex.Lock()
 				c.kubernetesGatherTaskMap[lcuuid].Stop()
+				c.mutex.Unlock()
 				kubernetesGatherTask := NewKubernetesGatherTask(c.cCtx, c.db, &domain, lcuuidToSubDomain[lcuuid], c.cfg, true)
 				if kubernetesGatherTask == nil {
 					continue
@@ -550,6 +562,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 				c.kubernetesGatherTaskMap[lcuuid] = kubernetesGatherTask
 				c.kubernetesGatherTaskMap[lcuuid].Start(gatherQueue)
 				c.mutex.Unlock()
+				log.Infof("sub domain (%s) config (%s) update to (%s)", lcuuid, oldSubDomain.SubDomainConfig, newSubDomain.Config, logger.NewORGPrefix(c.orgID))
 			}
 		}
 	}

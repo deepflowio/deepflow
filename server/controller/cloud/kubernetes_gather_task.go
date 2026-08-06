@@ -19,6 +19,7 @@ package cloud
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/deepflowio/deepflow/server/controller/cloud/config"
@@ -35,6 +36,7 @@ type KubernetesGatherTask struct {
 	kCtx                context.Context
 	kCancel             context.CancelFunc
 	orgID               int
+	resourceMutex       sync.RWMutex
 	gatherCost          float64
 	SubDomainConfig     string // 附属容器集群配置字段config
 	resource            kmodel.KubernetesGatherResource
@@ -87,10 +89,14 @@ func (k *KubernetesGatherTask) GetBasicInfo() kmodel.KubernetesGatherBasicInfo {
 }
 
 func (k *KubernetesGatherTask) GetResource() kmodel.KubernetesGatherResource {
+	k.resourceMutex.RLock()
+	defer k.resourceMutex.RUnlock()
 	return k.resource
 }
 
 func (k *KubernetesGatherTask) GetGatherCost() float64 {
+	k.resourceMutex.RLock()
+	defer k.resourceMutex.RUnlock()
 	return k.gatherCost
 }
 
@@ -130,12 +136,15 @@ func (k *KubernetesGatherTask) run(rSignal *queue.OverwriteQueue) {
 			kResource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
 		}
 		kResource.ErrorMessage = err.Error()
+		log.Infof("kubernetes gather (%s) assemble failed: %s", k.kubernetesGather.Name, err.Error(), logger.NewORGPrefix(k.orgID))
 	} else {
 		kResource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
 	}
+	k.resourceMutex.Lock()
 	k.resource = kResource
-	log.Infof("kubernetes gather (%s) assemble data complete", k.kubernetesGather.Name, logger.NewORGPrefix(k.orgID))
 	k.gatherCost = time.Now().Sub(startTime).Seconds()
+	k.resourceMutex.Unlock()
+	log.Infof("kubernetes gather (%s) assemble data complete", k.kubernetesGather.Name, logger.NewORGPrefix(k.orgID))
 	if rSignal == nil {
 		log.Errorf("kubernetes gather (%s) refresh signal is nil", logger.NewORGPrefix(k.orgID))
 		return

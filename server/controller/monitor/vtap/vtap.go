@@ -83,34 +83,82 @@ func (v *VTapCheck) Stop() {
 	log.Info("vtap check stopped")
 }
 
+func (v *VTapCheck) deleteVTapOnResourceDeleted(resourceDeletedTime time.Time, vtap mysqlmodel.VTap, db *mysql.DB) {
+	if !v.cfg.VTapDeleteOnResourceDeleted.Enabled {
+		return
+	}
+	if !resourceDeletedTime.IsZero() && time.Since(resourceDeletedTime) < time.Duration(v.cfg.VTapDeleteOnResourceDeleted.DeletedTimeMax)*time.Second {
+		return
+	}
+	err := db.Delete(&vtap).Error
+	if err != nil {
+		log.Errorf("failed to delete vtap (%s) on resource deleted: %s, error: %s", vtap.Name, resourceDeletedTime.Format(common.GO_BIRTHDAY), err.Error(), db.LogPrefixORGID)
+		return
+	}
+	log.Infof("delete vtap (%s) on resource deleted: %s", vtap.Name, resourceDeletedTime.Format(common.GO_BIRTHDAY), db.LogPrefixORGID)
+}
+
 func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
-	var vtaps []mysqlmodel.VTap
+	var reg = regexp.MustCompile(` |:`)
+	var hosts []mysqlmodel.Host
 	var vms []mysqlmodel.VM
 	var podNodes []mysqlmodel.PodNode
-	var reg = regexp.MustCompile(` |:`)
+	var pods []mysqlmodel.Pod
+	var vtaps []mysqlmodel.VTap
 
 	log.Debugf("vtap launch_server check start", db.LogPrefixORGID)
 
-	db.Select("id", "lcuuid", "name", "region", "az").Find(&vms)
+	err := db.Unscoped().Select("id", "lcuuid", "name", "ip", "region", "az", "deleted_at").Find(&hosts).Error
+	if err != nil {
+		log.Error(err, db.LogPrefixORGID)
+		return
+	}
+	LaunchServerToHost := make(map[string]mysqlmodel.Host)
+	for _, host := range hosts {
+		LaunchServerToHost[host.IP] = host
+	}
+
+	err = db.Unscoped().Select("id", "lcuuid", "name", "region", "az", "deleted_at").Find(&vms).Error
+	if err != nil {
+		log.Error(err, db.LogPrefixORGID)
+		return
+	}
 	lcuuidToVM := make(map[string]mysqlmodel.VM)
 	for _, vm := range vms {
 		lcuuidToVM[vm.Lcuuid] = vm
 	}
 
-	db.Select("id", "lcuuid", "name", "region", "az").Find(&podNodes)
+	err = db.Unscoped().Select("id", "lcuuid", "name", "region", "az", "deleted_at").Find(&podNodes).Error
+	if err != nil {
+		log.Error(err, db.LogPrefixORGID)
+		return
+	}
 	lcuuidToPodNode := make(map[string]mysqlmodel.PodNode)
 	for _, podNode := range podNodes {
 		lcuuidToPodNode[podNode.Lcuuid] = podNode
 	}
 
-	db.Select("id", "type", "lcuuid", "name", "launch_server_id", "region", "type", "launch_server").Find(&vtaps)
+	err = db.Unscoped().Select("id", "lcuuid", "name", "region", "az", "deleted_at").Find(&pods).Error
+	if err != nil {
+		log.Error(err, db.LogPrefixORGID)
+		return
+	}
+	lcuuidToPod := make(map[string]mysqlmodel.Pod)
+	for _, pod := range pods {
+		lcuuidToPod[pod.Lcuuid] = pod
+	}
+
+	err = db.Select("id", "type", "lcuuid", "name", "launch_server_id", "region", "type", "launch_server").Find(&vtaps).Error
+	if err != nil {
+		log.Error(err, db.LogPrefixORGID)
+		return
+	}
 	for _, vtap := range vtaps {
 		switch vtap.Type {
 		case common.VTAP_TYPE_WORKLOAD_V:
 			vm, ok := lcuuidToVM[vtap.Lcuuid]
-			if !ok {
-				log.Infof("delete vtap: %s %s, because no related vm", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
-				db.Delete(&vtap)
+			if !ok || vm.DeletedAt.Valid {
+				v.deleteVTapOnResourceDeleted(vm.DeletedAt.Time, vtap, db)
 			} else {
 				vtapName := reg.ReplaceAllString(fmt.Sprintf("%s-W%d", vm.Name, vm.ID), "-")
 				// check and update name
@@ -148,10 +196,9 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 			}
 
 		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_ESXI, common.VTAP_TYPE_HYPER_V:
-			var host mysqlmodel.Host
-			if ret := db.Where("ip = ?", vtap.LaunchServer).First(&host); ret.Error != nil {
-				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID, db.LogPrefixORGID)
-				db.Delete(&vtap)
+			host, ok := LaunchServerToHost[vtap.LaunchServer]
+			if !ok || host.DeletedAt.Valid {
+				v.deleteVTapOnResourceDeleted(host.DeletedAt.Time, vtap, db)
 			} else {
 				vtapName := reg.ReplaceAllString(fmt.Sprintf("%s-H%d", host.Name, host.ID), "-")
 				// check and update name
@@ -189,9 +236,8 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 			}
 		case common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM:
 			podNode, ok := lcuuidToPodNode[vtap.Lcuuid]
-			if !ok {
-				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
-				db.Delete(&vtap)
+			if !ok || podNode.DeletedAt.Valid {
+				v.deleteVTapOnResourceDeleted(podNode.DeletedAt.Time, vtap, db)
 			} else {
 				var vtapName string
 				if vtap.Type == common.VTAP_TYPE_POD_HOST {
@@ -233,10 +279,9 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 				}
 			}
 		case common.VTAP_TYPE_K8S_SIDECAR:
-			var pod mysqlmodel.Pod
-			if ret := db.Where("lcuuid = ?", vtap.Lcuuid).First(&pod); ret.Error != nil {
-				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid, db.LogPrefixORGID)
-				db.Delete(&vtap)
+			pod, ok := lcuuidToPod[vtap.Lcuuid]
+			if !ok || pod.DeletedAt.Valid {
+				v.deleteVTapOnResourceDeleted(pod.DeletedAt.Time, vtap, db)
 			} else {
 				vtapName := reg.ReplaceAllString(fmt.Sprintf("%s-P%d", pod.Name, pod.ID), "-")
 				// check and update name
