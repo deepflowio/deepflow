@@ -32,6 +32,7 @@ type MonitorConfig struct {
 	AutoRebalanceVTap           bool                          `default:"true" yaml:"auto_rebalance_vtap"`
 	RebalanceCheckInterval      int                           `default:"300" yaml:"rebalance_check_interval"` // unit: second
 	VTapAutoDelete              VTapAutoDelete                `yaml:"vtap_auto_delete"`
+	VTapDeleteOnResourceDeleted VTapDeleteOnResourceDeleted   `yaml:"vtap_delete_on_resource_deleted"`
 	Warrant                     Warrant                       `yaml:"warrant"`
 	IngesterLoadBalancingConfig IngesterLoadBalancingStrategy `yaml:"ingester-load-balancing-strategy"`
 	SyncDefaultORGDataInterval  int                           `default:"10" yaml:"sync_default_org_data_interval"`
@@ -46,4 +47,9 @@ type IngesterLoadBalancingStrategy struct {
 type VTapAutoDelete struct {
 	Enabled     bool `default:"true" yaml:"enabled"`
 	LostTimeMax int  `default:"3600" yaml:"lost_time_max"` // unit: second
+}
+
+type VTapDeleteOnResourceDeleted struct {
+	Enabled        bool `default:"true" yaml:"enabled"`
+	DeletedTimeMax int  `default:"60" yaml:"deleted_time_max"` // unit: second
 }

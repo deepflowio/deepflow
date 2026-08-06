@@ -33,15 +33,26 @@ import (
 // 合并附属容器集群的资源到云平台资源中
 // 遍历Cloud下所有KubernetesGather的数据，更新部分属性信息，并合并到Cloud的resource中
 func (c *Cloud) getSubDomainData(cResource model.Resource) map[string]model.SubDomainResource {
-	subDomainResources := make(map[string]model.SubDomainResource)
+	// kubernetesGatherTaskMap is mutated (with mutex held) by runKubernetesGatherTask in a separate goroutine,
+	// so snapshot it under the read lock to avoid a concurrent map read/write.
+	c.mutex.RLock()
+	tasks := make(map[string]*KubernetesGatherTask, len(c.kubernetesGatherTaskMap))
 	for lcuuid, kubernetesGatherTask := range c.kubernetesGatherTaskMap {
+		tasks[lcuuid] = kubernetesGatherTask
+	}
+	c.mutex.RUnlock()
+
+	subDomainResources := make(map[string]model.SubDomainResource)
+	for lcuuid, kubernetesGatherTask := range tasks {
 		subDomainResources[lcuuid] = c.generateSubDomainResource(lcuuid, kubernetesGatherTask.GetResource(), cResource)
 	}
 	return subDomainResources
 }
 
 func (c *Cloud) getSubDomainDataByLcuuid(lcuuid string, cResource model.Resource) map[string]model.SubDomainResource {
+	c.mutex.RLock()
 	kubernetesGatherTask, ok := c.kubernetesGatherTaskMap[lcuuid]
+	c.mutex.RUnlock()
 	if !ok {
 		msg := fmt.Sprintf("domain (%s) not found sub_domain lcuuid (%s)", c.basicInfo.Name, lcuuid)
 		log.Warning(msg, logger.NewORGPrefix(c.orgID))
