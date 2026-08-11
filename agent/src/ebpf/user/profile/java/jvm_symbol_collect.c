@@ -486,47 +486,132 @@ restore_ns:
 	return version_ok;
 }
 
-/* Find a JVM option in NUL-separated cmdline or environ data. */
+/* Check whether an environment variable is a standard JVM option carrier. */
+static bool java_preflight_is_jvm_option_env(const char *name)
+{
+	return strcmp(name, "JAVA_TOOL_OPTIONS") == 0 ||
+	       strcmp(name, "_JAVA_OPTIONS") == 0 ||
+	       strcmp(name, "JDK_JAVA_OPTIONS") == 0;
+}
+
+/* Match a complete NUL-separated argv token in /proc/<pid>/cmdline. */
+static int java_preflight_cmdline_contains_option(FILE *fp,
+						 const char *needle,
+						 size_t needle_len)
+{
+	size_t token_len = 0;
+	bool token_match = true;
+	int c;
+
+	while ((c = fgetc(fp)) != EOF) {
+		if (c == '\0') {
+			if (token_match && token_len == needle_len)
+				return 1;
+			token_len = 0;
+			token_match = true;
+			continue;
+		}
+		if (token_len >= needle_len ||
+		    c != (unsigned char)needle[token_len])
+			token_match = false;
+		token_len++;
+	}
+	if (ferror(fp))
+		return -1;
+	/* Accept a final record without a trailing NUL for completeness. */
+	return token_match && token_len == needle_len;
+}
+
+/* Match a whitespace-delimited option in standard JVM option environment variables. */
+static int java_preflight_environ_contains_option(FILE *fp,
+						  const char *needle,
+						  size_t needle_len)
+{
+	char env_name[64];
+	size_t env_name_len = 0, token_len = 0;
+	bool env_name_valid = true, option_env = false;
+	bool token_match = true, in_value = false;
+	int c;
+
+	while ((c = fgetc(fp)) != EOF) {
+		if (c == '\0') {
+			if (in_value && option_env && token_match &&
+			    token_len == needle_len)
+				return 1;
+			env_name_len = 0;
+			env_name_valid = true;
+			option_env = false;
+			token_len = 0;
+			token_match = true;
+			in_value = false;
+			continue;
+		}
+		if (!in_value) {
+			if (c == '=') {
+				env_name[env_name_len] = '\0';
+				option_env = env_name_valid &&
+					java_preflight_is_jvm_option_env(env_name);
+				in_value = true;
+				token_len = 0;
+				token_match = true;
+				continue;
+			}
+			if (env_name_len + 1 < sizeof(env_name))
+				env_name[env_name_len++] = (char)c;
+			else
+				env_name_valid = false;
+			continue;
+		}
+		if (!option_env)
+			continue;
+		if (isspace((unsigned char)c)) {
+			if (token_match && token_len == needle_len)
+				return 1;
+			token_len = 0;
+			token_match = true;
+			continue;
+		}
+		if (token_len >= needle_len ||
+		    c != (unsigned char)needle[token_len])
+			token_match = false;
+		token_len++;
+	}
+	if (ferror(fp))
+		return -1;
+	if (in_value && option_env && token_match && token_len == needle_len)
+		return 1;
+	return 0;
+}
+
+/* Find a real JVM option without matching arbitrary substrings in /proc data. */
 /* Return 1 if found, 0 if absent, and -1 if reading failed. */
 static int java_preflight_proc_contains(pid_t pid, const char *name,
 					       const char *needle)
 {
-	char path[64], buf[4096];
+	char path[64];
 	FILE *fp;
-	size_t n, total, carry, needle_len, i;
+	size_t needle_len;
+	int result;
 
 	snprintf(path, sizeof(path), "/proc/%d/%s", pid, name);
 	fp = fopen(path, "rb");
 	if (fp == NULL)
 		return -1;
 	needle_len = strlen(needle);
-	if (needle_len == 0 || needle_len >= sizeof(buf)) {
+	if (needle_len == 0) {
 		fclose(fp);
 		return 0;
 	}
-	/* Keep the previous chunk tail so options crossing an fread() boundary are found. */
-	carry = 0;
-	while ((n = fread(buf + carry, 1, sizeof(buf) - 1 - carry, fp)) > 0) {
-		total = carry + n;
-		/* cmdline and environ use NUL separators; byte comparison covers every option. */
-		for (i = 0; i + needle_len <= total; i++) {
-			if (memcmp(buf + i, needle, needle_len) == 0) {
-				fclose(fp);
-				return 1;
-			}
-		}
-		carry = needle_len - 1;
-		if (carry > total)
-			carry = total;
-		if (carry > 0)
-			memmove(buf, buf + total - carry, carry);
-	}
-	if (ferror(fp)) {
-		fclose(fp);
-		return -1;
-	}
+	if (strcmp(name, "cmdline") == 0)
+		result = java_preflight_cmdline_contains_option(fp, needle,
+								 needle_len);
+	else if (strcmp(name, "environ") == 0)
+		result = java_preflight_environ_contains_option(fp, needle,
+								  needle_len);
+	else
+		result = -1;
 	fclose(fp);
-	return 0;
+	return result;
 }
 
 /* Parse the Java version and extract the Java 8 update number. */
@@ -609,7 +694,9 @@ static bool java_preflight_parse_version(const char *version, int *major,
  *    completeness gate, not a claim that every update below 382 reproduced the
  *    crash. Non-HotSpot JVMs do not run these specialized checks.
  *
- * 4. Attach capability check: read the target cmdline and environ. Skip when
+ * 4. Attach capability check: read the target cmdline and environ. Match the
+ *    complete JVM option token in cmdline, and match whitespace-delimited
+ *    tokens only in the standard JVM option environment variables. Skip when
  *    -XX:+DisableAttachMechanism is present to avoid an injection that must
  *    fail; if either file cannot be read, capability cannot be confirmed and
  *    the result is also a conservative skip.

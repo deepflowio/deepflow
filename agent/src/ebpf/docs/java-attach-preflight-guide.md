@@ -152,7 +152,13 @@ HotSpot && Java 主版本 == 8 && update < 382
 避免把“检查失败”误判为“没有禁用参数”。`environ` 只保存进程启动时的环境，因此
 仍然需要同时检查 `cmdline`。
 
-`cmdline` 和 `environ` 是分块读取的，代码会保留上一块的尾部内容，因此参数即使跨越读取缓冲区边界也不会漏检。
+检查使用完整的 JVM option 边界：
+
+- `cmdline` 按 NUL 分隔的 argv 项匹配，只有完整参数等于
+  `-XX:+DisableAttachMechanism` 时才命中；例如业务参数
+  `--note=-XX:+DisableAttachMechanism` 不会命中；
+- `environ` 只解析标准 JVM 选项环境变量 `JAVA_TOOL_OPTIONS`、`_JAVA_OPTIONS`
+  和 `JDK_JAVA_OPTIONS`，并按空白分隔的完整 token 匹配；无关环境变量中的普通文本不会命中。
 
 ### 第六步：再次确认 PID 没有被复用
 
@@ -218,6 +224,9 @@ JAVA_ATTACH_SKIP pid=1234 reason=hotspot_java8_missing_JDK-8173361_and_JDK-83051
 | Host 与目标跨 namespace | PASS，正确进入并恢复 namespace |
 | 极简容器缺少 shell/env/timeout | PASS，使用宿主机回退路径 |
 | `DisableAttachMechanism` 参数 | PASS，正确跳过 |
+| 业务参数仅包含 `-XX:+DisableAttachMechanism` 文本 | PASS，不误判为禁用 attach |
+| 无关环境变量仅包含该文本 | PASS，不误判为禁用 attach |
+| `JAVA_TOOL_OPTIONS` 包含完整禁用参数 | PASS，正确跳过 |
 | PID 被复用或 exe 变化 | PASS，正确跳过 |
 
 其中，`8u352` 和 `8u381` 的可执行包当前尚未取得，因此只完成版本范围推导，未做二进制压力复现。
