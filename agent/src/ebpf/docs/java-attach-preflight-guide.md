@@ -67,15 +67,16 @@ java_attach_preflight(pid, &info)
 1. 在切换 namespace 前，从 `/proc/<pid>/exe` 获取目标 JVM 的真实可执行文件；
 2. 从目标 `/proc/<pid>/maps` 找到 `libjvm.so` 的架构目录，构造目标 JRE 的动态库路径：
    `lib/<arch>/jli`、`lib/<arch>` 和 `lib/<arch>/server`；
-3. 如果 Agent 与目标 mount namespace 不同，当前线程通过 `df_enter_ns` 切换到目标
-   mount namespace；同时设置目标 PID namespace，使随后由 `popen` 创建的版本子进程
-   使用目标 PID namespace；同 namespace 时跳过切换；
+3. 如果 Agent 与目标 mount namespace 不同，通过宿主机的 `nsenter` 进入目标 mount/PID
+   namespace，并显式指定 `--root=/proc/<pid>/root`；同 namespace 时跳过切换。`--root`
+   不能省略，因为单独进入 mount namespace 不会改变进程的 root，绝对路径仍可能指向
+   Agent/Host 文件系统；
 4. 启动一个短生命周期的版本命令，设置目标 JRE 的 `LD_LIBRARY_PATH`，从输出中的
-   `version "..."` 提取 `JAVA_VERSION`；
-5. 如果执行过 namespace 切换，通过 `df_exit_ns` 恢复当前线程的 namespace。
+   `version "..."` 提取 `JAVA_VERSION`。跨 namespace 时 `env`、`timeout`、Java 可执行文件
+   和动态库都在目标 rootfs 中解析；
 
-这样 Host 使用宿主机 namespace，POD 使用容器自己的 namespace，既不会误读 Agent
-文件系统，也不会因为 `libjli.so` 不在系统默认库路径中而误判。
+这样 Host 使用宿主机 namespace，POD 使用容器自己的 namespace 和 rootfs，既不会误读
+Agent 文件系统，也不会因为 `libjli.so` 不在系统默认库路径中而误判。
 
 这里的 `-version` 不是向正在运行的目标 JVM 发送命令，也不会对目标 JVM 执行 attach。
 它是在目标 namespace 中启动一个短生命周期的独立 Java 子进程，用来确认目标 Java
@@ -87,8 +88,8 @@ java_attach_preflight(pid, &info)
 这一步存在以下现实限制：
 
 - 目标容器没有进入目标 namespace 的权限时，版本命令无法启动；
-- 目标 namespace 中缺少 `/bin/sh`、`env` 或 `timeout` 时，优先回退到宿主机
-  `timeout/nsenter` 直接执行；宿主机也缺少这些工具或没有 namespace 权限时才会失败；
+- 宿主机缺少 `env`、`timeout` 或支持 `--root` 的 `nsenter`，或者没有 namespace 权限时，
+  跨 namespace 版本检查会失败并保守跳过；
 - 精简 JRE 缺少 `libjli.so` 或动态链接器时，版本命令可能失败；
 - 目标 JDK 文件在检查期间被替换时，子进程版本可能与原 JVM 已加载的库不一致；
 - 启动器异常或启动时间超过超时时间时，检查会失败。
@@ -221,8 +222,8 @@ JAVA_ATTACH_SKIP pid=1234 reason=hotspot_java8_missing_JDK-8173361_and_JDK-83051
 | HotSpot 8u412 版本识别 | PASS，允许继续检查 |
 | POD 中 HotSpot 8u212 | PASS，正确跳过 attach |
 | Host 与目标同 namespace | PASS，不切换 namespace |
-| Host 与目标跨 namespace | PASS，正确进入并恢复 namespace |
-| 极简容器缺少 shell/env/timeout | PASS，使用宿主机回退路径 |
+| Host 与目标跨 namespace | PASS，`nsenter --root` 使用目标 rootfs |
+| 极简容器缺少目标侧 shell/env/timeout | PASS，使用宿主机 root-aware nsenter 路径 |
 | `DisableAttachMechanism` 参数 | PASS，正确跳过 |
 | 业务参数仅包含 `-XX:+DisableAttachMechanism` 文本 | PASS，不误判为禁用 attach |
 | 无关环境变量仅包含该文本 | PASS，不误判为禁用 attach |
@@ -238,9 +239,8 @@ attach socket 或 namespace 权限失败。这属于测试环境限制，不是 
 ## 6. 代码位置
 
 - 公共预检逻辑：`agent/src/ebpf/user/profile/java/jvm_symbol_collect.c` 中的 `java_attach_preflight()`；
-- HotSpot 版本命令：同文件中的 `java_preflight_exec_version()`；跨 mount namespace
-  时调用 `df_enter_ns()`，通过 `exec_command()`/`popen()` 执行，完成后调用
-  `df_exit_ns()`；如果目标是没有 shell/env/timeout 的极简容器，则使用宿主机
-  `timeout/nsenter` 直接执行目标 Java；同 namespace 不切换；
+- HotSpot 版本命令：同文件中的 `java_preflight_exec_version()`；同 mount namespace
+  直接执行，跨 mount namespace 通过宿主机 `timeout/nsenter --mount --pid
+  --root=/proc/<pid>/root` 进入目标 rootfs 后执行；
 - 预检数据结构和返回值：`agent/src/ebpf/user/profile/java/jvm_symbol_collect.h`；
 - Agent 采集结果对“主动跳过”的处理：`agent/src/ebpf/user/profile/java/collect_symbol_files.c`。

@@ -317,39 +317,7 @@ static bool java_preflight_shell_quote(const char *value, char *quoted,
 	return true;
 }
 
-/* Check whether the target namespace has the minimal environment required by popen. */
-static bool java_preflight_target_command_env(pid_t pid)
-{
-	static const char *required[] = {
-		"/bin/sh",
-		"/usr/bin/env",
-		"/bin/env",
-		"/usr/bin/timeout",
-		"/bin/timeout",
-	};
-	char path[PATH_MAX + 64];
-	bool has_shell = false;
-	bool has_env = false;
-	bool has_timeout = false;
-	size_t i;
-
-	for (i = 0; i < sizeof(required) / sizeof(required[0]); i++) {
-		snprintf(path, sizeof(path), "/proc/%d/root%s", pid, required[i]);
-		if (access(path, X_OK) != 0)
-			continue;
-		if (strcmp(required[i], "/bin/sh") == 0)
-			has_shell = true;
-		if (strcmp(required[i], "/usr/bin/env") == 0 ||
-		    strcmp(required[i], "/bin/env") == 0)
-			has_env = true;
-		if (strcmp(required[i], "/usr/bin/timeout") == 0 ||
-		    strcmp(required[i], "/bin/timeout") == 0)
-			has_timeout = true;
-	}
-	return has_shell && has_env && has_timeout;
-}
-
-/* Find a command in the current namespace for the minimal-namespace fallback. */
+/* Find a command in the Agent/host rootfs for target-root execution. */
 static const char *java_preflight_host_command(const char *name)
 {
 	static const char *const env_paths[] = { "/usr/bin/env", "/bin/env" };
@@ -393,76 +361,62 @@ static bool java_preflight_exec_version(pid_t pid, const char *exe_path,
 	bool same_mntns;
 	bool use_host_nsenter = false;
 	const char *env_path;
-	const char *host_timeout;
-	const char *host_nsenter;
+	const char *host_timeout = NULL;
+	const char *host_nsenter = NULL;
 	int command_ret;
-	int ns_ret;
-	int pid_self_fd = -1;
-	int mnt_self_fd = -1;
 
 	if (exe_path == NULL || exe_path[0] != '/' || info == NULL)
 		return false;
 	java_preflight_build_library_path(pid, exe_path, library_path,
 						  sizeof(library_path));
-	/* Check the mount namespace first; do not setns or restore for the same namespace. */
+	/* Check the mount namespace before selecting the rootfs execution path. */
 	same_mntns = is_same_mntns(pid);
-	/* If a minimal POD lacks shell/env/timeout, use host nsenter to run Java directly. */
-	if (!same_mntns && !java_preflight_target_command_env(pid))
-		use_host_nsenter = true;
 	/*
-	 * The normal path enters the target PID/mount namespace before calling
-	 * exec_command. setns changes only this thread, so other Agent threads are
-	 * unaffected; the popen child created by exec_command inherits the target
-	 * namespace and resolves the Java path inside the POD. If the minimal target
-	 * namespace has no /bin/sh, host nsenter creates the Java child instead.
+	 * setns changes namespaces but does not change the calling thread's root. For
+	 * a different mount namespace, use host nsenter with --root so every absolute
+	 * path (env, Java, and LD_LIBRARY_PATH) resolves inside the target rootfs.
+	 * This also avoids changing the Agent thread's namespace while popen() runs.
 	 */
-	if (!same_mntns && !use_host_nsenter) {
-		/* The PID namespace affects only children; return 0 may still mean the
-		 * target PID could not be read. */
-		ns_ret = df_enter_ns(pid, "pid", &pid_self_fd);
-		if (ns_ret < 0)
-			goto restore_ns;
-		ns_ret = df_enter_ns(pid, "mnt", &mnt_self_fd);
-		/* A different mount namespace without a saved restore fd means switching failed. */
-		if (ns_ret < 0 || mnt_self_fd < 0)
-			goto restore_ns;
-	}
+	use_host_nsenter = !same_mntns;
 	if (use_host_nsenter) {
-		/* The target namespace lacks shell/env/timeout, so popen cannot run there. */
+		/* All helper commands execute before nsenter changes root; they must be
+		 * available in the Agent/host rootfs. */
 		env_path = java_preflight_host_command("env");
 		host_timeout = java_preflight_host_command("timeout");
 		host_nsenter = java_preflight_host_command("nsenter");
 		if (env_path == NULL || host_timeout == NULL || host_nsenter == NULL)
-			goto restore_ns;
+			return false;
 		ebpf_info(JAVA_LOG_TAG
-			  "JAVA_VERSION_NSENTER_FALLBACK pid=%d reason=target_runtime_helper_missing\n",
-			  pid);
+			  "JAVA_VERSION_NSENTER_ROOT pid=%d root=/proc/%d/root\n",
+			  pid, pid);
 	} else {
-		/* The target container may place env in /usr/bin or /bin. */
+		/* The same mount namespace can use the Agent's helper path directly. */
 		if (access("/usr/bin/env", X_OK) == 0)
 			env_path = "/usr/bin/env";
 		else if (access("/bin/env", X_OK) == 0)
 			env_path = "/bin/env";
 		else
-			goto restore_ns;
+			return false;
 	}
 	if (!java_preflight_shell_quote(library_path, quoted_library,
 					 sizeof(quoted_library)) ||
 	    !java_preflight_shell_quote(exe_path, quoted_exe,
 					 sizeof(quoted_exe)))
-		goto restore_ns;
+		return false;
 	/*
-	 * exec_command uses popen(), so the command inherits the namespace entered by
-	 * this thread. The outer env sanitizes the Agent environment, timeout imposes
-	 * a five-second limit, and the inner env sets the target Java library path.
+	 * exec_command uses popen(). The outer env sanitizes the Agent environment,
+	 * timeout imposes a five-second limit, and LD_LIBRARY_PATH points to the
+	 * target JVM library directory. In the cross-namespace path nsenter changes
+	 * root before Java resolves these absolute paths.
 	 */
 	if (use_host_nsenter) {
-		/* Host env sanitizes the environment; nsenter enters the target namespace
-		 * and directly execs Java. */
+		/* --root is essential: --mount/--pid alone do not change the process root. */
 		snprintf(command_args, sizeof(command_args),
 			 "-i PATH=/usr/bin:/bin HOME=/tmp LD_LIBRARY_PATH=%s %s 5 "
-			 "%s --target %d --mount --pid -- %s -version 2>&1",
-			 quoted_library, host_timeout, host_nsenter, pid, quoted_exe);
+			 "%s --target %d --mount --pid --root=/proc/%d/root --no-fork -- %s "
+			 "-version 2>&1",
+			 quoted_library, host_timeout, host_nsenter, pid, pid,
+			 quoted_exe);
 	} else {
 		snprintf(command_args, sizeof(command_args),
 			 "-i PATH=/usr/bin:/bin HOME=/tmp timeout 5 %s -i "
@@ -474,14 +428,6 @@ static bool java_preflight_exec_version(pid_t pid, const char *exe_path,
 	if (command_ret == 0) {
 		java_preflight_parse_version_output(output, info);
 		version_ok = info->java_version[0] != '\0';
-	}
-
-restore_ns:
-	/* Restore this thread's namespace only when crossing mount namespaces. */
-	if (!same_mntns && !use_host_nsenter) {
-		/* Restore this thread's namespaces in reverse entry order. */
-		df_exit_ns(mnt_self_fd);
-		df_exit_ns(pid_self_fd);
 	}
 	return version_ok;
 }
@@ -683,16 +629,17 @@ static bool java_preflight_parse_version(const char *version, int *major,
  *
  * 3. Target JVM version check: obtain -version only for HotSpot. Read the
  *    target exe and maps first; when the target and Agent use different mount
- *    namespaces, enter the target PID/mount namespace with df_enter_ns, launch
- *    a short-lived version child, then restore with df_exit_ns. Do not switch
- *    namespaces when they are the same. This makes Host/POD checks use the
- *    target filesystem without relying on a release file. Skip conservatively
- *    when the command fails or the Java version cannot be parsed. Skip HotSpot
- *    Java 8 updates below 352 because the first fix is missing; also skip
- *    352-381 because the 8u-specific Sweeper protection is incomplete. Only
- *    382 and newer meet the current complete-fix baseline. This is a patch
- *    completeness gate, not a claim that every update below 382 reproduced the
- *    crash. Non-HotSpot JVMs do not run these specialized checks.
+ *    namespaces, run the short-lived child through host nsenter with
+ *    --mount --pid --root=/proc/<pid>/root. This is required because setns()
+ *    alone does not change the process root, and absolute paths could otherwise
+ *    resolve from the Agent/Host rootfs. Do not switch namespaces when they are
+ *    the same. Skip conservatively when the root-aware command fails or the Java
+ *    version cannot be parsed. Skip HotSpot Java 8 updates below 352 because
+ *    the first fix is missing; also skip 352-381 because the 8u-specific Sweeper
+ *    protection is incomplete. Only 382 and newer meet the current complete-fix
+ *    baseline. This is a patch completeness gate, not a claim that every update
+ *    below 382 reproduced the crash. Non-HotSpot JVMs do not run these
+ *    specialized checks.
  *
  * 4. Attach capability check: read the target cmdline and environ. Match the
  *    complete JVM option token in cmdline, and match whitespace-delimited
