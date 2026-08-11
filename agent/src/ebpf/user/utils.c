@@ -1162,6 +1162,7 @@ int df_enter_ns(int pid, const char *type, int *self_fd)
 			if (*self_fd < 0) {
 				ebpf_warning("open() failed with %s(%d)\n",
 					     strerror(errno), errno);
+				close(newns);
 				return -1;
 			}
 			// Some ancient Linux distributions do not have setns() function
