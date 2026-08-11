@@ -64,9 +64,15 @@ void collect_java_symbols(int pid, int *ret_val, bool error_occurred)
 	}
 
 	*ret_val = JAVA_SYMS_COLLECT_OK;
-	bool is_new_collector;
+	bool is_new_collector = false;
 	u64 start_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
-	if (update_java_symbol_file(pid, &is_new_collector))
+	int update_ret = update_java_symbol_file(pid, &is_new_collector);
+	if (update_ret == JAVA_ATTACH_SKIPPED_UNSUPPORTED_JVM) {
+		/* The preflight policy decided this skip; it is not a transient attach failure. */
+		*ret_val = JAVA_CREATE_COLLECTOR_SKIPPED;
+		return;
+	}
+	if (update_ret)
 		goto error;
 	u64 end_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 
@@ -160,7 +166,8 @@ void java_syms_update_main(void *arg)
 				collect_java_symbols(p->pid, &ret,
 						     p->gen_java_syms_file_err);
 				if (ret != JAVA_SYMS_COLLECT_ERR
-				    && ret != JAVA_CREATE_COLLECTOR_ERR) {
+				    && ret != JAVA_CREATE_COLLECTOR_ERR
+				    && ret != JAVA_CREATE_COLLECTOR_SKIPPED) {
 					if (ret == JAVA_SYMS_NEED_UPDATE
 					    || ret == JAVA_SYMS_NEW_COLLECTOR)
 						p->cache_need_update = true;
@@ -178,9 +185,12 @@ void java_syms_update_main(void *arg)
 					 * Mark an error occurred when creating collector,
 					 * no further symbol collection for this process.
 					 */
-					if (ret == JAVA_CREATE_COLLECTOR_ERR)
+					if (ret == JAVA_CREATE_COLLECTOR_ERR ||
+					    ret == JAVA_CREATE_COLLECTOR_SKIPPED)
 						p->gen_java_syms_file_err =
 						    true;
+					if (ret == JAVA_CREATE_COLLECTOR_SKIPPED)
+						p->need_new_symbol_collector = false;
 
 					p->cache_need_update = false;
 				}

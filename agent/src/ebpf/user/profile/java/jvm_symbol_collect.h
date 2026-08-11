@@ -24,6 +24,68 @@
 
 #define DF_JAVA_ATTACH_CMD "/usr/bin/deepflow-jattach"
 
+/* Complete fix update boundary for standard OpenJDK 8u. */
+#define JAVA_ATTACH_JAVA8_COMPLETE_FIX_UPDATE 382
+
+/*
+ * Standard OpenJDK Java 8u0-8u351 lacks JDK-8173361, while 8u352-8u381
+ * still lacks JDK-8305165. Neither range can be considered safe from the
+ * version alone. The complete-fix baseline is 8u382; HotSpot versions below
+ * this baseline are not injected by the profiling agent. Keep the policy here
+ * so the Agent and standalone attach tool use the same decision.
+ */
+#define JAVA_ATTACH_SKIPPED_UNSUPPORTED_JVM (-2)
+#define JAVA_PREFLIGHT_VERSION_LEN 128
+
+typedef enum {
+	JAVA_PREFLIGHT_ALLOW = 0,
+	JAVA_PREFLIGHT_SKIP = 1,
+	JAVA_PREFLIGHT_ERROR = 2,
+} java_preflight_result_t;
+
+typedef struct {
+	int major_version; /**< Java major version. */
+	int update_version; /**< Java 8 update version. */
+	bool is_hotspot; /**< Whether a HotSpot libjvm.so was detected. */
+	bool is_other_jvm; /**< Whether another known JVM, such as OpenJ9, was detected. */
+	bool attach_disabled; /**< Whether DisableAttachMechanism is set. */
+	char java_version[JAVA_PREFLIGHT_VERSION_LEN]; /**< JAVA_VERSION value. */
+	char reason[JAVA_PREFLIGHT_VERSION_LEN]; /**< Preflight result reason. */
+} java_preflight_info_t;
+
+/**
+ * Core JVM attach preflight entry point.
+ *
+ * The check must finish before creating a socket, copying the Agent SO, or
+ * calling jattach, and it cannot use the Attach API. Therefore this function
+ * must not call jcmd, jinfo, or jattach, or load code into the target process.
+ * When the target JVM runs on the Host or in a POD with a different mount
+ * namespace, run the version command in the target PID/mount namespace rather
+ * than using the Agent filesystem; in the same namespace, use the target exe.
+ *
+ * The result has the following meaning:
+ * - Process check failure: the target exited, is a zombie, or its PID is unreadable;
+ *   skip attach.
+ * - JVM map check failure: neither HotSpot libjvm.so nor another known JVM core
+ *   library was found; the target cannot be identified as a JVM, so skip attach.
+ * - Non-HotSpot JVM: for example, OpenJ9 skips the HotSpot version gate and is
+ *   allowed after the common safety checks.
+ * - HotSpot: execute the target JVM's own -version in the target namespace,
+ *   without relying on a release file; parse JAVA_VERSION for Java 8 update.
+ *   Do not switch namespaces when both processes already share one.
+ * - HotSpot Java 8 update below 352: the first known fix is missing; skip attach.
+ * - HotSpot Java 8 update 352-381: partial fixes are present, but the 8u-specific
+ *   Sweeper protection is missing; skip attach under the current policy.
+ * - HotSpot Java 8 update 382 or newer: both standard OpenJDK fixes are present;
+ *   continue with the remaining checks.
+ * - Attach is disabled, cmdline/environ cannot be read, or the PID is reused
+ *   during the check: skip attach without injection.
+ * - All checks pass: return allow so the caller may create the socket, copy the
+ *   Agent SO, and invoke jattach.
+ */
+java_preflight_result_t java_attach_preflight(pid_t pid,
+					      java_preflight_info_t *info);
+
 /*
  * The address range of the 64-bit user space is from 0x0000000000000000
  * to 0x00007fffffffffff, which effectively uses only 48 bits. We use 13

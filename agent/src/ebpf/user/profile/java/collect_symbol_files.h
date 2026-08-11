@@ -22,6 +22,8 @@
 #define JAVA_CREATE_COLLECTOR_ERR	2
 #define JAVA_SYMS_NEED_UPDATE		3
 #define JAVA_SYMS_NEW_COLLECTOR		4
+/* Attach was proactively skipped by the JVM/JVMTI preflight gate. */
+#define JAVA_CREATE_COLLECTOR_SKIPPED	5
 
 struct java_syms_update_task {
 	struct list_head list;
