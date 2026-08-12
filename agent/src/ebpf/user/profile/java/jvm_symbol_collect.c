@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <sys/epoll.h>
+#include <sys/wait.h>
 #include <dlfcn.h>
 #include <dirent.h>
 #include "../../config.h"
@@ -317,117 +318,249 @@ static bool java_preflight_shell_quote(const char *value, char *quoted,
 	return true;
 }
 
-/* Find a command in the Agent/host rootfs for target-root execution. */
-static const char *java_preflight_host_command(const char *name)
+/* Read one NUL-separated environment variable from the target process. */
+static int java_preflight_read_env(pid_t pid, const char *name, char *value,
+					   size_t value_len)
 {
-	static const char *const env_paths[] = { "/usr/bin/env", "/bin/env" };
-	static const char *const timeout_paths[] = {
-		"/usr/bin/timeout", "/bin/timeout"
-	};
-	static const char *const nsenter_paths[] = {
-		"/usr/bin/nsenter", "/bin/nsenter"
-	};
-	const char *const *paths;
-	size_t count;
-	size_t i;
+	char path[64];
+	char *entry = NULL;
+	size_t entry_len = 0;
+	size_t name_len;
+	ssize_t length;
+	FILE *fp;
+	int found = 0;
 
-	if (strcmp(name, "env") == 0) {
-		paths = env_paths;
-		count = sizeof(env_paths) / sizeof(env_paths[0]);
-	} else if (strcmp(name, "timeout") == 0) {
-		paths = timeout_paths;
-		count = sizeof(timeout_paths) / sizeof(timeout_paths[0]);
-	} else {
-		paths = nsenter_paths;
-		count = sizeof(nsenter_paths) / sizeof(nsenter_paths[0]);
+	if (name == NULL || value == NULL || value_len == 0)
+		return -1;
+	snprintf(path, sizeof(path), "/proc/%d/environ", pid);
+	fp = fopen(path, "rb");
+	if (fp == NULL)
+		return -1;
+	name_len = strlen(name);
+	while ((length = getdelim(&entry, &entry_len, '\0', fp)) >= 0) {
+		if ((size_t)length <= name_len ||
+		    strncmp(entry, name, name_len) != 0 || entry[name_len] != '=')
+			continue;
+		if (length > 0 && entry[length - 1] == '\0')
+			length -= 1;
+		if ((size_t)length < name_len + 1 ||
+		    (size_t)length - name_len - 1 >= value_len) {
+			free(entry);
+			fclose(fp);
+			return -1;
+		}
+		memcpy(value, entry + name_len + 1,
+		       (size_t)length - name_len - 1);
+		value[(size_t)length - name_len - 1] = '\0';
+		found = 1;
+		break;
 	}
-	for (i = 0; i < count; i++) {
-		if (access(paths[i], X_OK) == 0)
-			return paths[i];
-	}
-	return NULL;
+	if (ferror(fp))
+		found = -1;
+	free(entry);
+	fclose(fp);
+	return found;
 }
 
-/* Execute the target JVM -version in its PID/mount namespace and capture output. */
+/* Append a target environment value to the Java command when it is present. */
+static bool java_preflight_append_env(char *command, size_t command_len,
+					      const char *name, const char *value)
+{
+	char quoted[PATH_MAX * 8 + 8];
+	size_t used;
+	size_t remain;
+	int length;
+
+	if (value == NULL || value[0] == '\0')
+		return true;
+	if (!java_preflight_shell_quote(value, quoted, sizeof(quoted)))
+		return false;
+	used = strlen(command);
+	if (used >= command_len)
+		return false;
+	remain = command_len - used;
+	length = snprintf(command + used, remain, "%s=%s ", name, quoted);
+	return length >= 0 && (size_t)length < remain;
+}
+
+/* Append one dynamic-library directory without truncating the target path. */
+static bool java_preflight_append_library_path(char *path, size_t path_len,
+						 const char *directory)
+{
+	size_t used;
+	size_t remain;
+	int length;
+
+	if (directory == NULL || directory[0] == '\0')
+		return true;
+	used = strlen(path);
+	if (used >= path_len)
+		return false;
+	remain = path_len - used;
+	length = snprintf(path + used, remain, "%s%s", used ? ":" : "",
+				  directory);
+	return length >= 0 && (size_t)length < remain;
+}
+
+/* Compare two namespace identities using the stat result for the ns files. */
+static bool java_preflight_same_namespace(const struct stat *left,
+						 const struct stat *right)
+{
+	return left != NULL && right != NULL && left->st_dev == right->st_dev &&
+	       left->st_ino == right->st_ino;
+}
+
+/* Verify that current and future children use the original namespaces. */
+static bool java_preflight_verify_namespace_restore(const struct stat *pid_ns,
+						    const struct stat *mnt_ns)
+{
+	struct stat current_pid_ns;
+	struct stat current_mnt_ns;
+	struct stat child_pid_ns;
+	struct stat child_mnt_ns;
+	pid_t child_pid;
+	int status;
+
+	if (stat("/proc/self/ns/pid", &current_pid_ns) < 0 ||
+	    stat("/proc/self/ns/mnt", &current_mnt_ns) < 0 ||
+	    !java_preflight_same_namespace(&current_pid_ns, pid_ns) ||
+	    !java_preflight_same_namespace(&current_mnt_ns, mnt_ns))
+		return false;
+
+	/* CLONE_NEWPID affects future children, so verify one after restoration. */
+	child_pid = fork();
+	if (child_pid < 0)
+		return false;
+	if (child_pid == 0) {
+		if (stat("/proc/self/ns/pid", &child_pid_ns) < 0 ||
+		    stat("/proc/self/ns/mnt", &child_mnt_ns) < 0)
+			_exit(2);
+		_exit(java_preflight_same_namespace(&child_pid_ns, pid_ns) &&
+		       java_preflight_same_namespace(&child_mnt_ns, mnt_ns) ? 0 : 1);
+	}
+	if (waitpid(child_pid, &status, 0) < 0)
+		return false;
+	return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+/* Execute the target JVM -version after entering its PID/mount namespaces. */
 static bool java_preflight_exec_version(pid_t pid, const char *exe_path,
 					java_preflight_info_t *info)
 {
 	char library_path[PATH_MAX * 2] = {};
-	char quoted_library[PATH_MAX * 8 + 8] = {};
+	char target_library_path[PATH_MAX * 2] = {};
+	char target_java_home[PATH_MAX] = {};
+	char target_path[PATH_MAX * 2] = {};
+	char target_home[PATH_MAX] = {};
+	char target_lang[PATH_MAX] = {};
 	char quoted_exe[PATH_MAX * 4 + 8] = {};
-	char command_args[PATH_MAX * 12 + 256] = {};
+	char command[PATH_MAX * 16 + 512] = {};
 	char output[16384] = {};
-	bool version_ok = false;
-	bool same_mntns;
-	bool use_host_nsenter = false;
-	const char *env_path;
-	const char *host_timeout = NULL;
-	const char *host_nsenter = NULL;
+	struct stat original_pid_ns;
+	struct stat original_mnt_ns;
+	int pid_self_fd = -1;
+	int mnt_self_fd = -1;
+	int pid_ns_ret;
+	int mnt_ns_ret;
 	int command_ret;
+	int value_ret;
+	bool version_ok = false;
 
 	if (exe_path == NULL || exe_path[0] != '/' || info == NULL)
 		return false;
+	if (stat("/proc/self/ns/pid", &original_pid_ns) < 0 ||
+	    stat("/proc/self/ns/mnt", &original_mnt_ns) < 0)
+		return false;
 	java_preflight_build_library_path(pid, exe_path, library_path,
 						  sizeof(library_path));
-	/* Check the mount namespace before selecting the rootfs execution path. */
-	same_mntns = is_same_mntns(pid);
-	/*
-	 * setns changes namespaces but does not change the calling thread's root. For
-	 * a different mount namespace, use host nsenter with --root so every absolute
-	 * path (env, Java, and LD_LIBRARY_PATH) resolves inside the target rootfs.
-	 * This also avoids changing the Agent thread's namespace while popen() runs.
-	 */
-	use_host_nsenter = !same_mntns;
-	if (use_host_nsenter) {
-		/* All helper commands execute before nsenter changes root; they must be
-		 * available in the Agent/host rootfs. */
-		env_path = java_preflight_host_command("env");
-		host_timeout = java_preflight_host_command("timeout");
-		host_nsenter = java_preflight_host_command("nsenter");
-		if (env_path == NULL || host_timeout == NULL || host_nsenter == NULL)
-			return false;
-		ebpf_info(JAVA_LOG_TAG
-			  "JAVA_VERSION_NSENTER_ROOT pid=%d root=/proc/%d/root\n",
-			  pid, pid);
-	} else {
-		/* The same mount namespace can use the Agent's helper path directly. */
-		if (access("/usr/bin/env", X_OK) == 0)
-			env_path = "/usr/bin/env";
-		else if (access("/bin/env", X_OK) == 0)
-			env_path = "/bin/env";
-		else
-			return false;
-	}
-	if (!java_preflight_shell_quote(library_path, quoted_library,
-					 sizeof(quoted_library)) ||
-	    !java_preflight_shell_quote(exe_path, quoted_exe,
-					 sizeof(quoted_exe)))
+	value_ret = java_preflight_read_env(pid, "LD_LIBRARY_PATH",
+					     target_library_path,
+					     sizeof(target_library_path));
+	if (value_ret < 0)
 		return false;
-	/*
-	 * exec_command uses popen(). The outer env sanitizes the Agent environment,
-	 * timeout imposes a five-second limit, and LD_LIBRARY_PATH points to the
-	 * target JVM library directory. In the cross-namespace path nsenter changes
-	 * root before Java resolves these absolute paths.
-	 */
-	if (use_host_nsenter) {
-		/* --root is essential: --mount/--pid alone do not change the process root. */
-		snprintf(command_args, sizeof(command_args),
-			 "-i PATH=/usr/bin:/bin HOME=/tmp LD_LIBRARY_PATH=%s %s 5 "
-			 "%s --target %d --mount --pid --root=/proc/%d/root --no-fork -- %s "
-			 "-version 2>&1",
-			 quoted_library, host_timeout, host_nsenter, pid, pid,
-			 quoted_exe);
-	} else {
-		snprintf(command_args, sizeof(command_args),
-			 "-i PATH=/usr/bin:/bin HOME=/tmp timeout 5 %s -i "
-			 "PATH=/usr/bin:/bin HOME=/tmp LD_LIBRARY_PATH=%s %s -version 2>&1",
-			 env_path, quoted_library, quoted_exe);
+	value_ret = java_preflight_read_env(pid, "JAVA_HOME", target_java_home,
+					     sizeof(target_java_home));
+	if (value_ret < 0)
+		return false;
+	value_ret = java_preflight_read_env(pid, "PATH", target_path,
+					     sizeof(target_path));
+	if (value_ret < 0)
+		return false;
+	value_ret = java_preflight_read_env(pid, "HOME", target_home,
+					     sizeof(target_home));
+	if (value_ret < 0)
+		return false;
+	value_ret = java_preflight_read_env(pid, "LANG", target_lang,
+					     sizeof(target_lang));
+	if (value_ret < 0)
+		return false;
+
+	/* Prefer the mapped JVM directories and retain the target environment path. */
+	if (!java_preflight_append_library_path(target_library_path,
+						 sizeof(target_library_path), library_path))
+		return false;
+	if (target_path[0] == '\0')
+		snprintf(target_path, sizeof(target_path), "/usr/bin:/bin");
+	if (target_home[0] == '\0')
+		snprintf(target_home, sizeof(target_home), "/tmp");
+
+	/* Set PID namespace first so popen() children inherit it. */
+	pid_ns_ret = df_enter_ns(pid, "pid", &pid_self_fd);
+	if (pid_ns_ret < 0)
+		return false;
+	mnt_ns_ret = df_enter_ns(pid, "mnt", &mnt_self_fd);
+	if (mnt_ns_ret < 0) {
+		df_exit_ns(pid_self_fd);
+		return false;
 	}
-	command_ret = exec_command(env_path, command_args, output,
-					 sizeof(output));
+
+	if (!java_preflight_shell_quote(exe_path, quoted_exe,
+					       sizeof(quoted_exe)))
+		goto restore_ns;
+	if (!java_preflight_append_env(command, sizeof(command),
+					       "LD_LIBRARY_PATH",
+					       target_library_path) ||
+	    !java_preflight_append_env(command, sizeof(command), "JAVA_HOME",
+					       target_java_home) ||
+	    !java_preflight_append_env(command, sizeof(command), "PATH",
+					       target_path) ||
+	    !java_preflight_append_env(command, sizeof(command), "HOME",
+					       target_home) ||
+	    !java_preflight_append_env(command, sizeof(command), "LANG",
+					       target_lang))
+		goto restore_ns;
+	{
+		size_t used = strlen(command);
+		size_t remain = sizeof(command) - used;
+		int length;
+
+		if (used >= sizeof(command))
+			goto restore_ns;
+		length = snprintf(command + used, remain, "%s -version 2>&1",
+				  quoted_exe);
+		if (length < 0 || (size_t)length >= remain)
+			goto restore_ns;
+	}
+
+	ebpf_info(JAVA_LOG_TAG
+		  "JAVA_VERSION_SETNS pid=%d pid_ns=%d mnt_ns=%d\n", pid,
+		  pid_ns_ret, mnt_ns_ret);
+	command_ret = exec_command(command, "", output, sizeof(output));
 	if (command_ret == 0) {
 		java_preflight_parse_version_output(output, info);
 		version_ok = info->java_version[0] != '\0';
+	}
+
+restore_ns:
+	/* Restore in reverse order so later Agent children keep the original
+	 * namespaces. */
+	df_exit_ns(mnt_self_fd);
+	df_exit_ns(pid_self_fd);
+	if (!java_preflight_verify_namespace_restore(&original_pid_ns,
+						    &original_mnt_ns)) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "JAVA_VERSION_NS_RESTORE_FAILED pid=%d\n", pid);
+		return false;
 	}
 	return version_ok;
 }
@@ -628,13 +761,12 @@ static bool java_preflight_parse_version(const char *version, int *major,
  *    may call Agent_OnAttach again.
  *
  * 3. Target JVM version check: obtain -version only for HotSpot. Read the
- *    target exe and maps first; when the target and Agent use different mount
- *    namespaces, run the short-lived child through host nsenter with
- *    --mount --pid --root=/proc/<pid>/root. This is required because setns()
- *    alone does not change the process root, and absolute paths could otherwise
- *    resolve from the Agent/Host rootfs. Do not switch namespaces when they are
- *    the same. Skip conservatively when the root-aware command fails or the Java
- *    version cannot be parsed. Skip HotSpot Java 8 updates below 352 because
+ *    target exe, maps and NUL-separated environ first; build the target
+ *    LD_LIBRARY_PATH, then setns into the target PID/mount namespaces before
+ *    popen() creates the short-lived Java child. Restore both namespace
+ *    selections after pclose(), and verify that later children use the original
+ *    namespaces. Skip conservatively when namespace setup, command execution,
+ *    or version parsing fails. Skip HotSpot Java 8 updates below 352 because
  *    the first fix is missing; also skip 352-381 because the 8u-specific Sweeper
  *    protection is incomplete. Only 382 and newer meet the current complete-fix
  *    baseline. This is a patch completeness gate, not a claim that every update

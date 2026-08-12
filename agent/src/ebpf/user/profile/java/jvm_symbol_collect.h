@@ -59,9 +59,9 @@ typedef struct {
  * The check must finish before creating a socket, copying the Agent SO, or
  * calling jattach, and it cannot use the Attach API. Therefore this function
  * must not call jcmd, jinfo, or jattach, or load code into the target process.
- * When the target JVM runs on the Host or in a POD with a different mount
- * namespace, run the version command in the target PID/mount namespace rather
- * than using the Agent filesystem; in the same namespace, use the target exe.
+ * Run the version command with the target Java executable and environment after
+ * entering the target PID/mount namespaces; restore both namespace selections
+ * before returning so later Agent children keep the original namespaces.
  *
  * The result has the following meaning:
  * - Process check failure: the target exited, is a zombie, or its PID is unreadable;

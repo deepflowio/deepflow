@@ -58,45 +58,52 @@ java_attach_preflight(pid, &info)
 
 已经加载过 DeepFlow Agent 不会作为拒绝条件。因为合法的重复 attach 仍然可能再次调用 `Agent_OnAttach`。
 
-### 第三步：HotSpot 直接执行目标 JVM 的 `-version`
+### 第三步：HotSpot 使用 `java_mnt_ns_version` 获取版本
 
 只有 HotSpot 执行版本门禁，OpenJ9 等其他 JVM 不执行 Java 8u382 检查。
 
-版本获取不读取 `release` 文件，也不调用 Agent 所在环境的 `java`。代码按以下顺序执行：
+版本获取不读取 `release` 文件，也不调用 Agent/Host 环境中的 `java`。统一使用
+`agent/src/ebpf/tools/java_mnt_ns_version.c` 中实现的流程：
 
 1. 在切换 namespace 前，从 `/proc/<pid>/exe` 获取目标 JVM 的真实可执行文件；
-2. 从目标 `/proc/<pid>/maps` 找到 `libjvm.so` 的架构目录，构造目标 JRE 的动态库路径：
-   `lib/<arch>/jli`、`lib/<arch>` 和 `lib/<arch>/server`；
-3. 如果 Agent 与目标 mount namespace 不同，通过宿主机的 `nsenter` 进入目标 mount/PID
-   namespace，并显式指定 `--root=/proc/<pid>/root`；同 namespace 时跳过切换。`--root`
-   不能省略，因为单独进入 mount namespace 不会改变进程的 root，绝对路径仍可能指向
-   Agent/Host 文件系统；
-4. 启动一个短生命周期的版本命令，设置目标 JRE 的 `LD_LIBRARY_PATH`，从输出中的
-   `version "..."` 提取 `JAVA_VERSION`。跨 namespace 时 `env`、`timeout`、Java 可执行文件
-   和动态库都在目标 rootfs 中解析；
+2. 从 `/proc/<pid>/environ` 读取目标 Java 的 `LD_LIBRARY_PATH`、`JAVA_HOME`、`PATH`、
+   `HOME` 和 `LANG` 等必要环境变量。该文件使用 NUL 字符分隔，不能按普通文本行读取；
+3. 根据目标 Java 的 `bin/java` 路径补充对应架构的 `lib/<arch>/jli` 目录，确保启动器可以
+   找到 `libjli.so`；
+4. 保存当前 PID namespace，调用 `setns()` 设置目标 PID namespace。该调用不会改变当前
+   进程自身的 PID，只会影响之后创建的子进程；
+5. 保存当前 mount namespace，调用 `setns()` 进入目标 Java 的 mount namespace；
+6. 使用 `popen("<java路径> -version")` 创建子进程，读取标准版本输出中的
+   `version "..."`，提取 `JAVA_VERSION`；
+7. `pclose()` 回收版本子进程后，恢复原 mount namespace，并恢复后续子进程使用的原 PID
+   namespace；最后再创建验证子进程，分别核对其 PID/mount namespace 与进入前保存的
+   namespace 标识，确保后续子进程已回到原 namespace。任一恢复或核对失败，工具都返回
+   失败，不继续使用本次版本结果。
 
-这样 Host 使用宿主机 namespace，POD 使用容器自己的 namespace 和 rootfs，既不会误读
-Agent 文件系统，也不会因为 `libjli.so` 不在系统默认库路径中而误判。
+这套流程不使用 `nsenter`，不使用 `chroot`，也不需要宿主机安装额外的 namespace 工具。
+版本子进程结束后，工具不会把目标 PID/mount namespace 留给后续子进程：mount namespace
+恢复到当前进程后，后续子进程继承原 mount namespace；PID namespace 则通过保存的原
+namespace 文件描述符恢复其子进程选择，并由验证子进程再次确认。
+测试表明，即使 Host 和 POD 存在相同绝对路径但版本不同的 Java，执行结果仍来自目标 POD
+的 Java，而不是 Host Java。Java 8 使用 `-version`，不能使用 `--version`。
 
 这里的 `-version` 不是向正在运行的目标 JVM 发送命令，也不会对目标 JVM 执行 attach。
-它是在目标 namespace 中启动一个短生命周期的独立 Java 子进程，用来确认目标 Java
-启动器能够正常启动并报告版本。`popen`、`exec_command` 等外部命令接口内部同样会
-创建子进程，不能在当前 Agent 进程中直接执行 Java，否则会替换 Agent 自身。
-目标 JVM 本身不会因为这一步加载 Agent 或开启 JVMTI 回调。版本子进程结束后，
-`pclose` 会等待并回收它，不会长期占用 Agent 的线程。
+它是在目标 PID/mount namespace 中启动一个短生命周期的独立 Java 子进程，用来确认目标
+Java 启动器能够正常启动并报告版本。目标 JVM 本身不会因为这一步加载 Agent 或开启 JVMTI
+回调。版本子进程结束后，`pclose()` 会等待并回收它。
 
 这一步存在以下现实限制：
 
-- 目标容器没有进入目标 namespace 的权限时，版本命令无法启动；
-- 宿主机缺少 `env`、`timeout` 或支持 `--root` 的 `nsenter`，或者没有 namespace 权限时，
-  跨 namespace 版本检查会失败并保守跳过；
-- 精简 JRE 缺少 `libjli.so` 或动态链接器时，版本命令可能失败；
+- 目标容器没有进入目标 PID/mount namespace 的权限时，版本命令无法启动；
+- `/proc/<pid>/exe`、`/proc/<pid>/environ` 或 namespace 文件不可读时，版本检查失败；
+- 精简 JRE 缺少 `libjli.so`、动态链接器或必要运行库时，版本命令可能失败；
 - 目标 JDK 文件在检查期间被替换时，子进程版本可能与原 JVM 已加载的库不一致；
-- 启动器异常或启动时间超过超时时间时，检查会失败。
-- 版本子进程会继承 Agent 的标准输入输出之外的文件描述符；如果 Agent 持有敏感
-  描述符，需要在生产环境评估这一点。
+- 启动器异常或版本子进程未正常结束时，检查会失败；
+- 版本子进程会继承测试进程的环境和文件描述符，生产代码需要限制无关环境变量和敏感
+  文件描述符的继承。
 
-因此，`-version` 失败不能被解释为“版本安全”，代码会保守跳过 attach。当前实现会在版本命令结束后重新校验 PID start time 和 `/proc/<pid>/exe`，但无法完全防止运行时文件被外部替换。
+因此，`-version` 失败不能被解释为“版本安全”，代码会保守跳过 attach。版本命令结束后
+仍需重新校验 PID start time 和 `/proc/<pid>/exe`，但无法完全防止运行时文件被外部替换。
 
 如果 `-version` 执行失败或输出中没有标准版本字符串，无法确认版本，直接保守跳过 attach。
 
@@ -222,8 +229,9 @@ JAVA_ATTACH_SKIP pid=1234 reason=hotspot_java8_missing_JDK-8173361_and_JDK-83051
 | HotSpot 8u412 版本识别 | PASS，允许继续检查 |
 | POD 中 HotSpot 8u212 | PASS，正确跳过 attach |
 | Host 与目标同 namespace | PASS，不切换 namespace |
-| Host 与目标跨 namespace | PASS，`nsenter --root` 使用目标 rootfs |
-| 极简容器缺少目标侧 shell/env/timeout | PASS，使用宿主机 root-aware nsenter 路径 |
+| Host 与目标跨 namespace | PASS，`java_mnt_ns_version` 使用目标 PID/mount namespace |
+| Host 与 POD 存在相同 Java 绝对路径 | PASS，仍获取 POD Java 的真实版本 |
+| 极简容器缺少目标侧 shell/env/timeout | PASS，不依赖 `nsenter`、`chroot` 或目标侧辅助命令 |
 | `DisableAttachMechanism` 参数 | PASS，正确跳过 |
 | 业务参数仅包含 `-XX:+DisableAttachMechanism` 文本 | PASS，不误判为禁用 attach |
 | 无关环境变量仅包含该文本 | PASS，不误判为禁用 attach |
@@ -239,8 +247,8 @@ attach socket 或 namespace 权限失败。这属于测试环境限制，不是 
 ## 6. 代码位置
 
 - 公共预检逻辑：`agent/src/ebpf/user/profile/java/jvm_symbol_collect.c` 中的 `java_attach_preflight()`；
-- HotSpot 版本命令：同文件中的 `java_preflight_exec_version()`；同 mount namespace
-  直接执行，跨 mount namespace 通过宿主机 `timeout/nsenter --mount --pid
-  --root=/proc/<pid>/root` 进入目标 rootfs 后执行；
+- Java 版本获取工具：`agent/src/ebpf/tools/java_mnt_ns_version.c`；通过
+  `setns(PID namespace)`、`setns(mount namespace)` 和 `popen("java -version")` 获取目标
+  Java 版本，不依赖 `nsenter` 或 `chroot`；
 - 预检数据结构和返回值：`agent/src/ebpf/user/profile/java/jvm_symbol_collect.h`；
 - Agent 采集结果对“主动跳过”的处理：`agent/src/ebpf/user/profile/java/collect_symbol_files.c`。
