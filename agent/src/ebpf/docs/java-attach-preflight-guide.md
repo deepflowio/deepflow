@@ -81,6 +81,30 @@ java_attach_preflight(pid, &info)
    和 runner 中，Agent 父进程及其后续子进程从未进入目标 namespace，因此不需要恢复或
    额外验证父进程 namespace。
 
+父进程的等待是一个循环，不是一次阻塞等待：
+
+```text
+while (helper 尚未退出 || 版本输出管道尚未关闭) {
+    非阻塞读取 Java -version 输出；
+    waitpid(helper_pid, ..., WNOHANG) 检查 helper 是否退出；
+    检查单调时钟是否超过 5 秒 deadline；
+    poll(版本输出管道读端，最多等待 100ms)；
+}
+```
+
+这里的管道由 `pipe()` 创建：`pipe_fds[0]` 是父进程读取端，`pipe_fds[1]` 是 runner
+写入端。runner 将自己的标准输出和标准错误通过 `dup2()` 指向写入端，因此父进程的
+`poll()` 等待的是 `pipe_fds[0]` 是否有版本数据、EOF 或错误，不是等待 Java 目标进程。
+`waitpid(helper_pid, ..., WNOHANG)` 单独检查第一层 fork 创建的 helper；helper 内部会阻塞
+等待第二层 fork 创建的 runner，所以 helper 退出通常表示 runner 和 `-version` 已经结束。
+`poll()` 每次最多等待 100ms，醒来后重新检查 helper 和总 deadline，避免无输出时忙等，也
+避免任何单次等待绕过 5 秒上限。
+
+如果当前时间达到 deadline，父进程使用 `kill(-helper_pid, SIGKILL)` 终止 helper 进程组，
+再 `waitpid()` 回收 helper。进程组中包括 helper 和 runner，但不包括正在运行的目标 Java
+业务进程。超时、管道错误、helper 非正常退出或版本输出无法解析时，预检统一失败并跳过
+attach。
+
 这套流程不使用 `nsenter`，不使用 `chroot`，也不需要宿主机安装额外的 namespace 工具。
 版本 helper 结束后，目标 PID/mount namespace 不会留给 Agent 后续子进程；namespace
 切换发生在独立 helper 中，helper 退出后由内核回收其 namespace 状态。
