@@ -18,6 +18,7 @@ package vtap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/monitor/config"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowio/deepflow/server/libs/logger"
+	"gorm.io/gorm"
 )
 
 var log = logger.MustGetLogger("monitor/vtap")
@@ -103,7 +105,6 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 	var hosts []mysqlmodel.Host
 	var vms []mysqlmodel.VM
 	var podNodes []mysqlmodel.PodNode
-	var pods []mysqlmodel.Pod
 	var vtaps []mysqlmodel.VTap
 
 	log.Debugf("vtap launch_server check start", db.LogPrefixORGID)
@@ -113,9 +114,9 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 		log.Error(err, db.LogPrefixORGID)
 		return
 	}
-	LaunchServerToHost := make(map[string]mysqlmodel.Host)
+	launchServerToHost := make(map[string]mysqlmodel.Host)
 	for _, host := range hosts {
-		LaunchServerToHost[host.IP] = host
+		launchServerToHost[host.IP] = host
 	}
 
 	err = db.Unscoped().Select("id", "lcuuid", "name", "region", "az", "deleted_at").Find(&vms).Error
@@ -136,16 +137,6 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 	lcuuidToPodNode := make(map[string]mysqlmodel.PodNode)
 	for _, podNode := range podNodes {
 		lcuuidToPodNode[podNode.Lcuuid] = podNode
-	}
-
-	err = db.Unscoped().Select("id", "lcuuid", "name", "region", "az", "deleted_at").Find(&pods).Error
-	if err != nil {
-		log.Error(err, db.LogPrefixORGID)
-		return
-	}
-	lcuuidToPod := make(map[string]mysqlmodel.Pod)
-	for _, pod := range pods {
-		lcuuidToPod[pod.Lcuuid] = pod
 	}
 
 	err = db.Select("id", "type", "lcuuid", "name", "launch_server_id", "region", "type", "launch_server").Find(&vtaps).Error
@@ -196,7 +187,7 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 			}
 
 		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_ESXI, common.VTAP_TYPE_HYPER_V:
-			host, ok := LaunchServerToHost[vtap.LaunchServer]
+			host, ok := launchServerToHost[vtap.LaunchServer]
 			if !ok || host.DeletedAt.Valid {
 				v.deleteVTapOnResourceDeleted(host.DeletedAt.Time, vtap, db)
 			} else {
@@ -279,10 +270,19 @@ func (v *VTapCheck) launchServerCheck(db *mysql.DB) {
 				}
 			}
 		case common.VTAP_TYPE_K8S_SIDECAR:
-			pod, ok := lcuuidToPod[vtap.Lcuuid]
-			if !ok || pod.DeletedAt.Valid {
-				v.deleteVTapOnResourceDeleted(pod.DeletedAt.Time, vtap, db)
+			var pod mysqlmodel.Pod
+			err := db.Unscoped().Where("lcuuid = ?", vtap.Lcuuid).First(&pod).Error
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					v.deleteVTapOnResourceDeleted(time.Time{}, vtap, db)
+				} else {
+					log.Errorf("failed to get pod (%s) for vtap (%s): %s", vtap.Lcuuid, vtap.Name, err.Error(), db.LogPrefixORGID)
+				}
 			} else {
+				if pod.DeletedAt.Valid {
+					v.deleteVTapOnResourceDeleted(pod.DeletedAt.Time, vtap, db)
+					continue
+				}
 				vtapName := reg.ReplaceAllString(fmt.Sprintf("%s-P%d", pod.Name, pod.ID), "-")
 				// check and update name
 				if vtap.Name != vtapName {

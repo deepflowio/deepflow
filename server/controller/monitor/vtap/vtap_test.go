@@ -205,6 +205,10 @@ func (s *VTapTestSuite) TestLaunchServerCheck_WorkloadV() {
 func (s *VTapTestSuite) TestLaunchServerCheck_WorkloadV_DeleteWhenVMNotFound() {
 	cfg := config.MonitorConfig{
 		VTapCheckInterval: 60,
+		VTapDeleteOnResourceDeleted: config.VTapDeleteOnResourceDeleted{
+			Enabled:        true,
+			DeletedTimeMax: 60,
+		},
 	}
 	ctx := context.Background()
 	check := NewVTapCheck(cfg, ctx)
