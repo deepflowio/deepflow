@@ -58,39 +58,39 @@ java_attach_preflight(pid, &info)
 
 已经加载过 DeepFlow Agent 不会作为拒绝条件。因为合法的重复 attach 仍然可能再次调用 `Agent_OnAttach`。
 
-### 第三步：HotSpot 使用 `java_mnt_ns_version` 获取版本
+### 第三步：HotSpot 使用 namespace helper 获取版本
 
 只有 HotSpot 执行版本门禁，OpenJ9 等其他 JVM 不执行 Java 8u382 检查。
 
-版本获取不读取 `release` 文件，也不调用 Agent/Host 环境中的 `java`。统一使用
-`agent/src/ebpf/tools/java_mnt_ns_version.c` 中实现的流程：
+版本获取不读取 `release` 文件，也不调用 Agent/Host 环境中的 `java`。生产代码使用
+`jvm_symbol_collect.c` 中的 helper/runner 流程；`agent/src/ebpf/tools/java_mnt_ns_version.c`
+提供同一 namespace 路径选择的独立验证工具：
 
 1. 在切换 namespace 前，从 `/proc/<pid>/exe` 获取目标 JVM 的真实可执行文件；
 2. 从 `/proc/<pid>/environ` 读取目标 Java 的 `LD_LIBRARY_PATH`、`JAVA_HOME`、`PATH`、
    `HOME` 和 `LANG` 等必要环境变量。该文件使用 NUL 字符分隔，不能按普通文本行读取；
 3. 根据目标 Java 的 `bin/java` 路径补充对应架构的 `lib/<arch>/jli` 目录，确保启动器可以
    找到 `libjli.so`；
-4. 保存当前 PID namespace，调用 `setns()` 设置目标 PID namespace。该调用不会改变当前
-   进程自身的 PID，只会影响之后创建的子进程；
-5. 保存当前 mount namespace，调用 `setns()` 进入目标 Java 的 mount namespace；
-6. 使用 `popen("<java路径> -version")` 创建子进程，读取标准版本输出中的
-   `version "..."`，提取 `JAVA_VERSION`；
-7. `pclose()` 回收版本子进程后，恢复原 mount namespace，并恢复后续子进程使用的原 PID
-   namespace；最后再创建验证子进程，分别核对其 PID/mount namespace 与进入前保存的
-   namespace 标识，确保后续子进程已回到原 namespace。任一恢复或核对失败，工具都返回
-   失败，不继续使用本次版本结果。
+4. 创建独立的版本探测 helper。helper 调用 `setns()` 进入目标 PID/mount namespace；
+   `setns(CLONE_NEWPID)` 不改变 helper 自身的 PID，只影响 helper 后续创建的子进程；
+5. helper 再创建 runner，runner 使用 `execve()` 直接执行目标 `/proc/<pid>/exe` 的绝对路径，
+   参数为 Java 8 兼容的 `-version`，并通过管道把标准输出和标准错误传回父进程；
+6. Agent 父进程以非阻塞方式读取版本输出，同时用单调时钟实施 5 秒超时。超时后杀掉
+   helper 所在的进程组并回收 helper，避免 Java runner 残留；
+7. helper 执行完成后立即退出，不需要调用 `df_exit_ns()`。目标 namespace 只存在于 helper
+   和 runner 中，Agent 父进程及其后续子进程从未进入目标 namespace，因此不需要恢复或
+   额外验证父进程 namespace。
 
 这套流程不使用 `nsenter`，不使用 `chroot`，也不需要宿主机安装额外的 namespace 工具。
-版本子进程结束后，工具不会把目标 PID/mount namespace 留给后续子进程：mount namespace
-恢复到当前进程后，后续子进程继承原 mount namespace；PID namespace 则通过保存的原
-namespace 文件描述符恢复其子进程选择，并由验证子进程再次确认。
+版本 helper 结束后，目标 PID/mount namespace 不会留给 Agent 后续子进程；namespace
+切换发生在独立 helper 中，helper 退出后由内核回收其 namespace 状态。
 测试表明，即使 Host 和 POD 存在相同绝对路径但版本不同的 Java，执行结果仍来自目标 POD
 的 Java，而不是 Host Java。Java 8 使用 `-version`，不能使用 `--version`。
 
 这里的 `-version` 不是向正在运行的目标 JVM 发送命令，也不会对目标 JVM 执行 attach。
 它是在目标 PID/mount namespace 中启动一个短生命周期的独立 Java 子进程，用来确认目标
 Java 启动器能够正常启动并报告版本。目标 JVM 本身不会因为这一步加载 Agent 或开启 JVMTI
-回调。版本子进程结束后，`pclose()` 会等待并回收它。
+回调。版本 helper 和 runner 结束后，父进程回收 helper。
 
 这一步存在以下现实限制：
 
@@ -98,9 +98,9 @@ Java 启动器能够正常启动并报告版本。目标 JVM 本身不会因为�
 - `/proc/<pid>/exe`、`/proc/<pid>/environ` 或 namespace 文件不可读时，版本检查失败；
 - 精简 JRE 缺少 `libjli.so`、动态链接器或必要运行库时，版本命令可能失败；
 - 目标 JDK 文件在检查期间被替换时，子进程版本可能与原 JVM 已加载的库不一致；
-- 启动器异常或版本子进程未正常结束时，检查会失败；
-- 版本子进程会继承测试进程的环境和文件描述符，生产代码需要限制无关环境变量和敏感
-  文件描述符的继承。
+- 启动器异常、5 秒内未退出或版本子进程未正常结束时，检查会失败；
+- runner 使用目标 Java 的显式运行环境白名单，但 helper/runner 仍可能继承打开的文件描述符；
+  生产代码应避免在版本探测期间持有不必要的敏感描述符。
 
 因此，`-version` 失败不能被解释为“版本安全”，代码会保守跳过 attach。版本命令结束后
 仍需重新校验 PID start time 和 `/proc/<pid>/exe`，但无法完全防止运行时文件被外部替换。
@@ -247,8 +247,10 @@ attach socket 或 namespace 权限失败。这属于测试环境限制，不是 
 ## 6. 代码位置
 
 - 公共预检逻辑：`agent/src/ebpf/user/profile/java/jvm_symbol_collect.c` 中的 `java_attach_preflight()`；
-- Java 版本获取工具：`agent/src/ebpf/tools/java_mnt_ns_version.c`；通过
-  `setns(PID namespace)`、`setns(mount namespace)` 和 `popen("java -version")` 获取目标
-  Java 版本，不依赖 `nsenter` 或 `chroot`；
+- Java 版本获取实现：`agent/src/ebpf/user/profile/java/jvm_symbol_collect.c`；通过独立
+  helper、`setns(PID namespace)`、`setns(mount namespace)` 和 `execve(<目标绝对路径>,
+  {<目标路径>, "-version"})` 获取目标 Java 版本，不依赖 `nsenter` 或 `chroot`；
+- 独立验证工具：`agent/src/ebpf/tools/java_mnt_ns_version.c`；用于验证目标 namespace
+  中的 Java 路径、动态库环境和 namespace 恢复行为；
 - 预检数据结构和返回值：`agent/src/ebpf/user/profile/java/jvm_symbol_collect.h`；
 - Agent 采集结果对“主动跳过”的处理：`agent/src/ebpf/user/profile/java/collect_symbol_files.c`。

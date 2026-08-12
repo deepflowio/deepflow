@@ -15,17 +15,22 @@
  */
 
 #include <pthread.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include <poll.h>
+#include <signal.h>
+#include <sched.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <sys/epoll.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <dlfcn.h>
 #include <dirent.h>
 #include "../../config.h"
@@ -37,6 +42,7 @@
 #include "jvm_symbol_collect.h"
 
 #define SYM_COLLECT_MAX_EVENTS 4
+#define JAVA_PREFLIGHT_VERSION_TIMEOUT_MS 5000
 
 // Use thread pool to manage threads for obtaining Java symbols.
 symbol_collect_thread_pool_t *g_collect_pool;
@@ -288,36 +294,6 @@ static void java_preflight_build_library_path(pid_t pid,
 	}
 }
 
-/* Single-quote shell arguments so special characters in Java paths are inert. */
-static bool java_preflight_shell_quote(const char *value, char *quoted,
-					       size_t quoted_len)
-{
-	size_t used = 0;
-	size_t i;
-
-	if (value == NULL || quoted == NULL || quoted_len < 3)
-		return false;
-	quoted[used++] = '\'';
-	for (i = 0; value[i] != '\0'; i++) {
-		if (value[i] == '\'') {
-			/* A shell single quote must be encoded as '\'' . */
-			if (used + 4 >= quoted_len)
-				return false;
-			memcpy(quoted + used, "'\\''", 4);
-			used += 4;
-		} else {
-			if (used + 1 >= quoted_len)
-				return false;
-			quoted[used++] = value[i];
-		}
-	}
-	if (used + 2 > quoted_len)
-		return false;
-	quoted[used++] = '\'';
-	quoted[used] = '\0';
-	return true;
-}
-
 /* Read one NUL-separated environment variable from the target process. */
 static int java_preflight_read_env(pid_t pid, const char *name, char *value,
 					   size_t value_len)
@@ -361,28 +337,6 @@ static int java_preflight_read_env(pid_t pid, const char *name, char *value,
 	fclose(fp);
 	return found;
 }
-
-/* Append a target environment value to the Java command when it is present. */
-static bool java_preflight_append_env(char *command, size_t command_len,
-					      const char *name, const char *value)
-{
-	char quoted[PATH_MAX * 8 + 8];
-	size_t used;
-	size_t remain;
-	int length;
-
-	if (value == NULL || value[0] == '\0')
-		return true;
-	if (!java_preflight_shell_quote(value, quoted, sizeof(quoted)))
-		return false;
-	used = strlen(command);
-	if (used >= command_len)
-		return false;
-	remain = command_len - used;
-	length = snprintf(command + used, remain, "%s=%s ", name, quoted);
-	return length >= 0 && (size_t)length < remain;
-}
-
 /* Append one dynamic-library directory without truncating the target path. */
 static bool java_preflight_append_library_path(char *path, size_t path_len,
 						 const char *directory)
@@ -410,40 +364,208 @@ static bool java_preflight_same_namespace(const struct stat *left,
 	       left->st_ino == right->st_ino;
 }
 
-/* Verify that current and future children use the original namespaces. */
-static bool java_preflight_verify_namespace_restore(const struct stat *pid_ns,
-						    const struct stat *mnt_ns)
+/* Open a target namespace fd, or report that the current namespace is equal. */
+static int java_preflight_open_namespace(pid_t pid, const char *type,
+						 bool *same_namespace)
 {
-	struct stat current_pid_ns;
-	struct stat current_mnt_ns;
-	struct stat child_pid_ns;
-	struct stat child_mnt_ns;
-	pid_t child_pid;
-	int status;
+	char target_path[64];
+	char self_path[64];
+	struct stat target_stat;
+	struct stat self_stat;
+	int fd;
 
-	if (stat("/proc/self/ns/pid", &current_pid_ns) < 0 ||
-	    stat("/proc/self/ns/mnt", &current_mnt_ns) < 0 ||
-	    !java_preflight_same_namespace(&current_pid_ns, pid_ns) ||
-	    !java_preflight_same_namespace(&current_mnt_ns, mnt_ns))
-		return false;
-
-	/* CLONE_NEWPID affects future children, so verify one after restoration. */
-	child_pid = fork();
-	if (child_pid < 0)
-		return false;
-	if (child_pid == 0) {
-		if (stat("/proc/self/ns/pid", &child_pid_ns) < 0 ||
-		    stat("/proc/self/ns/mnt", &child_mnt_ns) < 0)
-			_exit(2);
-		_exit(java_preflight_same_namespace(&child_pid_ns, pid_ns) &&
-		       java_preflight_same_namespace(&child_mnt_ns, mnt_ns) ? 0 : 1);
+	if (same_namespace == NULL || type == NULL)
+		return -1;
+	*same_namespace = false;
+	if (snprintf(target_path, sizeof(target_path), "/proc/%d/ns/%s", pid,
+		     type) >= (int)sizeof(target_path) ||
+	    snprintf(self_path, sizeof(self_path), "/proc/self/ns/%s", type) >=
+		    (int)sizeof(self_path))
+		return -1;
+	if (stat(target_path, &target_stat) < 0 ||
+	    stat(self_path, &self_stat) < 0)
+		return -1;
+	if (java_preflight_same_namespace(&target_stat, &self_stat)) {
+		*same_namespace = true;
+		return -1;
 	}
-	if (waitpid(child_pid, &status, 0) < 0)
-		return false;
-	return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+	fd = open(target_path, O_RDONLY | O_CLOEXEC);
+	if (fd < 0)
+		return -1;
+	return fd;
 }
 
-/* Execute the target JVM -version after entering its PID/mount namespaces. */
+/* Return a monotonic clock value in milliseconds for the parent timeout. */
+static int64_t java_preflight_monotonic_ms(void)
+{
+	struct timespec ts;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0)
+		return -1;
+	return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+/* Execute Java directly in the helper's target namespaces. */
+static void java_preflight_version_runner(const char *exe_path,
+						 char *const envp[], int output_fd)
+{
+	char *const argv[] = { (char *)exe_path, (char *)"-version", NULL };
+
+	if (dup2(output_fd, STDOUT_FILENO) < 0 ||
+	    dup2(output_fd, STDERR_FILENO) < 0)
+		_exit(125);
+	if (output_fd != STDOUT_FILENO && output_fd != STDERR_FILENO)
+		close(output_fd);
+	execve(exe_path, argv, envp);
+	_exit(127);
+}
+
+/* Enter target namespaces, fork the runner, and wait for its exit status. */
+static void java_preflight_version_helper(const char *exe_path,
+						 char *const envp[], int pid_ns_fd,
+						 int mnt_ns_fd, int output_fd)
+{
+	pid_t runner_pid;
+	int status;
+
+	/* Isolate helper and runner so a timeout can terminate both processes. */
+	if (setpgid(0, 0) < 0)
+		_exit(124);
+#ifdef __NR_setns
+	if (pid_ns_fd >= 0 && syscall(__NR_setns, pid_ns_fd, CLONE_NEWPID) < 0)
+		_exit(124);
+	if (mnt_ns_fd >= 0 && syscall(__NR_setns, mnt_ns_fd, CLONE_NEWNS) < 0)
+		_exit(124);
+#else
+	(void)pid_ns_fd;
+	(void)mnt_ns_fd;
+	_exit(124);
+#endif
+	if (pid_ns_fd >= 0)
+		close(pid_ns_fd);
+	if (mnt_ns_fd >= 0)
+		close(mnt_ns_fd);
+
+	/* PID namespace changes apply to children created after setns(). */
+	runner_pid = fork();
+	if (runner_pid < 0)
+		_exit(124);
+	if (runner_pid == 0)
+		java_preflight_version_runner(exe_path, envp, output_fd);
+	close(output_fd);
+	while (waitpid(runner_pid, &status, 0) < 0) {
+		if (errno != EINTR)
+			_exit(124);
+	}
+	if (WIFEXITED(status))
+		_exit(WEXITSTATUS(status));
+	_exit(128 + WTERMSIG(status));
+}
+
+/* Drain version output without allowing a full pipe to block the runner. */
+static void java_preflight_drain_output(int fd, char *output,
+						size_t output_len, size_t *used,
+						 bool *eof)
+{
+	char discard[1024];
+	char *buffer;
+	ssize_t length;
+	size_t remain;
+
+	while (!*eof) {
+		buffer = *used < output_len - 1 ? output + *used : discard;
+		remain = *used < output_len - 1 ? output_len - 1 - *used :
+				 sizeof(discard);
+		length = read(fd, buffer, remain);
+		if (length > 0) {
+			if (buffer != discard)
+				*used += (size_t)length;
+			continue;
+		}
+		if (length == 0) {
+			*eof = true;
+			break;
+		}
+		if (errno == EINTR)
+			continue;
+		if (errno == EAGAIN || errno == EWOULDBLOCK)
+			break;
+		*eof = true;
+	}
+	if (output_len > 0)
+		output[*used < output_len ? *used : output_len - 1] = '\0';
+}
+
+/* Terminate and reap a helper together with its Java runner process group. */
+static void java_preflight_kill_helper(pid_t helper_pid, int *status)
+{
+	if (kill(-helper_pid, SIGKILL) < 0)
+		kill(helper_pid, SIGKILL);
+	while (waitpid(helper_pid, status, 0) < 0 && errno == EINTR)
+		;
+}
+
+/* Wait for the helper with a bounded timeout and collect its output. */
+static bool java_preflight_wait_helper(pid_t helper_pid, int output_fd,
+						 char *output, size_t output_len)
+{
+	struct pollfd poll_fd = { .fd = output_fd, .events = POLLIN };
+	int flags;
+	int status;
+	int poll_timeout;
+	int64_t deadline;
+	int64_t now;
+	pid_t wait_result;
+	size_t used = 0;
+	bool eof = false;
+	bool exited = false;
+
+	flags = fcntl(output_fd, F_GETFL, 0);
+	if (flags < 0 || fcntl(output_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+		java_preflight_kill_helper(helper_pid, &status);
+		return false;
+	}
+	deadline = java_preflight_monotonic_ms();
+	if (deadline < 0) {
+		java_preflight_kill_helper(helper_pid, &status);
+		return false;
+	}
+	deadline += JAVA_PREFLIGHT_VERSION_TIMEOUT_MS;
+	while (!exited || !eof) {
+		java_preflight_drain_output(output_fd, output, output_len, &used,
+						&eof);
+		if (!exited) {
+			wait_result = waitpid(helper_pid, &status, WNOHANG);
+			if (wait_result == helper_pid)
+				exited = true;
+			else if (wait_result < 0 && errno != EINTR) {
+				java_preflight_kill_helper(helper_pid, &status);
+				close(output_fd);
+				return false;
+			}
+		}
+		if (exited && eof)
+			break;
+		now = java_preflight_monotonic_ms();
+		if (now < 0 || now >= deadline) {
+			java_preflight_kill_helper(helper_pid, &status);
+			close(output_fd);
+			return false;
+		}
+		poll_timeout = (int)(deadline - now);
+		if (poll_timeout > 100)
+			poll_timeout = 100;
+		if (poll(&poll_fd, 1, poll_timeout) < 0 && errno != EINTR) {
+			java_preflight_kill_helper(helper_pid, &status);
+			close(output_fd);
+			return false;
+		}
+	}
+	close(output_fd);
+	return exited && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+/* Execute the target JVM -version in a bounded helper process. */
 static bool java_preflight_exec_version(pid_t pid, const char *exe_path,
 					java_preflight_info_t *info)
 {
@@ -453,23 +575,25 @@ static bool java_preflight_exec_version(pid_t pid, const char *exe_path,
 	char target_path[PATH_MAX * 2] = {};
 	char target_home[PATH_MAX] = {};
 	char target_lang[PATH_MAX] = {};
-	char quoted_exe[PATH_MAX * 4 + 8] = {};
-	char command[PATH_MAX * 16 + 512] = {};
 	char output[16384] = {};
-	struct stat original_pid_ns;
-	struct stat original_mnt_ns;
-	int pid_self_fd = -1;
-	int mnt_self_fd = -1;
-	int pid_ns_ret;
-	int mnt_ns_ret;
-	int command_ret;
+	char env_library[PATH_MAX * 2 + 32];
+	char env_java_home[PATH_MAX + 16];
+	char env_path[PATH_MAX * 2 + 8];
+	char env_home[PATH_MAX + 8];
+	char env_lang[PATH_MAX + 8];
+	char *envp[6] = {};
+	int env_count = 0;
+	int pid_ns_fd = -1;
+	int mnt_ns_fd = -1;
+	int pipe_fds[2] = { -1, -1 };
+	int flags;
+	pid_t helper_pid;
 	int value_ret;
+	bool same_pid_ns = false;
+	bool same_mnt_ns = false;
 	bool version_ok = false;
 
 	if (exe_path == NULL || exe_path[0] != '/' || info == NULL)
-		return false;
-	if (stat("/proc/self/ns/pid", &original_pid_ns) < 0 ||
-	    stat("/proc/self/ns/mnt", &original_mnt_ns) < 0)
 		return false;
 	java_preflight_build_library_path(pid, exe_path, library_path,
 						  sizeof(library_path));
@@ -503,65 +627,82 @@ static bool java_preflight_exec_version(pid_t pid, const char *exe_path,
 		snprintf(target_path, sizeof(target_path), "/usr/bin:/bin");
 	if (target_home[0] == '\0')
 		snprintf(target_home, sizeof(target_home), "/tmp");
-
-	/* Set PID namespace first so popen() children inherit it. */
-	pid_ns_ret = df_enter_ns(pid, "pid", &pid_self_fd);
-	if (pid_ns_ret < 0)
+	if (snprintf(env_library, sizeof(env_library), "LD_LIBRARY_PATH=%s",
+		     target_library_path) >= (int)sizeof(env_library) ||
+	    snprintf(env_path, sizeof(env_path), "PATH=%s", target_path) >=
+		    (int)sizeof(env_path) ||
+	    snprintf(env_home, sizeof(env_home), "HOME=%s", target_home) >=
+		    (int)sizeof(env_home))
 		return false;
-	mnt_ns_ret = df_enter_ns(pid, "mnt", &mnt_self_fd);
-	if (mnt_ns_ret < 0) {
-		df_exit_ns(pid_self_fd);
+	envp[env_count++] = env_library;
+	if (target_java_home[0] != '\0') {
+		if (snprintf(env_java_home, sizeof(env_java_home), "JAVA_HOME=%s",
+			     target_java_home) >= (int)sizeof(env_java_home))
+			return false;
+		envp[env_count++] = env_java_home;
+	}
+	envp[env_count++] = env_path;
+	envp[env_count++] = env_home;
+	if (target_lang[0] != '\0') {
+		if (snprintf(env_lang, sizeof(env_lang), "LANG=%s", target_lang) >=
+		    (int)sizeof(env_lang))
+			return false;
+		envp[env_count++] = env_lang;
+	}
+	envp[env_count] = NULL;
+
+	pid_ns_fd = java_preflight_open_namespace(pid, "pid", &same_pid_ns);
+	if (pid_ns_fd < 0 && !same_pid_ns)
+		return false;
+	mnt_ns_fd = java_preflight_open_namespace(pid, "mnt", &same_mnt_ns);
+	if (mnt_ns_fd < 0 && !same_mnt_ns) {
+		if (pid_ns_fd >= 0)
+			close(pid_ns_fd);
 		return false;
 	}
-
-	if (!java_preflight_shell_quote(exe_path, quoted_exe,
-					       sizeof(quoted_exe)))
-		goto restore_ns;
-	if (!java_preflight_append_env(command, sizeof(command),
-					       "LD_LIBRARY_PATH",
-					       target_library_path) ||
-	    !java_preflight_append_env(command, sizeof(command), "JAVA_HOME",
-					       target_java_home) ||
-	    !java_preflight_append_env(command, sizeof(command), "PATH",
-					       target_path) ||
-	    !java_preflight_append_env(command, sizeof(command), "HOME",
-					       target_home) ||
-	    !java_preflight_append_env(command, sizeof(command), "LANG",
-					       target_lang))
-		goto restore_ns;
-	{
-		size_t used = strlen(command);
-		size_t remain = sizeof(command) - used;
-		int length;
-
-		if (used >= sizeof(command))
-			goto restore_ns;
-		length = snprintf(command + used, remain, "%s -version 2>&1",
-				  quoted_exe);
-		if (length < 0 || (size_t)length >= remain)
-			goto restore_ns;
+	if (pipe(pipe_fds) < 0)
+		goto cleanup_fds;
+	flags = fcntl(pipe_fds[0], F_GETFL, 0);
+	if (flags < 0 || fcntl(pipe_fds[0], F_SETFL, flags | O_NONBLOCK) < 0)
+		goto cleanup_fds;
+	helper_pid = fork();
+	if (helper_pid < 0)
+		goto cleanup_fds;
+	if (helper_pid == 0) {
+		close(pipe_fds[0]);
+		java_preflight_version_helper(exe_path, envp, pid_ns_fd,
+						      mnt_ns_fd, pipe_fds[1]);
+		_exit(124);
 	}
-
-	ebpf_info(JAVA_LOG_TAG
-		  "JAVA_VERSION_SETNS pid=%d pid_ns=%d mnt_ns=%d\n", pid,
-		  pid_ns_ret, mnt_ns_ret);
-	command_ret = exec_command(command, "", output, sizeof(output));
-	if (command_ret == 0) {
-		java_preflight_parse_version_output(output, info);
-		version_ok = info->java_version[0] != '\0';
-	}
-
-restore_ns:
-	/* Restore in reverse order so later Agent children keep the original
-	 * namespaces. */
-	df_exit_ns(mnt_self_fd);
-	df_exit_ns(pid_self_fd);
-	if (!java_preflight_verify_namespace_restore(&original_pid_ns,
-						    &original_mnt_ns)) {
+	close(pipe_fds[1]);
+	pipe_fds[1] = -1;
+	setpgid(helper_pid, helper_pid);
+	if (!java_preflight_wait_helper(helper_pid, pipe_fds[0], output,
+						 sizeof(output))) {
 		ebpf_warning(JAVA_LOG_TAG
-			     "JAVA_VERSION_NS_RESTORE_FAILED pid=%d\n", pid);
-		return false;
+			     "JAVA_VERSION_HELPER_FAILED_OR_TIMEOUT pid=%d "
+			     "timeout=%dms\n", pid,
+			     JAVA_PREFLIGHT_VERSION_TIMEOUT_MS);
+		pipe_fds[0] = -1;
+		goto cleanup_fds;
 	}
+	pipe_fds[0] = -1;
+	java_preflight_parse_version_output(output, info);
+	version_ok = info->java_version[0] != '\0';
+	ebpf_info(JAVA_LOG_TAG
+		  "JAVA_VERSION_HELPER pid=%d pid_ns=%s mnt_ns=%s\n", pid,
+		  same_pid_ns ? "same" : "target",
+		  same_mnt_ns ? "same" : "target");
+
+cleanup_fds:
+	if (pipe_fds[0] >= 0)
+		close(pipe_fds[0]);
+	if (pipe_fds[1] >= 0)
+		close(pipe_fds[1]);
+	if (pid_ns_fd >= 0)
+		close(pid_ns_fd);
+	if (mnt_ns_fd >= 0)
+		close(mnt_ns_fd);
 	return version_ok;
 }
 
@@ -760,13 +901,16 @@ static bool java_preflight_parse_version(const char *version, int *major,
  *    already loaded Agent is not a rejection condition because a valid reattach
  *    may call Agent_OnAttach again.
  *
+
  * 3. Target JVM version check: obtain -version only for HotSpot. Read the
  *    target exe, maps and NUL-separated environ first; build the target
- *    LD_LIBRARY_PATH, then setns into the target PID/mount namespaces before
- *    popen() creates the short-lived Java child. Restore both namespace
- *    selections after pclose(), and verify that later children use the original
- *    namespaces. Skip conservatively when namespace setup, command execution,
- *    or version parsing fails. Skip HotSpot Java 8 updates below 352 because
+ *    LD_LIBRARY_PATH, then fork a short-lived helper. The helper enters the
+ *    target PID/mount namespaces and forks a runner that directly execve()s
+ *    the target Java executable. The parent drains the output and applies a
+ *    bounded timeout; the helper exits after the runner finishes, so the Agent
+ *    process and its later children never enter the target namespaces. Skip
+ *    conservatively when namespace setup, command execution, timeout, or
+ *    version parsing fails. Skip HotSpot Java 8 updates below 352 because
  *    the first fix is missing; also skip 352-381 because the 8u-specific Sweeper
  *    protection is incomplete. Only 382 and newer meet the current complete-fix
  *    baseline. This is a patch completeness gate, not a claim that every update
