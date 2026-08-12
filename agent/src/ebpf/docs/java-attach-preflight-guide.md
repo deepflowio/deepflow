@@ -80,7 +80,6 @@ java_attach_preflight(pid, &info)
 7. helper 执行完成后立即退出，不需要调用 `df_exit_ns()`。目标 namespace 只存在于 helper
    和 runner 中，Agent 父进程及其后续子进程从未进入目标 namespace，因此不需要恢复或
    额外验证父进程 namespace。
-<<<<<<< HEAD
 
 父进程的等待是一个循环，不是一次阻塞等待：
 
@@ -105,8 +104,6 @@ while (helper 尚未退出 || 版本输出管道尚未关闭) {
 再 `waitpid()` 回收 helper。进程组中包括 helper 和 runner，但不包括正在运行的目标 Java
 业务进程。超时、管道错误、helper 非正常退出或版本输出无法解析时，预检统一失败并跳过
 attach。
-=======
->>>>>>> fix(java): bound namespace version probing with helper
 
 这套流程不使用 `nsenter`，不使用 `chroot`，也不需要宿主机安装额外的 namespace 工具。
 版本 helper 结束后，目标 PID/mount namespace 不会留给 Agent 后续子进程；namespace
