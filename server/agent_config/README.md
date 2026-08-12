@@ -1791,6 +1791,7 @@ inputs:
 Synchronization interval for the process GPID mapping table.
 
 '0ns' means disabled. Do not configure a value less than `1s` except for `0ns`.
+It is recommended to configure this value to `10s`.
 
 ### Minimal Lifetime {#inputs.proc.min_lifetime}
 

@@ -1243,10 +1243,11 @@ inputs:
     #     Synchronization interval for the process GPID mapping table.
     #
     #     '0ns' means disabled. Do not configure a value less than `1s` except for `0ns`.
+    #     It is recommended to configure this value to `10s`.
     #   ch: |-
     #     进程 GPID 映射表的同步周期。
     #
-    #     '0ns' 表示不开启，除 '0ns' 外不要配置小于 `1s` 的值。
+    #     '0ns' 表示不开启，除 '0ns' 外不要配置小于 `1s` 的值。建议配置为 `10s`。
     process_gpid_sync_interval: 0ns
     # type: duration
     # name:
