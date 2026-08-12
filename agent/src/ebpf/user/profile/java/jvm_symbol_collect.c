@@ -15,14 +15,22 @@
  */
 
 #include <pthread.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/select.h>
+#include <ctype.h>
+#include <errno.h>
+#include <limits.h>
+#include <poll.h>
+#include <signal.h>
+#include <sched.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <sys/epoll.h>
+#include <sys/wait.h>
+#include <time.h>
 #include <dlfcn.h>
 #include <dirent.h>
 #include "../../config.h"
@@ -34,6 +42,7 @@
 #include "jvm_symbol_collect.h"
 
 #define SYM_COLLECT_MAX_EVENTS 4
+#define JAVA_PREFLIGHT_VERSION_TIMEOUT_MS 5000
 
 // Use thread pool to manage threads for obtaining Java symbols.
 symbol_collect_thread_pool_t *g_collect_pool;
@@ -47,6 +56,984 @@ static __thread java_unload_addr_str_t *unload_addrs;
 extern int jattach(int pid, int argc, char **argv, int print_output);
 static int create_symbol_collect_task(pid_t pid, options_t * opts,
 				      bool is_same_mntns);
+
+/* Set a readable failure reason for the preflight result. */
+static void java_preflight_set_reason(java_preflight_info_t *info,
+					      const char *reason)
+{
+	if (info == NULL)
+		return;
+	if (reason == NULL)
+		reason = "unknown";
+	strncpy(info->reason, reason, sizeof(info->reason) - 1);
+	info->reason[sizeof(info->reason) - 1] = '\0';
+}
+
+/* Read the target executable path and strip the exit marker. */
+static bool java_preflight_readlink(pid_t pid, char *path, size_t path_len)
+{
+	char proc_path[64];
+	ssize_t len;
+
+	if (path == NULL || path_len < 2)
+		return false;
+	snprintf(proc_path, sizeof(proc_path), "/proc/%d/exe", pid);
+	len = readlink(proc_path, path, path_len - 1);
+	if (len < 0)
+		return false;
+	path[len] = '\0';
+	/* readlink may return a path with the deleted suffix while a process exits. */
+	char *deleted = strstr(path, " (deleted)");
+	if (deleted != NULL)
+		*deleted = '\0';
+	return path[0] == '/';
+}
+
+/* Check whether the target process has exited or entered the zombie state. */
+static bool java_preflight_process_is_zombie(pid_t pid)
+{
+	char path[64], line[4096];
+	FILE *fp;
+	char *right_paren;
+
+	snprintf(path, sizeof(path), "/proc/%d/stat", pid);
+	fp = fopen(path, "r");
+	if (fp == NULL)
+		return true;
+	if (fgets(line, sizeof(line), fp) == NULL) {
+		fclose(fp);
+		return true;
+	}
+	fclose(fp);
+
+	/* comm may contain spaces and parentheses; the state follows the last ')'. */
+	right_paren = strrchr(line, ')');
+	if (right_paren == NULL || right_paren[1] != ' ' || right_paren[2] == '\0')
+		return true;
+	return right_paren[2] == 'Z' || right_paren[2] == 'X';
+}
+
+/* Extract a mapped file path from a maps line and strip an exit-time deleted marker. */
+static bool java_preflight_map_path(const char *line, char *path,
+					    size_t path_len)
+{
+	char *deleted;
+	char *end;
+	int parsed;
+
+	if (line == NULL || path == NULL || path_len < 2)
+		return false;
+	parsed = sscanf(line, "%*s %*s %*s %*s %*s %4095[^\n]", path);
+	if (parsed != 1)
+		return false;
+	path[path_len - 1] = '\0';
+	deleted = strstr(path, " (deleted)");
+	if (deleted != NULL)
+		*deleted = '\0';
+	end = path + strlen(path);
+	while (end > path && isspace((unsigned char)end[-1]))
+		*--end = '\0';
+	return path[0] == '/';
+}
+
+/* Check whether a maps filename is an OpenJ9 VM core library. */
+static bool java_preflight_is_openj9_library(const char *name)
+{
+	const char *suffix;
+
+	if (name == NULL || strncmp(name, "libj9vm", 7) != 0)
+		return false;
+	suffix = name + 7;
+	if (*suffix == '.')
+		return strcmp(suffix, ".so") == 0;
+	while (isdigit((unsigned char)*suffix))
+		suffix++;
+	return strcmp(suffix, ".so") == 0;
+}
+
+/* Scan the target maps and distinguish HotSpot from other known JVMs. */
+static bool java_preflight_maps(pid_t pid, java_preflight_info_t *info)
+{
+	char maps_path[64], line[PATH_MAX + 256];
+	char mapped_path[PATH_MAX];
+	FILE *fp;
+	bool found_libjvm = false;
+	bool found_other_jvm = false;
+
+	snprintf(maps_path, sizeof(maps_path), "/proc/%d/maps", pid);
+	fp = fopen(maps_path, "r");
+	if (fp == NULL)
+		return false;
+	while (fgets(line, sizeof(line), fp) != NULL) {
+		char *slash;
+
+		if (!java_preflight_map_path(line, mapped_path,
+					     sizeof(mapped_path)))
+			continue;
+		slash = strrchr(mapped_path, '/');
+		if (slash == NULL)
+			slash = mapped_path;
+		else
+			slash++;
+		if (java_preflight_is_openj9_library(slash)) {
+			/* OpenJ9 may also map a compatibility libjvm.so; prefer libj9vm. */
+			found_other_jvm = true;
+			continue;
+		}
+		if (strcmp(slash, "libjvm.so") == 0) {
+			found_libjvm = true;
+		}
+	}
+	fclose(fp);
+	if (found_other_jvm) {
+		info->is_other_jvm = true;
+		return true;
+	}
+	if (found_libjvm) {
+		info->is_hotspot = true;
+		return true;
+	}
+	return false;
+}
+
+/* Copy a selected range from -version output without relying on release format. */
+static void java_preflight_copy_range(const char *start, const char *end,
+					      char *dst, size_t dst_len)
+{
+	size_t len;
+
+	if (start == NULL || end == NULL || dst == NULL || dst_len == 0 ||
+	    end < start) {
+		return;
+	}
+	len = (size_t)(end - start);
+	if (len >= dst_len)
+		len = dst_len - 1;
+	memcpy(dst, start, len);
+	dst[len] = '\0';
+}
+
+/* Parse JAVA_VERSION from the target JVM -version output. */
+static void java_preflight_parse_version_output(const char *output,
+						java_preflight_info_t *info)
+{
+	const char *start;
+	const char *end;
+
+	if (output == NULL || info == NULL)
+		return;
+	/* The standard first output line looks like openjdk version "1.8.0_412". */
+	start = strstr(output, "version \"");
+	if (start == NULL)
+		return;
+	start += strlen("version \"");
+	end = strchr(start, '"');
+	java_preflight_copy_range(start, end, info->java_version,
+				  sizeof(info->java_version));
+}
+
+/* Derive the search path for JVM libraries such as libjli.so from maps and exe. */
+static void java_preflight_build_library_path(pid_t pid,
+					       const char *exe_path, char *path,
+					       size_t path_len)
+{
+	char maps_path[64], line[PATH_MAX + 256], mapped_path[PATH_MAX];
+	FILE *fp;
+
+	if (path == NULL || path_len == 0)
+		return;
+	path[0] = '\0';
+	snprintf(maps_path, sizeof(maps_path), "/proc/%d/maps", pid);
+	fp = fopen(maps_path, "r");
+	if (fp != NULL) {
+		while (fgets(line, sizeof(line), fp) != NULL) {
+			char *slash;
+			if (!java_preflight_map_path(line, mapped_path,
+					     sizeof(mapped_path)))
+				continue;
+			slash = strrchr(mapped_path, '/');
+			if (slash == NULL)
+				continue;
+			if (strcmp(slash + 1, "libjvm.so") != 0)
+				continue;
+			*slash = '\0';
+			slash = strrchr(mapped_path, '/');
+			if (slash == NULL || strcmp(slash + 1, "server") != 0)
+				continue;
+			*slash = '\0';
+			snprintf(path, path_len, "%s/jli:%s:%s/server", mapped_path,
+				 mapped_path, mapped_path);
+			break;
+		}
+		fclose(fp);
+	}
+	if (path[0] != '\0')
+		return;
+
+	/* If maps cannot be read, derive common architecture directories from the
+	 * standard <jre>/bin/java layout. */
+	if (exe_path != NULL && exe_path[0] == '/') {
+		char runtime_root[PATH_MAX];
+		char *slash = strrchr(exe_path, '/');
+		if (slash != NULL) {
+			size_t len = (size_t)(slash - exe_path);
+			if (len >= sizeof(runtime_root))
+				len = sizeof(runtime_root) - 1;
+			memcpy(runtime_root, exe_path, len);
+			runtime_root[len] = '\0';
+			slash = strrchr(runtime_root, '/');
+			if (slash != NULL && strcmp(slash + 1, "bin") == 0) {
+				*slash = '\0';
+				snprintf(path, path_len,
+					 "%s/lib/amd64/jli:%s/lib/amd64:%s/lib/amd64/server:"
+					 "%s/lib/aarch64/jli:%s/lib/aarch64:%s/lib/aarch64/server",
+					 runtime_root, runtime_root, runtime_root,
+					 runtime_root, runtime_root, runtime_root);
+			}
+		}
+	}
+}
+
+/* Read one NUL-separated environment variable from the target process. */
+static int java_preflight_read_env(pid_t pid, const char *name, char *value,
+					   size_t value_len)
+{
+	char path[64];
+	char *entry = NULL;
+	size_t entry_len = 0;
+	size_t name_len;
+	ssize_t length;
+	FILE *fp;
+	int found = 0;
+
+	if (name == NULL || value == NULL || value_len == 0)
+		return -1;
+	snprintf(path, sizeof(path), "/proc/%d/environ", pid);
+	fp = fopen(path, "rb");
+	if (fp == NULL)
+		return -1;
+	name_len = strlen(name);
+	while ((length = getdelim(&entry, &entry_len, '\0', fp)) >= 0) {
+		if ((size_t)length <= name_len ||
+		    strncmp(entry, name, name_len) != 0 || entry[name_len] != '=')
+			continue;
+		if (length > 0 && entry[length - 1] == '\0')
+			length -= 1;
+		if ((size_t)length < name_len + 1 ||
+		    (size_t)length - name_len - 1 >= value_len) {
+			free(entry);
+			fclose(fp);
+			return -1;
+		}
+		memcpy(value, entry + name_len + 1,
+		       (size_t)length - name_len - 1);
+		value[(size_t)length - name_len - 1] = '\0';
+		found = 1;
+		break;
+	}
+	if (ferror(fp))
+		found = -1;
+	free(entry);
+	fclose(fp);
+	return found;
+}
+/* Append one dynamic-library directory without truncating the target path. */
+static bool java_preflight_append_library_path(char *path, size_t path_len,
+						 const char *directory)
+{
+	size_t used;
+	size_t remain;
+	int length;
+
+	if (directory == NULL || directory[0] == '\0')
+		return true;
+	used = strlen(path);
+	if (used >= path_len)
+		return false;
+	remain = path_len - used;
+	length = snprintf(path + used, remain, "%s%s", used ? ":" : "",
+				  directory);
+	return length >= 0 && (size_t)length < remain;
+}
+
+/* Compare two namespace identities using the stat result for the ns files. */
+static bool java_preflight_same_namespace(const struct stat *left,
+						 const struct stat *right)
+{
+	return left != NULL && right != NULL && left->st_dev == right->st_dev &&
+	       left->st_ino == right->st_ino;
+}
+
+/* Open a target namespace fd, or report that the current namespace is equal. */
+static int java_preflight_open_namespace(pid_t pid, const char *type,
+						 bool *same_namespace)
+{
+	char target_path[64];
+	char self_path[64];
+	struct stat target_stat;
+	struct stat self_stat;
+	int fd;
+
+	if (same_namespace == NULL || type == NULL)
+		return -1;
+	*same_namespace = false;
+	if (snprintf(target_path, sizeof(target_path), "/proc/%d/ns/%s", pid,
+		     type) >= (int)sizeof(target_path) ||
+	    snprintf(self_path, sizeof(self_path), "/proc/self/ns/%s", type) >=
+		    (int)sizeof(self_path))
+		return -1;
+	if (stat(target_path, &target_stat) < 0 ||
+	    stat(self_path, &self_stat) < 0)
+		return -1;
+	if (java_preflight_same_namespace(&target_stat, &self_stat)) {
+		*same_namespace = true;
+		return -1;
+	}
+	fd = open(target_path, O_RDONLY | O_CLOEXEC);
+	if (fd < 0)
+		return -1;
+	return fd;
+}
+
+/* Return a monotonic clock value in milliseconds for the parent timeout. */
+static int64_t java_preflight_monotonic_ms(void)
+{
+	struct timespec ts;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0)
+		return -1;
+	return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+/* Execute Java directly in the helper's target namespaces. */
+static void java_preflight_version_runner(const char *exe_path,
+						 char *const envp[], int output_fd)
+{
+	char *const argv[] = { (char *)exe_path, (char *)"-version", NULL };
+
+	if (dup2(output_fd, STDOUT_FILENO) < 0 ||
+	    dup2(output_fd, STDERR_FILENO) < 0)
+		_exit(125);
+	if (output_fd != STDOUT_FILENO && output_fd != STDERR_FILENO)
+		close(output_fd);
+	execve(exe_path, argv, envp);
+	_exit(127);
+}
+
+/* Enter target namespaces, fork the runner, and wait for its exit status. */
+static void java_preflight_version_helper(const char *exe_path,
+						 char *const envp[], int pid_ns_fd,
+						 int mnt_ns_fd, int output_fd)
+{
+	pid_t runner_pid;
+	int status;
+
+	/* Isolate helper and runner so a timeout can terminate both processes. */
+	if (setpgid(0, 0) < 0)
+		_exit(124);
+#ifdef __NR_setns
+	if (pid_ns_fd >= 0 && syscall(__NR_setns, pid_ns_fd, CLONE_NEWPID) < 0)
+		_exit(124);
+	if (mnt_ns_fd >= 0 && syscall(__NR_setns, mnt_ns_fd, CLONE_NEWNS) < 0)
+		_exit(124);
+#else
+	(void)pid_ns_fd;
+	(void)mnt_ns_fd;
+	_exit(124);
+#endif
+	if (pid_ns_fd >= 0)
+		close(pid_ns_fd);
+	if (mnt_ns_fd >= 0)
+		close(mnt_ns_fd);
+
+	/* PID namespace changes apply to children created after setns(). */
+	runner_pid = fork();
+	if (runner_pid < 0)
+		_exit(124);
+	if (runner_pid == 0)
+		java_preflight_version_runner(exe_path, envp, output_fd);
+	close(output_fd);
+	while (waitpid(runner_pid, &status, 0) < 0) {
+		if (errno != EINTR)
+			_exit(124);
+	}
+	if (WIFEXITED(status))
+		_exit(WEXITSTATUS(status));
+	_exit(128 + WTERMSIG(status));
+}
+
+/* Drain version output without allowing a full pipe to block the runner. */
+static void java_preflight_drain_output(int fd, char *output,
+						size_t output_len, size_t *used,
+						 bool *eof)
+{
+	char discard[1024];
+	char *buffer;
+	ssize_t length;
+	size_t remain;
+
+	while (!*eof) {
+		buffer = *used < output_len - 1 ? output + *used : discard;
+		remain = *used < output_len - 1 ? output_len - 1 - *used :
+				 sizeof(discard);
+		length = read(fd, buffer, remain);
+		if (length > 0) {
+			if (buffer != discard)
+				*used += (size_t)length;
+			continue;
+		}
+		if (length == 0) {
+			*eof = true;
+			break;
+		}
+		if (errno == EINTR)
+			continue;
+		if (errno == EAGAIN || errno == EWOULDBLOCK)
+			break;
+		*eof = true;
+	}
+	if (output_len > 0)
+		output[*used < output_len ? *used : output_len - 1] = '\0';
+}
+
+/* Terminate and reap a helper together with its Java runner process group. */
+static void java_preflight_kill_helper(pid_t helper_pid, int *status)
+{
+	if (kill(-helper_pid, SIGKILL) < 0)
+		kill(helper_pid, SIGKILL);
+	while (waitpid(helper_pid, status, 0) < 0 && errno == EINTR)
+		;
+}
+
+/* Wait for the helper with a bounded timeout and collect its output. */
+static bool java_preflight_wait_helper(pid_t helper_pid, int output_fd,
+						 char *output, size_t output_len)
+{
+	struct pollfd poll_fd = { .fd = output_fd, .events = POLLIN };
+	int flags;
+	int status;
+	int poll_timeout;
+	int64_t deadline;
+	int64_t now;
+	pid_t wait_result;
+	size_t used = 0;
+	bool eof = false;
+	bool exited = false;
+
+	flags = fcntl(output_fd, F_GETFL, 0);
+	if (flags < 0 || fcntl(output_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+		java_preflight_kill_helper(helper_pid, &status);
+		return false;
+	}
+	deadline = java_preflight_monotonic_ms();
+	if (deadline < 0) {
+		java_preflight_kill_helper(helper_pid, &status);
+		return false;
+	}
+	deadline += JAVA_PREFLIGHT_VERSION_TIMEOUT_MS;
+	while (!exited || !eof) {
+		java_preflight_drain_output(output_fd, output, output_len, &used,
+						&eof);
+		if (!exited) {
+			wait_result = waitpid(helper_pid, &status, WNOHANG);
+			if (wait_result == helper_pid)
+				exited = true;
+			else if (wait_result < 0 && errno != EINTR) {
+				java_preflight_kill_helper(helper_pid, &status);
+				close(output_fd);
+				return false;
+			}
+		}
+		if (exited && eof)
+			break;
+		now = java_preflight_monotonic_ms();
+		if (now < 0 || now >= deadline) {
+			java_preflight_kill_helper(helper_pid, &status);
+			close(output_fd);
+			return false;
+		}
+		poll_timeout = (int)(deadline - now);
+		if (poll_timeout > 100)
+			poll_timeout = 100;
+		if (poll(&poll_fd, 1, poll_timeout) < 0 && errno != EINTR) {
+			java_preflight_kill_helper(helper_pid, &status);
+			close(output_fd);
+			return false;
+		}
+	}
+	close(output_fd);
+	return exited && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+/* Execute the target JVM -version in a bounded helper process. */
+static bool java_preflight_exec_version(pid_t pid, const char *exe_path,
+					java_preflight_info_t *info)
+{
+	char library_path[PATH_MAX * 2] = {};
+	char target_library_path[PATH_MAX * 2] = {};
+	char target_java_home[PATH_MAX] = {};
+	char target_path[PATH_MAX * 2] = {};
+	char target_home[PATH_MAX] = {};
+	char target_lang[PATH_MAX] = {};
+	char output[16384] = {};
+	char env_library[PATH_MAX * 2 + 32];
+	char env_java_home[PATH_MAX + 16];
+	char env_path[PATH_MAX * 2 + 8];
+	char env_home[PATH_MAX + 8];
+	char env_lang[PATH_MAX + 8];
+	char *envp[6] = {};
+	int env_count = 0;
+	int pid_ns_fd = -1;
+	int mnt_ns_fd = -1;
+	int pipe_fds[2] = { -1, -1 };
+	int flags;
+	pid_t helper_pid;
+	int value_ret;
+	bool same_pid_ns = false;
+	bool same_mnt_ns = false;
+	bool version_ok = false;
+
+	if (exe_path == NULL || exe_path[0] != '/' || info == NULL)
+		return false;
+	java_preflight_build_library_path(pid, exe_path, library_path,
+						  sizeof(library_path));
+	value_ret = java_preflight_read_env(pid, "LD_LIBRARY_PATH",
+					     target_library_path,
+					     sizeof(target_library_path));
+	if (value_ret < 0)
+		return false;
+	value_ret = java_preflight_read_env(pid, "JAVA_HOME", target_java_home,
+					     sizeof(target_java_home));
+	if (value_ret < 0)
+		return false;
+	value_ret = java_preflight_read_env(pid, "PATH", target_path,
+					     sizeof(target_path));
+	if (value_ret < 0)
+		return false;
+	value_ret = java_preflight_read_env(pid, "HOME", target_home,
+					     sizeof(target_home));
+	if (value_ret < 0)
+		return false;
+	value_ret = java_preflight_read_env(pid, "LANG", target_lang,
+					     sizeof(target_lang));
+	if (value_ret < 0)
+		return false;
+
+	/* Prefer the mapped JVM directories and retain the target environment path. */
+	if (!java_preflight_append_library_path(target_library_path,
+						 sizeof(target_library_path), library_path))
+		return false;
+	if (target_path[0] == '\0')
+		snprintf(target_path, sizeof(target_path), "/usr/bin:/bin");
+	if (target_home[0] == '\0')
+		snprintf(target_home, sizeof(target_home), "/tmp");
+	if (snprintf(env_library, sizeof(env_library), "LD_LIBRARY_PATH=%s",
+		     target_library_path) >= (int)sizeof(env_library) ||
+	    snprintf(env_path, sizeof(env_path), "PATH=%s", target_path) >=
+		    (int)sizeof(env_path) ||
+	    snprintf(env_home, sizeof(env_home), "HOME=%s", target_home) >=
+		    (int)sizeof(env_home))
+		return false;
+	envp[env_count++] = env_library;
+	if (target_java_home[0] != '\0') {
+		if (snprintf(env_java_home, sizeof(env_java_home), "JAVA_HOME=%s",
+			     target_java_home) >= (int)sizeof(env_java_home))
+			return false;
+		envp[env_count++] = env_java_home;
+	}
+	envp[env_count++] = env_path;
+	envp[env_count++] = env_home;
+	if (target_lang[0] != '\0') {
+		if (snprintf(env_lang, sizeof(env_lang), "LANG=%s", target_lang) >=
+		    (int)sizeof(env_lang))
+			return false;
+		envp[env_count++] = env_lang;
+	}
+	envp[env_count] = NULL;
+
+	pid_ns_fd = java_preflight_open_namespace(pid, "pid", &same_pid_ns);
+	if (pid_ns_fd < 0 && !same_pid_ns)
+		return false;
+	mnt_ns_fd = java_preflight_open_namespace(pid, "mnt", &same_mnt_ns);
+	if (mnt_ns_fd < 0 && !same_mnt_ns) {
+		if (pid_ns_fd >= 0)
+			close(pid_ns_fd);
+		return false;
+	}
+	if (pipe(pipe_fds) < 0)
+		goto cleanup_fds;
+	flags = fcntl(pipe_fds[0], F_GETFL, 0);
+	if (flags < 0 || fcntl(pipe_fds[0], F_SETFL, flags | O_NONBLOCK) < 0)
+		goto cleanup_fds;
+	helper_pid = fork();
+	if (helper_pid < 0)
+		goto cleanup_fds;
+	if (helper_pid == 0) {
+		close(pipe_fds[0]);
+		java_preflight_version_helper(exe_path, envp, pid_ns_fd,
+						      mnt_ns_fd, pipe_fds[1]);
+		_exit(124);
+	}
+	close(pipe_fds[1]);
+	pipe_fds[1] = -1;
+	setpgid(helper_pid, helper_pid);
+	if (!java_preflight_wait_helper(helper_pid, pipe_fds[0], output,
+						 sizeof(output))) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "JAVA_VERSION_HELPER_FAILED_OR_TIMEOUT pid=%d "
+			     "timeout=%dms\n", pid,
+			     JAVA_PREFLIGHT_VERSION_TIMEOUT_MS);
+		pipe_fds[0] = -1;
+		goto cleanup_fds;
+	}
+	pipe_fds[0] = -1;
+	java_preflight_parse_version_output(output, info);
+	version_ok = info->java_version[0] != '\0';
+	ebpf_info(JAVA_LOG_TAG
+		  "JAVA_VERSION_HELPER pid=%d pid_ns=%s mnt_ns=%s\n", pid,
+		  same_pid_ns ? "same" : "target",
+		  same_mnt_ns ? "same" : "target");
+
+cleanup_fds:
+	if (pipe_fds[0] >= 0)
+		close(pipe_fds[0]);
+	if (pipe_fds[1] >= 0)
+		close(pipe_fds[1]);
+	if (pid_ns_fd >= 0)
+		close(pid_ns_fd);
+	if (mnt_ns_fd >= 0)
+		close(mnt_ns_fd);
+	return version_ok;
+}
+
+/* Check whether an environment variable is a standard JVM option carrier. */
+static bool java_preflight_is_jvm_option_env(const char *name)
+{
+	return strcmp(name, "JAVA_TOOL_OPTIONS") == 0 ||
+	       strcmp(name, "_JAVA_OPTIONS") == 0 ||
+	       strcmp(name, "JDK_JAVA_OPTIONS") == 0;
+}
+
+/* Match a complete NUL-separated argv token in /proc/<pid>/cmdline. */
+static int java_preflight_cmdline_contains_option(FILE *fp,
+						 const char *needle,
+						 size_t needle_len)
+{
+	size_t token_len = 0;
+	bool token_match = true;
+	int c;
+
+	while ((c = fgetc(fp)) != EOF) {
+		if (c == '\0') {
+			if (token_match && token_len == needle_len)
+				return 1;
+			token_len = 0;
+			token_match = true;
+			continue;
+		}
+		if (token_len >= needle_len ||
+		    c != (unsigned char)needle[token_len])
+			token_match = false;
+		token_len++;
+	}
+	if (ferror(fp))
+		return -1;
+	/* Accept a final record without a trailing NUL for completeness. */
+	return token_match && token_len == needle_len;
+}
+
+/* Match a whitespace-delimited option in standard JVM option environment variables. */
+static int java_preflight_environ_contains_option(FILE *fp,
+						  const char *needle,
+						  size_t needle_len)
+{
+	char env_name[64];
+	size_t env_name_len = 0, token_len = 0;
+	bool env_name_valid = true, option_env = false;
+	bool token_match = true, in_value = false;
+	int c;
+
+	while ((c = fgetc(fp)) != EOF) {
+		if (c == '\0') {
+			if (in_value && option_env && token_match &&
+			    token_len == needle_len)
+				return 1;
+			env_name_len = 0;
+			env_name_valid = true;
+			option_env = false;
+			token_len = 0;
+			token_match = true;
+			in_value = false;
+			continue;
+		}
+		if (!in_value) {
+			if (c == '=') {
+				env_name[env_name_len] = '\0';
+				option_env = env_name_valid &&
+					java_preflight_is_jvm_option_env(env_name);
+				in_value = true;
+				token_len = 0;
+				token_match = true;
+				continue;
+			}
+			if (env_name_len + 1 < sizeof(env_name))
+				env_name[env_name_len++] = (char)c;
+			else
+				env_name_valid = false;
+			continue;
+		}
+		if (!option_env)
+			continue;
+		if (isspace((unsigned char)c)) {
+			if (token_match && token_len == needle_len)
+				return 1;
+			token_len = 0;
+			token_match = true;
+			continue;
+		}
+		if (token_len >= needle_len ||
+		    c != (unsigned char)needle[token_len])
+			token_match = false;
+		token_len++;
+	}
+	if (ferror(fp))
+		return -1;
+	if (in_value && option_env && token_match && token_len == needle_len)
+		return 1;
+	return 0;
+}
+
+/* Find a real JVM option without matching arbitrary substrings in /proc data. */
+/* Return 1 if found, 0 if absent, and -1 if reading failed. */
+static int java_preflight_proc_contains(pid_t pid, const char *name,
+					       const char *needle)
+{
+	char path[64];
+	FILE *fp;
+	size_t needle_len;
+	int result;
+
+	snprintf(path, sizeof(path), "/proc/%d/%s", pid, name);
+	fp = fopen(path, "rb");
+	if (fp == NULL)
+		return -1;
+	needle_len = strlen(needle);
+	if (needle_len == 0) {
+		fclose(fp);
+		return 0;
+	}
+	if (strcmp(name, "cmdline") == 0)
+		result = java_preflight_cmdline_contains_option(fp, needle,
+								 needle_len);
+	else if (strcmp(name, "environ") == 0)
+		result = java_preflight_environ_contains_option(fp, needle,
+								  needle_len);
+	else
+		result = -1;
+	fclose(fp);
+	return result;
+}
+
+/* Parse the Java version and extract the Java 8 update number. */
+static bool java_preflight_parse_version(const char *version, int *major,
+						 int *update)
+{
+	const char *p = version;
+	char *end;
+	long first, second = -1;
+
+	if (version == NULL || major == NULL || update == NULL || *version == '\0')
+		return false;
+	if (!isdigit((unsigned char)*p))
+		return false;
+	first = strtol(p, &end, 10);
+	if (end == p || first < 0 || first > INT_MAX)
+		return false;
+	if (*end == '.' && end[1] != '\0' && isdigit((unsigned char)end[1])) {
+		second = strtol(end + 1, &end, 10);
+	}
+	if (first == 1 && second >= 0) {
+		*major = (int)second;
+	} else {
+		*major = (int)first;
+	}
+	*update = -1;
+	if (*major == 8) {
+		const char *u = strchr(version, '_');
+		long parsed;
+		if (u == NULL)
+			u = strchr(version, 'u');
+		if (u != NULL && isdigit((unsigned char)u[1])) {
+			parsed = strtol(u + 1, &end, 10);
+			if (parsed < 0 || parsed > INT_MAX)
+				return false;
+			if (*end != '\0' && *end != '-' && *end != '+')
+				return false;
+			*update = (int)parsed;
+		} else if (first == 8 && *end == '.' &&
+			   isdigit((unsigned char)end[1])) {
+			/* Also accept version strings in the 8.0.382 form. */
+			parsed = strtol(end + 1, &end, 10);
+			if (parsed < 0 || parsed > INT_MAX)
+				return false;
+			*update = (int)parsed;
+			if (*end != '\0' && *end != '-' && *end != '+')
+				return false;
+		}
+		if (*update < 0)
+			return false;
+	}
+	return true;
+}
+
+/*
+ * Core JVM attach preflight entry point.
+ *
+ * This is the shared version gate for the main Agent and deepflow-jattach.
+ * The checks run in the following order:
+ *
+ * 1. Process state check: read /proc/<pid>/stat and exclude exited or zombie
+ *    processes. Record the PID start time and exe for later PID-reuse checks.
+ *
+ * 2. JVM map check: read /proc/<pid>/maps and identify HotSpot libjvm.so or
+ *    another known JVM core library, such as OpenJ9 libj9vm. If neither is
+ *    found, the target is not a recognizable JVM and the result is skip. An
+ *    already loaded Agent is not a rejection condition because a valid reattach
+ *    may call Agent_OnAttach again.
+ *
+
+ * 3. Target JVM version check: obtain -version only for HotSpot. Read the
+ *    target exe, maps and NUL-separated environ first; build the target
+ *    LD_LIBRARY_PATH, then fork a short-lived helper. The helper enters the
+ *    target PID/mount namespaces and forks a runner that directly execve()s
+ *    the target Java executable. The parent drains the output and applies a
+ *    bounded timeout; the helper exits after the runner finishes, so the Agent
+ *    process and its later children never enter the target namespaces. Skip
+ *    conservatively when namespace setup, command execution, timeout, or
+ *    version parsing fails. Skip HotSpot Java 8 updates below 352 because both
+ *    known fixes are missing; also skip 352-381 because JDK-8305165 is missing.
+ *    Only 382 and newer meet the current complete-fix baseline. This is a patch
+ *    completeness gate, not a claim that every update below 382 reproduced the
+ *    crash. Non-HotSpot JVMs do not run these specialized checks.
+ *
+ * 4. Attach capability check: read the target cmdline and environ. Match the
+ *    complete JVM option token in cmdline, and match whitespace-delimited
+ *    tokens only in the standard JVM option environment variables. Skip when
+ *    -XX:+DisableAttachMechanism is present to avoid an injection that must
+ *    fail; if either file cannot be read, capability cannot be confirmed and
+ *    the result is also a conservative skip.
+ *
+ * 5. Race recheck: read the PID start time and exe again. If the process exits,
+ *    the PID is reused, or the exe changes during the check, discard the result
+ *    instead of applying it to another process.
+ *
+ * Return JAVA_PREFLIGHT_ALLOW only after every check passes. Only then may the
+ * caller create a socket, copy the Agent SO, and invoke jattach; every skip
+ * result must stop the injection flow.
+ */
+java_preflight_result_t java_attach_preflight(pid_t pid,
+					      java_preflight_info_t *info)
+{
+	char exe_before[PATH_MAX], exe_after[PATH_MAX];
+	u64 start_before, start_after;
+	int cmdline_check;
+	int environ_check;
+
+	if (info == NULL)
+		return JAVA_PREFLIGHT_ERROR;
+	memset(info, 0, sizeof(*info));
+	info->update_version = -1;
+	if (pid <= 0) {
+		java_preflight_set_reason(info, "invalid_pid");
+		return JAVA_PREFLIGHT_SKIP;
+	}
+	if (java_preflight_process_is_zombie(pid)) {
+		java_preflight_set_reason(info, "zombie_or_exited");
+		return JAVA_PREFLIGHT_SKIP;
+	}
+	start_before = get_process_starttime_and_comm(pid, NULL, 0);
+	if (start_before == 0 || !java_preflight_readlink(pid, exe_before,
+							 sizeof(exe_before))) {
+		java_preflight_set_reason(info, "process_not_readable");
+		return JAVA_PREFLIGHT_SKIP;
+	}
+	if (!java_preflight_maps(pid, info)) {
+		java_preflight_set_reason(info, "jvm_not_mapped");
+		return JAVA_PREFLIGHT_SKIP;
+	}
+	if (info->is_hotspot &&
+	    !java_preflight_exec_version(pid, exe_before, info)) {
+		/* A failed version check cannot verify the 8u382 gate; skip attach. */
+		java_preflight_set_reason(info, "version_command_failed");
+		return JAVA_PREFLIGHT_SKIP;
+	}
+	if (info->is_hotspot) {
+		if (info->java_version[0] == '\0' ||
+		    !java_preflight_parse_version(info->java_version,
+						   &info->major_version,
+						   &info->update_version)) {
+			java_preflight_set_reason(info, "unrecognized_java_version");
+			return JAVA_PREFLIGHT_SKIP;
+		}
+	}
+	cmdline_check = java_preflight_proc_contains(
+		pid, "cmdline", "-XX:+DisableAttachMechanism");
+	environ_check = java_preflight_proc_contains(
+		pid, "environ", "-XX:+DisableAttachMechanism");
+	if (cmdline_check < 0 || environ_check < 0) {
+		/* Unreadable JVM options prevent confirming attach capability; skip. */
+		java_preflight_set_reason(info, "attach_options_unreadable");
+		return JAVA_PREFLIGHT_SKIP;
+	}
+	if (cmdline_check > 0 || environ_check > 0) {
+		info->attach_disabled = true;
+		java_preflight_set_reason(info, "attach_disabled");
+		return JAVA_PREFLIGHT_SKIP;
+	}
+	if (info->is_hotspot && info->major_version == 8 &&
+	    info->update_version < JAVA_ATTACH_JAVA8_COMPLETE_FIX_UPDATE) {
+		/* 8u0-8u351 miss both fixes; 8u352-8u381 miss the second fix. */
+		if (info->update_version < JAVA_ATTACH_JAVA8_FIRST_FIX_UPDATE)
+			java_preflight_set_reason(
+				info,
+				"hotspot_java8_missing_JDK-8173361_and_JDK-8305165_crash_risk");
+		else
+			java_preflight_set_reason(
+				info,
+				"hotspot_java8_missing_JDK-8305165_crash_risk");
+		return JAVA_PREFLIGHT_SKIP;
+	}
+	start_after = get_process_starttime_and_comm(pid, NULL, 0);
+	if (start_after == 0 || start_after != start_before ||
+	    !java_preflight_readlink(pid, exe_after, sizeof(exe_after)) ||
+	    strcmp(exe_before, exe_after) != 0) {
+		java_preflight_set_reason(info, "pid_reused_or_exe_changed");
+		return JAVA_PREFLIGHT_SKIP;
+	}
+
+	java_preflight_set_reason(info, "allowed");
+	return JAVA_PREFLIGHT_ALLOW;
+}
+
+/* Convert the preflight result to Agent state and emit the common log. */
+static int java_preflight_status(pid_t pid,
+				 java_preflight_result_t result,
+				 const java_preflight_info_t *info)
+{
+	const char *required;
+
+	if (result == JAVA_PREFLIGHT_ALLOW)
+		return 0;
+	if (info != NULL) {
+		required = info->is_hotspot ? "8u382+" : "none";
+		ebpf_warning(JAVA_LOG_TAG
+			     "JAVA_ATTACH_SKIP pid=%d reason=%s jvm=%s required=%s\n", pid,
+			     info->reason[0] ? info->reason : "unknown",
+			     info->java_version[0] ? info->java_version : "unknown",
+			     required);
+	}
+	return JAVA_ATTACH_SKIPPED_UNSUPPORTED_JVM;
+}
 
 bool test_dl_open(const char *so_lib_file_path)
 {
@@ -920,6 +1907,13 @@ static int create_symbol_collect_task(pid_t pid, options_t * opts,
 	int ret = -1;
 	symbol_collect_task_t *task = NULL;
 	int map_socket = -1, log_socket = -1;
+	java_preflight_info_t preflight_info;
+	java_preflight_result_t preflight_result;
+
+	/* The second check covers the window between process discovery and task creation. */
+	preflight_result = java_attach_preflight(pid, &preflight_info);
+	if (preflight_result != JAVA_PREFLIGHT_ALLOW)
+		return java_preflight_status(pid, preflight_result, &preflight_info);
 
 	// make the sockets accessable from unprivileged user in container
 	umask(0);
@@ -976,6 +1970,11 @@ static int create_symbol_collect_task(pid_t pid, options_t * opts,
 	memset(ret_buf, 0, sizeof(ret_buf));
 	ret =
 	    exec_command(DF_JAVA_ATTACH_CMD, buffer, ret_buf, sizeof(ret_buf));
+	/* deepflow-jattach is a separate process; negative skip codes become 254/253
+	 * through the shell, so restore the original policy result for structured logs. */
+	if (ret != 0 && strstr(ret_buf, "JAVA_ATTACH_SKIP") != NULL) {
+		ret = JAVA_ATTACH_SKIPPED_UNSUPPORTED_JVM;
+	}
 	if (ret != 0) {
 		ebpf_warning(JAVA_LOG_TAG "ret %d: %s", ret, ret_buf);
 	}
@@ -1092,8 +2091,20 @@ static symbol_collect_task_t *get_task_by_pid(pid_t pid)
 	return task;
 }
 
+/*
+ * First gate for the main Agent: it must run before the thread pool, socket,
+ * and collector are created.
+ */
 int start_java_symbol_collection(pid_t pid, const char *opts)
 {
+	java_preflight_info_t preflight_info;
+	java_preflight_result_t preflight_result;
+
+	/* If the JVM is rejected, do not initialize the collector or create a socket. */
+	preflight_result = java_attach_preflight(pid, &preflight_info);
+	if (preflight_result != JAVA_PREFLIGHT_ALLOW)
+		return java_preflight_status(pid, preflight_result, &preflight_info);
+
 	// Initialize a thread pool for managing Java symbols.
 	if (g_collect_pool == NULL) {
 		if (symbol_collect_thread_pool_init()) {
@@ -1412,9 +2423,22 @@ static int attach(pid_t pid, char *opts)
 	return ret;
 }
 
+/*
+ * Second gate for deepflow-jattach: it must run before namespace switching,
+ * SO preparation, and jattach invocation to avoid a check race between the
+ * main Agent and the standalone tool.
+ */
 int java_attach(pid_t pid)
 {
 	int ret = -1;
+	java_preflight_info_t preflight_info;
+	java_preflight_result_t preflight_result;
+
+	/* Defense in depth: run the check again immediately before preparing jattach. */
+	preflight_result = java_attach_preflight(pid, &preflight_info);
+	if (preflight_result != JAVA_PREFLIGHT_ALLOW)
+		return java_preflight_status(pid, preflight_result, &preflight_info);
+
 	bool is_same_mnt = is_same_mntns(pid);
 	if (is_same_mnt) {
 		ret = prepare_for_attach_same_ns(pid);

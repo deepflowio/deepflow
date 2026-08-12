@@ -103,6 +103,7 @@ OBJS := user/elf.o \
 
 JAVA_TOOL := deepflow-jattach
 JAVA_AGENT_VERSION := 3.1
+JAVA_NS_TOOL := tools/java_mnt_ns_version
 JAVA_AGENT_GNU_SO := df_java_agent_v$(JAVA_AGENT_VERSION).so
 JAVA_AGENT_MUSL_SO := df_java_agent_musl_v$(JAVA_AGENT_VERSION).so
 JAVA_AGENT_SO := $(JAVA_AGENT_GNU_SO) $(JAVA_AGENT_MUSL_SO)
@@ -250,7 +251,7 @@ $(JAVA_AGENT_MUSL_SO): tools/bintobuffer $(JAVA_AGENT_SRC)
 
 build: $(CTLBIN_C) $(ELFFILES) $(JAVA_TOOL) $(LIBTRACE)
 
-tools: $(CTLBIN)
+tools: $(CTLBIN) $(JAVA_NS_TOOL)
 
 $(CTLBIN_C): $(CTLBIN) tools/bintobuffer
 	$(call msg,CTLBIN_C,$(CTLBIN_C))
@@ -259,6 +260,10 @@ $(CTLBIN_C): $(CTLBIN) tools/bintobuffer
 $(CTLBIN): $(CTLSRC) 
 	$(call msg,TOOLS,deepflow-ebpfctl)
 	$(Q)$(CC) $(CFLAGS) --static -g -O2 $(CTLSRC) -o $@ -lelf -lz -lpthread
+
+$(JAVA_NS_TOOL): tools/java_mnt_ns_version.c
+	$(call msg,TOOLS,$@)
+	$(Q)$(CC) $(CFLAGS) tools/java_mnt_ns_version.c -o $@
 
 $(JAVA_TOOL): $(JAVA_AGENT_SO) user/log.c user/utils.c user/mem.c user/vec.c user/profile/java/jvm_symbol_collect.c libs/jattach/build/libjattach.a
 	$(call msg,TOOLS,$@)
@@ -347,7 +352,7 @@ clean:
 	$(Q)rm -rf .profiler .socket-tracer
 	$(Q)rm -rf samples/rust/socket-tracer/target
 	$(Q)rm -rf samples/rust/profiler/target
-	$(Q)rm -rf $(JAVA_AGENT_SO) $(JAVA_TOOL) $(CTLBIN) $(CTLBIN_C) tools/bintobuffer
+	$(Q)rm -rf $(JAVA_AGENT_SO) $(JAVA_TOOL) $(JAVA_NS_TOOL) $(CTLBIN) $(CTLBIN_C) tools/bintobuffer
 
 test: $(ELFFILES) $(LIBTRACE)
 	$(Q)$(MAKE) -C test --no-print-directory
