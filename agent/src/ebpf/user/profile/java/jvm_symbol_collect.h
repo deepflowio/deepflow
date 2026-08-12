@@ -25,14 +25,15 @@
 #define DF_JAVA_ATTACH_CMD "/usr/bin/deepflow-jattach"
 
 /* Complete fix update boundary for standard OpenJDK 8u. */
+#define JAVA_ATTACH_JAVA8_FIRST_FIX_UPDATE 352
 #define JAVA_ATTACH_JAVA8_COMPLETE_FIX_UPDATE 382
 
 /*
- * Standard OpenJDK Java 8u0-8u351 lacks JDK-8173361, while 8u352-8u381
- * still lacks JDK-8305165. Neither range can be considered safe from the
- * version alone. The complete-fix baseline is 8u382; HotSpot versions below
- * this baseline are not injected by the profiling agent. Keep the policy here
- * so the Agent and standalone attach tool use the same decision.
+ * Standard OpenJDK Java 8u0-8u351 lacks both JDK-8173361 and JDK-8305165,
+ * while 8u352-8u381 still lacks JDK-8305165. Neither range can be considered
+ * safe from the version alone. The complete-fix baseline is 8u382; HotSpot
+ * versions below this baseline are not injected by the profiling agent. Keep
+ * the policy here so the Agent and standalone attach tool use the same decision.
  */
 #define JAVA_ATTACH_SKIPPED_UNSUPPORTED_JVM (-2)
 #define JAVA_PREFLIGHT_VERSION_LEN 128
@@ -74,9 +75,9 @@ typedef struct {
  * - HotSpot: execute the target JVM's own -version in the target namespace,
  *   without relying on a release file; parse JAVA_VERSION for Java 8 update.
  *   Do not switch namespaces when both processes already share one.
- * - HotSpot Java 8 update below 352: the first known fix is missing; skip attach.
- * - HotSpot Java 8 update 352-381: partial fixes are present, but the 8u-specific
- *   Sweeper protection is missing; skip attach under the current policy.
+ * - HotSpot Java 8 update below 352: both known fixes are missing; skip attach.
+ * - HotSpot Java 8 update 352-381: JDK-8173361 is present, but JDK-8305165 is
+ *   missing; skip attach under the current policy.
  * - HotSpot Java 8 update 382 or newer: both standard OpenJDK fixes are present;
  *   continue with the remaining checks.
  * - Attach is disabled, cmdline/environ cannot be read, or the PID is reused

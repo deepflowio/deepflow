@@ -4,7 +4,7 @@
 
 DeepFlow 在采集 Java 符号前，需要把一个 JVMTI Agent 加载到目标 JVM 中。这个动作叫作 `attach`。
 
-旧版 HotSpot，特别是本次客户环境中的 Java 8u342，在处理 `CompiledMethodLoad` 事件时存在已知缺陷。Agent 一旦打开这个 JVM 能力，在高频 JIT 编译、类加载和类卸载同时发生时，可能触发 JVM 崩溃。版本范围需要分段理解：`8u0–8u351` 缺少首个已知修复，`8u352–8u381` 虽然已有第一组修复但仍缺少 8u 特有的 Sweeper 保护，`8u382` 起才包含完整补丁链。当前代码使用 `8u382` 作为完整修复门禁，因此这是保守的补丁完整性判断，不是声称所有低于 8u382 的版本都已逐一复现。
+旧版 HotSpot，特别是本次客户环境中的 Java 8u342，在处理 `CompiledMethodLoad` 事件时存在已知缺陷。Agent 一旦打开这个 JVM 能力，在高频 JIT 编译、类加载和类卸载同时发生时，可能触发 JVM 崩溃。版本范围需要分段理解：`8u0–8u351` 同时缺少 `JDK-8173361` 和 `JDK-8305165`，`8u352–8u381` 已包含前一个修复但仍缺少 `JDK-8305165`，`8u382` 起才包含完整补丁链。当前代码使用 `8u382` 作为完整修复门禁，因此这是保守的补丁完整性判断，不是声称所有低于 8u382 的版本都已逐一复现。
 
 因此，代码现在会在 attach 之前先检查目标 JVM：
 
@@ -136,8 +136,8 @@ Java 启动器能够正常启动并报告版本。目标 JVM 本身不会因为�
 版本判断首先识别 Java 8 update 所处的补丁范围：
 
 ```text
-update <= 351       -> 缺少 JDK-8173361，高风险
-352 <= update <= 381 -> 已有第一组修复，但缺少 JDK-8305165，残余风险
+update <= 351       -> 缺少 JDK-8173361 和 JDK-8305165，高风险
+352 <= update <= 381 -> 已有 JDK-8173361，但缺少 JDK-8305165，残余风险
 update >= 382       -> 两组标准 OpenJDK 修复齐全，达到当前安全基线
 ```
 
@@ -150,7 +150,7 @@ HotSpot && Java 主版本 == 8 && update < 382
 
 例如：
 
-- `1.8.0_342`：属于缺少首个修复的高风险段，跳过 attach；
+- `1.8.0_342`：属于同时缺少两个修复的高风险段，跳过 attach；
 - `1.8.0_352`：属于部分修复段，当前仍跳过 attach；
 - `1.8.0_381`：属于部分修复段，当前仍跳过 attach；
 - `1.8.0_382`：通过版本门禁；
@@ -208,8 +208,8 @@ HotSpot && Java 主版本 == 8 && update < 382
 | 进程退出或是僵尸进程 | 跳过 attach |
 | 找不到 JVM 核心库 | 跳过 attach |
 | HotSpot，`-version` 执行失败或无法解析 | 跳过 attach |
-| HotSpot，`8u0–8u351` | 缺少 JDK-8173361，跳过 attach |
-| HotSpot，`8u352–8u381` | 补丁不完整，当前跳过 attach |
+| HotSpot，`8u0–8u351` | 缺少 JDK-8173361 和 JDK-8305165，跳过 attach |
+| HotSpot，`8u352–8u381` | 缺少 JDK-8305165，当前跳过 attach |
 | HotSpot，版本达到 8u382 或更高 | 通过版本门禁，继续通用检查 |
 | OpenJ9 等非 HotSpot JVM | 不做版本门禁，继续通用检查 |
 | `DisableAttachMechanism` 已启用 | 跳过 attach |
@@ -219,11 +219,18 @@ HotSpot && Java 主版本 == 8 && update < 382
 
 跳过时会输出统一日志，例如：
 
-对于低于 8u382 的 HotSpot Java 8，`reason` 统一说明：Java 程序缺失
-`JDK-8173361` 和 `JDK-8305165` 修复，存在崩溃风险，为安全起见不执行 attach。
+对于低于 8u382 的 HotSpot Java 8，`reason` 会按版本范围说明缺失的修复：8u0–8u351
+缺少 `JDK-8173361` 和 `JDK-8305165`，8u352–8u381 缺少 `JDK-8305165`。两类版本均存在
+崩溃风险，为安全起见不执行 attach。
 
 ```text
 JAVA_ATTACH_SKIP pid=1234 reason=hotspot_java8_missing_JDK-8173361_and_JDK-8305165_crash_risk jvm=1.8.0_212 required=8u382+
+```
+
+8u352–8u381 的日志示例：
+
+```text
+JAVA_ATTACH_SKIP pid=1234 reason=hotspot_java8_missing_JDK-8305165_crash_risk jvm=1.8.0_352 required=8u382+
 ```
 
 ## 5. 本机验证结果

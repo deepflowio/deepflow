@@ -910,12 +910,11 @@ static bool java_preflight_parse_version(const char *version, int *major,
  *    bounded timeout; the helper exits after the runner finishes, so the Agent
  *    process and its later children never enter the target namespaces. Skip
  *    conservatively when namespace setup, command execution, timeout, or
- *    version parsing fails. Skip HotSpot Java 8 updates below 352 because
- *    the first fix is missing; also skip 352-381 because the 8u-specific Sweeper
- *    protection is incomplete. Only 382 and newer meet the current complete-fix
- *    baseline. This is a patch completeness gate, not a claim that every update
- *    below 382 reproduced the crash. Non-HotSpot JVMs do not run these
- *    specialized checks.
+ *    version parsing fails. Skip HotSpot Java 8 updates below 352 because both
+ *    known fixes are missing; also skip 352-381 because JDK-8305165 is missing.
+ *    Only 382 and newer meet the current complete-fix baseline. This is a patch
+ *    completeness gate, not a claim that every update below 382 reproduced the
+ *    crash. Non-HotSpot JVMs do not run these specialized checks.
  *
  * 4. Attach capability check: read the target cmdline and environ. Match the
  *    complete JVM option token in cmdline, and match whitespace-delimited
@@ -993,14 +992,15 @@ java_preflight_result_t java_attach_preflight(pid_t pid,
 	}
 	if (info->is_hotspot && info->major_version == 8 &&
 	    info->update_version < JAVA_ATTACH_JAVA8_COMPLETE_FIX_UPDATE) {
-		/*
-		 * The attach baseline requires both standard fixes. Every Java 8 update
-		 * below 8u382 is conservatively treated as missing the complete fix set,
-		 * and one unified reason is used instead of classifying the update range.
-		 */
-		java_preflight_set_reason(
-			info,
-			"hotspot_java8_missing_JDK-8173361_and_JDK-8305165_crash_risk");
+		/* 8u0-8u351 miss both fixes; 8u352-8u381 miss the second fix. */
+		if (info->update_version < JAVA_ATTACH_JAVA8_FIRST_FIX_UPDATE)
+			java_preflight_set_reason(
+				info,
+				"hotspot_java8_missing_JDK-8173361_and_JDK-8305165_crash_risk");
+		else
+			java_preflight_set_reason(
+				info,
+				"hotspot_java8_missing_JDK-8305165_crash_risk");
 		return JAVA_PREFLIGHT_SKIP;
 	}
 	start_after = get_process_starttime_and_comm(pid, NULL, 0);
