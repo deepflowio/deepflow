@@ -1201,12 +1201,39 @@ int exec_command(const char *cmd, const char *args,
 {
 	FILE *fp;
 	int rc = 0;
-	char cmd_buf[PERF_PATH_SZ * 2];
-	snprintf(cmd_buf, sizeof(cmd_buf), "%s %s", cmd, args);
+	char *cmd_buf;
+	size_t cmd_len;
+	size_t args_len;
+	size_t cmd_buf_size;
+
+	/* 按实际命令和参数长度分配缓冲区，避免固定缓存导致命令被截断。 */
+	if (cmd == NULL)
+		return -1;
+	if (args == NULL)
+		args = "";
+	cmd_len = strlen(cmd);
+	args_len = strlen(args);
+	if (cmd_len > SIZE_MAX - args_len ||
+	    cmd_len + args_len > SIZE_MAX - 2) {
+		ebpf_warning("%s command length overflow\n", __func__);
+		return -1;
+	}
+	cmd_buf_size = cmd_len + args_len + 2;
+	cmd_buf = malloc(cmd_buf_size);
+	if (cmd_buf == NULL) {
+		ebpf_warning("%s command buffer allocation failed, size %zu\n",
+			     __func__, cmd_buf_size);
+		return -1;
+	}
+	if (snprintf(cmd_buf, cmd_buf_size, "%s %s", cmd, args) < 0) {
+		free(cmd_buf);
+		return -1;
+	}
 	fp = popen(cmd_buf, "r");
 	if (NULL == fp) {
 		ebpf_warning("%s '%s' execute error,[%s]\n",
 			     __func__, cmd_buf, strerror(errno));
+		free(cmd_buf);
 		return -1;
 	}
 
@@ -1230,9 +1257,13 @@ int exec_command(const char *cmd, const char *args,
 	if (-1 == rc) {
 		ebpf_warning("pclose error, '%s' error:%s\n",
 			     cmd_buf, strerror(errno));
+		free(cmd_buf);
+		return -1;
 	} else {
 		if (WIFEXITED(rc)) {
-			return WEXITSTATUS(rc);
+			int exit_status = WEXITSTATUS(rc);
+			free(cmd_buf);
+			return exit_status;
 		} else if (WIFSIGNALED(rc)) {
 			ebpf_info
 			    ("'%s' abnormal termination,signal number %d\n",
@@ -1243,6 +1274,7 @@ int exec_command(const char *cmd, const char *args,
 		}
 	}
 
+	free(cmd_buf);
 	return -1;
 }
 
