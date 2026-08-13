@@ -266,6 +266,13 @@ controller:
         # 资源ID限制：所有设备ID（除宿主机外）、容器节点、Ingress、工作负载、ReplicaSet、POD
         resource_max_id_1: 499999
         # local debug log
+        # 是否跳过同步空资源
+        skip_sync_if_empty:
+          # 默认总开关：false
+          enabled: false
+          # 当前版本仅支持配置 sub_domain
+          resources:
+          #  - sub_domain
         log_debug: 
           enabled: false
           detail_enabled: false

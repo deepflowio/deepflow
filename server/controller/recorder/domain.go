@@ -28,7 +28,7 @@ import (
 
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 	rcommon "github.com/deepflowio/deepflow/server/controller/recorder/common"
 	"github.com/deepflowio/deepflow/server/controller/recorder/config"
@@ -74,14 +74,14 @@ func (d *domain) CloseStatsd() {
 }
 
 func (d *domain) Refresh(target string, cloudData cloudmodel.Resource) error {
-	log.Infof("refresh target: %s", target, d.metadata.LogPrefixes)
+	log.Infof("refresh target: %s, cloudData count: %s", target, GetResourceFieldCountsString(cloudData), d.metadata.LogPrefixes)
 	switch target {
 	case RefreshTargetDomain:
 		log.Info("refresher started, triggered by ticker/hand", d.metadata.LogPrefixes)
 		if err := d.refreshDomainExcludeSubDomain(cloudData); err != nil {
 			return err
 		}
-		return d.subDomains.RefreshAll(cloudData.SubDomainResources)
+		return d.subDomains.RefreshAll(cloudData.SubDomains, cloudData.SubDomainResources)
 	case RefreshTargetSubDomain:
 		log.Info("refresher started, triggered by hand", d.metadata.LogPrefixes)
 		return d.subDomains.RefreshOne(cloudData.SubDomainResources)
@@ -130,6 +130,13 @@ func (d *domain) shouldRefresh(cloudData cloudmodel.Resource) error {
 		}
 		if len(cloudData.VMs) == 0 && len(cloudData.Pods) == 0 {
 			log.Info("domain has no vms and pods, does nothing", d.metadata.LogPrefixes)
+			return DataMissingError
+		}
+		// 检查当 SubDomains 为空时，是否需要跳过同步
+		if d.metadata.Config.SkipSyncIfEmptyCfg.Enabled &&
+			slices.Contains(d.metadata.Config.SkipSyncIfEmptyCfg.Resources, common.RESOURCE_TYPE_SUB_DOMAIN_EN) &&
+			len(cloudData.SubDomains) == 0 {
+			log.Info("domain has no SubDomains, does nothing", d.metadata.LogPrefixes)
 			return DataMissingError
 		}
 	} else {
@@ -285,7 +292,7 @@ func (d *domain) updateSyncedAt(syncAt time.Time) {
 	log.Infof("update domain synced_at: %s", syncAt.Format(common.GO_BIRTHDAY), d.metadata.LogPrefixes)
 	d.fillStatsd(syncAt)
 
-	var domain mysqlmodel.Domain
+	var domain metadbmodel.Domain
 	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.GetDomainLcuuid()).First(&domain).Error
 	if err != nil {
 		log.Errorf("get domain from db failed: %s", err, d.metadata.LogPrefixes)
@@ -303,7 +310,7 @@ func (d *domain) fillStatsd(syncAt time.Time) {
 }
 
 func (d *domain) updateStateInfo(cloudData cloudmodel.Resource) {
-	var domain mysqlmodel.Domain
+	var domain metadbmodel.Domain
 	err := d.metadata.DB.Where("lcuuid = ?", d.metadata.GetDomainLcuuid()).First(&domain).Error
 	if err != nil {
 		log.Errorf("get domain from db failed: %s", err, d.metadata.LogPrefixes)
@@ -314,7 +321,7 @@ func (d *domain) updateStateInfo(cloudData cloudmodel.Resource) {
 	log.Debugf("update domain (%+v)", domain, d.metadata.LogPrefixes)
 
 	for subDomainLcuuid, subDomainResource := range cloudData.SubDomainResources {
-		var subDomain mysqlmodel.SubDomain
+		var subDomain metadbmodel.SubDomain
 		err := d.metadata.DB.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
 		if err != nil {
 			log.Errorf("get sub_domain (lcuuid: %s) from db failed: %s", subDomainLcuuid, err, d.metadata.LogPrefixes)
