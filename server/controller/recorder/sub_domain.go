@@ -62,10 +62,11 @@ func (s *subDomains) CloseStatsd() {
 	}
 }
 
-func (s *subDomains) RefreshAll(cloudSubDomainResources map[string]cloudmodel.SubDomainResource) error {
+func (s *subDomains) RefreshAll(cloudSubDomains []cloudmodel.SubDomain, cloudSubDomainResources map[string]cloudmodel.SubDomainResource) error {
 	// 遍历 cloud 中的 subdomain 资源，与缓存中的 subdomain 资源对比，根据对比结果增删改
 	var err error
 	for lcuuid, resource := range cloudSubDomainResources {
+		log.Infof("sub_domain(lcuuid=%s) will be refreshed", lcuuid, s.metadata.LogPrefixes)
 		sd, ok := s.refreshers[lcuuid]
 		if !ok {
 			sd, err = s.newRefresher(lcuuid)
@@ -79,10 +80,21 @@ func (s *subDomains) RefreshAll(cloudSubDomainResources map[string]cloudmodel.Su
 		}
 	}
 
+	lcuuidToCloudSubDomain := make(map[string]cloudmodel.SubDomain)
+	for _, sd := range cloudSubDomains {
+		lcuuidToCloudSubDomain[sd.Lcuuid] = sd
+	}
+
 	// 遍历 subdomain 字典，删除 cloud 未返回的 subdomain 资源
 	for lcuuid, sd := range s.refreshers {
+		log.Infof("sub_domain(lcuuid=%s) resources will be checked", lcuuid, sd.metadata.LogPrefixes)
 		if _, ok := cloudSubDomainResources[lcuuid]; !ok {
-			log.Info("sub_domain will be deleted", sd.metadata.LogPrefixes)
+			// 当 cloud 中存在 subDomain 时，表明数据不一致，不删除
+			if item, ok := lcuuidToCloudSubDomain[lcuuid]; ok {
+				log.Infof("sub_domain(lcuuid=%s, name=%s) is still in cloud, skip", lcuuid, item.Name, sd.metadata.LogPrefixes)
+				continue
+			}
+			log.Infof("sub_domain(lcuuid=%s) resources will be deleted", lcuuid, sd.metadata.LogPrefixes)
 			sd.clear()
 			delete(s.refreshers, lcuuid)
 			delete(s.cacheMng.SubDomainCacheMap, lcuuid)
@@ -95,6 +107,7 @@ func (s *subDomains) RefreshOne(cloudSubDomainResources map[string]cloudmodel.Su
 	// 遍历 cloud 中的 subdomain 资源，与缓存中的 subdomain 资源对比，根据对比结果增删改
 	var err error
 	for lcuuid, resource := range cloudSubDomainResources {
+		log.Infof("sub_domain(lcuuid=%s) will be refreshed", lcuuid, s.metadata.LogPrefixes)
 		sd, ok := s.refreshers[lcuuid]
 		if !ok {
 			sd, err = s.newRefresher(lcuuid)

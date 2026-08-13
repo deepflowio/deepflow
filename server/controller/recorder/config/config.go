@@ -35,6 +35,7 @@ type RecorderConfig struct {
 	EventCfg               eventConfig.Config
 	SelfHealCfg            SelfHealConfig            `yaml:"self_heal"`
 	TagRecorderSelfHealCfg TagRecorderSelfHealConfig `yaml:"tagrecorder_self_heal"`
+	SkipSyncIfEmptyCfg     SkipSyncIfEmptyConfig     `yaml:"skip_sync_if_empty"`
 }
 
 func Get() *RecorderConfig {
@@ -49,6 +50,11 @@ type LogDebugConfig struct {
 	Enabled       bool     `default:"false" yaml:"enabled"`
 	DetailEnabled bool     `default:"false" yaml:"detail_enabled"`
 	ResourceTypes []string `default:"" yaml:"resource_type"`
+}
+
+type SkipSyncIfEmptyConfig struct {
+	Enabled   bool     `default:"false" yaml:"enabled"`
+	Resources []string `default:"" yaml:"resources"`
 }
 
 type SelfHealConfig struct {

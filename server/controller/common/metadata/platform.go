@@ -117,7 +117,7 @@ func (m *Platform) SetDomain(domain metadbmodel.Domain) {
 		m.teamID = domain.TeamID
 		m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(domain.TeamID))
 	}
-	m.LogPrefixes = append(m.LogPrefixes, NewDomainPrefix(domain.Name))
+	m.LogPrefixes = append(m.LogPrefixes, NewDomainPrefix(domain.Name, domain.Lcuuid))
 }
 
 func (m *Platform) SetSubDomain(subDomain metadbmodel.SubDomain) {
@@ -126,7 +126,7 @@ func (m *Platform) SetSubDomain(subDomain metadbmodel.SubDomain) {
 		m.teamID = subDomain.TeamID
 		m.LogPrefixes = append(m.LogPrefixes, logger.NewTeamPrefix(subDomain.TeamID))
 	}
-	m.LogPrefixes = append(m.LogPrefixes, NewSubDomainPrefix(subDomain.Name))
+	m.LogPrefixes = append(m.LogPrefixes, NewSubDomainPrefix(subDomain.Name, subDomain.Lcuuid))
 }
 
 func MetadataDomain(domain metadbmodel.Domain) func(*Platform) {
@@ -149,11 +149,11 @@ type SubDomainInfo struct {
 	metadbmodel.SubDomain
 }
 
-func NewDomainPrefix(name string) logger.Prefix {
+func NewDomainPrefix(name, lcuuid string) logger.Prefix {
 	if name == "" {
 		return &DomainIDPrefix{0}
 	}
-	return &DomainNameLogPrefix{name}
+	return &DomainNameLogPrefix{name, lcuuid}
 }
 
 type DomainIDPrefix struct {
@@ -165,21 +165,23 @@ func (p *DomainIDPrefix) Prefix() string {
 }
 
 type DomainNameLogPrefix struct {
-	Name string
+	Name   string
+	Lcuuid string
 }
 
 func (p *DomainNameLogPrefix) Prefix() string {
-	return fmt.Sprintf("[DomainName-%s]", p.Name)
+	return fmt.Sprintf("[DomainName-%s-%s]", p.Name, p.Lcuuid)
 }
 
-func NewSubDomainPrefix(name string) logger.Prefix {
-	return &SubDomainNameLogPrefix{name}
+func NewSubDomainPrefix(name, lcuuid string) logger.Prefix {
+	return &SubDomainNameLogPrefix{name, lcuuid}
 }
 
 type SubDomainNameLogPrefix struct {
-	Name string
+	Name   string
+	Lcuuid string
 }
 
 func (p *SubDomainNameLogPrefix) Prefix() string {
-	return fmt.Sprintf("[SubDomainName-%s]", p.Name)
+	return fmt.Sprintf("[SubDomainName-%s-%s]", p.Name, p.Lcuuid)
 }

@@ -18,7 +18,9 @@
 package recorder
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/deepflowio/deepflow/server/controller/recorder/cache"
 )
@@ -65,4 +67,44 @@ func (r *Recorder) GetToolMap(domainLcuuid, subDomainLcuuid, field string) map[i
 		return nil
 	}
 	return dataSet.(map[interface{}]interface{})
+}
+
+// GetResourceFieldCountsString returns a string representation of slice and map field counts in the resource object
+// This is a more descriptive name than CountString
+func GetResourceFieldCountsString(obj interface{}) string {
+	var parts []string
+	v := reflect.ValueOf(obj)
+	t := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		f := v.Field(i)
+		name := t.Field(i).Name
+
+		switch f.Kind() {
+		case reflect.Slice:
+			parts = append(parts, fmt.Sprintf("%s=%d", name, f.Len()))
+		case reflect.Map:
+			parts = append(parts, fmt.Sprintf("%s=%d", name, f.Len()))
+			for _, key := range f.MapKeys() {
+				sub := joinSliceFields(f.MapIndex(key))
+				parts = append(parts, fmt.Sprintf("%s[%v]=%s", name, key.Interface(), sub))
+			}
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
+// 提取结构体中所有 slice 字段的 Name=Len 拼接
+func joinSliceFields(v reflect.Value) string {
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	var parts []string
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		if f := v.Field(i); f.Kind() == reflect.Slice {
+			parts = append(parts, fmt.Sprintf("%s=%d", t.Field(i).Name, f.Len()))
+		}
+	}
+	return strings.Join(parts, ", ")
 }
