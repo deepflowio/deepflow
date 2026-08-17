@@ -43,6 +43,7 @@
 #include "config.h"
 
 #define LOG_BUF_SZ 512
+#define DF_SYMBOL_SEND_EAGAIN_THRESHOLD 30U
 
 /*
  * HotSpot JVM does not support agent unloading. However, you
@@ -64,6 +65,8 @@ char perf_log_socket_path[128];
 
 int perf_map_socket_fd = -1;
 int perf_map_log_socket_fd = -1;
+static unsigned int perf_map_send_eagain_count;
+static unsigned int perf_log_send_eagain_count;
 
 // Cache symbols for batch sending
 char g_symbol_buffer[STRING_BUFFER_SIZE * 4];
@@ -89,10 +92,16 @@ jint close_files(void);
 	}  \
   } while (0)
 
-inline int send_msg(int sock_fd, const char *buf, size_t len)
+static inline int send_msg(int sock_fd, const char *buf, size_t len)
 {
 	int send_bytes = 0;
 	int n = 0;		// Initialize n
+	unsigned int *eagain_count = NULL;
+
+	if (sock_fd == perf_map_socket_fd)
+		eagain_count = &perf_map_send_eagain_count;
+	else if (sock_fd == perf_map_log_socket_fd)
+		eagain_count = &perf_log_send_eagain_count;
 
 	do {
 		/*
@@ -101,9 +110,17 @@ inline int send_msg(int sock_fd, const char *buf, size_t len)
 		 */
 		n = send(sock_fd, buf + send_bytes, len - send_bytes, MSG_NOSIGNAL);
 		if (n == -1) {
-			if (errno == EINTR || errno == EAGAIN
-			    || errno == EWOULDBLOCK) {
-				// Retry on interrupt or temporary failure
+			if (errno == EINTR) {
+				/* Retry an interrupted send without changing the backpressure count. */
+				continue;
+			}
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				/* Bound non-blocking retries across callbacks to avoid a busy loop. */
+				if (eagain_count == NULL ||
+				    ++(*eagain_count) >= DF_SYMBOL_SEND_EAGAIN_THRESHOLD) {
+					close_files_locked();
+					break;
+				}
 				continue;
 			} else {
 				close_files_locked();	// Example function call, define as needed
@@ -113,6 +130,9 @@ inline int send_msg(int sock_fd, const char *buf, size_t len)
 			// Connection closed by peer
 			close_files_locked();	// Example function call, define as needed
 			break;
+		} else if (eagain_count != NULL) {
+			/* A successful send clears consecutive backpressure. */
+			*eagain_count = 0;
 		}
 
 		send_bytes += n;
@@ -226,6 +246,8 @@ static jint close_files_locked(void)
 
 	perf_map_socket_fd = -1;
 	perf_map_log_socket_fd = -1;
+	perf_map_send_eagain_count = 0;
+	perf_log_send_eagain_count = 0;
 
 	if (perf_fd > 0) {
 		close(perf_fd);
