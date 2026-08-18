@@ -565,23 +565,41 @@ static bool java_preflight_wait_helper(pid_t helper_pid, int output_fd,
 	return exited && WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
-/* Execute the target JVM -version in a bounded helper process. */
-static bool java_preflight_exec_version(pid_t pid, const char *exe_path,
-					java_preflight_info_t *info)
-{
-	char library_path[PATH_MAX * 2] = {};
-	char target_library_path[PATH_MAX * 2] = {};
-	char target_java_home[PATH_MAX] = {};
-	char target_path[PATH_MAX * 2] = {};
-	char target_home[PATH_MAX] = {};
-	char target_lang[PATH_MAX] = {};
-	char output[16384] = {};
+/* Keep version-probe buffers on the heap to avoid overflowing jcol-* stacks. */
+struct java_preflight_version_buffers {
+	char library_path[PATH_MAX * 2];
+	char target_library_path[PATH_MAX * 2];
+	char target_java_home[PATH_MAX];
+	char target_path[PATH_MAX * 2];
+	char target_home[PATH_MAX];
+	char target_lang[PATH_MAX];
+	char output[16384];
 	char env_library[PATH_MAX * 2 + 32];
 	char env_java_home[PATH_MAX + 16];
 	char env_path[PATH_MAX * 2 + 8];
 	char env_home[PATH_MAX + 8];
 	char env_lang[PATH_MAX + 8];
-	char *envp[6] = {};
+	char *envp[6];
+};
+
+/* Execute the target JVM -version in a bounded helper process. */
+static bool java_preflight_exec_version(pid_t pid, const char *exe_path,
+					java_preflight_info_t *info)
+{
+	struct java_preflight_version_buffers *buffers;
+	char *library_path;
+	char *target_library_path;
+	char *target_java_home;
+	char *target_path;
+	char *target_home;
+	char *target_lang;
+	char *output;
+	char *env_library;
+	char *env_java_home;
+	char *env_path;
+	char *env_home;
+	char *env_lang;
+	char **envp;
 	int env_count = 0;
 	int pid_ns_fd = -1;
 	int mnt_ns_fd = -1;
@@ -595,70 +613,85 @@ static bool java_preflight_exec_version(pid_t pid, const char *exe_path,
 
 	if (exe_path == NULL || exe_path[0] != '/' || info == NULL)
 		return false;
+	buffers = calloc(1, sizeof(*buffers));
+	if (buffers == NULL)
+		return false;
+	library_path = buffers->library_path;
+	target_library_path = buffers->target_library_path;
+	target_java_home = buffers->target_java_home;
+	target_path = buffers->target_path;
+	target_home = buffers->target_home;
+	target_lang = buffers->target_lang;
+	output = buffers->output;
+	env_library = buffers->env_library;
+	env_java_home = buffers->env_java_home;
+	env_path = buffers->env_path;
+	env_home = buffers->env_home;
+	env_lang = buffers->env_lang;
+	envp = buffers->envp;
 	java_preflight_build_library_path(pid, exe_path, library_path,
-						  sizeof(library_path));
+						  sizeof(buffers->library_path));
 	value_ret = java_preflight_read_env(pid, "LD_LIBRARY_PATH",
 					     target_library_path,
-					     sizeof(target_library_path));
+					     sizeof(buffers->target_library_path));
 	if (value_ret < 0)
-		return false;
+		goto cleanup_fds;
 	value_ret = java_preflight_read_env(pid, "JAVA_HOME", target_java_home,
-					     sizeof(target_java_home));
+					     sizeof(buffers->target_java_home));
 	if (value_ret < 0)
-		return false;
+		goto cleanup_fds;
 	value_ret = java_preflight_read_env(pid, "PATH", target_path,
-					     sizeof(target_path));
+					     sizeof(buffers->target_path));
 	if (value_ret < 0)
-		return false;
+		goto cleanup_fds;
 	value_ret = java_preflight_read_env(pid, "HOME", target_home,
-					     sizeof(target_home));
+					     sizeof(buffers->target_home));
 	if (value_ret < 0)
-		return false;
+		goto cleanup_fds;
 	value_ret = java_preflight_read_env(pid, "LANG", target_lang,
-					     sizeof(target_lang));
+					     sizeof(buffers->target_lang));
 	if (value_ret < 0)
-		return false;
+		goto cleanup_fds;
 
 	/* Prefer the mapped JVM directories and retain the target environment path. */
 	if (!java_preflight_append_library_path(target_library_path,
-						 sizeof(target_library_path), library_path))
-		return false;
+						 sizeof(buffers->target_library_path), library_path))
+		goto cleanup_fds;
 	if (target_path[0] == '\0')
-		snprintf(target_path, sizeof(target_path), "/usr/bin:/bin");
+		snprintf(target_path, sizeof(buffers->target_path), "/usr/bin:/bin");
 	if (target_home[0] == '\0')
-		snprintf(target_home, sizeof(target_home), "/tmp");
-	if (snprintf(env_library, sizeof(env_library), "LD_LIBRARY_PATH=%s",
-		     target_library_path) >= (int)sizeof(env_library) ||
-	    snprintf(env_path, sizeof(env_path), "PATH=%s", target_path) >=
-		    (int)sizeof(env_path) ||
-	    snprintf(env_home, sizeof(env_home), "HOME=%s", target_home) >=
-		    (int)sizeof(env_home))
-		return false;
+		snprintf(target_home, sizeof(buffers->target_home), "/tmp");
+	if (snprintf(env_library, sizeof(buffers->env_library), "LD_LIBRARY_PATH=%s",
+		     target_library_path) >= (int)sizeof(buffers->env_library) ||
+	    snprintf(env_path, sizeof(buffers->env_path), "PATH=%s", target_path) >=
+		    (int)sizeof(buffers->env_path) ||
+	    snprintf(env_home, sizeof(buffers->env_home), "HOME=%s", target_home) >=
+		    (int)sizeof(buffers->env_home))
+		goto cleanup_fds;
 	envp[env_count++] = env_library;
 	if (target_java_home[0] != '\0') {
-		if (snprintf(env_java_home, sizeof(env_java_home), "JAVA_HOME=%s",
-			     target_java_home) >= (int)sizeof(env_java_home))
-			return false;
+		if (snprintf(env_java_home, sizeof(buffers->env_java_home),
+			     "JAVA_HOME=%s", target_java_home) >=
+			    (int)sizeof(buffers->env_java_home))
+			goto cleanup_fds;
 		envp[env_count++] = env_java_home;
 	}
 	envp[env_count++] = env_path;
 	envp[env_count++] = env_home;
 	if (target_lang[0] != '\0') {
-		if (snprintf(env_lang, sizeof(env_lang), "LANG=%s", target_lang) >=
-		    (int)sizeof(env_lang))
-			return false;
+		if (snprintf(env_lang, sizeof(buffers->env_lang), "LANG=%s",
+			     target_lang) >= (int)sizeof(buffers->env_lang))
+			goto cleanup_fds;
 		envp[env_count++] = env_lang;
 	}
 	envp[env_count] = NULL;
 
 	pid_ns_fd = java_preflight_open_namespace(pid, "pid", &same_pid_ns);
 	if (pid_ns_fd < 0 && !same_pid_ns)
-		return false;
+		goto cleanup_fds;
 	mnt_ns_fd = java_preflight_open_namespace(pid, "mnt", &same_mnt_ns);
 	if (mnt_ns_fd < 0 && !same_mnt_ns) {
-		if (pid_ns_fd >= 0)
-			close(pid_ns_fd);
-		return false;
+		goto cleanup_fds;
 	}
 	if (pipe(pipe_fds) < 0)
 		goto cleanup_fds;
@@ -678,7 +711,7 @@ static bool java_preflight_exec_version(pid_t pid, const char *exe_path,
 	pipe_fds[1] = -1;
 	setpgid(helper_pid, helper_pid);
 	if (!java_preflight_wait_helper(helper_pid, pipe_fds[0], output,
-						 sizeof(output))) {
+						 sizeof(buffers->output))) {
 		ebpf_warning(JAVA_LOG_TAG
 			     "JAVA_VERSION_HELPER_FAILED_OR_TIMEOUT pid=%d "
 			     "timeout=%dms\n", pid,
@@ -703,6 +736,7 @@ cleanup_fds:
 		close(pid_ns_fd);
 	if (mnt_ns_fd >= 0)
 		close(mnt_ns_fd);
+	free(buffers);
 	return version_ok;
 }
 
