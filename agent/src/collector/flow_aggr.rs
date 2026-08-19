@@ -452,11 +452,16 @@ impl Sender {
         // We use acl_gid to mark which flows are configured with PCAP storage policies.
         // Since acl_gid is used for both PCAP and NPB functions, only the acl_gid used by PCAP is sent here.
         let mut acl_gids = U16Set::new();
-        for policy_data in f.tag.policy_data.iter() {
+        for (policy_data, flow_metrics_peer) in f
+            .tag
+            .policy_data
+            .iter()
+            .zip(f.flow.flow_metrics_peers.iter())
+        {
             let Some(policy_data) = policy_data else {
                 continue;
             };
-            if !policy_data.contain_pcap() {
+            if !policy_data.contain_pcap() || flow_metrics_peer.packet_count == 0 {
                 continue;
             }
             for action in policy_data.npb_actions.iter() {
