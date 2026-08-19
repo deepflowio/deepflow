@@ -262,6 +262,7 @@ pub fn links_by_name_regex<S: AsRef<str>>(regex: S) -> Result<Vec<Link>> {
 
 pub fn get_route_src_ip_and_mac(dest_addr: &IpAddr) -> Result<(IpAddr, MacAddr)> {
     route_get(*dest_addr).and_then(|r| {
+        println!("get_route_src_ip_and_mac({}): {:?}", dest_addr, r);
         get_interface_by_index_from_win32(r.oif_index)
             .map(|link| (r.pref_src.unwrap(), link.mac_addr))
     })
@@ -396,7 +397,7 @@ fn get_pcap_interfaces() -> Result<Vec<Link>> {
         .map_err(|e| Error::Windows(format!("list pcap interfaces failed: {}", e)))?;
     let adapters = get_adapters_addresses().map(|(adapters, _)| adapters)?;
     let mut pcap_interfaces = vec![];
-    for device in devices {
+    for device in devices.clone() {
         if let Some(link) = adapters
             .iter()
             .find(|&l| !&l.adapter_id.is_empty() && device.name.contains(&l.adapter_id))
@@ -406,6 +407,12 @@ fn get_pcap_interfaces() -> Result<Vec<Link>> {
             pcap_interfaces.push(_link);
         }
     }
+    println!(
+        "get_pcap_interfaces devices count {}, pcap_interfaces count {}, link {:?}",
+        devices.len(),
+        pcap_interfaces.len(),
+        pcap_interfaces
+    );
 
     Ok(pcap_interfaces)
 }
@@ -473,6 +480,10 @@ pub fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
                 || adapter.FriendlyName.is_null()
             {
                 adapter_ptr = adapter.Next;
+                println!(
+                    "get_adapters_addresses updown is error: {:?}",
+                    adapter.OperStatus
+                );
                 continue;
             }
 
@@ -483,6 +494,10 @@ pub fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
                 Some(name) => name,
                 None => {
                     adapter_ptr = adapter.Next;
+                    println!(
+                        "get_adapters_addresses friendly name is error: {:?}",
+                        adapter.OperStatus
+                    );
                     continue;
                 }
             };
@@ -494,6 +509,10 @@ pub fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
                 Some(name) => name,
                 None => {
                     adapter_ptr = adapter.Next;
+                    println!(
+                        "get_adapters_addresses adaptcher id is error: {:?}",
+                        friendly_name
+                    );
                     continue;
                 }
             };
@@ -508,6 +527,7 @@ pub fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
                 Some(mac) => mac,
                 None => {
                     adapter_ptr = adapter.Next;
+                    println!("get_adapters_addresses mac is error: {:?}", friendly_name);
                     continue;
                 }
             };
@@ -531,6 +551,10 @@ pub fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
                 flags |= LinkFlags::UP;
             }
 
+            println!(
+                "get_adapters_addresses IfType {:?}, if_index {} adapter_id {:?} mac {:?}",
+                adapter.IfType, if_index, adapter_id, mac_addr
+            );
             match IfType::try_from(adapter.IfType).map_err(|e| {
                 Error::Windows(format!(
                     "adapter name={}, id={} info has invalid if_type, error: {}",

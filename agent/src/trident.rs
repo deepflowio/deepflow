@@ -23,6 +23,8 @@ use std::net::SocketAddr;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::{Path, PathBuf};
 use std::process;
+#[cfg(target_os = "windows")]
+use std::str::FromStr;
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, Ordering},
     Arc, Condvar, Mutex, RwLock, Weak,
@@ -495,7 +497,33 @@ impl Trident {
         let controller_ip: IpAddr = config.controller_ips[0].parse()?;
         let (ctrl_ip, ctrl_mac) = match get_ctrl_ip_and_mac(&controller_ip) {
             Ok(tuple) => tuple,
-            Err(e) => return Err(anyhow!("get ctrl ip and mac failed: {}", e)),
+            Err(e) => {
+                #[cfg(target_os = "windows")]
+                match (
+                    IpAddr::from_str(&config.ctrl_ip),
+                    MacAddr::from_str(&config.ctrl_mac),
+                ) {
+                    (Ok(ip), Ok(mac)) => {
+                        println!("get ctrl ip and mac by {} failed: {}, use ctrl_ip({}) and ctrl_mac({}) from config instead", controller_ip, e, ip, mac);
+                        (ip, mac)
+                    }
+                    _ => {
+                        println!("ctrl_ip({}) or ctrl_mac({}) is invalid, and get ctrl ip and mac by {} failed: {}, Please revise the configuration file again.",
+                            config.ctrl_ip, config.ctrl_mac, controller_ip, e);
+                        return Err(anyhow!(
+                            "get ctrl ip and mac by {} failed: {}",
+                            controller_ip,
+                            e
+                        ));
+                    }
+                }
+                #[cfg(not(target_os = "windows"))]
+                return Err(anyhow!(
+                    "get ctrl ip and mac by {} failed: {}",
+                    controller_ip,
+                    e
+                ));
+            }
         };
         let mut config_handler = ConfigHandler::new(config, ctrl_ip, ctrl_mac);
 

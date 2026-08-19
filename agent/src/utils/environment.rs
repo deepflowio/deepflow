@@ -378,10 +378,10 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
     }
 
     // FIXME: Getting ctrl_ip and ctrl_mac sometimes fails, increase three retry opportunities to ensure access to ctrl_ip and ctrl_mac
-    for _ in 0..3 {
+    for _ in 0..1 {
         let tuple = get_route_src_ip_and_mac(dest);
         if tuple.is_err() {
-            warn!(
+            println!(
                 "failed getting control ip and mac from {}, because: {:?}, wait 1 second",
                 dest, tuple,
             );
@@ -391,7 +391,7 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
         let (ip, mac) = tuple.unwrap();
         let links = link_list();
         if links.is_err() {
-            warn!(
+            println!(
                 "failed getting local interfaces, because: {:?}, wait 1 second",
                 links
             );
