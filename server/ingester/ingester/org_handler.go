@@ -67,6 +67,10 @@ func (o *OrgHandler) DropOrg(orgId uint16) error {
 	return o.dropOrgDatabase(orgId)
 }
 
+func (o *OrgHandler) IsHealthy() bool {
+	return true
+}
+
 // FIXME: After clearing the Org data, if the same Org ID is created again later, data writing will fail. You can restart deepflow-server to solve it.
 func (o *OrgHandler) dropOrgDatabase(orgId uint16) error {
 	if ckdb.IsDefaultOrgID(orgId) {
