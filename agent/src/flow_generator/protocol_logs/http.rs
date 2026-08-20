@@ -23,6 +23,7 @@ use std::{
 };
 
 use hpack::Decoder;
+use log::debug;
 use nom::{AsBytes, ParseTo};
 use serde::Serialize;
 
@@ -33,6 +34,7 @@ use public_derive::L7Log;
 
 use super::{
     consts::*,
+    openai_api,
     pb_adapter::{
         ExtendedInfo, KeyVal, L7ProtocolSendLog, L7Request, L7Response, MetricKeyVal, TraceInfo,
     },
@@ -339,6 +341,16 @@ pub struct HttpInfo {
     #[serde(skip)]
     metrics: Vec<MetricKeyVal>,
 
+    /// OpenAI API accumulated session state; Some only when this HttpInfo
+    /// carries OpenAI-specific data (request biz-dims, response metrics, etc.).
+    #[serde(skip)]
+    pub openai_session: Option<Box<openai_api::OpenAISession>>,
+
+    /// True when this is an OpenAI streaming request that requires multi-merge.
+    /// Drives `need_merge()` for HTTP/1 streaming sessions.
+    #[serde(skip)]
+    openai_need_merge: bool,
+
     #[serde(skip)]
     is_on_blacklist: bool,
 
@@ -395,7 +407,7 @@ impl L7ProtocolInfoInterface for HttpInfo {
     fn need_merge(&self) -> bool {
         match self.raw_data_type {
             L7ProtoRawDataType::GoHttp2Uprobe => true,
-            _ => false,
+            _ => self.openai_need_merge,
         }
     }
 
@@ -604,6 +616,14 @@ impl HttpInfo {
                 if other.is_resp_end {
                     self.is_resp_end = true;
                 }
+                // For OpenAI multi-merge: the request entry is cached with is_req_end=false
+                // so the session aggregator doesn't discard it. Each response packet
+                // carries is_req_end=true so we propagate it here to let is_session_end()
+                // = is_req_end && is_resp_end eventually return true.
+                // For normal HTTP this is a no-op since responses never set is_req_end.
+                if other.is_req_end {
+                    self.is_req_end = true;
+                }
                 self.captured_response_byte += other.captured_response_byte;
 
                 if other.status != L7ResponseStatus::Ok {
@@ -642,6 +662,34 @@ impl HttpInfo {
         super::swap_if!(self, x_request_id_1, is_default, other);
         self.attributes.append(&mut other.attributes);
         self.metrics.append(&mut other.metrics);
+
+        // Merge OpenAI session: the response (or final SSE packet) carries the
+        // fully-accumulated session. Always prefer the incoming session over the
+        // stored one because:
+        //   • For non-streaming: the request stores a partial clone; the response
+        //     has the complete session with parsed usage.
+        //   • For streaming: the request stores None; the final SSE packet has the
+        //     complete session.
+        // Replacing unconditionally is safe — SSE continuations that have not
+        // completed yet carry None, so the `if let` guard prevents overwriting.
+        if let Some(other_session) = other.openai_session.take() {
+            debug!(
+                "openai: merge – {} openai_session (kind={:?} events={} usage={:?})",
+                if self.openai_session.is_some() {
+                    "replacing"
+                } else {
+                    "setting"
+                },
+                other_session.kind,
+                other_session.stream_event_count,
+                other_session.usage.as_ref().map(|u| u.total_tokens),
+            );
+            self.openai_session = Some(other_session);
+        }
+        if other.openai_need_merge {
+            self.openai_need_merge = true;
+        }
+
         Ok(())
     }
 
@@ -857,6 +905,38 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             }
         }
 
+        // OpenAI API: populate attributes/metrics from the accumulated session state.
+        let openai_protocol_str = if let Some(session) = f.openai_session.take() {
+            let (ttft, tpot) = session.compute_timings();
+            debug!(
+                "openai: converting to send log: kind={:?} stream={} usage_status={:?} \
+                 events={} ttft={:?} tpot={:?} tokens={:?} stream_end_ts={:?} req_ts={}",
+                session.kind,
+                session.is_stream,
+                session.usage_status,
+                session.stream_event_count,
+                ttft,
+                tpot,
+                session.usage.as_ref().map(|u| u.total_tokens),
+                session.stream_end_ts_us,
+                session.request_ts_us,
+            );
+            // Biz dimension attrs (org_path/user_id/app_id) are pushed directly to
+            // f.attributes at REQUEST time so they appear even on timed-out sessions.
+            // populate_log also emits them (to capture body-sourced attrs from TCP
+            // continuation segments). Remove the direct-push duplicates first so the
+            // merged log has each attr exactly once with the latest session value.
+            f.attributes.retain(|kv| {
+                kv.key != openai_api::ATTR_BIZ_ORG_PATH
+                    && kv.key != openai_api::ATTR_BIZ_USER_ID
+                    && kv.key != openai_api::ATTR_BIZ_APP_ID
+            });
+            session.populate_log(&mut f.attributes, &mut f.metrics);
+            Some(openai_api::BIZ_PROTOCOL.to_string())
+        } else {
+            None
+        };
+
         L7ProtocolSendLog {
             req_len: f.req_content_length,
             resp_len: f.resp_content_length,
@@ -913,6 +993,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 user_agent: f.user_agent,
                 referer: f.referer,
                 rpc_service: f.service_name,
+                protocol_str: openai_protocol_str,
                 attributes: {
                     if f.attributes.is_empty() {
                         None
@@ -965,6 +1046,11 @@ pub struct HttpLog {
     perf_stats: Vec<L7PerfStats>,
     http2_req_decoder: Option<Decoder<'static>>,
     http2_resp_decoder: Option<Decoder<'static>>,
+
+    /// Per-session OpenAI state accumulated across multiple response packets.
+    /// Created when an OpenAI streaming request is first seen; cleared when the
+    /// stream ends or the session is reset.
+    openai_session: Option<Box<openai_api::OpenAISession>>,
 
     #[cfg(feature = "enterprise")]
     custom_field_store: Store,
@@ -1049,6 +1135,23 @@ impl L7ProtocolParserInterface for HttpLog {
 
         match self.proto {
             L7Protocol::Http1 => {
+                // Per-packet trace: only at debug level to avoid flooding production logs.
+                if config.openai_api.enabled && param.direction == PacketDirection::ServerToClient {
+                    debug!(
+                        "openai: flow={} parse_payload Http1 direction={:?} \
+                         len={} starts={:?} session={}",
+                        param.flow_id,
+                        param.direction,
+                        payload.len(),
+                        &payload[..payload.len().min(8)],
+                        if self.openai_session.is_some() {
+                            "Some"
+                        } else {
+                            "None"
+                        },
+                    );
+                }
+
                 let mut info = HttpInfo {
                     proto: self.proto,
                     is_tls: param.is_tls(),
@@ -1056,27 +1159,51 @@ impl L7ProtocolParserInterface for HttpLog {
                     ..Default::default()
                 };
 
-                let l7_payload = self.parse_http_v1(
+                // Try standard HTTP/1 parsing first.
+                let parse_result = self.parse_http_v1(
                     payload,
                     param,
-                    &mut info,
-                    #[cfg(feature = "enterprise")]
-                    custom_policies,
-                )?;
-                self.set_info_by_config(
-                    param,
-                    config,
-                    payload,
-                    Some(l7_payload),
                     &mut info,
                     #[cfg(feature = "enterprise")]
                     custom_policies,
                 );
 
-                if param.parse_log {
-                    Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
-                } else {
-                    Ok(L7ParseResult::None)
+                match parse_result {
+                    Ok(l7_payload) => {
+                        self.set_info_by_config(
+                            param,
+                            config,
+                            payload,
+                            Some(l7_payload),
+                            &mut info,
+                            #[cfg(feature = "enterprise")]
+                            custom_policies,
+                        );
+
+                        // OpenAI API enhancement after successful HTTP parse.
+                        self.handle_openai_http1(payload, l7_payload, param, config, &mut info);
+
+                        if param.parse_log {
+                            Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info)))
+                        } else {
+                            Ok(L7ParseResult::None)
+                        }
+                    }
+                    Err(http_err) => {
+                        // Not a valid HTTP/1 header – check if this is an OpenAI SSE
+                        // continuation packet belonging to an active streaming session.
+                        if let Some(sse_info) =
+                            self.handle_openai_sse_continuation(payload, param, config)
+                        {
+                            if param.parse_log {
+                                Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(sse_info)))
+                            } else {
+                                Ok(L7ParseResult::None)
+                            }
+                        } else {
+                            Err(http_err)
+                        }
+                    }
                 }
             }
             L7Protocol::Http2 | L7Protocol::Grpc | L7Protocol::Triple => {
@@ -1190,6 +1317,11 @@ impl L7ProtocolParserInterface for HttpLog {
         new_log.perf_stats = self.perf_stats();
         new_log.http2_req_decoder = self.http2_req_decoder.take();
         new_log.http2_resp_decoder = self.http2_resp_decoder.take();
+        // Preserve an active OpenAI streaming session across per-packet resets.
+        // reset() is called after every packet; without this the RESPONSE packet
+        // would find openai_session=None because the REQUEST packet's session was
+        // discarded. Matches the same pattern as http2_req/resp_decoder above.
+        new_log.openai_session = self.openai_session.take();
         *self = new_log;
     }
 
@@ -1344,6 +1476,457 @@ impl HttpLog {
             expected_headers_set.clone(),
         ));
         self.http2_resp_decoder = Some(Decoder::new_with_expected_headers(expected_headers_set));
+    }
+
+    // ─── OpenAI API integration helpers ─────────────────────────────────────
+
+    /// Called after a successful HTTP/1 parse to apply OpenAI-specific logic:
+    /// - On request: create/init an OpenAISession if the path matches.
+    /// - On response: feed the body into the SSE state machine or parse JSON usage.
+    fn handle_openai_http1(
+        &mut self,
+        full_payload: &[u8],
+        body: &[u8],
+        param: &ParseParam,
+        config: &LogParserConfig,
+        info: &mut HttpInfo,
+    ) {
+        if !config.openai_api.enabled {
+            return;
+        }
+
+        match info.msg_type {
+            LogMessageType::Request => {
+                if info.method != Method::Post {
+                    return;
+                }
+                if !openai_api::is_openai_path(&info.path, config) {
+                    debug!(
+                        "openai: flow={} path={} not matched by prefixes={:?} suffixes={:?}",
+                        param.flow_id,
+                        info.path,
+                        config.openai_api.path_prefixes,
+                        config.openai_api.path_suffixes
+                    );
+                    return;
+                }
+
+                let kind = openai_api::kind_from_path(&info.path);
+                let mut session = Box::new(openai_api::OpenAISession::new(
+                    kind,
+                    false,
+                    param.time,
+                    config.openai_api.sse_buffer_max_bytes,
+                    &config.openai_api.usage_field_paths,
+                ));
+
+                self.extract_openai_headers_from_payload(full_payload, &mut session, config);
+
+                if !body.is_empty() {
+                    openai_api::parse_request_body(&mut session, body, config);
+                }
+
+                // is_req_end must stay false: the session aggregator discards any
+                // first-seen packet with need_merge=true && (req_end || resp_end).
+                // The response side propagates is_req_end back via merge().
+                info.stream_id = Some(session.stream_id);
+                info.is_resp_end = false;
+                info.openai_need_merge = true;
+
+                debug!(
+                    "openai: flow={} REQUEST path={} kind={:?} stream={} stream_id={} \
+                     biz_user={:?} biz_app={:?} biz_org={:?} body_bytes={}",
+                    param.flow_id,
+                    info.path,
+                    kind,
+                    session.is_stream,
+                    session.stream_id,
+                    session.biz_user_id,
+                    session.biz_app_id,
+                    session.biz_org_path,
+                    body.len(),
+                );
+
+                // Write biz-dimension attributes on the request packet so they survive
+                // even if the final merged entry loses them.
+                if let Some(v) = &session.biz_org_path {
+                    info.attributes.push(KeyVal {
+                        key: openai_api::ATTR_BIZ_ORG_PATH.to_string(),
+                        val: v.clone(),
+                    });
+                }
+                if let Some(v) = &session.biz_user_id {
+                    info.attributes.push(KeyVal {
+                        key: openai_api::ATTR_BIZ_USER_ID.to_string(),
+                        val: v.clone(),
+                    });
+                }
+                if let Some(v) = &session.biz_app_id {
+                    info.attributes.push(KeyVal {
+                        key: openai_api::ATTR_BIZ_APP_ID.to_string(),
+                        val: v.clone(),
+                    });
+                }
+
+                // For non-streaming sessions, also attach a clone of the initial
+                // session state to the REQUEST info. If the response is never seen
+                // (packet drop, MTU issue, etc.) the session-aggregator times out
+                // the REQUEST entry but it will still be tagged as openai-api with
+                // the request-side metadata (path, biz dimensions).
+                // When the real response arrives, merge() replaces this clone with
+                // the response's fully-populated session.
+                if !session.is_stream {
+                    info.openai_session = Some(session.clone());
+                }
+
+                self.openai_session = Some(session);
+            }
+
+            LogMessageType::Response => {
+                let (stream_id, is_already_stream) = match self.openai_session.as_ref() {
+                    Some(s) => (s.stream_id, s.is_stream),
+                    None => {
+                        debug!(
+                            "openai: flow={} RESPONSE arrived but no openai_session \
+                             (mid-flow capture or session already finished)",
+                            param.flow_id
+                        );
+                        return;
+                    }
+                };
+
+                info.stream_id = Some(stream_id);
+                // is_req_end=true will be propagated into the stored REQUEST entry
+                // via merge(), satisfying is_session_end() = is_req_end && is_resp_end.
+                info.is_req_end = true;
+                info.openai_need_merge = true;
+
+                // Scan headers once and derive both flags from the same pass.
+                let (is_sse, is_chunked) = Self::response_sse_and_chunked(full_payload, body);
+                let is_stream = is_already_stream || is_sse;
+
+                debug!(
+                    "openai: flow={} RESPONSE stream_id={} status={:?} is_already_stream={} \
+                     is_sse={} is_chunked={} body_bytes={}",
+                    param.flow_id,
+                    stream_id,
+                    info.status_code,
+                    is_already_stream,
+                    is_sse,
+                    is_chunked,
+                    body.len(),
+                );
+
+                // Propagate chunked flag to the session so continuation packets
+                // can decode chunk framing before feeding to the SSE state machine.
+                if is_chunked {
+                    if let Some(s) = self.openai_session.as_mut() {
+                        s.is_chunked_transfer = true;
+                    }
+                }
+
+                if is_stream {
+                    let done = {
+                        let session = self.openai_session.as_mut().unwrap();
+                        session.is_stream = true;
+                        // Upgrade Unknown → Missing now that we know this is a stream.
+                        // Unknown means "not yet determined"; Missing means "expected but
+                        // not yet seen", which is the correct state for an in-progress SSE.
+                        if session.usage_status == openai_api::UsageStatus::Unknown {
+                            session.usage_status = openai_api::UsageStatus::Missing;
+                        }
+                        // For chunked SSE, the first response body is empty (headers
+                        // only) so feed_sse is a no-op here; actual SSE events arrive
+                        // in subsequent continuation packets.
+                        session.feed_sse(body, param.time)
+                    };
+                    info.is_resp_end = done;
+                    debug!(
+                        "openai: flow={} SSE response fed stream_id={} done={} \
+                         events={} usage_status={:?}",
+                        param.flow_id,
+                        stream_id,
+                        done,
+                        self.openai_session
+                            .as_ref()
+                            .map(|s| s.stream_event_count)
+                            .unwrap_or(0),
+                        self.openai_session
+                            .as_ref()
+                            .map(|s| s.usage_status)
+                            .unwrap_or_default(),
+                    );
+                    if done {
+                        info.openai_session = self.openai_session.take();
+                    }
+                } else {
+                    {
+                        let session = self.openai_session.as_mut().unwrap();
+                        if !body.is_empty() {
+                            openai_api::parse_response_json(session, body, config);
+                        }
+                        // Non-streaming: stream ends at the response packet.
+                        session.stream_end_ts_us = Some(param.time);
+                    }
+                    info.is_resp_end = true;
+                    info.openai_session = self.openai_session.take();
+                    debug!(
+                        "openai: flow={} non-stream RESPONSE done stream_id={} usage_status={:?}",
+                        param.flow_id,
+                        stream_id,
+                        info.openai_session
+                            .as_ref()
+                            .map(|s| s.usage_status)
+                            .unwrap_or_default(),
+                    );
+                }
+            }
+
+            _ => {}
+        }
+    }
+
+    /// Scan raw HTTP/1 headers in `payload` and extract OpenAI biz dimensions.
+    fn extract_openai_headers_from_payload(
+        &self,
+        payload: &[u8],
+        session: &mut openai_api::OpenAISession,
+        config: &LogParserConfig,
+    ) {
+        let mut headers = parse_v1_headers(payload);
+        let _ = headers.next(); // skip request line
+        for line in headers {
+            if let Some(col) = line.find(':') {
+                if col + 1 >= line.len() {
+                    continue;
+                }
+                // extract_biz_from_header uses eq_ignore_ascii_case internally,
+                // so no need to lowercase here.
+                let key = line[..col].trim();
+                let val = line[col + 1..].trim();
+                openai_api::extract_biz_from_header(session, key, val, config);
+            }
+        }
+    }
+
+    /// Scan the HTTP/1 response headers once and return `(is_sse, is_chunked)`.
+    ///
+    /// Combining both checks avoids two separate O(n) scans for `\r\n\r\n`.
+    fn response_sse_and_chunked(full_payload: &[u8], body: &[u8]) -> (bool, bool) {
+        // Fast path: body already starts with SSE markers (no header scan needed).
+        let body_is_sse = body.starts_with(b"data:") || body.starts_with(b"event:");
+
+        // Find the end of headers (single O(n) scan).
+        let header_end = full_payload
+            .windows(4)
+            .position(|w| w == b"\r\n\r\n")
+            .unwrap_or(full_payload.len());
+        let headers = &full_payload[..header_end];
+
+        // Case-insensitive header search without allocation: compare each
+        // window byte-by-byte with the lower-case needle.
+        let header_contains = |needle: &[u8]| -> bool {
+            if headers.len() < needle.len() {
+                return false;
+            }
+            headers.windows(needle.len()).any(|w| {
+                w.iter()
+                    .zip(needle.iter())
+                    .all(|(a, b)| a.to_ascii_lowercase() == *b)
+            })
+        };
+
+        let is_sse = body_is_sse || header_contains(b"text/event-stream");
+        let is_chunked = header_contains(b"transfer-encoding: chunked");
+        (is_sse, is_chunked)
+    }
+
+    /// Handle raw TCP payload that is NOT a valid HTTP/1 header but belongs to
+    /// an active OpenAI session. Covers three cases:
+    ///
+    /// 1. **Request body continuation** (`ClientToServer`): when the POST body arrives
+    ///    in a separate TCP segment from the headers, parse it to detect `"stream": true`
+    ///    before the response arrives.
+    ///
+    /// 2. **SSE continuation** (`is_stream=true`, `ServerToClient`): feed the raw bytes
+    ///    into the SSE state machine and forward progress to the session aggregator.
+    ///
+    /// 3. **Non-streaming fallback** (`is_stream=false`, `ServerToClient`): when
+    ///    `parse_http_v1` fails for a non-streaming response (e.g., body-only TCP
+    ///    segment, or an unusual response format), complete the session immediately
+    ///    so the cached REQUEST is not left to time out.
+    fn handle_openai_sse_continuation(
+        &mut self,
+        payload: &[u8],
+        param: &ParseParam,
+        config: &LogParserConfig,
+    ) -> Option<HttpInfo> {
+        if !config.openai_api.enabled {
+            return None;
+        }
+
+        let (stream_id, is_stream) = match self.openai_session.as_ref() {
+            Some(s) => (s.stream_id, s.is_stream),
+            None => {
+                // No active session — normal for non-OpenAI flows.
+                if param.direction == PacketDirection::ServerToClient {
+                    debug!(
+                        "openai: flow={} non-HTTP server→client payload but no active session",
+                        param.flow_id,
+                    );
+                }
+                return None;
+            }
+        };
+
+        // ── Client→server continuation (request body in separate TCP segment) ──
+        // When the POST body arrives after the HTTP headers in a later TCP segment,
+        // parse_http_v1 fails for that segment. Parse the payload as a request body
+        // to pick up the "stream" flag before the response arrives.
+        if param.direction == PacketDirection::ClientToServer {
+            if !is_stream && !payload.is_empty() {
+                let session = self.openai_session.as_mut().unwrap();
+                openai_api::parse_request_body(session, payload, config);
+                debug!(
+                    "openai: flow={} request body continuation parsed stream_id={} is_stream={}",
+                    param.flow_id, stream_id, session.is_stream,
+                );
+            }
+            return None;
+        }
+
+        // ── Non-streaming fallback ────────────────────────────────────────────
+        // parse_http_v1 failed for a server→client packet while a non-streaming
+        // session is active. The packet is likely a body-continuation segment
+        // (headers were in a prior segment) or an oddly-formatted first response.
+        // Complete the session now so the cached REQUEST is not left to time out.
+        //
+        // EXCEPTION: any HTTP-looking payload (starts with "HTTP/") where
+        // parse_http_v1 failed — e.g. 1xx informational responses (100 Continue,
+        // 103 Early Hints) or a reason-phrase-less "HTTP/1.1 NNN" that was
+        // rejected by a too-strict length check. Preserve the session so the
+        // real response that follows can be matched.
+        if !is_stream {
+            // Don't consume the session for any packet that looks like an HTTP
+            // response header (starts with "HTTP/"). parse_http_v1 may have
+            // legitimately rejected it (1xx status, reason-phrase-less status
+            // line, unsupported version), but the actual response is coming.
+            if payload.starts_with(b"HTTP/") {
+                debug!(
+                    "openai: flow={} HTTP-header-like packet rejected by parse_http_v1 \
+                     (preserving session stream_id={}), starts={:?}",
+                    param.flow_id,
+                    stream_id,
+                    &payload[..payload.len().min(16)],
+                );
+                return None;
+            }
+            let session = self.openai_session.as_mut().unwrap();
+            if !payload.is_empty() {
+                // Best-effort: the payload might be the JSON body; extract usage
+                // if it parses. Failure is silent (usage_status stays Missing).
+                openai_api::parse_response_json(session, payload, config);
+            }
+            session.stream_end_ts_us = Some(param.time);
+            let mut info = HttpInfo {
+                proto: self.proto,
+                is_tls: param.is_tls(),
+                msg_type: LogMessageType::Response,
+                stream_id: Some(stream_id),
+                is_req_end: true,
+                is_resp_end: true,
+                openai_need_merge: true,
+                ..Default::default()
+            };
+            info.openai_session = self.openai_session.take();
+            debug!(
+                "openai: flow={} non-stream RESPONSE fallback stream_id={} \
+                 (HTTP parse failed, completing session) usage_status={:?}",
+                param.flow_id,
+                stream_id,
+                info.openai_session
+                    .as_ref()
+                    .map(|s| s.usage_status)
+                    .unwrap_or_default(),
+            );
+            return Some(info);
+        }
+
+        // ── SSE continuation ─────────────────────────────────────────────────
+
+        let done = {
+            let session = self.openai_session.as_mut().unwrap();
+            if session.is_chunked_transfer {
+                // Decode HTTP chunked framing into the session's reusable scratch
+                // buffer (zero extra allocation per continuation packet).
+                let ok = {
+                    // Temporarily move the scratch buffer out so we can mutably
+                    // borrow both it and the rest of `session`.
+                    let mut scratch = std::mem::take(&mut session.chunked_decode_buf);
+                    // Terminal chunk can appear in the same TCP segment as the
+                    // final SSE events (usage + [DONE]). Always feed decoded data
+                    // first; mark stream done afterward.
+                    let is_terminal = openai_api::decode_chunked_sse_into(payload, &mut scratch);
+                    let sse_done = if !scratch.is_empty() {
+                        session.feed_sse(&scratch, param.time)
+                    } else {
+                        false
+                    };
+                    let result = if is_terminal {
+                        if !session.stream_completed {
+                            session.stream_completed = true;
+                        }
+                        session.stream_end_ts_us.get_or_insert(param.time);
+                        true
+                    } else {
+                        sse_done
+                    };
+                    session.chunked_decode_buf = scratch; // restore (reuses capacity)
+                    result
+                };
+                ok
+            } else {
+                session.feed_sse(payload, param.time)
+            }
+        };
+
+        debug!(
+            "openai: flow={} SSE continuation stream_id={} payload_bytes={} done={} \
+             events={} usage_status={:?}",
+            param.flow_id,
+            stream_id,
+            payload.len(),
+            done,
+            self.openai_session
+                .as_ref()
+                .map(|s| s.stream_event_count)
+                .unwrap_or(0),
+            self.openai_session
+                .as_ref()
+                .map(|s| s.usage_status)
+                .unwrap_or_default(),
+        );
+
+        let mut info = HttpInfo {
+            proto: self.proto,
+            is_tls: param.is_tls(),
+            msg_type: LogMessageType::Response,
+            stream_id: Some(stream_id),
+            is_req_end: true,
+            is_resp_end: done,
+            openai_need_merge: true,
+            ..Default::default()
+        };
+
+        if done {
+            info.openai_session = self.openai_session.take();
+            debug!(
+                "openai: flow={} SSE stream DONE stream_id={} – moving session to HttpInfo",
+                param.flow_id, stream_id,
+            );
+        }
+
+        Some(info)
     }
 
     fn http1_check_protocol(&mut self, payload: &[u8]) -> Option<LogMessageType> {
@@ -3374,5 +3957,332 @@ mod tests {
         assert!(parser
             .check_payload("GET / HTTP/1.1\r\n\r\n".as_bytes(), &param)
             .is_some());
+    }
+
+    // ── OpenAI API tests ────────────────────────────────────────────────────
+
+    /// Build a LogParserConfig with OpenAI API enabled, accepting any path that
+    /// contains "completions" as suffix, so that the test pcap paths (which may
+    /// not start with "/v1/") still match.
+    fn openai_test_config() -> LogParserConfig {
+        use crate::config::config::{
+            OpenAIApiConfig, OpenAIBizDimExtractor, OpenAIBizDimExtractors, OpenAIUsageFieldPaths,
+        };
+        LogParserConfig {
+            openai_api: OpenAIApiConfig {
+                enabled: true,
+                // Accept paths that end with "completions" so that the test pcap
+                // path /model-center/api/llm/openai/v1/chat/completions matches.
+                path_prefixes: vec![],
+                path_suffixes: vec!["completions".to_string()],
+                request_body_max_bytes: 65536,
+                response_event_max_bytes: 32768,
+                sse_buffer_max_bytes: 524288,
+                usage_field_paths: OpenAIUsageFieldPaths::default(),
+                biz_dimension_extractors: OpenAIBizDimExtractors {
+                    org_path: OpenAIBizDimExtractor {
+                        headers: vec!["x-org-path".to_string()],
+                        json_paths: vec!["metadata.org_path".to_string()],
+                    },
+                    user_id: OpenAIBizDimExtractor {
+                        headers: vec!["x-user-id".to_string()],
+                        json_paths: vec![
+                            "safety_identifier".to_string(),
+                            "user".to_string(),
+                            "source_aigc_appid".to_string(),
+                            "metadata.user_id".to_string(),
+                        ],
+                    },
+                    app_id: OpenAIBizDimExtractor {
+                        headers: vec!["x-app-id".to_string()],
+                        json_paths: vec![
+                            "appid".to_string(),
+                            "source_appid".to_string(),
+                            "metadata.app_id".to_string(),
+                        ],
+                    },
+                },
+            },
+            ..Default::default()
+        }
+    }
+
+    /// Run all packets in a pcap file through the HTTP1 parser and collect the
+    /// resulting `HttpInfo` objects (merged request+response pairs).
+    fn run_openai_pcap(pcap_name: &str, config: &LogParserConfig) -> Vec<HttpInfo> {
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap_name));
+        let log_cache = Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY)));
+        let mut packets: Vec<_> = capture.collect();
+        if packets.is_empty() {
+            return vec![];
+        }
+
+        let first_dst_port = packets[0].lookup_key.dst_port;
+        let mut parser = HttpLog::new_v1();
+        let mut results: Vec<HttpInfo> = Vec::new();
+
+        for packet in packets.iter_mut() {
+            packet.lookup_key.direction = if packet.lookup_key.dst_port == first_dst_port {
+                PacketDirection::ClientToServer
+            } else {
+                PacketDirection::ServerToClient
+            };
+            let payload = match packet.get_l4_payload() {
+                Some(p) => p,
+                None => continue,
+            };
+
+            let param = &mut ParseParam::new(
+                packet as &MetaPacket,
+                Some(log_cache.clone()),
+                Default::default(),
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Default::default(),
+                true,
+                true,
+            );
+            param.set_captured_byte(payload.len());
+            param.set_log_parser_config(config);
+
+            match parser.parse_payload(payload, param) {
+                Ok(L7ParseResult::Single(L7ProtocolInfo::HttpInfo(info))) => {
+                    // Merge responses / SSE continuations into the previous entry.
+                    // A Request starts a new session; everything else merges into the current one.
+                    if info.msg_type != LogMessageType::Request {
+                        if let Some(last) = results.last_mut() {
+                            let mut other = info;
+                            let _ = last.merge(&mut other);
+                            continue;
+                        }
+                    }
+                    results.push(info);
+                }
+                _ => {}
+            }
+        }
+        results
+    }
+
+    fn attr_val<'a>(info: &'a HttpInfo, key: &str) -> Option<&'a str> {
+        info.attributes
+            .iter()
+            .find(|kv| kv.key == key)
+            .map(|kv| kv.val.as_str())
+    }
+
+    fn metric_val(info: &HttpInfo, key: &str) -> Option<f32> {
+        info.metrics
+            .iter()
+            .find(|kv| kv.key == key)
+            .map(|kv| kv.val)
+    }
+
+    #[test]
+    fn test_openai_normal_usage_pcap() {
+        let config = openai_test_config();
+        let results = run_openai_pcap("openai_normal_usage.pcap", &config);
+
+        // Expect at least one merged request+response.
+        assert!(
+            !results.is_empty(),
+            "no results from openai_normal_usage.pcap"
+        );
+        let info = &results[0];
+
+        // openai_session should carry the final state.
+        let session = info.openai_session.as_ref().expect("openai_session absent");
+
+        // For a non-streaming response, usage should be available.
+        assert!(
+            matches!(
+                session.usage_status,
+                crate::flow_generator::protocol_logs::openai_api::UsageStatus::Available
+            ),
+            "usage_status should be Available, got {:?}",
+            session.usage_status
+        );
+        let usage = session.usage.as_ref().expect("usage absent");
+        assert!(usage.input_tokens > 0, "input_tokens should be > 0");
+        assert!(usage.output_tokens > 0, "output_tokens should be > 0");
+    }
+
+    #[test]
+    fn test_openai_stream_usage_pcap() {
+        let config = openai_test_config();
+        let results = run_openai_pcap("openai_stream_usage.pcap", &config);
+
+        assert!(
+            !results.is_empty(),
+            "no results from openai_stream_usage.pcap"
+        );
+        // Find the merged entry that has openai_session populated.
+        let info = results
+            .iter()
+            .find(|i| i.openai_session.is_some())
+            .expect("no result with openai_session");
+
+        let session = info.openai_session.as_ref().unwrap();
+
+        // Streaming pcap should be detected as stream.
+        assert!(session.is_stream, "should be detected as stream");
+
+        // Usage should be available (stream includes usage in chunks).
+        assert!(
+            matches!(
+                session.usage_status,
+                crate::flow_generator::protocol_logs::openai_api::UsageStatus::Available
+            ),
+            "usage_status should be Available"
+        );
+
+        let usage = session.usage.as_ref().expect("usage absent");
+        assert!(usage.input_tokens > 0, "input_tokens should be > 0");
+        assert!(usage.output_tokens > 0, "output_tokens should be > 0");
+        assert!(
+            session.stream_event_count > 0,
+            "stream_event_count should be > 0"
+        );
+    }
+
+    /// Regression test for `openai_stream_v537.pcap`.
+    ///
+    /// This pcap uses HTTP chunked-transfer-encoding where each SSE event is
+    /// spread across three chunks: `data:`, `{json}\n`, and `\r\n` (blank line).
+    /// After chunk decoding the event boundary is `\n\r\n` (not `\n\n`).
+    /// Also, every chunk in this pcap includes inline usage data.
+    #[test]
+    fn test_openai_stream_v537_pcap() {
+        let config = openai_test_config();
+        let results = run_openai_pcap("openai_stream_v537.pcap", &config);
+
+        assert!(
+            !results.is_empty(),
+            "no results from openai_stream_v537.pcap"
+        );
+
+        let info = results
+            .iter()
+            .find(|i| i.openai_session.is_some())
+            .expect("no result with openai_session");
+        let session = info.openai_session.as_ref().unwrap();
+
+        assert!(session.is_stream, "should be detected as stream");
+        assert!(
+            matches!(
+                session.usage_status,
+                crate::flow_generator::protocol_logs::openai_api::UsageStatus::Available
+            ),
+            "usage_status should be Available (inline usage in every chunk), got {:?}",
+            session.usage_status,
+        );
+        let usage = session.usage.as_ref().expect("usage absent");
+        assert!(usage.input_tokens > 0, "input_tokens should be > 0");
+        assert!(usage.output_tokens > 0, "output_tokens should be > 0");
+        assert!(
+            session.stream_event_count > 0,
+            "stream_event_count should be > 0"
+        );
+        assert!(session.stream_completed, "stream should be completed");
+    }
+
+    #[test]
+    fn test_openai_stream_pcap() {
+        let config = openai_test_config();
+        let results = run_openai_pcap("openai_stream.pcap", &config);
+
+        // The stream pcap without explicit usage may still produce a result.
+        // Just verify parsing doesn't panic and produces reasonable output.
+        // If there are results, verify stream is detected.
+        for info in &results {
+            if let Some(session) = &info.openai_session {
+                // If detected as openai, it should at least be kind=ChatCompletions.
+                assert!(
+                    matches!(
+                        session.kind,
+                        crate::flow_generator::protocol_logs::openai_api::OpenAIKind::ChatCompletions
+                    ),
+                    "kind should be ChatCompletions"
+                );
+            }
+        }
+    }
+
+    /// Test that OpenAI metrics are correctly propagated into the L7ProtocolSendLog.
+    #[test]
+    fn test_openai_metrics_in_send_log() {
+        use crate::flow_generator::protocol_logs::openai_api::{
+            OpenAIKind, OpenAISession, OpenAIUsage, UsageStatus,
+        };
+
+        // request_ts_us = 0, stream_end_ts_us = 5_000_000 µs → 5000 ms total.
+        let mut session = Box::new(OpenAISession::new(
+            OpenAIKind::ChatCompletions,
+            true,
+            0,
+            131072,
+            &Default::default(),
+        ));
+        session.usage = Some(OpenAIUsage {
+            input_tokens: 100,
+            output_tokens: 50,
+            total_tokens: 150,
+            cached_tokens: None,
+        });
+        session.usage_status = UsageStatus::Available;
+        session.first_output_ts_us = Some(100_000);
+        session.last_output_ts_us = Some(600_000);
+        session.stream_end_ts_us = Some(5_000_000); // 5 s after request
+        session.stream_event_count = 5;
+        session.stream_completed = true;
+        session.biz_user_id = Some("test-user".to_string());
+        session.biz_app_id = Some("test-app".to_string());
+
+        let info = HttpInfo {
+            proto: L7Protocol::Http1,
+            msg_type: LogMessageType::Session,
+            openai_session: Some(session),
+            ..Default::default()
+        };
+
+        let send_log: L7ProtocolSendLog = info.into();
+        let ext = send_log.ext_info.expect("ext_info absent");
+
+        // protocol_str should be "openai-api"
+        assert_eq!(
+            ext.protocol_str.as_deref(),
+            Some("openai-api"),
+            "protocol_str should be openai-api"
+        );
+
+        // Attributes should contain biz_user_id and biz_app_id.
+        let attrs = ext.attributes.expect("attributes absent");
+        let attr_map: std::collections::HashMap<_, _> = attrs
+            .iter()
+            .map(|kv| (kv.key.as_str(), kv.val.as_str()))
+            .collect();
+        assert_eq!(attr_map.get("biz_user_id"), Some(&"test-user"));
+        assert_eq!(attr_map.get("biz_app_id"), Some(&"test-app"));
+
+        // Metrics should contain token counts.
+        let metrics = ext.metrics.expect("metrics absent");
+        let metric_map: std::collections::HashMap<_, _> =
+            metrics.iter().map(|kv| (kv.key.as_str(), kv.val)).collect();
+        assert_eq!(metric_map.get("llm_input_tokens"), Some(&100.0f32));
+        assert_eq!(metric_map.get("llm_output_tokens"), Some(&50.0f32));
+        assert_eq!(metric_map.get("llm_total_tokens"), Some(&150.0f32));
+
+        // TTFT and TPOT should be present.
+        assert!(metric_map.contains_key("llm_ttft_us"), "ttft missing");
+        assert!(metric_map.contains_key("llm_tpot_us"), "tpot missing");
+
+        // Total stream duration: 5_000_000 µs - 0 µs = 5_000_000 µs.
+        let total_us = metric_map
+            .get("llm_total_stream_us")
+            .copied()
+            .expect("llm_total_stream_us missing");
+        assert!(
+            (total_us - 5_000_000.0).abs() < 1.0,
+            "expected ~5_000_000 µs total stream, got {total_us}"
+        );
     }
 }

@@ -2029,6 +2029,92 @@ impl Default for InferenceWhitelist {
     }
 }
 
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct OpenAIBizDimExtractor {
+    pub headers: Vec<String>,
+    pub json_paths: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct OpenAIBizDimExtractors {
+    pub org_path: OpenAIBizDimExtractor,
+    pub user_id: OpenAIBizDimExtractor,
+    pub app_id: OpenAIBizDimExtractor,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct OpenAIUsageFieldPaths {
+    /// JSON paths (dot-notation) to read the input token count, tried in order.
+    pub input_tokens: Vec<String>,
+    /// JSON paths (dot-notation) to read the output token count, tried in order.
+    pub output_tokens: Vec<String>,
+    /// JSON paths (dot-notation) to read the total token count, tried in order.
+    pub total_tokens: Vec<String>,
+    /// JSON paths (dot-notation) to read the cached token count, tried in order.
+    pub cached_tokens: Vec<String>,
+}
+
+impl Default for OpenAIUsageFieldPaths {
+    fn default() -> Self {
+        Self {
+            input_tokens: vec!["usage.prompt_tokens".to_string()],
+            output_tokens: vec!["usage.completion_tokens".to_string()],
+            total_tokens: vec!["usage.total_tokens".to_string()],
+            cached_tokens: vec![
+                "usage.prompt_tokens_details.cached_tokens".to_string(),
+                "usage.cache_read_input_tokens".to_string(),
+            ],
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct OpenAIApiConfig {
+    pub enabled: bool,
+    pub path_prefixes: Vec<String>,
+    pub path_suffixes: Vec<String>,
+    pub request_body_max_bytes: usize,
+    pub response_event_max_bytes: usize,
+    pub sse_buffer_max_bytes: usize,
+    pub usage_field_paths: OpenAIUsageFieldPaths,
+    pub biz_dimension_extractors: OpenAIBizDimExtractors,
+}
+
+impl Default for OpenAIApiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            path_prefixes: vec![],
+            path_suffixes: vec![
+                "/v1/chat/completions".to_string(),
+                "/v1/responses".to_string(),
+            ],
+            request_body_max_bytes: 65536,
+            response_event_max_bytes: 32768,
+            sse_buffer_max_bytes: 131072,
+            usage_field_paths: OpenAIUsageFieldPaths::default(),
+            biz_dimension_extractors: OpenAIBizDimExtractors {
+                org_path: OpenAIBizDimExtractor {
+                    headers: vec!["x-org-path".to_string()],
+                    json_paths: vec![],
+                },
+                user_id: OpenAIBizDimExtractor {
+                    headers: vec!["x-user-id".to_string()],
+                    json_paths: vec![],
+                },
+                app_id: OpenAIBizDimExtractor {
+                    headers: vec!["appid".to_string()],
+                    json_paths: vec![],
+                },
+            },
+        }
+    }
+}
+
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct ProtocolSpecialConfig {
@@ -2038,6 +2124,7 @@ pub struct ProtocolSpecialConfig {
     pub net_sign: NetSignConfig,
     pub mysql: MysqlConfig,
     pub grpc: GrpcConfig,
+    pub openai_api: OpenAIApiConfig,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]

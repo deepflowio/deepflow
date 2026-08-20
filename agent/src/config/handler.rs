@@ -55,9 +55,10 @@ use super::config::{Ebpf, EbpfFileIoEvent, ProcessMatcher, SymbolTable};
 use super::{
     config::{
         ApiResources, Config, DpdkSource, ExtraLogFields, ExtraLogFieldsInfo, HttpEndpoint,
-        HttpEndpointMatchRule, Iso8583ParseConfig, NetSignParseConfig, OracleConfig, PcapStream,
-        PortConfig, ProcessorsFlowLogTunning, RequestLogTunning, SessionTimeout, TagFilterOperator,
-        Timeouts, UserConfig, WebSphereMqParseConfig, GRPC_BUFFER_SIZE_MIN,
+        HttpEndpointMatchRule, Iso8583ParseConfig, NetSignParseConfig, OpenAIApiConfig,
+        OracleConfig, PcapStream, PortConfig, ProcessorsFlowLogTunning, RequestLogTunning,
+        SessionTimeout, TagFilterOperator, Timeouts, UserConfig, WebSphereMqParseConfig,
+        GRPC_BUFFER_SIZE_MIN,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -1205,6 +1206,7 @@ pub struct LogParserConfig {
     pub unconcerned_dns_nxdomain_trie: DomainNameTrie,
     pub mysql_decompress_payload: bool,
     pub mysql_endpoint_disabled: bool,
+    pub openai_api: OpenAIApiConfig,
     pub custom_app: CustomAppConfig,
 }
 
@@ -1225,6 +1227,7 @@ impl Default for LogParserConfig {
             unconcerned_dns_nxdomain_trie: DomainNameTrie::default(),
             mysql_decompress_payload: true,
             mysql_endpoint_disabled: true,
+            openai_api: OpenAIApiConfig::default(),
             custom_app: CustomAppConfig::default(),
         }
     }
@@ -1272,6 +1275,7 @@ impl fmt::Debug for LogParserConfig {
             )
             .field("mysql_decompress_payload", &self.mysql_decompress_payload)
             .field("mysql_endpoint_disabled", &self.mysql_endpoint_disabled)
+            .field("openai_api_enabled", &self.openai_api.enabled)
             .field("custom_app", &self.custom_app)
             .finish()
     }
@@ -2382,6 +2386,13 @@ impl TryFrom<(Config, UserConfig)> for ModuleConfig {
                     .protocol_special_config
                     .mysql
                     .endpoint_disabled,
+                openai_api: conf
+                    .processors
+                    .request_log
+                    .application_protocol_inference
+                    .protocol_special_config
+                    .openai_api
+                    .clone(),
                 #[cfg(not(feature = "enterprise"))]
                 custom_app: CustomAppConfig::default(),
                 #[cfg(feature = "enterprise")]
