@@ -20,7 +20,6 @@ use std::{
 };
 
 use log::{debug, warn};
-use pcap;
 use regex::Regex;
 use windows::Win32::{
     Foundation::{CHAR, ERROR_BUFFER_OVERFLOW, NO_ERROR},
@@ -390,18 +389,54 @@ pub fn route_get(dest_addr: IpAddr) -> Result<Route> {
     }
 }
 
+struct PcapDeviceList(*mut pcap_sys::pcap_if_t);
+
+impl Drop for PcapDeviceList {
+    fn drop(&mut self) {
+        if !self.0.is_null() {
+            unsafe { pcap_sys::pcap_freealldevs(self.0) };
+        }
+    }
+}
+
+fn pcap_device_names() -> Result<Vec<String>> {
+    let mut head = std::ptr::null_mut();
+    let mut errbuf = [0; pcap_sys::PCAP_ERRBUF_SIZE as usize];
+    let ret = unsafe { pcap_sys::pcap_findalldevs(&mut head, errbuf.as_mut_ptr()) };
+    if ret != 0 {
+        let message = unsafe { std::ffi::CStr::from_ptr(errbuf.as_ptr()) }
+            .to_string_lossy();
+        return Err(Error::Windows(format!("list pcap interfaces failed: {message}")));
+    }
+
+    let devices = PcapDeviceList(head);
+    let mut cursor = devices.0;
+    let mut names = Vec::new();
+    while !cursor.is_null() {
+        let raw_name = unsafe { (*cursor).name };
+        if raw_name.is_null() {
+            return Err(Error::Windows("pcap interface has null name".to_string()));
+        }
+        let name = unsafe { std::ffi::CStr::from_ptr(raw_name) }
+            .to_str()
+            .map_err(|e| Error::Windows(format!("pcap interface name is not UTF-8: {e}")))?;
+        names.push(name.to_owned());
+        cursor = unsafe { (*cursor).next };
+    }
+    Ok(names)
+}
+
 fn get_pcap_interfaces() -> Result<Vec<Link>> {
-    let devices = pcap::Device::list()
-        .map_err(|e| Error::Windows(format!("list pcap interfaces failed: {}", e)))?;
+    let device_names = pcap_device_names()?;
     let adapters = get_adapters_addresses().map(|(adapters, _)| adapters)?;
     let mut pcap_interfaces = vec![];
-    for device in devices {
+    for name in device_names {
         if let Some(link) = adapters
             .iter()
-            .find(|&l| !&l.adapter_id.is_empty() && device.name.contains(&l.adapter_id))
+            .find(|&l| !&l.adapter_id.is_empty() && name.contains(&l.adapter_id))
         {
             let mut _link = link.clone();
-            _link.device_name = device.name;
+            _link.device_name = name;
             pcap_interfaces.push(_link);
         }
     }
