@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 
-use std::{borrow::Cow, cell::OnceCell, collections::HashMap, fmt, str};
+use std::{
+    borrow::Cow,
+    cell::OnceCell,
+    collections::{HashMap, VecDeque},
+    fmt, str,
+};
 
 use serde::{Serialize, Serializer};
 use strum_macros::Display;
@@ -128,6 +133,10 @@ impl From<u8> for ResponseType {
 pub struct RedisInfo {
     msg_type: LogMessageType,
     #[serde(skip)]
+    session_id: u32,
+    #[serde(skip)]
+    tcp_seq_offset: u32,
+    #[serde(skip)]
     is_tls: bool,
 
     #[serde(
@@ -185,7 +194,11 @@ impl L7LogAttribute for RedisInfo {
 
 impl L7ProtocolInfoInterface for RedisInfo {
     fn session_id(&self) -> Option<u32> {
-        None
+        Some(self.session_id)
+    }
+
+    fn tcp_seq_offset(&self) -> u32 {
+        self.tcp_seq_offset
     }
 
     fn merge_log(&mut self, other: &mut L7ProtocolInfo) -> Result<()> {
@@ -369,7 +382,8 @@ impl From<&RedisInfo> for LogCache {
 
 #[derive(Default)]
 pub struct RedisLog {
-    has_request: bool,
+    pending_requests: VecDeque<u32>,
+    next_session_id: u32,
     perf_stats: Vec<L7PerfStats>,
     obfuscate: bool,
     #[cfg(feature = "enterprise")]
@@ -395,57 +409,71 @@ impl L7ProtocolParserInterface for RedisLog {
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<L7ParseResult> {
         self.obfuscate = param.obfuscate_cache.is_some();
         #[cfg(feature = "enterprise")]
-        self.custom_field_store.clear();
-        #[cfg(feature = "enterprise")]
         let custom_policies = param
             .parse_config
             .and_then(|config| config.get_custom_field_policies(L7Protocol::Redis.into(), param));
 
-        let mut info = RedisInfo {
-            is_tls: param.is_tls(),
-            ..Default::default()
-        };
-        self.parse(payload, param.l4_protocol, param.direction, &mut info)?;
+        let mut infos = self.parse(payload, param.l4_protocol, param.direction)?;
+        for info in infos.iter_mut() {
+            info.is_tls = param.is_tls();
 
-        #[cfg(feature = "enterprise")]
-        if let Some(cp) = custom_policies {
-            cp.apply(
-                &mut self.custom_field_store,
-                &info,
-                param.direction.into(),
-                Source::Dummy,
-            );
-            for op in self.custom_field_store.drain_with(cp, &info) {
-                match &op.op {
-                    Op::SaveHeader(_) => (),
-                    Op::SavePayload(key) => {
-                        info.attributes.push(KeyVal {
-                            key: key.to_string(),
-                            val: String::from_utf8_lossy(payload).to_string(),
-                        });
+            #[cfg(feature = "enterprise")]
+            if let Some(cp) = custom_policies {
+                self.custom_field_store.clear();
+                cp.apply(
+                    &mut self.custom_field_store,
+                    info,
+                    param.direction.into(),
+                    Source::Dummy,
+                );
+                for op in self.custom_field_store.drain_with(cp, info) {
+                    match &op.op {
+                        Op::SaveHeader(_) => (),
+                        Op::SavePayload(key) => {
+                            info.attributes.push(KeyVal {
+                                key: key.to_string(),
+                                val: String::from_utf8_lossy(payload).to_string(),
+                            });
+                        }
+                        _ => (),
                     }
-                    _ => (),
                 }
             }
+
+            if let Some(config) = param.parse_config {
+                info.set_is_on_blacklist(config);
+            }
         }
 
-        set_captured_byte!(info, param);
-        if let Some(config) = param.parse_config {
-            info.set_is_on_blacklist(config);
+        // All infos originate from the same TCP payload. Attribute the captured
+        // bytes once so a coalesced pipeline does not multiply traffic metrics.
+        if let Some(info) = infos.first_mut() {
+            set_captured_byte!(info, param);
         }
+
         self.perf_stats.clear();
         if param.parse_perf {
-            let mut perf_stat = L7PerfStats::default();
-            if let Some(stats) = info.perf_stats(param) {
-                info.rrt = stats.rrt_sum;
-                perf_stat.sequential_merge(&stats);
+            for info in infos.iter_mut() {
+                let mut perf_stat = L7PerfStats::default();
+                if let Some(stats) = info.perf_stats(param) {
+                    info.rrt = stats.rrt_sum;
+                    perf_stat.sequential_merge(&stats);
+                }
+                self.perf_stats.push(perf_stat);
             }
-            self.perf_stats.push(perf_stat);
         }
-        if param.parse_log {
-            Ok(L7ParseResult::Single(L7ProtocolInfo::RedisInfo(info)))
+
+        if !param.parse_log {
+            return Ok(L7ParseResult::None);
+        }
+        let mut logs = infos
+            .into_iter()
+            .map(L7ProtocolInfo::RedisInfo)
+            .collect::<Vec<_>>();
+        if logs.len() == 1 {
+            Ok(L7ParseResult::Single(logs.pop().unwrap()))
         } else {
-            Ok(L7ParseResult::None)
+            Ok(L7ParseResult::Multi(logs))
         }
     }
 
@@ -467,16 +495,32 @@ impl RedisLog {
         self.perf_stats = vec![];
     }
 
-    fn fill_request(&mut self, request: CommandLine, info: &mut RedisInfo) {
+    fn fill_request(&mut self, request: CommandLine, offset: usize, info: &mut RedisInfo) {
         info.request_type = Vec::from(request.command());
         info.msg_type = LogMessageType::Request;
         info.request = request.stringify(self.obfuscate);
-        self.has_request = true;
+        // Session ID 0 is also the key used by non-multiplexed cBPF logs and
+        // SocketClosed notifications. Start pipeline IDs at 1 to avoid that
+        // reserved-key collision.
+        self.next_session_id = self.next_session_id.wrapping_add(1);
+        if self.next_session_id == 0 {
+            self.next_session_id = 1;
+        }
+        info.session_id = self.next_session_id;
+        info.tcp_seq_offset = offset as u32;
+        self.pending_requests.push_back(self.next_session_id);
     }
 
-    fn fill_response(&mut self, context: (Vec<u8>, ResponseType), info: &mut RedisInfo) {
+    fn fill_response(
+        &mut self,
+        context: (Vec<u8>, ResponseType),
+        session_id: u32,
+        offset: usize,
+        info: &mut RedisInfo,
+    ) {
         info.msg_type = LogMessageType::Response;
-        self.has_request = false;
+        info.session_id = session_id;
+        info.tcp_seq_offset = offset as u32;
         let (context, response_type) = context;
         info.resp_status = L7ResponseStatus::Ok;
         info.response_result = response_type;
@@ -498,8 +542,7 @@ impl RedisLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-        info: &mut RedisInfo,
-    ) -> Result<()> {
+    ) -> Result<Vec<RedisInfo>> {
         if proto != IpProtocol::TCP {
             return Err(Error::InvalidIpProtocol);
         }
@@ -507,17 +550,39 @@ impl RedisLog {
             return Err(Error::L7ProtocolUnknown);
         }
 
-        match direction {
-            // only parse the request with payload start with '*' which indicate is a command start, otherwise assume tcp fragment of request
-            PacketDirection::ClientToServer if payload.get(0) == Some(&b'*') => {
-                self.fill_request(CommandLine::new(payload)?, info)
+        let mut remaining = payload;
+        let mut infos = Vec::new();
+        while !remaining.is_empty() {
+            let offset = payload.len() - remaining.len();
+            let mut info = RedisInfo::default();
+            match direction {
+                // Only parse requests beginning with '*', which indicates a
+                // command boundary. A non-'*' payload is a TCP fragment.
+                PacketDirection::ClientToServer if remaining[0] == b'*' => {
+                    let request = match CommandLine::new(remaining) {
+                        Ok(request) => request,
+                        Err(e) if infos.is_empty() => return Err(e),
+                        Err(_) => break,
+                    };
+                    remaining = request.remaining;
+                    self.fill_request(request, offset, &mut info);
+                }
+                PacketDirection::ServerToClient if !self.pending_requests.is_empty() => {
+                    let (response, rest) = match stringifier::decode_one(remaining, false) {
+                        Ok(response) => response,
+                        Err(e) if infos.is_empty() => return Err(e),
+                        Err(_) => break,
+                    };
+                    remaining = rest;
+                    let session_id = self.pending_requests.pop_front().unwrap();
+                    self.fill_response(response, session_id, offset, &mut info);
+                }
+                _ if infos.is_empty() => return Err(Error::L7ProtocolUnknown),
+                _ => break,
             }
-            PacketDirection::ServerToClient if self.has_request => {
-                self.fill_response(stringifier::decode(payload, false)?, info)
-            }
-            _ => return Err(Error::L7ProtocolUnknown),
-        };
-        Ok(())
+            infos.push(info);
+        }
+        Ok(infos)
     }
 }
 
@@ -798,7 +863,7 @@ mod stringifier {
         }
     }
 
-    pub fn decode(payload: &[u8], strict: bool) -> Result<(Vec<u8>, ResponseType)> {
+    pub fn decode_one(payload: &[u8], strict: bool) -> Result<((Vec<u8>, ResponseType), &[u8])> {
         if payload.is_empty() {
             return Err(Error::RedisLogParseFailed);
         }
@@ -810,8 +875,16 @@ mod stringifier {
             (_, Err(Error::RedisLogParseFailed)) | (true, Err(Error::RedisLogParsePartial)) => {
                 Err(Error::RedisLogParseFailed)
             }
-            _ => Ok((output, ResponseType::from(payload[0]))),
+            (false, Err(Error::RedisLogParsePartial)) => {
+                Ok(((output, ResponseType::from(payload[0])), &[]))
+            }
+            (_, Ok(rest)) => Ok(((output, ResponseType::from(payload[0])), rest)),
+            (_, Err(e)) => Err(e),
         }
+    }
+
+    pub fn decode(payload: &[u8], strict: bool) -> Result<(Vec<u8>, ResponseType)> {
+        decode_one(payload, strict).map(|(output, _)| output)
     }
 }
 
@@ -877,6 +950,7 @@ const ALL_COMMNADS_STR: &str = include_str!("redis-commands");
 
 struct CommandLine<'a> {
     payload: &'a [u8],
+    remaining: &'a [u8],
     cmd_upper: String,
     length: usize,
 }
@@ -917,6 +991,7 @@ impl<'a> CommandLine<'a> {
 
         Ok(Self {
             payload,
+            remaining: payload_iter,
             cmd_upper,
             length: length as usize,
         })
@@ -1372,6 +1447,124 @@ mod tests {
                 str::from_utf8(input.0.as_bytes()).unwrap().escape_default()
             );
         }
+    }
+
+    #[test]
+    fn decode_multiple_responses_in_one_tcp_payload() {
+        let payload = b"+OK\r\n+OK\r\n";
+        let ((first, _), remaining) = stringifier::decode_one(payload, false).unwrap();
+        assert_eq!(first, b"+OK");
+        assert_eq!(remaining, b"+OK\r\n");
+
+        let ((second, _), remaining) = stringifier::decode_one(remaining, false).unwrap();
+        assert_eq!(second, b"+OK");
+        assert!(remaining.is_empty());
+    }
+
+    #[test]
+    fn decode_multiple_commands_in_one_tcp_payload() {
+        let mut payload = encode_redis_command("PSETEX key-1 86400000 value");
+        payload.extend_from_slice(&encode_redis_command("GET key-1"));
+
+        let first = CommandLine::new(&payload).unwrap();
+        assert_eq!(first.command(), b"PSETEX");
+        assert!(!first.remaining.is_empty());
+
+        let second = CommandLine::new(first.remaining).unwrap();
+        assert_eq!(second.command(), b"GET");
+        assert!(second.remaining.is_empty());
+    }
+
+    #[test]
+    fn parse_pipeline_with_coalesced_responses() {
+        let mut redis = RedisLog::default();
+        let first_request = encode_redis_command("PSETEX key-1 86400000 value");
+        let second_request = encode_redis_command("GET key-1");
+
+        let infos = redis
+            .parse(
+                &first_request,
+                IpProtocol::TCP,
+                PacketDirection::ClientToServer,
+            )
+            .unwrap();
+        assert_eq!(infos.len(), 1);
+        assert_eq!(infos[0].request_type, b"PSETEX");
+        assert_eq!(redis.pending_requests.len(), 1);
+
+        let infos = redis
+            .parse(
+                &second_request,
+                IpProtocol::TCP,
+                PacketDirection::ClientToServer,
+            )
+            .unwrap();
+        assert_eq!(infos.len(), 1);
+        assert_eq!(infos[0].request_type, b"GET");
+        assert_eq!(redis.pending_requests.len(), 2);
+
+        let infos = redis
+            .parse(
+                b"+OK\r\n$5\r\nvalue\r\n",
+                IpProtocol::TCP,
+                PacketDirection::ServerToClient,
+            )
+            .unwrap();
+        assert_eq!(infos.len(), 2);
+        assert_eq!(infos[0].status, b"+OK");
+        assert!(infos[1].status.is_empty());
+        assert_eq!(infos[0].session_id, 1);
+        assert_eq!(infos[1].session_id, 2);
+        assert_eq!(infos[0].tcp_seq_offset, 0);
+        assert_eq!(infos[1].tcp_seq_offset, 5);
+        assert_eq!(redis.pending_requests.len(), 0);
+    }
+
+    #[test]
+    fn pipeline_commands_have_distinct_sessions_and_tcp_offsets() {
+        let mut payload = encode_redis_command("PSETEX key-1 86400000 value");
+        let second_offset = payload.len() as u32;
+        payload.extend_from_slice(&encode_redis_command("GET key-1"));
+
+        let mut redis = RedisLog::default();
+        let requests = redis
+            .parse(&payload, IpProtocol::TCP, PacketDirection::ClientToServer)
+            .unwrap();
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].session_id, 1);
+        assert_eq!(requests[1].session_id, 2);
+        assert_eq!(requests[0].tcp_seq_offset, 0);
+        assert_eq!(requests[1].tcp_seq_offset, second_offset);
+
+        let responses = redis
+            .parse(
+                b"+OK\r\n$5\r\nvalue\r\n",
+                IpProtocol::TCP,
+                PacketDirection::ServerToClient,
+            )
+            .unwrap();
+        assert_eq!(responses.len(), 2);
+        assert_eq!(responses[0].session_id, requests[0].session_id);
+        assert_eq!(responses[1].session_id, requests[1].session_id);
+        assert_eq!(responses[0].tcp_seq_offset, 0);
+        assert_eq!(responses[1].tcp_seq_offset, 5);
+    }
+
+    #[test]
+    fn keep_complete_command_before_truncated_command() {
+        let first_request = encode_redis_command("GET key-1");
+        let second_request = encode_redis_command("GET key-2");
+        let mut payload = first_request;
+        payload.extend_from_slice(&second_request[..second_request.len() - 1]);
+
+        let mut redis = RedisLog::default();
+        let infos = redis
+            .parse(&payload, IpProtocol::TCP, PacketDirection::ClientToServer)
+            .unwrap();
+        assert_eq!(infos.len(), 1);
+        assert_eq!(infos[0].request_type, b"GET");
+        assert_eq!(infos[0].request, b"GET key-1");
+        assert_eq!(redis.pending_requests.len(), 1);
     }
 
     #[test]
