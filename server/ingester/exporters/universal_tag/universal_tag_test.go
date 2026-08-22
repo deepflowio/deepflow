@@ -111,6 +111,30 @@ func TestQueryUniversalTagsPodGroupAutoServiceType(t *testing.T) {
 	}
 }
 
+// The third branch this fix covers: a custom service (104), from
+// GetAutoService's customServiceID branch.
+func TestQueryUniversalTagsCustomServiceAutoServiceType(t *testing.T) {
+	u := makeManagerWithPodGroup(TYPE_CUSTOM_SERVICE, 555, "some-custom-service")
+	tags := u.QueryUniversalTags(
+		1,
+		0, 0, 0, 0, 0, 0, 0,
+		uint8(TYPE_VM),
+		uint8(TYPE_CUSTOM_SERVICE), // autoServiceType
+		uint8(TYPE_POD),            // autoInstanceType
+		0,
+		555, // autoServiceID
+		0,
+		0, 0, 0, 0, 0, 0,
+		true, 0, nil,
+	)
+	if tags[AutoServiceType] != "custom_service" {
+		t.Errorf("custom_service auto_service_type = %q, want \"custom_service\"", tags[AutoServiceType])
+	}
+	if tags[AutoService] != "some-custom-service" {
+		t.Errorf("custom_service auto_service = %q, want \"some-custom-service\"", tags[AutoService])
+	}
+}
+
 // pod_node endpoints land on PodClusterType (103) via GetAutoService's
 // podClusterID branch, which was the other hole in the table.
 func TestQueryUniversalTagsPodClusterAutoServiceType(t *testing.T) {
