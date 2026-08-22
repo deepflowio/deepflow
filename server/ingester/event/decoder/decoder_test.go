@@ -52,6 +52,16 @@ func TestRouteProcEventType(t *testing.T) {
 			},
 			want: common.PROC_OPS_EVENT,
 		},
+		{
+			name: "proc block goes to proc_block_event",
+			event: &pb.ProcEvent{
+				EventType: pb.EventType_ProcBlockEvent,
+				ProcBlockEventData: &pb.ProcBlockEventData{
+					RuleId: "block-reboot",
+				},
+			},
+			want: common.PROC_BLOCK_EVENT,
+		},
 	}
 
 	for _, tt := range tests {

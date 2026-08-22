@@ -47,10 +47,36 @@ func TestMySQLDMLInsert_AIAgentEventDataSourcesShareDefaultRetention(t *testing.
 		"VALUES (28, '事件-文件管理事件', 'event.file_mgmt_event', 0, 7*24, @lcuuid);",
 		"VALUES (29, '事件-进程权限事件', 'event.proc_perm_event', 0, 7*24, @lcuuid);",
 		"VALUES (30, '事件-进程操作事件', 'event.proc_ops_event', 0, 7*24, @lcuuid);",
+		"VALUES (31, '事件-进程阻断事件', 'event.proc_block_event', 0, 7*24, @lcuuid);",
 	}
 	for _, item := range required {
 		if !strings.Contains(sql, item) {
 			t.Fatalf("missing AI event data source default retention entry: %s", item)
+		}
+	}
+}
+
+func TestProcBlockEventDataSourceHasPostMainMySQLIssue(t *testing.T) {
+	const mainBaselineVersion = "7.1.0.40"
+
+	if !versionGreater(DB_VERSION_EXPECTED, mainBaselineVersion) {
+		t.Fatalf("DB_VERSION_EXPECTED=%s, want version greater than main baseline %s", DB_VERSION_EXPECTED, mainBaselineVersion)
+	}
+
+	sqlPath := filepath.Join("rawsql", "mysql", "issu", DB_VERSION_EXPECTED+".sql")
+	content, err := os.ReadFile(sqlPath)
+	if err != nil {
+		t.Fatalf("read latest mysql issu sql failed: %v", err)
+	}
+	sql := string(content)
+
+	required := []string{
+		"CALL InsertDataSourceIfNotExists('事件-进程阻断事件', 'event.proc_block_event', 0, 7*24);",
+		"UPDATE db_version SET version='" + DB_VERSION_EXPECTED + "';",
+	}
+	for _, item := range required {
+		if !strings.Contains(sql, item) {
+			t.Fatalf("missing proc block event mysql issu entry: %s", item)
 		}
 	}
 }

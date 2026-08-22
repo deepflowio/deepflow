@@ -209,6 +209,8 @@ func (n *EventStore) NewColumnBlock() ckdb.CKColumnBlock {
 		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_PROC_PERM_EVENT)
 	case common.PROC_OPS_EVENT:
 		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_PROC_OPS_EVENT)
+	case common.PROC_BLOCK_EVENT:
+		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_PROC_BLOCK_EVENT)
 	default:
 		b.NativeTagsBlock = nativetag.GetTableNativeTagsColumnBlock(n.OrgId, nativetag.EVENT_EVENT)
 	}

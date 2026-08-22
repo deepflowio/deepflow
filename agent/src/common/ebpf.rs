@@ -44,6 +44,7 @@ pub const UNIX_SOCKET: u8 = 8;
 pub const FILE_OP_EVENT: u8 = 9;
 pub const PERM_OP_EVENT: u8 = 10;
 pub const PROC_LIFECYCLE_EVENT: u8 = 11;
+pub const PROC_BLOCK_EVENT: u8 = 12;
 
 const EBPF_TYPE_TRACEPOINT: u8 = 0;
 const EBPF_TYPE_TLS_UPROBE: u8 = 1;

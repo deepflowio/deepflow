@@ -39,6 +39,11 @@ func TestEventStoreDataSourceForNewAiAgentTables(t *testing.T) {
 			store: EventStore{StoreEventType: eventcommon.PROC_OPS_EVENT},
 			want:  uint32(exporterconfig.PROC_OPS_EVENT),
 		},
+		{
+			name:  "proc block event",
+			store: EventStore{StoreEventType: eventcommon.PROC_BLOCK_EVENT},
+			want:  uint32(exporterconfig.PROC_BLOCK_EVENT),
+		},
 	}
 
 	for _, tt := range tests {
@@ -60,6 +65,7 @@ func TestGenEventCKTableDisables1SAggrForNewAiAgentTables(t *testing.T) {
 		{eventcommon.FILE_MGMT_EVENT.TableName(), false},
 		{eventcommon.PROC_PERM_EVENT.TableName(), false},
 		{eventcommon.PROC_OPS_EVENT.TableName(), false},
+		{eventcommon.PROC_BLOCK_EVENT.TableName(), false},
 	}
 
 	for _, tt := range tests {

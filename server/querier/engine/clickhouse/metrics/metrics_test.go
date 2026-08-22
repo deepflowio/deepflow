@@ -101,6 +101,9 @@ func TestCheckDBField(t *testing.T) {
 					case chCommon.TABLE_NAME_PROC_OPS_EVENT:
 						metrics = PROC_OPS_EVENT_METRICS
 						replaceMetrics = PROC_OPS_EVENT_METRICS_REPLACE
+					case chCommon.TABLE_NAME_PROC_BLOCK_EVENT:
+						metrics = PROC_BLOCK_EVENT_METRICS
+						replaceMetrics = PROC_BLOCK_EVENT_METRICS_REPLACE
 					}
 				}
 				if metrics == nil {
@@ -152,6 +155,7 @@ func TestLoadMetricsForNewAiAgentTables(t *testing.T) {
 		chCommon.TABLE_NAME_FILE_MGMT_EVENT,
 		chCommon.TABLE_NAME_PROC_PERM_EVENT,
 		chCommon.TABLE_NAME_PROC_OPS_EVENT,
+		chCommon.TABLE_NAME_PROC_BLOCK_EVENT,
 	}
 	for _, table := range tables {
 		loadMetrics, err := LoadMetrics("event", table, metricData.(map[string]interface{}))

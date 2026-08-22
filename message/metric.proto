@@ -266,6 +266,7 @@ enum EventType {
     FileOpEvent = 2;    // File creation/deletion/chmod/chown
     PermOpEvent = 3;    // setuid/setgid/setreuid/setregid
     ProcLifecycleEvent = 4; // fork/exec/exit
+    ProcBlockEvent = 5; // AI Agent command/syscall enforcement audit/block
 }
 
 enum FileOpType {
@@ -328,6 +329,40 @@ message ProcLifecycleEventData {
     bytes exec_path = 9;
 }
 
+enum EnforcementTargetType {
+    EnforcementTargetUnknown = 0;
+    EnforcementTargetExec = 1;
+    EnforcementTargetSyscall = 2;
+}
+
+enum EnforcementAction {
+    EnforcementActionUnknown = 0;
+    EnforcementActionAudit = 1;
+    EnforcementActionDeny = 2;
+    EnforcementActionSigkill = 3;
+}
+
+message ProcBlockEventData {
+    string rule_id = 1;
+    EnforcementTargetType target_type = 2;
+    EnforcementAction action = 3;
+    string mechanism = 4;
+    string guarantee = 5;
+    int32 errno = 6;
+    uint32 pid = 7;
+    uint32 parent_pid = 8;
+    uint32 ai_agent_root_pid = 9;
+    uint32 uid = 10;
+    uint32 gid = 11;
+    bytes comm = 12;
+    bytes cmdline = 13;
+    bytes exec_path = 14;
+    string syscall_name = 15;
+    uint32 syscall_id = 16;
+    uint64 timestamp = 17;
+    uint64 policy_epoch = 18;
+}
+
 message ProcEvent {
     uint32 pid = 1;
     uint32 thread_id = 2;
@@ -343,6 +378,7 @@ message ProcEvent {
     PermOpEventData perm_op_event_data = 12;
     ProcLifecycleEventData proc_lifecycle_event_data = 13;
     uint32 ai_agent_root_pid = 14;
+    ProcBlockEventData proc_block_event_data = 15;
 }
 
 message PrometheusMetric {

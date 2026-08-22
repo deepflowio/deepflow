@@ -1896,6 +1896,7 @@ Configuration Item:
 - rewrite_name: The name will replace the process name or cmd use regexp replace.
   Default value `""` means no replacement.
 - enabled_features: List of features enabled for matched processes. Available options:
+  - proc.ai_agent (Only identifies AI Agents; it does not implicitly enable `proc.gprocess_info` or `proc.socket_list`)
   - proc.gprocess_info (Ensure `inputs.proc.enabled` is configured to **true**)
   - proc.golang_symbol_table (Ensure `inputs.proc.symbol_table.golang_specific.enabled` is configured to **true**)
   - proc.socket_list (Ensure `inputs.proc.socket_info_sync_interval` is configured to a **number > 0**)
@@ -2202,6 +2203,7 @@ inputs:
 **Enum options**:
 | Value | Note                         |
 | ----- | ---------------------------- |
+| proc.ai_agent | Only identifies AI Agents; it does not implicitly enable `proc.gprocess_info` or `proc.socket_list` |
 | proc.gprocess_info | Synchronize process resource information and inject process tags from the observation point into raw eBPF data |
 | proc.golang_symbol_table | Parse Golang-specific symbol tables to optimize profiling data when Golang processes prune the standard symbol table |
 | proc.socket_list | Synchronize active socket information of processes to inject process labels for both peers in application and network observation data |
@@ -2218,7 +2220,12 @@ inputs:
 
 **Description**:
 
-Also ensure the global configuration parameters for related features are enabled:
+`proc.ai_agent` only identifies AI Agents. It does not require another
+global feature toggle, and it does not implicitly enable
+`proc.gprocess_info` or `proc.socket_list`.
+
+Other related features still require their corresponding global
+configuration parameters to be enabled:
 - proc.gprocess_info (Ensure `inputs.proc.enabled` is configured to **true**)
 - proc.golang_symbol_table (Ensure `inputs.proc.symbol_table.golang_specific.enabled` is configured to **true**)
 - proc.socket_list (Ensure `inputs.proc.socket_info_sync_interval` is configured to a **number > 0**)
@@ -2318,6 +2325,468 @@ inputs:
 **Description**:
 
 Whether to enable AI Agent file IO event collection.
+
+#### Enforcement {#inputs.proc.ai_agent.enforcement}
+
+AI Agent command and selected direct syscall audit/block enforcement.
+
+##### Enabled {#inputs.proc.ai_agent.enforcement.enabled}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.enabled`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+Enable the AI Agent enforcement pipeline.
+
+- With `mode: audit_only`, it emits audit events only and does not prevent execution.
+- With `mode: block`, matched `deny` rules may actually prevent execution.
+
+##### Mode {#inputs.proc.ai_agent.enforcement.mode}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.mode`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        mode: audit_only
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| audit_only | |
+| block | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Global enforcement mode.
+
+- `audit_only`: all matching rules emit `proc_block_event` with `guarantee=audit_only`; no command or syscall is prevented.
+- `block`: only rules with `action.type: deny` attempt strong block; the rest remain audit-only.
+
+If you want a specific rule to stay audit-only under `mode: block`, use:
+
+```yaml
+action:
+  type: audit
+```
+
+##### Strategy {#inputs.proc.ai_agent.enforcement.strategy}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.strategy`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        strategy: auto
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| auto | Recommended |
+| lsm_only | Enable only path-only LSM exec blocking |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Enforcement mechanism selection for path-only exec blocking.
+
+Current strong-block behavior:
+
+- `auto`: use BPF LSM for path-only exec rules when allowed and available.
+- `lsm_only`: require the LSM path for path-only exec rules.
+
+Notes:
+
+- argv-qualified exec blocking is controlled by `allowed_mechanisms` plus `syscall_strategy`, because it uses the standalone kprobe override path.
+- Historical values such as `override_only`, `sigkill_only`, and `audit_only` are compatibility leftovers and are not recommended for new configs.
+
+##### Syscall Strategy {#inputs.proc.ai_agent.enforcement.syscall_strategy}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.syscall_strategy`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        syscall_strategy: auto
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| auto | Recommended |
+| override_only | Enable direct-syscall blocking through kprobe override |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Mechanism selection for direct syscall blocking.
+
+Current strong-block behavior:
+
+- `auto`
+- `override_only`
+
+Both currently map to the kprobe override implementation. Historical values such as `lsm_only`, `sigkill_only`, and `audit_only` are compatibility leftovers and are not recommended for new configs.
+
+##### Allowed Mechanisms {#inputs.proc.ai_agent.enforcement.allowed_mechanisms}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.allowed_mechanisms`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        allowed_mechanisms:
+        - lsm
+        - kprobe_override
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| lsm | Path-only exec strong block |
+| kprobe_override | argv-qualified exec and direct-syscall strong block |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Mechanisms allowed by configuration.
+
+Current implementation consumes only:
+
+- `lsm`
+- `kprobe_override`
+
+Notes:
+
+- `kprobe_override` is attempted only when this list contains it and runtime capability probing confirms support.
+- `sigkill` and `seccomp` are compatibility leftovers and are not consumed by the current kernel blocking path.
+
+##### Default Fallback {#inputs.proc.ai_agent.enforcement.default_fallback}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.default_fallback`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        default_fallback: sigkill
+```
+
+**Enum options**:
+| Value | Note                         |
+| ----- | ---------------------------- |
+| sigkill | |
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string |
+
+**Description**:
+
+Reserved compatibility field. The current kernel blocking path does not consume this value. Keep the default.
+
+##### Max Rules {#inputs.proc.ai_agent.enforcement.max_rules}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.max_rules`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        max_rules: 256
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Range | [0, 256] |
+
+**Description**:
+
+Maximum compiled exec BPF record count, not the number of top-level rule objects.
+
+Notes:
+
+- Each `exec.exact` entry consumes 1 exec BPF record.
+- Each `exec.suffix` entry consumes 1 exec BPF record.
+- If `argv_matches` or `cmdline_prefixes` is present, the record count is multiplied by the selector count.
+- Audit-only rules still count when they compile into `exact` / `suffix` / `argv_matches` / `cmdline_prefixes`-backed exec records.
+- Pure `exec.prefix` audit rules stay in user space and do not consume exec BPF records.
+- Current exec strong-block cap is `256` compiled records.
+- The direct-syscall path uses a separate fixed map and a smaller supported syscall set.
+
+##### Rules {#inputs.proc.ai_agent.enforcement.rules}
+
+**Tags**:
+
+`hot_update`
+<mark>ee_feature</mark>
+
+**FQCN**:
+
+`inputs.proc.ai_agent.enforcement.rules`
+
+**Default value**:
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        rules: []
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | list |
+
+**Description**:
+
+AI Agent enforcement rules.
+
+Current effective rule fields:
+
+- `scope`: only `ai_agent_tree` is supported.
+- `target_type`: `exec` or `syscall`.
+- `action.type`: recommended values are `deny` and `audit`; only `deny` enters the strong-block path and other values remain audit-only.
+- `action.errno`: reserved compatibility field. Current BPF blocking uses `EPERM`.
+- `audit`: reserved compatibility field. It does not switch behavior, and matched rules still emit `proc_block_event`.
+- `exec.exact` / `exec.suffix`: strong-block selectors.
+- `exec.prefix`: user-space audit-only selector; not used for strong block on 4.18.
+- `exec.argv_matches`: strong block supports only `index: 0..3`, `op: exact`, and it must be combined with `exact` or `suffix` path selectors.
+- `exec.cmdline_prefixes`: strong block supports 256-byte truncated cmdline prefix matching, and it must be combined with `exact` or `suffix` path selectors.
+- `syscall.names` / `syscall.symbols`: current direct-syscall support is limited to `reboot`, `init_module`, `finit_module`, `delete_module`, and `kexec_load`, and both block and audit-only syscall handling still rely on `kprobe_override`.
+
+Recommended example:
+
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        enabled: true
+        mode: block
+        strategy: auto
+        syscall_strategy: override_only
+        allowed_mechanisms:
+        - lsm
+        - kprobe_override
+        max_rules: 256
+        rules:
+        - id: block-uname
+          scope: ai_agent_tree
+          target_type: exec
+          action:
+            type: deny
+            errno: EPERM
+          audit: true
+          exec:
+            exact:
+            - /usr/bin/uname
+            - /bin/uname
+            suffix:
+            - /uname
+        - id: block-systemctl-reboot
+          scope: ai_agent_tree
+          target_type: exec
+          action:
+            type: deny
+            errno: EPERM
+          audit: true
+          exec:
+            exact:
+            - /usr/bin/systemctl
+            - /bin/systemctl
+            argv_matches:
+            - index: 1
+              op: exact
+              value: reboot
+        - id: block-systemctl-reboot-cmdline
+          scope: ai_agent_tree
+          target_type: exec
+          action:
+            type: deny
+          exec:
+            exact:
+            - /usr/bin/systemctl
+            cmdline_prefixes:
+            - systemctl reboot
+        - id: block-direct-reboot
+          scope: ai_agent_tree
+          target_type: syscall
+          action:
+            type: deny
+            errno: EPERM
+          audit: true
+          syscall:
+            names:
+            - reboot
+            symbols:
+            - __x64_sys_reboot
+```
+
+The example above consumes 5 compiled exec BPF records:
+
+- `block-uname`: 2 `exact` + 1 `suffix` = 3
+- `block-systemctl-reboot`: 2 `exact` * 1 `argv_matches` = 2
+
+Audit-only examples:
+
+1. If all rules should audit only, use the global `mode: audit_only`:
+
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        enabled: true
+        mode: audit_only
+        rules:
+        - id: audit-uname
+          scope: ai_agent_tree
+          target_type: exec
+          exec:
+            exact:
+            - /usr/bin/uname
+            - /bin/uname
+```
+
+2. If some rules should block and others should only audit, keep `mode: block` and set `action.type: audit` on the audit-only rule:
+
+```yaml
+inputs:
+  proc:
+    ai_agent:
+      enforcement:
+        enabled: true
+        mode: block
+        rules:
+        - id: audit-uname
+          scope: ai_agent_tree
+          target_type: exec
+          action:
+            type: audit
+          exec:
+            exact:
+            - /usr/bin/uname
+            - /bin/uname
+        - id: block-direct-reboot
+          scope: ai_agent_tree
+          target_type: syscall
+          action:
+            type: deny
+            errno: EPERM
+          syscall:
+            names:
+            - reboot
+            symbols:
+            - __x64_sys_reboot
+```
+
+Notes:
+
+- A rule with `action.type: audit` still emits `proc_block_event`, but `guarantee` will be `audit_only`.
+- `audit: true/false` is not the switch for audit-only behavior and does not control blocking.
 
 ### Symbol Table {#inputs.proc.symbol_table}
 
@@ -9142,4 +9611,3 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
-

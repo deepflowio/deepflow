@@ -19,3 +19,8 @@ var PROC_OPS_EVENT_METRICS = map[string]*Metrics{}
 var PROC_OPS_EVENT_METRICS_REPLACE = map[string]*Metrics{
 	"log_count": NewReplaceMetrics("1", ""),
 }
+
+var PROC_BLOCK_EVENT_METRICS = map[string]*Metrics{}
+var PROC_BLOCK_EVENT_METRICS_REPLACE = map[string]*Metrics{
+	"log_count": NewReplaceMetrics("1", ""),
+}

@@ -232,12 +232,17 @@ func NewEventor(eventType common.EventType, config *config.Config, recv *receive
 			if err != nil {
 				return nil, err
 			}
+			procBlockWriter, err := dbwriter.NewEventWriter(common.PROC_BLOCK_EVENT, i, config)
+			if err != nil {
+				return nil, err
+			}
 			procEventWriters = &decoder.ProcEventWriters{
-				FileWriter:     eventWriter,
-				FileAggWriter:  fileAggWriter,
-				FileMgmtWriter: fileMgmtWriter,
-				ProcPermWriter: procPermWriter,
-				ProcOpsWriter:  procOpsWriter,
+				FileWriter:      eventWriter,
+				FileAggWriter:   fileAggWriter,
+				FileMgmtWriter:  fileMgmtWriter,
+				ProcPermWriter:  procPermWriter,
+				ProcOpsWriter:   procOpsWriter,
+				ProcBlockWriter: procBlockWriter,
 			}
 		}
 		platformDatas[i], err = platformDataManager.NewPlatformInfoTable("event-" + eventType.String() + "-" + strconv.Itoa(i))

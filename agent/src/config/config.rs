@@ -607,6 +607,7 @@ pub struct AiAgentConfig {
     pub http_endpoints: Vec<String>,
     pub max_payload_size: usize,
     pub file_io_enabled: bool,
+    pub enforcement: AiAgentEnforcementConfig,
 }
 
 impl Default for AiAgentConfig {
@@ -619,8 +620,117 @@ impl Default for AiAgentConfig {
             ],
             max_payload_size: 0, // 0 means unlimited
             file_io_enabled: true,
+            enforcement: AiAgentEnforcementConfig::default(),
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AiAgentEnforcementConfig {
+    pub enabled: bool,
+    pub mode: String,
+    pub strategy: String,
+    pub syscall_strategy: String,
+    pub allowed_mechanisms: Vec<String>,
+    pub default_fallback: String,
+    pub max_rules: usize,
+    pub rules: Vec<AiAgentEnforcementRule>,
+}
+
+impl Default for AiAgentEnforcementConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            mode: "audit_only".to_string(),
+            strategy: "auto".to_string(),
+            syscall_strategy: "auto".to_string(),
+            allowed_mechanisms: vec!["lsm".to_string(), "kprobe_override".to_string()],
+            default_fallback: "sigkill".to_string(),
+            max_rules: 256,
+            rules: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AiAgentEnforcementRule {
+    pub id: String,
+    pub description: String,
+    pub scope: String,
+    pub target_type: String,
+    pub action: AiAgentEnforcementAction,
+    pub audit: bool,
+    pub exec: AiAgentExecMatch,
+    pub syscall: AiAgentSyscallMatch,
+}
+
+impl Default for AiAgentEnforcementRule {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            description: String::new(),
+            scope: "ai_agent_tree".to_string(),
+            target_type: "exec".to_string(),
+            action: AiAgentEnforcementAction::default(),
+            audit: true,
+            exec: AiAgentExecMatch::default(),
+            syscall: AiAgentSyscallMatch::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AiAgentEnforcementAction {
+    #[serde(rename = "type")]
+    pub action_type: String,
+    pub errno: String,
+}
+
+impl Default for AiAgentEnforcementAction {
+    fn default() -> Self {
+        Self {
+            action_type: "deny".to_string(),
+            errno: "EPERM".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AiAgentExecMatch {
+    pub exact: Vec<String>,
+    pub prefix: Vec<String>,
+    pub suffix: Vec<String>,
+    pub argv_matches: Vec<AiAgentExecArgvMatch>,
+    pub cmdline_prefixes: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AiAgentExecArgvMatch {
+    pub index: u8,
+    pub op: String,
+    pub value: String,
+}
+
+impl Default for AiAgentExecArgvMatch {
+    fn default() -> Self {
+        Self {
+            index: 0,
+            op: "exact".to_string(),
+            value: String::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AiAgentSyscallMatch {
+    pub names: Vec<String>,
+    pub symbols: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -3567,6 +3677,7 @@ pub const OS_PROC_REGEXP_MATCH_TYPE_PROC_NAME: &'static str = "process_name";
 pub const OS_PROC_REGEXP_MATCH_TYPE_PARENT_PROC_NAME: &'static str = "parent_process_name";
 pub const OS_PROC_REGEXP_MATCH_TYPE_TAG: &'static str = "tag";
 pub const OS_PROC_REGEXP_MATCH_TYPE_CMD_WITH_ARGS: &'static str = "cmdline_with_args";
+pub const OS_PROC_ENABLED_FEATURE_AI_AGENT: &str = "proc.ai_agent";
 
 // use for proc scan match and replace
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
@@ -4195,6 +4306,25 @@ enabled: true
 "#;
         let proc: Proc = serde_yaml::from_str(default_matcher_yaml).unwrap();
         assert_eq!(proc.process_matcher, Proc::default().process_matcher);
+    }
+
+    #[test]
+    fn parse_proc_config_with_ai_agent_feature() {
+        let yaml = r#"
+process_matcher:
+- match_regex: ^python3$
+  match_type: process_name
+  enabled_features: [proc.ai_agent, proc.gprocess_info]
+"#;
+        let proc: Proc = serde_yaml::from_str(yaml).unwrap();
+
+        assert_eq!(
+            proc.process_matcher[0].enabled_features,
+            vec![
+                OS_PROC_ENABLED_FEATURE_AI_AGENT.to_string(),
+                "proc.gprocess_info".to_string(),
+            ]
+        );
     }
 
     #[test]

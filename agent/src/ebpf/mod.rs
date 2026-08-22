@@ -169,6 +169,8 @@ pub const DATA_SOURCE_PERM_OP_EVENT: u8 = 10;
 #[allow(dead_code)]
 pub const DATA_SOURCE_PROC_LIFECYCLE_EVENT: u8 = 11;
 #[allow(dead_code)]
+pub const DATA_SOURCE_PROC_BLOCK_EVENT: u8 = 12;
+#[allow(dead_code)]
 pub const DATA_SOURCE_GO_HTTP2_DATAFRAME_UPROBE: u8 = 5;
 #[allow(dead_code)]
 pub const DATA_SOURCE_UNIX_SOCKET: u8 = 8;

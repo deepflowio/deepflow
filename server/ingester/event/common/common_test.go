@@ -11,6 +11,7 @@ func TestNewAiAgentEventTypesTableName(t *testing.T) {
 		{FILE_MGMT_EVENT, "file_mgmt_event"},
 		{PROC_PERM_EVENT, "proc_perm_event"},
 		{PROC_OPS_EVENT, "proc_ops_event"},
+		{PROC_BLOCK_EVENT, "proc_block_event"},
 	}
 
 	for _, tt := range tests {
