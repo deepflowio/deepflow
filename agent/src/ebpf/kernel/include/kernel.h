@@ -54,6 +54,10 @@ typedef struct {
 	void *net;
 } possible_net_t;
 
+typedef struct {
+	long long counter;
+} atomic64_t;
+
 struct sock_common {
 	union {
 		__addrpair skc_addrpair;
@@ -90,6 +94,7 @@ struct sock_common {
 	possible_net_t skc_net;
 	struct in6_addr skc_v6_daddr;
 	struct in6_addr skc_v6_rcv_saddr;
+	atomic64_t skc_cookie;
 };
 
 struct socket;
@@ -190,6 +195,7 @@ struct files_struct {
 
 struct task_struct {
 	struct files_struct *files;
+	__u32 tgid;
 };
 
 struct tcp_sock {

@@ -77,6 +77,9 @@ static long
     (void *)16;
 static __u64 __attribute__ ((__unused__)) (*bpf_get_current_task) (void) =
     (void *)35;
+static __u64
+    __attribute__ ((__unused__)) (*bpf_get_socket_cookie) (void *ctx) =
+    (void *)46;
 static long
     __attribute__ ((__unused__)) (*bpf_perf_event_output) (void *ctx, void *map,
 							   __u64 flags,
