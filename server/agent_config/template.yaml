@@ -8171,6 +8171,217 @@ outputs:
     #     设置 deepflow-agent 做 NPB 分发的最大吞吐率。
     # upgrade_from: max_npb_bps
     max_tx_throughput: 1000
+    # type: section
+    # name: NPB (Network Packet Broker)
+    # description:
+    self_load_circuit_breaker:
+      # type: bool
+      # name: Enabled
+      # unit:
+      # range: []
+      # enum_options: []
+      # modification: hot_update 
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Load Self-Monitoring Switch
+      #   ch: |-
+      #     负载自监控开关
+      enabled: true
+      # type: duration
+      # name:
+      #   en: Monitoring time interval 
+      #   ch: 监控时间间隔 
+      # unit:
+      # range: [1s, 60s]
+      # enum_options: []
+      # modification: hot_update 
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     Monitoring time interval 
+      #   ch: |-
+      #     监控时间间隔 
+      monitoring_interval: 10s 
+      # type: int 
+      # name:
+      #   en: Trigger Times  
+      #   ch: 触发次数 
+      # unit:
+      # range: [1, 60]
+      # enum_options: []
+      # modification: hot_update 
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When the load exceeds the trigger threshold multiple times consecutively, the deepflow-agent will stop 
+      #     the NPB function to reduce the load, while other functions can be used normally.
+      #   ch: |-
+      #     当连续多次检测到负载超过触发阈值，deepflow-agent 会停止 NPB 功能来降低负载，其他功能可以正常使用。
+      trigger_times: 5
+      # type: int 
+      # name:
+      #   en: Recovery Times  
+      #   ch: 恢复次数 
+      # unit:
+      # range: [1, 60]
+      # enum_options: []
+      # modification: hot_update 
+      # ee_feature: false
+      # description:
+      #   en: |-
+      #     When the load is detected to be below the recovery threshold multiple times consecutively, the deepflow-agent
+      #     will enable the NPB function.
+      #   ch: |-
+      #     当连续多次检测到负载低于恢复阈值，deepflow-agent 会开启 NPB 功能。
+      recovery_times: 5
+      # type: section
+      # name: CPU 
+      # description:
+      cpu:
+        # type: bool
+        # name: Enabled
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     CPU Load Monitoring Switch 
+        #   ch: |-
+        #     CPU 负载监控开关
+        enabled: true
+        # type: int 
+        # name:
+        #   en: Trigger Threshold 
+        #   ch: 触发阈值 
+        # unit:
+        # range: [1, 100]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When the load exceeds this threshold multiple times consecutively, the deepflow-agent will stop the NPB function
+        #     to reduce the load, while other functions can be used normally.
+        #   ch: |-
+        #     当连续多次检测到负载超过该阈值，deepflow-agent 会停止 NPB 功能来降低负载，其他功能可以正常使用。
+        trigger_threshold: 90
+        # type: int 
+        # name:
+        #   en: Recovery Threshold 
+        #   ch: 恢复阈值 
+        # unit:
+        # range: [1, 100]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When the load is detected to be below this threshold multiple times consecutively, the deepflow-agent will enable
+        #     the NPB function.
+        #   ch: |-
+        #     当连续多次检测到负载低于该阈值，deepflow-agent 会开启 NPB 功能。
+        recovery_threshold: 70
+      # type: section
+      # name: Memory 
+      # description:
+      memory:
+        # type: bool
+        # name: Enabled
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Memory Load Monitoring Switch 
+        #   ch: |-
+        #     内存负载监控开关
+        enabled: true
+        # type: int 
+        # name:
+        #   en: Trigger Threshold 
+        #   ch: 触发阈值 
+        # unit:
+        # range: [1, 100]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When the load exceeds this threshold multiple times consecutively, the deepflow-agent will stop the NPB function
+        #     to reduce the load, while other functions can be used normally.
+        #   ch: |-
+        #     当连续多次检测到负载超过该阈值，deepflow-agent 会停止 NPB 功能来降低负载，其他功能可以正常使用。
+        trigger_threshold: 90
+        # type: int 
+        # name:
+        #   en: Recovery Threshold 
+        #   ch: 恢复阈值 
+        # unit:
+        # range: [1, 100]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When the load is detected to be below this threshold multiple times consecutively, the deepflow-agent will enable
+        #     the NPB function.
+        #   ch: |-
+        #     当连续多次检测到负载低于该阈值，deepflow-agent 会开启 NPB 功能。
+        recovery_threshold: 70
+      # type: section
+      # name: Queue 
+      # description:
+      queue:
+        # type: bool
+        # name: Enabled
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Queue Load Monitoring Switch 
+        #   ch: |-
+        #     队列负载监控开关
+        enabled: true
+        # type: int 
+        # name:
+        #   en: Trigger Threshold 
+        #   ch: 触发阈值 
+        # unit:
+        # range: [1, 100]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When the load exceeds this threshold multiple times consecutively, the deepflow-agent will stop the NPB function
+        #     to reduce the load, while other functions can be used normally.
+        #   ch: |-
+        #     当连续多次检测到负载超过该阈值，deepflow-agent 会停止 NPB 功能来降低负载，其他功能可以正常使用。
+        trigger_threshold: 90
+        # type: int 
+        # name:
+        #   en: Recovery Threshold 
+        #   ch: 恢复阈值 
+        # unit:
+        # range: [1, 100]
+        # enum_options: []
+        # modification: hot_update
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When the load is detected to be below this threshold multiple times consecutively, the deepflow-agent will enable
+        #     the NPB function.
+        #   ch: |-
+        #     当连续多次检测到负载低于该阈值，deepflow-agent 会开启 NPB 功能。
+        recovery_threshold: 70
   # type: section
   # name:
   #   en: Compression

@@ -2825,6 +2825,107 @@ where
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default)]
+pub struct SelfLoadCircuitBreakerThreshold {
+    pub enabled: bool,
+    pub trigger_threshold: u8,
+    pub recovery_threshold: u8,
+}
+
+impl Default for SelfLoadCircuitBreakerThreshold {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            trigger_threshold: 90,
+            recovery_threshold: 70,
+        }
+    }
+}
+
+impl SelfLoadCircuitBreakerThreshold {
+    fn validate(&self, name: &str) -> Result<(), ConfigError> {
+        if self.trigger_threshold < self.recovery_threshold {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "{} trigger threshold must be greater than or equal to recovery threshold",
+                name
+            )));
+        }
+
+        if !(1..=100u8).contains(&self.trigger_threshold) {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "{} trigger threshold must be [1, 100]",
+                name
+            )));
+        }
+
+        if !(1..=100u8).contains(&self.recovery_threshold) {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "{} recovery threshold must be [1, 100]",
+                name
+            )));
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct SelfLoadCircuitBreaker {
+    pub enabled: bool,
+    #[serde(with = "humantime_serde")]
+    pub monitoring_interval: Duration,
+    pub trigger_times: u8,
+    pub recovery_times: u8,
+    pub cpu: SelfLoadCircuitBreakerThreshold,
+    pub memory: SelfLoadCircuitBreakerThreshold,
+    pub queue: SelfLoadCircuitBreakerThreshold,
+}
+
+impl Default for SelfLoadCircuitBreaker {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            monitoring_interval: Duration::from_secs(10),
+            trigger_times: 5,
+            recovery_times: 5,
+            cpu: SelfLoadCircuitBreakerThreshold::default(),
+            memory: SelfLoadCircuitBreakerThreshold::default(),
+            queue: SelfLoadCircuitBreakerThreshold::default(),
+        }
+    }
+}
+
+impl SelfLoadCircuitBreaker {
+    fn validate(&self) -> Result<(), ConfigError> {
+        if self.monitoring_interval < Duration::from_secs(1)
+            || self.monitoring_interval > Duration::from_secs(60)
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(
+                "monitoring interval must be [1s, 60s]".to_string(),
+            ));
+        }
+
+        if !(1..=60u8).contains(&self.trigger_times) {
+            return Err(ConfigError::RuntimeConfigInvalid(
+                "trigger times must be [1, 10]".to_string(),
+            ));
+        }
+
+        if !(1..=60u8).contains(&self.recovery_times) {
+            return Err(ConfigError::RuntimeConfigInvalid(
+                "recovery times must be [1, 10]".to_string(),
+            ));
+        }
+
+        self.cpu.validate("CPU")?;
+        self.memory.validate("Memory")?;
+        self.queue.validate("Queue")?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct Npb {
     pub max_mtu: u32,
     pub raw_udp_vlan_tag: u16,
@@ -2838,6 +2939,7 @@ pub struct Npb {
     pub underlay_direction_flags: bool,
     #[serde(deserialize_with = "deser_u64_with_mega_unit")]
     pub max_tx_throughput: u64,
+    pub self_load_circuit_breaker: SelfLoadCircuitBreaker,
 }
 
 impl Default for Npb {
@@ -2852,6 +2954,7 @@ impl Default for Npb {
             overlay_vlan_header_trimming: false,
             underlay_direction_flags: true,
             max_tx_throughput: 1000 << 20,
+            self_load_circuit_breaker: SelfLoadCircuitBreaker::default(),
         }
     }
 }
@@ -3126,6 +3229,8 @@ impl UserConfig {
                 self.outputs.npb.raw_udp_vlan_tag
             )));
         }
+
+        self.outputs.npb.self_load_circuit_breaker.validate()?;
 
         if self.global.communication.ingester_port == 0 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(

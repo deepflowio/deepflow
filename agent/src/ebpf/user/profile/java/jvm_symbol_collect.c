@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define _GNU_SOURCE
+
 #include <pthread.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -26,6 +28,7 @@
 #include <sched.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <sys/epoll.h>
