@@ -26,6 +26,8 @@ cfg_if::cfg_if! {
         pub use linux_process::{ProcessData, ProcessDataOp, get_os_app_tag_by_exec, OsAppTag};
     } else if #[cfg(target_os = "windows")] {
         pub struct ProcessData {}
+    } else if #[cfg(target_os = "macos")] {
+        pub struct ProcessData {}
     }
 }
 
