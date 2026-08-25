@@ -305,8 +305,17 @@ func ReleaseApplicationLogStore(l *ApplicationLogStore) {
 	if l == nil || l.SubReferenceCount() {
 		return
 	}
+	for i := range l.AttributeNames {
+		l.AttributeNames[i] = ""
+	}
 	attributeNames := l.AttributeNames[:0]
+	for i := range l.AttributeValues {
+		l.AttributeValues[i] = ""
+	}
 	attributeValues := l.AttributeValues[:0]
+	for i := range l.MetricsNames {
+		l.MetricsNames[i] = ""
+	}
 	metricsNames := l.MetricsNames[:0]
 	metricsValues := l.MetricsValues[:0]
 	*l = ApplicationLogStore{}
