@@ -36,6 +36,10 @@ type UserInfo struct {
 	DatabaseName string
 }
 
+func (u *UserInfo) IsAdmin() bool {
+	return u.Type == common.USER_TYPE_ADMIN || u.Type == common.USER_TYPE_SUPER_ADMIN
+}
+
 func NewUserInfo(userType, userID, orgID int) *UserInfo {
 	return &UserInfo{
 		Type:  userType,
