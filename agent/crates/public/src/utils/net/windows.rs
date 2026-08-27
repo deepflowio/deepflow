@@ -405,9 +405,10 @@ fn pcap_device_names() -> Result<Vec<String>> {
     let mut errbuf = [0; pcap_sys::PCAP_ERRBUF_SIZE as usize];
     let ret = unsafe { pcap_sys::pcap_findalldevs(&mut head, errbuf.as_mut_ptr()) };
     if ret != 0 {
-        let message = unsafe { std::ffi::CStr::from_ptr(errbuf.as_ptr()) }
-            .to_string_lossy();
-        return Err(Error::Windows(format!("list pcap interfaces failed: {message}")));
+        let message = unsafe { std::ffi::CStr::from_ptr(errbuf.as_ptr()) }.to_string_lossy();
+        return Err(Error::Windows(format!(
+            "list pcap interfaces failed: {message}"
+        )));
     }
 
     let devices = PcapDeviceList(head);

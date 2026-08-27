@@ -21,6 +21,8 @@ use enum_dispatch::enum_dispatch;
 use log::{debug, error};
 use serde::Serialize;
 
+#[cfg(feature = "enterprise")]
+use crate::flow_generator::protocol_logs::SqlServerInfo;
 use crate::{
     common::{
         flow::L7PerfStats,
@@ -132,6 +134,7 @@ cfg_if::cfg_if! {
     PingInfo(PingInfo),
     CustomInfo(CustomInfo),
     Iso8583Info(crate::flow_generator::protocol_logs::rpc::Iso8583Info),
+    SqlServerInfo(SqlServerInfo),
             // add new protocol info below
         );
     }
