@@ -952,6 +952,11 @@ impl FlowMap {
         }
         let flow_config = config.flow;
         let flow_closed = self.update_tcp_flow(config, meta_packet, node);
+        // TCP Option 中的 PID 属于当前报文发送端。进入 L7 解析前尽早将其
+        // 转换为 GPID，确保当前报文生成的调用日志能够直接携带该值。
+        // 后续若需要纠正 flow 方向，reverse_flow() 会连同两端 peer 一起
+        // 交换 GPID，不会造成客户端和服务端错位。
+        self.lookup_process_gpid(meta_packet, node);
         let mut count = 0;
 
         if flow_config.collector_enabled {
@@ -972,8 +977,6 @@ impl FlowMap {
                 count += self.collect_metric(config, node, meta_packet, direction, false);
             }
         }
-
-        self.lookup_process_gpid(meta_packet, node);
 
         // After collect_metric() is called for eBPF MetaPacket, its direction is determined.
         if node.tagged_flow.flow.signal_source == SignalSource::EBPF && count > 0 {
@@ -1910,6 +1913,10 @@ impl FlowMap {
             self.update_syn_or_syn_ack_seq(&mut node, meta_packet);
         }
 
+        // 在 L7 解析和日志生成前填入 GPID。即使这是短连接中唯一一个携带
+        // 服务端 PID 的响应包，当前调用日志也能获取到服务端 GPID。
+        self.lookup_process_gpid(meta_packet, &mut node);
+
         let mut count = 0;
 
         if flow_config.collector_enabled {
@@ -1941,8 +1948,6 @@ impl FlowMap {
                 node.residual_request -= count;
             }
         }
-
-        self.lookup_process_gpid(meta_packet, &mut node);
 
         // Enterprise Edition Feature: packet-sequence
         if let Some(output) = self.pseq_output.as_mut() {
@@ -2755,12 +2760,13 @@ pub fn _new_flow_map_and_receiver(
     flow_timeout: Option<FlowTimeout>,
     ignore_idc_vlan: bool,
 ) -> (ModuleConfig, FlowMap, Receiver<Arc<BatchedBox<TaggedFlow>>>) {
-    _new_flow_map_and_receiver_with_process_gpid(
+    let (config, flow_map, flow_receiver, _) = _new_flow_map_and_receiver_with_process_gpid(
         agent_type,
         flow_timeout,
         ignore_idc_vlan,
         ProcessGpidTable::default(),
-    )
+    );
+    (config, flow_map, flow_receiver)
 }
 
 fn _new_flow_map_and_receiver_with_process_gpid(
@@ -2768,14 +2774,20 @@ fn _new_flow_map_and_receiver_with_process_gpid(
     flow_timeout: Option<FlowTimeout>,
     ignore_idc_vlan: bool,
     process_gpid_table: ProcessGpidTable,
-) -> (ModuleConfig, FlowMap, Receiver<Arc<BatchedBox<TaggedFlow>>>) {
+) -> (
+    ModuleConfig,
+    FlowMap,
+    Receiver<Arc<BatchedBox<TaggedFlow>>>,
+    Receiver<AppProto>,
+) {
     let (_, mut policy_getter) = Policy::new(1, 0, 0, 1 << 10, 1 << 14, false, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
     let (output_queue_sender, output_queue_receiver, _) =
         queue::bounded_with_debug(256, "", &queue_debugger);
     let (l7_stats_output_queue_sender, _, _) = queue::bounded_with_debug(256, "", &queue_debugger);
-    let (app_proto_log_queue, _, _) = queue::bounded_with_debug(256, "", &queue_debugger);
+    let (app_proto_log_queue, app_proto_log_receiver, _) =
+        queue::bounded_with_debug(256, "", &queue_debugger);
     let (packet_sequence_queue, _, _) = queue::bounded_with_debug(256, "", &queue_debugger); // Enterprise Edition Feature: packet-sequence
     let mut config = ModuleConfig {
         flow: FlowConfig {
@@ -2807,7 +2819,12 @@ fn _new_flow_map_and_receiver_with_process_gpid(
         false,
     );
 
-    (config, flow_map, output_queue_receiver)
+    (
+        config,
+        flow_map,
+        output_queue_receiver,
+        app_proto_log_receiver,
+    )
 }
 
 pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
@@ -2922,7 +2939,7 @@ mod tests {
                 ),
             ]),
         );
-        let (mut module_config, mut flow_map, _) = _new_flow_map_and_receiver_with_process_gpid(
+        let (mut module_config, mut flow_map, _, _) = _new_flow_map_and_receiver_with_process_gpid(
             AgentType::TtProcess,
             None,
             false,
@@ -3016,6 +3033,79 @@ mod tests {
             v1_node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].gpid,
             0
         );
+    }
+
+    #[test]
+    fn process_gpid_is_available_to_first_l7_response_log() {
+        const SERVER_AGENT_ID: u32 = 40;
+        const SERVER_PID: u32 = 50;
+        const SERVER_GPID: u32 = 60;
+
+        let process_gpid_table = ProcessGpidTable::default();
+        process_gpid_table.update_for_test(
+            1,
+            AHashMap::from_iter([(
+                ((SERVER_AGENT_ID as u64) << 32) | SERVER_PID as u64,
+                SERVER_GPID,
+            )]),
+        );
+        let (module_config, mut flow_map, _, app_proto_log_receiver) =
+            _new_flow_map_and_receiver_with_process_gpid(
+                AgentType::TtProcess,
+                None,
+                false,
+                process_gpid_table,
+            );
+        let config = Config {
+            flow: &module_config.flow,
+            log_parser: &module_config.log_parser,
+            collector: &module_config.collector,
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            ebpf: None,
+        };
+
+        let capture = Capture::load_pcap("resources/test/flow_generator/http.pcap", None);
+        let packets = capture.as_meta_packets();
+        flow_map.reset_start_time(packets[0].lookup_key.timestamp.into());
+        let dst_mac = packets[0].lookup_key.dst_mac;
+        let timestamp = time::SystemTime::now()
+            .duration_since(time::UNIX_EPOCH)
+            .unwrap();
+
+        for mut packet in packets {
+            packet.lookup_key.timestamp = Duration::new(
+                timestamp.as_secs(),
+                Duration::from(packet.lookup_key.timestamp).subsec_nanos(),
+            )
+            .into();
+            packet.lookup_key.direction = if packet.lookup_key.dst_mac == dst_mac {
+                PacketDirection::ClientToServer
+            } else {
+                PacketDirection::ServerToClient
+            };
+            if packet.lookup_key.direction == PacketDirection::ServerToClient
+                && packet.payload_len > 0
+            {
+                // 被动连接的服务端 PID 在首次发送响应时才可用。
+                packet.trace_info = Some(TraceInfo::V2 {
+                    agent_id: SERVER_AGENT_ID,
+                    pid: SERVER_PID,
+                });
+            }
+            flow_map.inject_meta_packet(&config, &mut packet);
+        }
+        flow_map.flush_queue(&module_config.flow, timestamp.add(Duration::from_secs(120)));
+
+        let response = (0..4).find_map(|_| {
+            let AppProto::MetaAppProto(log) =
+                app_proto_log_receiver.recv(Some(DEFAULT_DURATION)).ok()?
+            else {
+                return None;
+            };
+            log.is_response().then_some(log)
+        });
+        let response = response.expect("expected HTTP response log");
+        assert_eq!(response.base_info.gpid_1, SERVER_GPID);
     }
 
     #[test]
