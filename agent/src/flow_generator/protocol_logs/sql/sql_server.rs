@@ -16,6 +16,7 @@
 
 use std::fmt;
 
+use log::debug;
 use serde::Serialize;
 
 use crate::{
@@ -28,7 +29,7 @@ use crate::{
     },
     config::handler::LogParserConfig,
     flow_generator::{
-        error::Result,
+        error::{Error, Result},
         protocol_logs::{
             pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
             set_captured_byte, value_is_default, AppProtoHead, L7ResponseStatus,
@@ -210,7 +211,13 @@ impl L7ProtocolParserInterface for SqlServerLog {
         info.is_tls = param.is_tls();
         let mut tds = TdsParser::new(payload.into());
 
-        tds.parse().ok();
+        if let Err(e) = tds.parse() {
+            debug!("sql server parse failed {:?}", e);
+            return Err(Error::L7LogParseFailed {
+                proto: L7Protocol::SqlServer,
+                reason: format!("{:?}", e).into(),
+            });
+        }
 
         match param.direction {
             PacketDirection::ClientToServer => {
