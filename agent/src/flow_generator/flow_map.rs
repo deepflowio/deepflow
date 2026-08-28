@@ -3096,16 +3096,30 @@ mod tests {
         }
         flow_map.flush_queue(&module_config.flow, timestamp.add(Duration::from_secs(120)));
 
-        let response = (0..4).find_map(|_| {
+        let mut request = None;
+        let mut response = None;
+        for _ in 0..4 {
             let AppProto::MetaAppProto(log) =
-                app_proto_log_receiver.recv(Some(DEFAULT_DURATION)).ok()?
+                app_proto_log_receiver.recv(Some(DEFAULT_DURATION)).unwrap()
             else {
-                return None;
+                continue;
             };
-            log.is_response().then_some(log)
-        });
-        let response = response.expect("expected HTTP response log");
+            if log.is_request() {
+                request = Some(log);
+            } else if log.is_response() {
+                response = Some(log);
+            }
+            if request.is_some() && response.is_some() {
+                break;
+            }
+        }
+        let mut request = request.expect("expected HTTP request log");
+        let mut response = response.expect("expected HTTP response log");
+        assert_eq!(request.base_info.gpid_1, 0);
         assert_eq!(response.base_info.gpid_1, SERVER_GPID);
+
+        request.session_merge(&mut response).unwrap();
+        assert_eq!(request.base_info.gpid_1, SERVER_GPID);
     }
 
     #[test]
