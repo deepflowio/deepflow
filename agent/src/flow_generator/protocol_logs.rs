@@ -43,7 +43,7 @@ pub use rpc::{
 };
 pub use sql::{
     MemcachedInfo, MemcachedLog, MongoDBInfo, MongoDBLog, MysqlInfo, MysqlLog, OracleInfo,
-    OracleLog, PostgreInfo, PostgresqlLog, RedisInfo, RedisLog,
+    OracleLog, PostgreInfo, PostgresqlLog, RedisInfo, RedisLog, SqlServerInfo, SqlServerLog,
 };
 pub use tls::{TlsInfo, TlsLog};
 

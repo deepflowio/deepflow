@@ -21,8 +21,6 @@ use enum_dispatch::enum_dispatch;
 use log::{debug, error};
 use serde::Serialize;
 
-#[cfg(feature = "enterprise")]
-use crate::flow_generator::protocol_logs::SqlServerInfo;
 use crate::{
     common::{
         flow::L7PerfStats,
@@ -33,7 +31,7 @@ use crate::{
             fastcgi::FastCGIInfo, pb_adapter::L7ProtocolSendLog, AmqpInfo, BrpcInfo, DnsInfo,
             DubboInfo, HttpInfo, KafkaInfo, MemcachedInfo, MongoDBInfo, MqttInfo, MysqlInfo,
             NatsInfo, OpenWireInfo, OracleInfo, PingInfo, PostgreInfo, PulsarInfo, RedisInfo,
-            SofaRpcInfo, SomeIpInfo, TarsInfo, TlsInfo, ZmtpInfo,
+            SofaRpcInfo, SomeIpInfo, SqlServerInfo, TarsInfo, TlsInfo, ZmtpInfo,
         },
         AppProtoHead, Result,
     },
@@ -104,6 +102,7 @@ cfg_if::cfg_if! {
     SomeIpInfo(SomeIpInfo),
     PingInfo(PingInfo),
     CustomInfo(CustomInfo),
+    SqlServerInfo(SqlServerInfo),
             // add new protocol info below
         );
     } else {
