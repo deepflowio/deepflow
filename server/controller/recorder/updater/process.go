@@ -177,28 +177,6 @@ func (p *Process) generateUpdateInfo(diffBase *diffbase.Process, cloudItem *clou
 		mapInfo["deviceid"] = deviceID
 	}
 
-	if len(mapInfo) > 0 {
-		var podGroupID int
-		if deviceType == common.VIF_DEVICE_TYPE_POD {
-			podInfo, err := p.cache.ToolDataSet.GetPodInfoByID(deviceID)
-			if err != nil {
-				log.Error(err)
-				return nil, nil, false
-			}
-
-			if podInfo != nil {
-				podGroupID = podInfo.PodGroupID
-			}
-		}
-		gid, ok := p.cache.ToolDataSet.GetProcessGIDByIdentifier(
-			p.cache.ToolDataSet.GetProcessIdentifier(diffBase.Name, cloudItem.ProcessName, podGroupID, cloudItem.VTapID, cloudItem.CommandLine),
-		)
-		if !ok {
-			log.Errorf("process %s gid not found", diffBase.Lcuuid, p.metadata.LogPrefixes)
-			return nil, nil, false
-		}
-		structInfo.GID.Set(gid, gid)
-	}
 	return structInfo, mapInfo, len(mapInfo) > 0
 }
 
