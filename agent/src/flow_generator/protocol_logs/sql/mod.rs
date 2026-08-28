@@ -32,7 +32,6 @@ mod postgresql;
 mod redis;
 mod sql_check;
 mod sql_obfuscate;
-#[cfg(feature = "enterprise")]
 mod sql_server;
 
 pub use memcached::{MemcachedInfo, MemcachedLog};
@@ -41,7 +40,6 @@ pub use mysql::{MysqlInfo, MysqlLog};
 pub use oracle::{OracleInfo, OracleLog};
 pub use postgresql::{PostgreInfo, PostgresqlLog};
 pub use redis::{RedisInfo, RedisLog};
-#[cfg(feature = "enterprise")]
 pub use sql_server::{SqlServerInfo, SqlServerLog};
 
 pub type ObfuscateCache = Rc<RefCell<LruCache<u64, String>>>;

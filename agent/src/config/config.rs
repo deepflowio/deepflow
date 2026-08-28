@@ -3021,6 +3021,7 @@ impl UserConfig {
     const DEFAULT_DNS_PORTS: &'static str = "53,5353";
     const DEFAULT_TLS_PORTS: &'static str = "443,6443";
     const DEFAULT_ORACLE_PORTS: &'static str = "1521";
+    const DEFAULT_SQL_SERVER_PORTS: &'static str = "1433";
     const DEFAULT_MEMCACHED_PORTS: &'static str = "11211";
     const PACKET_FANOUT_MODE_MAX: u32 = 7;
 
@@ -3101,6 +3102,23 @@ impl UserConfig {
             new.insert(
                 oracle_str.to_string(),
                 Self::DEFAULT_ORACLE_PORTS.to_string(),
+            );
+        }
+        let sql_server_str = L7ProtocolParser::SqlServer(
+            crate::flow_generator::protocol_logs::sql::SqlServerLog::default(),
+        )
+        .as_str();
+        // SQL Server default only parse 1433 port. when l7_protocol_ports config without SqlServer, need to reserve the SQL Server default config.
+        if !self
+            .processors
+            .request_log
+            .filters
+            .port_number_prefilters
+            .contains_key(sql_server_str)
+        {
+            new.insert(
+                sql_server_str.to_string(),
+                Self::DEFAULT_SQL_SERVER_PORTS.to_string(),
             );
         }
         let memcached_str = L7ProtocolParser::Memcached(MemcachedLog::default()).as_str();

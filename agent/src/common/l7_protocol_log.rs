@@ -38,15 +38,13 @@ use crate::config::config::Iso8583ParseConfig;
 use crate::config::handler::LogParserConfig;
 use crate::config::OracleConfig;
 use crate::flow_generator::flow_map::FlowMapCounter;
-#[cfg(feature = "enterprise")]
-use crate::flow_generator::protocol_logs::SqlServerLog;
 use crate::flow_generator::protocol_logs::{
     fastcgi::FastCGILog,
     plugin::{custom_wrap::CustomWrapLog, get_custom_log_parser},
     sql::ObfuscateCache,
     AmqpLog, BrpcLog, DnsLog, DubboLog, HttpLog, KafkaLog, L7ResponseStatus, MemcachedLog,
     MongoDBLog, MqttLog, MysqlLog, NatsLog, OpenWireLog, OracleLog, PingLog, PostgresqlLog,
-    PulsarLog, RedisLog, SofaRpcLog, SomeIpLog, TarsLog, TlsLog, ZmtpLog,
+    PulsarLog, RedisLog, SofaRpcLog, SomeIpLog, SqlServerLog, TarsLog, TlsLog, ZmtpLog,
 };
 
 use crate::flow_generator::Result;
@@ -183,6 +181,7 @@ cfg_if::cfg_if! {
         TLS(TlsLog),
         SomeIp(SomeIpLog),
         Ping(PingLog),
+        SqlServer(SqlServerLog),
                 // add protocol below
             }
         }
