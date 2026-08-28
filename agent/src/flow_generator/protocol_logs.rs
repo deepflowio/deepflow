@@ -312,6 +312,15 @@ impl AppProtoLogsBaseInfo {
         if self.head.proto != log.head.proto {
             self.head.proto = log.head.proto;
         }
+        // TCP Option 中的进程信息可能直到首个响应包才出现。请求日志先进入
+        // session 聚合时 GPID 仍为 0，需要用响应日志中已经解析出的值补齐。
+        // 已存在的非零值保持不变，避免后续报文覆盖已确定的进程归属。
+        if self.gpid_0 == 0 {
+            self.gpid_0 = log.gpid_0;
+        }
+        if self.gpid_1 == 0 {
+            self.gpid_1 = log.gpid_1;
+        }
         if log.process_id_0 > 0 {
             self.process_id_0 = log.process_id_0;
             std::mem::swap(&mut self.process_kname_0, &mut log.process_kname_0);
