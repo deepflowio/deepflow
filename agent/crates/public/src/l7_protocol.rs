@@ -66,7 +66,7 @@ pub enum L7Protocol {
     MySQL = 60,
     PostgreSQL = 61,
     Oracle = 62,
-    SqlServer = 63,
+    SqlServer = 64,
 
     // NoSQL
     Redis = 80,

@@ -75,7 +75,7 @@ pub const SOCK_DATA_POSTGRESQL: u16 = 61;
 #[allow(dead_code)]
 pub const SOCK_DATA_ORACLE: u16 = 62;
 #[allow(dead_code)]
-pub const SOCK_DATA_SQL_SERVER: u16 = 63;
+pub const SOCK_DATA_SQL_SERVER: u16 = 64;
 #[allow(dead_code)]
 pub const SOCK_DATA_REDIS: u16 = 80;
 #[allow(dead_code)]
