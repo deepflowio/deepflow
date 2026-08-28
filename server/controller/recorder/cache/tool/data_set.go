@@ -137,6 +137,7 @@ type ProcessIdentifier struct {
 	PodGroupID  int
 	VTapID      uint32
 	CommandLine string
+	ContainerID string
 }
 
 func NewDataSet(md *rcommon.Metadata) *DataSet {
@@ -1117,10 +1118,10 @@ func (t *DataSet) DeleteProcess(dbItem *metadbmodel.Process) {
 }
 
 func (t *DataSet) GetProcessIdentifierByDBProcess(p *metadbmodel.Process) ProcessIdentifier {
-	return t.GetProcessIdentifier(p.Name, p.ProcessName, p.PodGroupID, p.VTapID, p.CommandLine)
+	return t.GetProcessIdentifier(p.Name, p.ProcessName, p.PodGroupID, p.VTapID, p.CommandLine, p.ContainerID)
 }
 
-func (t *DataSet) GetProcessIdentifier(name, processName string, podGroupID int, vtapID uint32, commandLine string) ProcessIdentifier {
+func (t *DataSet) GetProcessIdentifier(name, processName string, podGroupID int, vtapID uint32, commandLine, containerID string) ProcessIdentifier {
 	var identifier ProcessIdentifier
 	if podGroupID == 0 {
 		if slices.Contains([]string{"java", "python", "python3", "node"}, processName) {
@@ -1130,6 +1131,7 @@ func (t *DataSet) GetProcessIdentifier(name, processName string, podGroupID int,
 			Name:        name,
 			VTapID:      vtapID,
 			CommandLine: commandLine,
+			ContainerID: containerID,
 		}
 	} else {
 		identifier = ProcessIdentifier{
