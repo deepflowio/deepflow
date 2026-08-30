@@ -43,6 +43,6 @@ pub fn decapsulate_tencent_gre(
     _flags: u16,
     _gre_protocol_type: u16,
     _ip_header_size: usize,
-) -> Option<(usize, u32)> {
+) -> Option<(usize, u32, u32)> {
     None
 }
