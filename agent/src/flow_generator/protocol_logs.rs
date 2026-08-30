@@ -51,7 +51,6 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "enterprise")] {
         pub use rpc::{Iso8583Info, Iso8583Log};
         pub use mq::{WebSphereMqInfo, WebSphereMqLog};
-        pub use sql::{SqlServerInfo, SqlServerLog};
     }
 }
 
