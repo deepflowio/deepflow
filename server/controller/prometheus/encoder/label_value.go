@@ -102,8 +102,6 @@ func (lv *labelValue) refresh(args ...interface{}) error {
 
 func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue, error) {
 	lv.lock.Lock()
-	defer lv.lock.Unlock()
-
 	resp := make([]*controller.PrometheusLabelValue, 0)
 	dbToAdd := make([]*metadbmodel.PrometheusLabelValue, 0)
 	for i := range strs {
@@ -114,6 +112,8 @@ func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue,
 		}
 		dbToAdd = append(dbToAdd, &metadbmodel.PrometheusLabelValue{Value: str})
 	}
+	lv.lock.Unlock()
+
 	if len(dbToAdd) == 0 {
 		return resp, nil
 	}
@@ -123,16 +123,26 @@ func (lv *labelValue) encode(strs []string) ([]*controller.PrometheusLabelValue,
 		log.Errorf("add %s error: %s", lv.resourceType, err.Error(), lv.org.LogPrefix)
 		return nil, err
 	}
+
+	lv.lock.Lock()
 	for i := range dbToAdd {
 		lv.store(dbToAdd[i])
 		resp = append(resp, &controller.PrometheusLabelValue{Value: &dbToAdd[i].Value, Id: proto.Uint32(uint32(dbToAdd[i].ID))})
 	}
+	lv.lock.Unlock()
 	return resp, nil
 }
 
 func (lv *labelValue) getID(str string) (int, bool) {
 	id, ok := lv.strToID[str]
 	return id, ok
+}
+
+// getIDSafe is a thread-safe variant for callers that do not already hold lv.lock.
+func (lv *labelValue) getIDSafe(str string) (int, bool) {
+	lv.lock.Lock()
+	defer lv.lock.Unlock()
+	return lv.getID(str)
 }
 
 func (lv *labelValue) store(item *metadbmodel.PrometheusLabelValue) {
