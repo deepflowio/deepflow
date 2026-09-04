@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -3025,6 +3024,11 @@ impl UserConfig {
     const DEFAULT_MEMCACHED_PORTS: &'static str = "11211";
     const PACKET_FANOUT_MODE_MAX: u32 = 7;
 
+    const FAST_PATH_MIN: u64 = 16000;
+    const FAST_PATH_STEP_MEM: u64 = 500 * MB; // 500 MiB
+    const FAST_PATH_STEP_SIZE: u64 = 16000;
+    const FAST_PATH_MAX: u64 = 1 << 20;
+
     pub fn adjust(&mut self) {
         // DPDK from eBPF
         if self.inputs.ebpf.tunning.userspace_worker_threads as usize
@@ -3039,11 +3043,17 @@ impl UserConfig {
     }
 
     pub fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
-        if self.processors.packet.policy.fast_path_map_size > 0 {
-            return self.processors.packet.policy.fast_path_map_size;
+        let explicit = self.processors.packet.policy.fast_path_map_size;
+        if explicit > 0 {
+            return explicit;
         }
 
-        min(max((mem_size / MB / 128 * 32000) as usize, 32000), 1 << 20)
+        let size = (mem_size / Self::FAST_PATH_STEP_MEM)
+            .saturating_mul(Self::FAST_PATH_STEP_SIZE)
+            .max(Self::FAST_PATH_MIN)
+            .min(Self::FAST_PATH_MAX);
+
+        size as usize
     }
 
     pub fn get_af_packet_blocks(
