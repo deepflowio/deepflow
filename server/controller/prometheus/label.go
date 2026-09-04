@@ -87,7 +87,7 @@ func (s *ORGLabelSynchronizers) assembleFully(version uint32) (*trident.Promethe
 
 func (s *ORGLabelSynchronizers) goAssembleFully(args ...interface{}) error {
 	orgIDToResp := args[0].(cmap.ConcurrentMap[int, *trident.PrometheusLabelResponse])
-	cache := args[1].(*cache.Cache)
+	cache := args[1].(cache.PrometheusCache)
 	synchronizer := newLabelSynchronizer(cache)
 	resp, err := synchronizer.assembleFully()
 	if err != nil {
@@ -149,7 +149,7 @@ type LabelSynchronizer struct {
 	statsdCounter *statsd.PrometheusLabelIDsCounter
 }
 
-func newLabelSynchronizer(c *cache.Cache) *LabelSynchronizer {
+func newLabelSynchronizer(c cache.PrometheusCache) *LabelSynchronizer {
 	return &LabelSynchronizer{
 		Synchronizer:  newSynchronizer(c),
 		grpcurl:       new(GRPCURL),
@@ -285,7 +285,7 @@ func (s *LabelSynchronizer) assembleMetricLabel(mls []*trident.MetricLabelReques
 
 		var rls []*trident.LabelResponse
 		mn := ml.GetMetricName()
-		mni, ok := s.cache.MetricName.GetIDByName(mn)
+		mni, ok := s.cache.GetMetricNameID(mn)
 		if !ok {
 			nonMetricNameToCount[mn]++
 			continue
@@ -294,17 +294,17 @@ func (s *LabelSynchronizer) assembleMetricLabel(mls []*trident.MetricLabelReques
 		for _, l := range ml.GetLabels() {
 			ln := l.GetName()
 			lv := l.GetValue()
-			ni, ok := s.cache.LabelName.GetIDByName(ln)
+			ni, ok := s.cache.GetLabelNameID(ln)
 			if !ok {
 				nonLabelNames.Add(ln)
 				continue
 			}
-			vi, ok := s.cache.LabelValue.GetIDByValue(lv)
+			vi, ok := s.cache.GetLabelValueID(lv)
 			if !ok {
 				nonLabelValues.Add(lv)
 				continue
 			}
-			id, _ := s.cache.MetricAndAPPLabelLayout.GetIndexByKey(cache.NewLayoutKey(mn, ln))
+			id, _ := s.cache.GetMetricAndAPPLabelLayoutIndex(cache.NewLayoutKey(mn, ln))
 			rls = append(rls, &trident.LabelResponse{
 				Name:                &ln,
 				NameId:              proto.Uint32(uint32(ni)),
@@ -339,36 +339,36 @@ func (s *LabelSynchronizer) assembleMetricLabel(mls []*trident.MetricLabelReques
 
 func (s *LabelSynchronizer) addMetricNameCache(arg ...interface{}) error {
 	mns := arg[0].([]*controller.PrometheusMetricName)
-	s.cache.MetricName.Add(mns)
+	s.cache.AddMetricNamesFromGrpc(mns)
 	return nil
 }
 
 func (s *LabelSynchronizer) addLabelNameCache(arg ...interface{}) error {
 	lns := arg[0].([]*controller.PrometheusLabelName)
-	s.cache.LabelName.Add(lns)
+	s.cache.AddLabelNamesFromGrpc(lns)
 	return nil
 }
 
 func (s *LabelSynchronizer) addLabelValueCache(arg ...interface{}) error {
 	lvs := arg[0].([]*controller.PrometheusLabelValue)
-	s.cache.LabelValue.Add(lvs)
+	s.cache.AddLabelValuesFromGrpc(lvs)
 	return nil
 }
 
 func (s *LabelSynchronizer) addMetricAPPLabelLayoutCache(arg ...interface{}) error {
 	ls := arg[0].([]*controller.PrometheusMetricAPPLabelLayout)
-	s.cache.MetricAndAPPLabelLayout.Add(ls)
+	s.cache.AddMetricAndAPPLabelLayoutsFromGrpc(ls)
 	return nil
 }
 
 func (s *LabelSynchronizer) addLabelCache(arg ...interface{}) error {
 	ls := arg[0].([]*controller.PrometheusLabel)
-	s.cache.Label.Add(ls)
+	s.cache.AddLabelsFromGrpc(ls)
 	return nil
 }
 
 type dataToEncode struct {
-	cache *cache.Cache
+	cache cache.PrometheusCache
 
 	metricNames            mapset.Set[string]
 	labelNames             mapset.Set[string]
@@ -378,7 +378,7 @@ type dataToEncode struct {
 	metricNameToLabelNames map[string]mapset.Set[string]
 }
 
-func newDataToEncode(c *cache.Cache) *dataToEncode {
+func newDataToEncode(c cache.PrometheusCache) *dataToEncode {
 	return &dataToEncode{
 		cache: c,
 
@@ -397,26 +397,26 @@ func (d *dataToEncode) cardinality() int {
 }
 
 func (d *dataToEncode) tryAppendMetricName(name string) {
-	if _, ok := d.cache.MetricName.GetIDByName(name); !ok {
+	if _, ok := d.cache.GetMetricNameID(name); !ok {
 		d.metricNames.Add(name)
 	}
 }
 
 func (d *dataToEncode) tryAppendLabelName(name string) {
-	if _, ok := d.cache.LabelName.GetIDByName(name); !ok {
+	if _, ok := d.cache.GetLabelNameID(name); !ok {
 		d.labelNames.Add(name)
 	}
 }
 
 func (d *dataToEncode) tryAppendLabelValue(value string) {
-	if _, ok := d.cache.LabelValue.GetIDByValue(value); !ok {
+	if _, ok := d.cache.GetLabelValueID(value); !ok {
 		d.labelValues.Add(value)
 	}
 }
 
 func (d *dataToEncode) tryAppendMetricAPPLabelLayout(metricName, labelName string) {
 	k := cache.NewLayoutKey(metricName, labelName)
-	if _, ok := d.cache.MetricAndAPPLabelLayout.GetIndexByKey(k); !ok {
+	if _, ok := d.cache.GetMetricAndAPPLabelLayoutIndex(k); !ok {
 		d.metricAPPLabelLayouts.Add(k)
 	}
 }
@@ -426,7 +426,7 @@ func (d *dataToEncode) appendMetricAPPLabelLayout(metricName, labelName string) 
 }
 
 func (d *dataToEncode) tryAppendLabel(name, value string) {
-	if _, ok := d.cache.Label.GetIDByKey(cache.NewLabelKey(name, value)); !ok {
-		d.labels.Add(cache.NewLabelKey(name, value))
+	if _, ok := d.cache.GetLabelID(name, value); ok {
+		return
 	}
 }

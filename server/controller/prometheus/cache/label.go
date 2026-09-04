@@ -142,7 +142,7 @@ func (l *label) GetIDByKey(key LabelKey) (int, bool) {
 	return 0, false
 }
 
-func (l *label) Add(batch []*controller.PrometheusLabel) {
+func (l *label) AddFromGrpc(batch []*controller.PrometheusLabel) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for _, item := range batch {
@@ -150,6 +150,18 @@ func (l *label) Add(batch []*controller.PrometheusLabel) {
 		valueID, ok2 := l.labelValue.GetIDByValue(item.GetValue())
 		if ok1 && ok2 {
 			l.pending[IDLabelKey{NameID: nameID, ValueID: valueID}] = int(item.GetId())
+		}
+	}
+}
+
+func (l *label) Add(batch []*metadbmodel.PrometheusLabel) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, item := range batch {
+		nameID, ok1 := l.labelName.GetIDByName(item.Name)
+		valueID, ok2 := l.labelValue.GetIDByValue(item.Value)
+		if ok1 && ok2 {
+			l.pending[IDLabelKey{NameID: nameID, ValueID: valueID}] = item.ID
 		}
 	}
 }
@@ -169,7 +181,8 @@ func (l *label) refresh(args ...interface{}) error {
 	newActive := make(map[IDLabelKey]int, count)
 	for rows.Next() {
 		var id int
-		var name, value string
+		var name string
+		var value string
 		if scanErr := rows.Scan(&id, &name, &value); scanErr != nil {
 			log.Errorf("stream scan prometheus_label interrupted: %v", scanErr, l.org.LogPrefix)
 			return scanErr
