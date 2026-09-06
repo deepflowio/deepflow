@@ -40,7 +40,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/libs/lru"
-	"github.com/deepflowio/deepflow/server/querier/app/prometheus/cache"
+	cachenew "github.com/deepflowio/deepflow/server/querier/app/prometheus/cache_new"
 	"github.com/deepflowio/deepflow/server/querier/app/prometheus/model"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	chCommon "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/common"
@@ -80,9 +80,9 @@ type prometheusExecutor struct {
 	ticker          *time.Ticker
 	lookbackDelta   time.Duration
 
-	cacher            *cache.Cacher
-	queryKeyGenerator *cache.WeakKeyGenerator
-	cacheKeyGenerator *cache.CacheKeyGenerator
+	cacher            *cachenew.PromQLCache
+	queryKeyGenerator *cachenew.WeakKeyGenerator
+	cacheKeyGenerator *cachenew.CacheKeyGenerator
 	locker            sync.Locker
 }
 
@@ -91,9 +91,9 @@ func NewPrometheusExecutor(delta time.Duration) *prometheusExecutor {
 		extraLabelCache: map[string]*lru.Cache[string, string]{},
 		lookbackDelta:   delta,
 
-		cacher:            cache.NewCacher(),
-		queryKeyGenerator: &cache.WeakKeyGenerator{},
-		cacheKeyGenerator: &cache.CacheKeyGenerator{},
+		cacher:            cachenew.NewPromQLCache(),
+		queryKeyGenerator: &cachenew.WeakKeyGenerator{},
+		cacheKeyGenerator: &cachenew.CacheKeyGenerator{},
 		locker:            &sync.Mutex{},
 	}
 	go executor.triggerLoadExternalTag()
@@ -263,7 +263,7 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 	}
 
 	analyzer := newQueryAnalyzer(p.lookbackDelta)
-	keyGenerator := &cache.WeakKeyGenerator{}
+	keyGenerator := &cachenew.WeakKeyGenerator{}
 	reader := &prometheusReader{
 		slimit:                  args.Slimit,
 		orgID:                   args.OrgID,
@@ -303,7 +303,7 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 
 		defer func() {
 			if result == nil || err != nil || result.Error != "" || result.Data == nil {
-				p.cacher.Remove(cachedKey)
+				p.cacher.Fail(cachedKey)
 			}
 		}()
 	}
@@ -363,7 +363,7 @@ func (p *prometheusExecutor) offloadRangeQueryExecute(ctx context.Context, args 
 	}
 
 	if config.Cfg.Prometheus.Cache.ResponseCache {
-		if mergeResult, err := p.cacher.Merge(cachedKey, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err == nil {
+		if mergeResult, err := p.cacher.Complete(cachedKey, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err == nil {
 			result.Data = &model.PromQueryData{ResultType: mergeResult.Value.Type(), Result: mergeResult.Value}
 		} else {
 			// err != nil
@@ -397,7 +397,7 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 	}
 
 	analyzer := newQueryAnalyzer(p.lookbackDelta)
-	keyGenerator := &cache.WeakKeyGenerator{}
+	keyGenerator := &cachenew.WeakKeyGenerator{}
 	reader := &prometheusReader{
 		slimit:                  args.Slimit,
 		orgID:                   args.OrgID,
@@ -448,7 +448,7 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 
 		defer func() {
 			if result == nil || err != nil || result.Error != "" || result.Data == nil {
-				p.cacher.Remove(cachedKey)
+				p.cacher.Fail(cachedKey)
 			}
 		}()
 	}
@@ -512,7 +512,7 @@ func (p *prometheusExecutor) offloadInstantQueryExecute(ctx context.Context, arg
 
 	if config.Cfg.Prometheus.Cache.ResponseCache {
 		// instant query merge failed should not influence return result
-		if _, err = p.cacher.Merge(cachedKey, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err != nil {
+		if _, err = p.cacher.Complete(cachedKey, promRequest.Start, promRequest.End, promRequest.Step.Microseconds(), *res); err != nil {
 			log.Errorf("cache merge error: %v", err)
 		}
 	}
