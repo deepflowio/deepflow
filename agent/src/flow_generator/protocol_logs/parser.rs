@@ -535,9 +535,9 @@ impl SessionQueue {
 
         if item.need_protocol_merge() {
             let (req_end, resp_end) = item.l7_info.is_req_resp_end();
-            // http2 uprobe 有可能会重复收到resp_end, 直接忽略，防止堆积
-            // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
-            if req_end || resp_end {
+            // Duplicate protocol-merge completions can arrive after the cached session was already
+            // sent. Ignore only fully-ended fragments so partial req/resp updates can still merge.
+            if req_end && resp_end {
                 return;
             }
         }
@@ -735,5 +735,95 @@ impl SessionAggregator {
             let _ = thread.join();
         }
         info!("app protocol logs parser (id={}) stopped", self.id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{sync::Arc, time::Duration};
+
+    use arc_swap::{access::Map, ArcSwap};
+
+    use super::*;
+    use crate::{config::handler::ModuleConfig, plugin::CustomInfo};
+    use public::debug::QueueDebugger;
+
+    fn log_parser_config(config: &ModuleConfig) -> &LogParserConfig {
+        &config.log_parser
+    }
+
+    fn new_log_parser_access(config: ModuleConfig) -> LogParserAccess {
+        Map::new(
+            Arc::new(ArcSwap::from_pointee(config)),
+            log_parser_config as fn(&ModuleConfig) -> &LogParserConfig,
+        )
+    }
+
+    fn new_protocol_merge_item(
+        msg_type: LogMessageType,
+        req_end: bool,
+        resp_end: bool,
+    ) -> AppProto {
+        let mut base_info = AppProtoLogsBaseInfo::default();
+        base_info.start_time = Timestamp::from_secs(1);
+        base_info.end_time = Timestamp::from_secs(1);
+        base_info.flow_id = 1;
+        base_info.head = AppProtoHead {
+            proto: L7Protocol::Custom,
+            msg_type,
+            ..Default::default()
+        };
+
+        AppProto::MetaAppProto(Box::new(MetaAppProto {
+            base_info,
+            direction: match msg_type {
+                LogMessageType::Response => PacketDirection::ServerToClient,
+                _ => PacketDirection::ClientToServer,
+            },
+            direction_score: 0,
+            l7_info: L7ProtocolInfo::CustomInfo(CustomInfo {
+                request_id: Some(1),
+                need_protocol_merge: true,
+                is_req_end: req_end,
+                is_resp_end: resp_end,
+                ..Default::default()
+            }),
+        }))
+    }
+
+    #[test]
+    fn protocol_merge_partial_fragments_are_cached_until_session_end() {
+        let module_config = ModuleConfig::default();
+        let queue_debugger = QueueDebugger::new();
+        let (output_queue_sender, output_queue_receiver, _) =
+            queue::bounded_with_debug(16, "", &queue_debugger);
+        let counter: Arc<SessionAggrCounter> = Default::default();
+        let mut session_queue = SessionQueue::new(
+            counter.clone(),
+            output_queue_sender,
+            new_log_parser_access(module_config.clone()),
+        );
+
+        session_queue.aggregate_session_and_send(
+            &module_config.log_parser,
+            new_protocol_merge_item(LogMessageType::Request, true, false),
+        );
+        assert_eq!(session_queue.entries.len(), 1);
+        assert_eq!(counter.cached.load(Ordering::Relaxed), 1);
+
+        session_queue.aggregate_session_and_send(
+            &module_config.log_parser,
+            new_protocol_merge_item(LogMessageType::Response, false, true),
+        );
+        session_queue.throttle_sender.throttle.flush();
+
+        assert_eq!(session_queue.entries.len(), 0);
+        assert_eq!(counter.cached.load(Ordering::Relaxed), 0);
+
+        let output = output_queue_receiver
+            .recv(Some(Duration::from_secs(1)))
+            .expect("expected merged protocol log");
+        assert!(output.override_resp_status.is_none());
+        assert!(output.data.l7_info.is_session_end());
     }
 }
