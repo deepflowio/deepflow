@@ -63,6 +63,11 @@ pub unsafe extern "C" fn unwind_table_load(table: *mut UnwindTable, pid: u32) {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn unwind_table_load_with_status(table: *mut UnwindTable, pid: u32) -> bool {
+    (*table).load(pid)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn unwind_table_unload(table: *mut UnwindTable, pid: u32) {
     (*table).unload(pid);
 }

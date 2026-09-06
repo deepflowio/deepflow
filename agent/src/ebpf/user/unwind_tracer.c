@@ -52,6 +52,19 @@ static proc_event_list_t proc_events = { .head = { .prev = &proc_events.head, .n
 static pthread_mutex_t g_unwind_table_lock = PTHREAD_MUTEX_INITIALIZER;
 static unwind_table_t *g_unwind_table = NULL;
 
+#define DWARF_DEDUP_SLOTS 4096
+#define DWARF_DEDUP_PROBES 4
+#define DWARF_FAST_RETRY_DELAY 2
+#define DWARF_SLOW_RETRY_DELAY 120
+
+struct dwarf_dedup_entry {
+    pid_t pid;
+    u64 stime;
+};
+
+static struct dwarf_dedup_entry g_dwarf_dedup[DWARF_DEDUP_SLOTS];
+static pthread_mutex_t g_dwarf_dedup_lock = PTHREAD_MUTEX_INITIALIZER;
+
 static struct {
     bool dwarf_enabled;
     struct {
@@ -65,6 +78,174 @@ static struct {
                       .dwarf_regex = { .m = PTHREAD_MUTEX_INITIALIZER, .exists = false, },
                       .dwarf_process_map_size = 1024,
                       .dwarf_shard_map_size = 128, };
+
+static bool requires_dwarf_unwind_table(int pid);
+
+static bool dwarf_processed(pid_t pid, u64 stime) {
+    if (stime == 0) {
+        return false;
+    }
+
+    uint32_t idx = ((uint32_t)pid * 2654435761u) & (DWARF_DEDUP_SLOTS - 1);
+    pthread_mutex_lock(&g_dwarf_dedup_lock);
+    for (int i = 0; i < DWARF_DEDUP_PROBES; i++) {
+        struct dwarf_dedup_entry *entry =
+            &g_dwarf_dedup[(idx + i) & (DWARF_DEDUP_SLOTS - 1)];
+        if (entry->pid == pid && entry->stime == stime) {
+            pthread_mutex_unlock(&g_dwarf_dedup_lock);
+            return true;
+        }
+    }
+    pthread_mutex_unlock(&g_dwarf_dedup_lock);
+    return false;
+}
+
+static void dwarf_mark_processed(pid_t pid, u64 stime) {
+    if (stime == 0) {
+        return;
+    }
+
+    uint32_t idx = ((uint32_t)pid * 2654435761u) & (DWARF_DEDUP_SLOTS - 1);
+    pthread_mutex_lock(&g_dwarf_dedup_lock);
+    for (int i = 0; i < DWARF_DEDUP_PROBES; i++) {
+        struct dwarf_dedup_entry *entry =
+            &g_dwarf_dedup[(idx + i) & (DWARF_DEDUP_SLOTS - 1)];
+        if (entry->pid == pid && entry->stime == stime) {
+            pthread_mutex_unlock(&g_dwarf_dedup_lock);
+            return;
+        }
+        if (entry->pid == 0) {
+            entry->pid = pid;
+            entry->stime = stime;
+            pthread_mutex_unlock(&g_dwarf_dedup_lock);
+            return;
+        }
+    }
+    g_dwarf_dedup[idx].pid = pid;
+    g_dwarf_dedup[idx].stime = stime;
+    pthread_mutex_unlock(&g_dwarf_dedup_lock);
+}
+
+static void dwarf_clear_processed(pid_t pid) {
+    uint32_t idx = ((uint32_t)pid * 2654435761u) & (DWARF_DEDUP_SLOTS - 1);
+    pthread_mutex_lock(&g_dwarf_dedup_lock);
+    for (int i = 0; i < DWARF_DEDUP_PROBES; i++) {
+        struct dwarf_dedup_entry *entry =
+            &g_dwarf_dedup[(idx + i) & (DWARF_DEDUP_SLOTS - 1)];
+        if (entry->pid == pid) {
+            entry->pid = 0;
+            entry->stime = 0;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&g_dwarf_dedup_lock);
+}
+
+static void dwarf_clear_all_processed(void) {
+    pthread_mutex_lock(&g_dwarf_dedup_lock);
+    memset(g_dwarf_dedup, 0, sizeof(g_dwarf_dedup));
+    pthread_mutex_unlock(&g_dwarf_dedup_lock);
+}
+
+static inline void list_add_before(struct list_head *new, struct list_head *next) {
+    new->next = next;
+    new->prev = next->prev;
+    next->prev->next = new;
+    next->prev = new;
+}
+
+static bool dwarf_event_pending(int pid, uint64_t stime) {
+    struct list_head *p;
+    struct process_create_event *event = NULL;
+    bool pending = false;
+
+    pthread_mutex_lock(&proc_events.m);
+    for (p = proc_events.head.next; p != &proc_events.head; p = p->next) {
+        event = container_of(p, struct process_create_event, list);
+        if (event->pid == pid && event->stime == stime) {
+            pending = true;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&proc_events.m);
+
+    return pending;
+}
+
+static void dwarf_add_event_with_delay(struct bpf_tracer *tracer, int pid, uint64_t stime,
+                                       uint32_t delay_sec) {
+    struct process_create_event *event = calloc(1, sizeof(struct process_create_event));
+    if (!event) {
+        ebpf_warning("dwarf event alloc failed for pid %d\n", pid);
+        return;
+    }
+
+    event->tracer = tracer;
+    event->pid = pid;
+    event->stime = stime;
+    event->expire_time = get_sys_uptime();
+    if (pid != getpid()) {
+        event->expire_time += delay_sec;
+    }
+
+    pthread_mutex_lock(&proc_events.m);
+    struct list_head *p;
+    bool inserted = false;
+    for (p = proc_events.head.next; p != &proc_events.head; p = p->next) {
+        struct process_create_event *cur = container_of(p, struct process_create_event, list);
+        if (event->expire_time < cur->expire_time) {
+            list_add_before(&event->list, p);
+            inserted = true;
+            break;
+        }
+    }
+    if (!inserted) {
+        list_add_tail(&event->list, &proc_events.head);
+    }
+    pthread_mutex_unlock(&proc_events.m);
+}
+
+static void dwarf_clear_pending_events(int pid) {
+    struct list_head *p, *n;
+    struct process_create_event *event = NULL;
+
+    pthread_mutex_lock(&proc_events.m);
+    list_for_each_safe(p, n, &proc_events.head) {
+        event = container_of(p, struct process_create_event, list);
+        if (event->pid != pid) {
+            continue;
+        }
+        list_head_del(&event->list);
+        process_event_free(event);
+    }
+    pthread_mutex_unlock(&proc_events.m);
+}
+
+static void dwarf_clear_all_pending_events(void) {
+    struct list_head *p, *n;
+    struct process_create_event *event = NULL;
+
+    pthread_mutex_lock(&proc_events.m);
+    list_for_each_safe(p, n, &proc_events.head) {
+        event = container_of(p, struct process_create_event, list);
+        list_head_del(&event->list);
+        process_event_free(event);
+    }
+    pthread_mutex_unlock(&proc_events.m);
+}
+
+static bool try_load_dwarf_unwind_table(unwind_table_t *table, int pid, u64 stime) {
+    if (!table || !requires_dwarf_unwind_table(pid)) {
+        return false;
+    }
+
+    if (unwind_table_load_with_status(table, pid)) {
+        dwarf_mark_processed(pid, stime);
+        return true;
+    }
+
+    return false;
+}
 
 bool get_dwarf_enabled(void) { return g_unwind_config.dwarf_enabled; }
 
@@ -80,6 +261,10 @@ void set_dwarf_enabled(bool enabled) {
     ebpf_info(LOG_CP_TAG "%s DWARF unwinding.\n", enabled ? "Enabled" : "Disabled");
 
     if (!g_unwind_table) {
+        if (!g_unwind_config.dwarf_enabled) {
+            dwarf_clear_all_processed();
+            dwarf_clear_all_pending_events();
+        }
         return;
     }
 
@@ -89,6 +274,8 @@ void set_dwarf_enabled(bool enabled) {
         pthread_mutex_lock(&g_unwind_table_lock);
         unwind_table_unload_all(g_unwind_table);
         pthread_mutex_unlock(&g_unwind_table_lock);
+        dwarf_clear_all_processed();
+        dwarf_clear_all_pending_events();
     }
 }
 
@@ -241,6 +428,9 @@ int unwind_tracer_init(struct bpf_tracer *tracer) {
 }
 
 void unwind_tracer_drop() {
+    dwarf_clear_all_pending_events();
+    dwarf_clear_all_processed();
+
     pthread_mutex_lock(&g_unwind_table_lock);
     if (g_unwind_table) {
         unwind_table_unload_all(g_unwind_table);
@@ -255,6 +445,10 @@ void unwind_process_exec(int pid) {
         return;
     }
 
+    if (pid <= 1) {
+        return;
+    }
+
     // Enterprise hook for interpreter processing
     extended_process_exec(pid);
 
@@ -263,7 +457,33 @@ void unwind_process_exec(int pid) {
         return;
     }
 
-    add_event_to_proc_list(&proc_events, tracer, pid, NULL);
+    if (!process_probing_check(pid)) {
+        return;
+    }
+
+    u64 stime = get_process_starttime(pid);
+    if (stime == 0) {
+        return;
+    }
+
+    if (dwarf_processed(pid, stime)) {
+        return;
+    }
+
+    bool loaded = false;
+    pthread_mutex_lock(&g_unwind_table_lock);
+    loaded = try_load_dwarf_unwind_table(g_unwind_table, pid, stime);
+    pthread_mutex_unlock(&g_unwind_table_lock);
+
+    if (loaded) {
+        dwarf_clear_pending_events(pid);
+        return;
+    }
+
+    if (!dwarf_event_pending(pid, stime)) {
+        dwarf_add_event_with_delay(tracer, pid, stime, DWARF_FAST_RETRY_DELAY);
+        dwarf_add_event_with_delay(tracer, pid, stime, DWARF_SLOW_RETRY_DELAY);
+    }
 }
 
 // Process events in the queue
@@ -273,6 +493,7 @@ void unwind_events_handle(void) {
     }
 
     struct process_create_event *event = NULL;
+    struct bpf_tracer *tracer = NULL;
     pthread_mutex_lock(&g_unwind_table_lock);
     do {
         event = get_first_event(&proc_events);
@@ -283,11 +504,33 @@ void unwind_events_handle(void) {
             break;
         }
 
-        if (g_unwind_table && requires_dwarf_unwind_table(event->pid)) {
-            unwind_table_load(g_unwind_table, event->pid);
+        remove_event(&proc_events, event);
+
+        if (event->stime == 0 || event->stime != get_process_starttime(event->pid)) {
+            process_event_free(event);
+            continue;
         }
 
-        remove_event(&proc_events, event);
+        if (dwarf_processed(event->pid, event->stime)) {
+            process_event_free(event);
+            continue;
+        }
+
+        if (!process_probing_check(event->pid)) {
+            process_event_free(event);
+            continue;
+        }
+
+        tracer = event->tracer;
+        if (!tracer || tracer->state != TRACER_RUNNING) {
+            process_event_free(event);
+            continue;
+        }
+
+        if (try_load_dwarf_unwind_table(g_unwind_table, event->pid, event->stime)) {
+            dwarf_clear_pending_events(event->pid);
+        }
+
         process_event_free(event);
 
     } while (true);
@@ -303,22 +546,13 @@ void unwind_process_exit(int pid) {
     // Enterprise hook
     extended_process_exit(pid);
 
+    dwarf_clear_pending_events(pid);
+    dwarf_clear_processed(pid);
+
     struct bpf_tracer *tracer = find_bpf_tracer(CP_TRACER_NAME);
     if (tracer == NULL || tracer->state != TRACER_RUNNING) {
         return;
     }
-
-    struct list_head *p, *n;
-    struct process_create_event *e = NULL;
-    pthread_mutex_lock(&proc_events.m);
-    list_for_each_safe(p, n, &proc_events.head) {
-        e = container_of(p, struct process_create_event, list);
-        if (e->pid == pid) {
-            list_head_del(&e->list);
-            process_event_free(e);
-        }
-    }
-    pthread_mutex_unlock(&proc_events.m);
 
     pthread_mutex_lock(&g_unwind_table_lock);
     if (g_unwind_table) {
@@ -354,8 +588,13 @@ static int load_running_processes(struct bpf_tracer *tracer, unwind_table_t *unw
 
         extended_process_exec(pid);
 
-        if (requires_dwarf_unwind_table(pid)) {
-            unwind_table_load(unwind_table, pid);
+        u64 stime = get_process_starttime(pid);
+        if (stime == 0) {
+            continue;
+        }
+
+        if (try_load_dwarf_unwind_table(unwind_table, pid, stime)) {
+            dwarf_clear_pending_events(pid);
         }
     }
 
@@ -377,6 +616,7 @@ void unwind_process_reload() {
     if (g_unwind_table) {
         // Unload everything for the moment
         // Maybe preserve some data on regex changes
+        dwarf_clear_all_processed();
         unwind_table_unload_all(g_unwind_table);
         load_running_processes(tracer, g_unwind_table);
     }
