@@ -7,7 +7,8 @@ ENV RUST_BACKTRACE 1
 ARG TARGETARCH
 RUN --mount=target=/tmp-mount \
     mkdir -p /lib64 && \
-    apt-get update && apt-get upgrade -y && apt-get install \
+    rm /var/lib/dpkg/info/libc-bin.* && \
+    apt-get clean && apt-get update && apt-get upgrade -y && apt-get install \
     --no-install-suggests  --no-install-recommends -y \
     tzdata \
     iproute2 \
