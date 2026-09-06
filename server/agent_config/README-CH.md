@@ -6016,6 +6016,543 @@ processors:
 
 开启后所有 gRPC 数据包都认为是 `stream` 类型，并且会将 `data` 类型数据包上报，同时延迟计算的响应使用带有 `grpc-status` 字段的。
 
+##### OpenAI API {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api}
+
+OpenAI 兼容 API 协议增强配置。开启后，对命中配置路径的 HTTP/1 和 HTTP/2 流量进行
+OpenAI API 识别，并附加 LLM 专用指标（TTFT/TPOT/Token 用量）和业务维度属性（组织/用户/应用）。
+
+###### 开启 OpenAI API 解析 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.enabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.enabled`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+开启 OpenAI 兼容 API 协议增强。
+
+###### 路径前缀过滤 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.path_prefixes}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.path_prefixes`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          path_prefixes: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**详细描述**:
+
+路径以任意配置前缀开头的 HTTP 请求将进行 OpenAI API 增强。path_prefixes 与
+path_suffixes 独立匹配，满足其中任意一个即可。列表为空时该组不参与匹配；
+两个列表同时为空则不匹配任何路径。
+
+###### 路径后缀过滤 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.path_suffixes}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.path_suffixes`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          path_suffixes:
+          - /v1/chat/completions
+          - /v1/responses
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**详细描述**:
+
+路径以任意配置后缀结尾的 HTTP 请求将进行 OpenAI API 增强。path_prefixes 与
+path_suffixes 独立匹配，满足其中任意一个即可。列表为空时该组不参与匹配；
+两个列表同时为空则不匹配任何路径。
+
+###### 请求体最大缓存字节数 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.request_body_max_bytes}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.request_body_max_bytes`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          request_body_max_bytes: 65536
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | byte |
+| Range | [1024, 1048576] |
+
+**详细描述**:
+
+请求体的最大缓存和解析字节数，用于提取 `stream` 标志和业务维度字段。
+
+###### 响应事件最大解析字节数 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.response_event_max_bytes}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.response_event_max_bytes`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          response_event_max_bytes: 32768
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | byte |
+| Range | [1024, 1048576] |
+
+**详细描述**:
+
+单个 SSE 事件 JSON 的最大解析字节数（非流式响应体大小限制）。
+
+###### SSE 缓冲区最大字节数 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.sse_buffer_max_bytes}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.sse_buffer_max_bytes`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          sse_buffer_max_bytes: 131072
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | byte |
+| Range | [4096, 4194304] |
+
+**详细描述**:
+
+SSE 事件跨多个响应包重组时的总缓冲上限。超限后丢弃后续事件并设置
+`attribute.llm_abort_reason=sse_buffer_overflow`。
+
+###### Token 用量字段路径配置 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths}
+
+配置从 API 响应中提取 Token 用量的 JSON 路径。路径为相对于响应顶层 JSON 的点分格式
+（如 "usage.prompt_tokens" 解析为 json["usage"]["prompt_tokens"]）。
+多个路径按顺序尝试，取第一个非空值。
+
+####### 输入 Token 字段路径 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.input_tokens}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.input_tokens`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          usage_field_paths:
+            input_tokens:
+            - usage.prompt_tokens
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**详细描述**:
+
+按顺序尝试的 JSON 路径，用于读取输入（prompt）Token 数量。
+
+####### 输出 Token 字段路径 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.output_tokens}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.output_tokens`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          usage_field_paths:
+            output_tokens:
+            - usage.completion_tokens
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**详细描述**:
+
+按顺序尝试的 JSON 路径，用于读取输出（completion）Token 数量。
+
+####### 总 Token 字段路径 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.total_tokens}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.total_tokens`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          usage_field_paths:
+            total_tokens:
+            - usage.total_tokens
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**详细描述**:
+
+按顺序尝试的 JSON 路径，用于读取总 Token 数量。
+若均未命中，则自动计算为 input_tokens + output_tokens。
+
+####### 缓存 Token 字段路径 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.cached_tokens}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.usage_field_paths.cached_tokens`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          usage_field_paths:
+            cached_tokens:
+            - usage.prompt_tokens_details.cached_tokens
+            - usage.cache_read_input_tokens
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**详细描述**:
+
+按顺序尝试的 JSON 路径，用于读取缓存（Prompt Cache 命中）Token 数量。
+usage.prompt_tokens_details.cached_tokens 对应 OpenAI API；
+usage.cache_read_input_tokens 对应 Anthropic API。
+若均未命中，则不输出 llm_cached_tokens 指标。
+
+###### 业务维度提取配置 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors}
+
+配置从请求头或 JSON Body 字段提取 org_path、user_id、app_id 的规则。
+每个维度采用"首个命中即停止"策略：先按顺序尝试 headers，若均未命中则
+按顺序尝试 json_paths，找到第一个非空值后不再继续后续候选项。
+
+####### 组织架构路径 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.org_path}
+
+提取组织架构路径维度的规则。
+
+######## 请求头候选列表 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.org_path.headers}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.org_path.headers`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          biz_dimension_extractors:
+            org_path:
+              headers:
+              - x-org-path
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**详细描述**:
+
+按顺序尝试的 HTTP 请求头名称，用于提取 org_path。
+
+######## JSON 字段路径候选列表 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.org_path.json_paths}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.org_path.json_paths`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          biz_dimension_extractors:
+            org_path:
+              json_paths: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**详细描述**:
+
+按顺序尝试的 JSON Body 字段路径，用于提取 org_path。
+支持一级点号路径，如 "metadata.org_path"。
+
+####### 用户标识 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.user_id}
+
+提取业务用户标识维度的规则。
+
+######## 请求头候选列表 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.user_id.headers}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.user_id.headers`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          biz_dimension_extractors:
+            user_id:
+              headers:
+              - x-user-id
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**详细描述**:
+
+按顺序尝试的 HTTP 请求头名称，用于提取 user_id。
+
+######## JSON 字段路径候选列表 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.user_id.json_paths}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.user_id.json_paths`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          biz_dimension_extractors:
+            user_id:
+              json_paths: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**详细描述**:
+
+按顺序尝试的 JSON Body 字段路径，用于提取 user_id。
+支持一级点号路径，如 "metadata.user_id"。
+
+####### 应用标识 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.app_id}
+
+提取应用标识维度的规则。
+
+######## 请求头候选列表 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.app_id.headers}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.app_id.headers`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          biz_dimension_extractors:
+            app_id:
+              headers:
+              - appid
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**详细描述**:
+
+按顺序尝试的 HTTP 请求头名称，用于提取 app_id。
+
+######## JSON 字段路径候选列表 {#processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.app_id.json_paths}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`processors.request_log.application_protocol_inference.protocol_special_config.openai_api.biz_dimension_extractors.app_id.json_paths`
+
+**默认值**:
+```yaml
+processors:
+  request_log:
+    application_protocol_inference:
+      protocol_special_config:
+        openai_api:
+          biz_dimension_extractors:
+            app_id:
+              json_paths: []
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | string[] |
+
+**详细描述**:
+
+按顺序尝试的 JSON Body 字段路径，用于提取 app_id。
+支持一级点号路径，如 "metadata.app_id"。
+
 #### 自定义协议解析 {#processors.request_log.application_protocol_inference.custom_protocols}
 
 **标签**:
