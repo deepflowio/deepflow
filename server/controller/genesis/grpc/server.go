@@ -260,7 +260,15 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 	_, enabled := g.workloadResourceEnabledCache.Get(fmt.Sprintf("%d-%s", orgID, groupShortLcuuid))
 
 	platformData := request.GetPlatformData()
-	if version == localVersion || platformData == nil {
+	if version == localVersion {
+		// It is necessary to verify whether there are available data for use,
+		// If there is no data, needs to be re-reported.
+		if v, ok := g.gsync.GetVtapUpdatedVersion(vtap); !ok || v != version {
+			g.vtapToVersion.Store(vtap, uint64(0))
+			log.Infof("genesis sync re-reporting, not data for keep alive, reset local version, from ip %s vtap_id %v", remote, vtapID, logger.NewORGPrefix(orgID))
+			return &agent.GenesisSyncResponse{}, nil
+		}
+
 		// If the worload-v is modified to be enabled during the period of continuous heartbeat,
 		// it will trigger the re-reporting of the full data.
 		if _, ok := g.workloadResourceChangeEnabledCache.Get(vtap); ok {
@@ -278,6 +286,7 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 				VtapID:                  vtapID,
 				ORGID:                   orgID,
 				TeamID:                  uint32(teamID),
+				Version:                 version,
 				MessageType:             common.TYPE_RENEW,
 				Message:                 request,
 				StorageRefresh:          refresh,
@@ -285,6 +294,20 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 			},
 		)
 		return &agent.GenesisSyncResponse{Version: &localVersion}, nil
+	}
+
+	if platformData == nil {
+		log.Debugf("genesis sync received version %v platform is nil from ip %s vtap_id %v, local version %v", version, remote, vtapID, localVersion, logger.NewORGPrefix(orgID))
+		return &agent.GenesisSyncResponse{}, nil
+	}
+
+	// 当采集器为容器类型时（cluster id 非空）
+	//  - 采集器未注册（vtapID==0），即使没有 Interfaces 也需要处理 vinterface 来让采集器能够注册
+	//  - 采集器已经注册（vtapID!=0），采集器重启会出现 Interfaces 为空的情况
+	// 为了避免 vinterface 异常增删，丢弃当前消息
+	if k8sClusterID != "" && len(platformData.Interfaces) == 0 && vtapID != 0 {
+		log.Infof("genesis sync received version %v message with empty interfaces from ip %s vtap_id %v, local version %v", version, remote, vtapID, localVersion, logger.NewORGPrefix(orgID))
+		return &agent.GenesisSyncResponse{Version: &version}, nil
 	}
 
 	log.Infof("genesis sync received version %v -> %v from ip %s vtap_id %v", localVersion, version, remote, vtapID, logger.NewORGPrefix(orgID))
@@ -295,6 +318,7 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *agent.Gen
 			VtapID:                  vtapID,
 			ORGID:                   orgID,
 			TeamID:                  uint32(teamID),
+			Version:                 version,
 			K8SClusterID:            k8sClusterID,
 			MessageType:             common.TYPE_UPDATE,
 			Message:                 request,
