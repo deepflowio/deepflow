@@ -216,6 +216,9 @@ int mount_info_cache_init(const char *name)
 
 struct mount_info *mount_info_cache_lookup(pid_t pid, u64 mntns_id)
 {
+	if (!enable_mount_info_cache())
+		return MOUNT_INFO_INVAL;
+
 	if (mntns_id == 0 && pid > 0) {
 		if (get_mount_ns_id(pid, &mntns_id))
 			return MOUNT_INFO_INVAL;
@@ -552,6 +555,9 @@ static int check_mount_kvp_cb(mount_info_hash_kv * kvp, void *ctx)
 
 void collect_mount_info_stats(bool output_log)
 {
+	if (!enable_mount_info_cache())
+		return;
+
 	u64 elems_count = 0;
 	mount_info_hash_t *h = &mount_info_hash;
 	mount_info_hash_foreach_key_value_pair(h,
@@ -592,6 +598,9 @@ void check_and_cleanup_mount_info(pid_t pid, u64 mntns_id)
 // Periodically check whether the host node's mount information has changed.
 void check_root_mount_info(bool output_log)
 {
+	if (!enable_mount_info_cache())
+		return;
+
 	u32 new_hash = 0;
 	hash_mountinfo_file(1, &new_hash);
 	if (new_hash != 0 && new_hash != host_root_mountinfo_hash) {

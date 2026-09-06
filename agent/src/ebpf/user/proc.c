@@ -762,7 +762,10 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 int create_and_init_proc_info_caches(void)
 {
 	// Initialize the mount information cache.
-	mount_info_cache_init("mount-info-cache");
+	if (mount_info_cache_init("mount-info-cache")) {
+		ebpf_warning("mount_info_cache_init() failed.\n");
+		return ETR_NOMEM;
+	}
 
 	/*
 	 * Building a 'proc_event_ring' for handling process events.
