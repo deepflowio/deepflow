@@ -385,16 +385,22 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
                 "failed getting control ip and mac from {}, because: {:?}, wait 1 second",
                 dest, tuple,
             );
+            println!(
+                "failed getting control ip and mac from {}, because: {:?}, wait 1 second",
+                dest, tuple,
+            );
             thread::sleep(Duration::from_secs(1));
             continue;
         }
         let (ip, mac) = tuple.unwrap();
+        println!("{} {} get_route_src_ip_and_mac return {} {}", file!(), line!(), ip, mac);
         let links = link_list();
         if links.is_err() {
             warn!(
                 "failed getting local interfaces, because: {:?}, wait 1 second",
                 links
             );
+            println!("{} {}", file!(), line!());
             thread::sleep(Duration::from_secs(1));
             continue;
         }
@@ -403,7 +409,9 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
         // interface of the default route.
         for link in links.unwrap().iter() {
             if link.mac_addr == mac {
+                println!("{} {} ", file!(), line!());
                 if !link.flags.contains(LinkFlags::UP) {
+                    println!("{} {} {:?}", file!(), line!(), link);
                     let dest = if dest.is_ipv4() {
                         DNS_HOST_IPV4
                     } else {
@@ -412,6 +420,7 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
                     let tuple = get_route_src_ip_and_mac(&dest);
                     if tuple.is_err() {
                         warn!("failed getting control ip and mac from {}, because: {:?}, wait 1 second", dest, tuple);
+                        println!("failed getting control ip and mac from {}, because: {:?}, wait 1 second", dest, tuple);
                         thread::sleep(Duration::from_secs(1));
                         // There are scenarios where multiple network cards use the same MAC address, so it is necessary to
                         // continue checking the other network cards.
@@ -419,6 +428,7 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
                     }
                     return Ok(tuple.unwrap());
                 }
+                println!("{} {} ", file!(), line!());
                 break;
             }
         }
