@@ -32,6 +32,7 @@ const (
 	FILE_MGMT_EVENT
 	PROC_PERM_EVENT
 	PROC_OPS_EVENT
+	PROC_BLOCK_EVENT
 	ALERT_EVENT
 	K8S_EVENT
 	ALERT_RECORD
@@ -51,6 +52,8 @@ func (e EventType) String() string {
 		return "proc_perm_event"
 	case PROC_OPS_EVENT:
 		return "proc_ops_event"
+	case PROC_BLOCK_EVENT:
+		return "proc_block_event"
 	case ALERT_EVENT:
 		return "alert_event"
 	case K8S_EVENT:
@@ -77,6 +80,8 @@ func (e EventType) TableName() string {
 		return "proc_perm_event"
 	case PROC_OPS_EVENT:
 		return "proc_ops_event"
+	case PROC_BLOCK_EVENT:
+		return "proc_block_event"
 	case ALERT_EVENT:
 		return "alert_event"
 	case ALERT_RECORD:
@@ -90,6 +95,8 @@ func (e EventType) DataSource() uint32 {
 	switch e {
 	case FILE_EVENT, FILE_AGG_EVENT, FILE_MGMT_EVENT, PROC_PERM_EVENT, PROC_OPS_EVENT:
 		return uint32(exportconfig.FILE_EVENT)
+	case PROC_BLOCK_EVENT:
+		return uint32(exportconfig.PROC_BLOCK_EVENT)
 	default:
 		return uint32(exportconfig.MAX_DATASOURCE_ID)
 	}

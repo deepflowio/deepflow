@@ -57,6 +57,7 @@ use crate::{
     common::{
         enums::CaptureNetworkType,
         flow::L7Stats,
+        kernel_capability::KernelCapability,
         tagged_flow::{BoxedTaggedFlow, TaggedFlow},
         tap_types::CaptureNetworkTyper,
         FeatureFlags, DEFAULT_LOG_RETENTION, DEFAULT_LOG_UNCOMPRESSED_FILE_COUNT,
@@ -989,6 +990,12 @@ impl Trident {
 
         #[cfg(feature = "enterprise")]
         Trident::kernel_version_check(&state, &exception_handler);
+
+        let enforcement_kernel_capability = KernelCapability::detect();
+        info!(
+            "AI Agent enforcement kernel capability: {:?}",
+            enforcement_kernel_capability
+        );
 
         #[cfg(feature = "enterprise")]
         {

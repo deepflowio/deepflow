@@ -101,6 +101,7 @@ var DEFAULT_DATA_SOURCE_DISPLAY_NAMES = []string{
 	"事件-文件管理事件",     // event.file_mgmt_event
 	"事件-进程权限事件",     // event.proc_perm_event
 	"事件-进程操作事件",     // event.proc_ops_event
+	"事件-进程阻断事件",     // event.proc_block_event
 	"事件-文件读写指标",     // event.file_event_metrics
 	"事件-告警事件",       // event.alert_event
 	"应用-性能剖析",       // profile.in_process
@@ -114,6 +115,7 @@ var aiAgentRetentionCollections = []string{
 	"event.file_mgmt_event",
 	"event.proc_perm_event",
 	"event.proc_ops_event",
+	"event.proc_block_event",
 }
 
 func linkedRetentionCollections(collection string) []string {

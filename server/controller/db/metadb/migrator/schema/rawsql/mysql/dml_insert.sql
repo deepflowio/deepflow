@@ -93,6 +93,9 @@ INSERT INTO data_source (id, display_name, data_table_collection, interval_time,
 set @lcuuid = (select uuid());
 INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
                  VALUES (30, '事件-进程操作事件', 'event.proc_ops_event', 0, 7*24, @lcuuid);
+set @lcuuid = (select uuid());
+INSERT INTO data_source (id, display_name, data_table_collection, interval_time, retention_time, lcuuid)
+                 VALUES (31, '事件-进程阻断事件', 'event.proc_block_event', 0, 7*24, @lcuuid);
 
 INSERT INTO region (id, name, lcuuid) values(1, '系统默认', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
 INSERT INTO az (id, name, lcuuid, region, domain) values(1, '系统默认', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'ffffffff-ffff-ffff-ffff-ffffffffffff');

@@ -73,6 +73,7 @@ const (
 	PROC_OPS_EVENT
 	L4_FLOW_LOG
 	L7_FLOW_LOG
+	PROC_BLOCK_EVENT
 
 	MAX_DATASOURCE_ID
 )
@@ -93,6 +94,7 @@ var dataSourceStrings = []string{
 	PROC_OPS_EVENT:     "event.proc_ops_event",
 	L4_FLOW_LOG:        "flow_log.l4_flow_log",
 	L7_FLOW_LOG:        "flow_log.l7_flow_log",
+	PROC_BLOCK_EVENT:   "event.proc_block_event",
 	MAX_DATASOURCE_ID:  "invalid_datasource",
 }
 
@@ -112,6 +114,7 @@ var dataSourceTopicStrings = []string{
 	PROC_OPS_EVENT:     TOPIC_PREFIX + dataSourceStrings[PROC_OPS_EVENT],
 	L4_FLOW_LOG:        TOPIC_PREFIX + dataSourceStrings[L4_FLOW_LOG],
 	L7_FLOW_LOG:        TOPIC_PREFIX + dataSourceStrings[L7_FLOW_LOG],
+	PROC_BLOCK_EVENT:   TOPIC_PREFIX + dataSourceStrings[PROC_BLOCK_EVENT],
 	MAX_DATASOURCE_ID:  TOPIC_PREFIX + dataSourceStrings[MAX_DATASOURCE_ID],
 }
 
@@ -157,7 +160,7 @@ func (d DataSourceID) TopicString() string {
 
 func (d DataSourceID) IsMap() bool {
 	switch d {
-	case NETWORK_1M, APPLICATION_1M, NETWORK_1S, APPLICATION_1S, FILE_EVENT, FILE_AGG_EVENT, FILE_MGMT_EVENT, PROC_PERM_EVENT, PROC_OPS_EVENT:
+	case NETWORK_1M, APPLICATION_1M, NETWORK_1S, APPLICATION_1S, FILE_EVENT, FILE_AGG_EVENT, FILE_MGMT_EVENT, PROC_PERM_EVENT, PROC_OPS_EVENT, PROC_BLOCK_EVENT:
 		return false
 	default:
 		return true

@@ -21,6 +21,7 @@ pub mod endpoint;
 mod error;
 pub mod feature;
 pub mod flow;
+pub mod kernel_capability;
 pub mod l7_protocol_info;
 pub mod l7_protocol_log;
 pub mod lookup_key;

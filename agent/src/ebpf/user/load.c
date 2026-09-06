@@ -46,6 +46,11 @@
 #include "ssl_tracer.h"
 #include "profile/perf_profiler.h"
 #include "unwind_tracer.h"
+#include "extended/extended.h"
+
+#ifndef BPF_PROG_TYPE_LSM
+#define BPF_PROG_TYPE_LSM 29
+#endif
 
 /*
  * When full map preallocation is too expensive, the 'BPF_F_NO_PREALLOC'
@@ -69,6 +74,23 @@ extern int btf__set_pointer_size(struct btf *btf, size_t ptr_sz);
 #define VERIFIER_LOG_ENV	"DF_EBPF_VERIFIER_LOG_TO_FILE"
 
 static int probe_read_kernel_feat;
+
+static const char *prog_load_name(const struct ebpf_prog *prog, char *buf,
+				  size_t buf_len)
+{
+	if (prog->type == BPF_PROG_TYPE_LSM && prog->sec_name != NULL &&
+	    !strncmp(prog->sec_name, "lsm/", 4) && prog->sec_name[4] != '\0') {
+		/*
+		 * BCC uses the lsm__ prefix to set expected_attach_type to
+		 * BPF_LSM_MAC. libbpf then adds the kernel BTF bpf_lsm_
+		 * prefix while resolving attach_btf_id.
+		 */
+		snprintf(buf, buf_len, "lsm__%s", prog->sec_name + 4);
+		return buf;
+	}
+
+	return prog->name;
+}
 
 int suspend_stderr()
 {
@@ -257,7 +279,10 @@ static void log_verifier_tail(const char *buf, size_t len)
 
 int load_ebpf_prog(struct ebpf_prog *prog)
 {
-	return bcc_prog_load(prog->type, prog->name,
+	char name_buf[128];
+	const char *name = prog_load_name(prog, name_buf, sizeof(name_buf));
+
+	return bcc_prog_load(prog->type, name,
 			     prog->insns, prog->insns_size, prog->obj->license,
 			     prog->obj->kern_version, 0, NULL,
 			     0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
@@ -621,6 +646,8 @@ static enum bpf_prog_type get_prog_type(struct sec_desc *desc)
 		prog_type = BPF_PROG_TYPE_KPROBE;
 	} else if (!memcmp(desc->name, "tracepoint/", 11)) {
 		prog_type = BPF_PROG_TYPE_TRACEPOINT;
+	} else if (!memcmp(desc->name, "lsm/", 4)) {
+		prog_type = BPF_PROG_TYPE_LSM;
 	} else if (!memcmp(desc->name, "perf_event", 10)) {
 		prog_type = BPF_PROG_TYPE_PERF_EVENT;
 	} else if (!memcmp(desc->name, "fentry/", 7) ||
@@ -637,6 +664,14 @@ static enum bpf_prog_type get_prog_type(struct sec_desc *desc)
 	}
 
 	return prog_type;
+}
+
+static bool is_optional_ai_agent_kprobe_override_prog(struct ebpf_prog *prog)
+{
+	return prog != NULL && prog->type == BPF_PROG_TYPE_KPROBE &&
+	    prog->name != NULL &&
+	    (strstr(prog->name, "df_K_ai_agent_syscall_override_") == prog->name ||
+	     strstr(prog->name, "df_K_ai_agent_exec_override_") == prog->name);
 }
 
 static int load_obj__progs(struct ebpf_object *obj)
@@ -770,12 +805,15 @@ static int load_obj__progs(struct ebpf_object *obj)
 		// Modify eBPF instructions based on BTF relocation information.
 		obj_relocate_core(new_prog);
 
+		char name_buf[128];
+		const char *name =
+		    prog_load_name(new_prog, name_buf, sizeof(name_buf));
 		int stderr_fd = suspend_stderr();
 		if (stderr_fd < 0) {
 			ebpf_warning("Failed to suspend stderr\n");
 		}
 		new_prog->prog_fd =
-		    bcc_prog_load(new_prog->type, new_prog->name,
+		    bcc_prog_load(new_prog->type, name,
 				  new_prog->insns, new_prog->insns_size,
 				  obj->license, obj->kern_version, 0, NULL,
 				  0 /*EBPF_LOG_LEVEL, log_buf, LOG_BUF_SZ */ );
@@ -786,7 +824,7 @@ static int load_obj__progs(struct ebpf_object *obj)
 			bool save_full_log = env_flag_enabled(VERIFIER_LOG_ENV);
 			ebpf_warning
 			    ("bcc_prog_load() failed. name: %s, %s errno: %d\n",
-			     new_prog->name, strerror(errno), errno);
+			     name, strerror(errno), errno);
 			char log_path[] = "/tmp/df_verifier_XXXXXX.log";
 			int tmp_fd = -1;
 			char tail_buf[VERIFIER_LOG_TAIL_BYTES + 1] = { 0 };
@@ -852,7 +890,7 @@ static int load_obj__progs(struct ebpf_object *obj)
 					log_pipe[1] = -1;
 
 					fd2 = bcc_prog_load(new_prog->type,
-							    new_prog->name,
+							    name,
 							    new_prog->insns,
 							    new_prog->insns_size,
 							    obj->license,
@@ -906,7 +944,7 @@ static int load_obj__progs(struct ebpf_object *obj)
 				}
 
 				fd2 = bcc_prog_load(new_prog->type,
-						    new_prog->name,
+						    name,
 						    new_prog->insns,
 						    new_prog->insns_size,
 						    obj->license,
@@ -930,7 +968,7 @@ static int load_obj__progs(struct ebpf_object *obj)
 
 			if (!load_attempted) {
 				fd2 = bcc_prog_load(new_prog->type,
-						    new_prog->name,
+						    name,
 						    new_prog->insns,
 						    new_prog->insns_size,
 						    obj->license,
@@ -966,7 +1004,7 @@ static int load_obj__progs(struct ebpf_object *obj)
 				// Preserve errno from the latest attempt for better diagnostics.
 				ebpf_warning
 				    ("bcc_prog_load() still failed. name: %s, errno after retry: %d (orig %d)\n",
-				     new_prog->name, retry_errno, saved_errno);
+				     name, retry_errno, saved_errno);
 				errno = retry_errno;
 			}
 
@@ -980,6 +1018,26 @@ static int load_obj__progs(struct ebpf_object *obj)
 				    ("The number of EBPF instructions (%d) "
 				     "exceeded the maximum limit (%d).\n",
 				     new_prog->insns_cnt, BPF_MAXINSNS);
+			}
+
+			/*
+			 * BPF LSM is an optional enforcement mechanism. Kernels
+			 * without CONFIG_BPF_LSM or an active bpf LSM can reject
+			 * the program before attach, so keep the rest of the
+			 * socket tracer available and let userspace fall back.
+			 */
+			if (new_prog->type == BPF_PROG_TYPE_LSM) {
+				ebpf_warning
+				    ("Skip optional BPF LSM program '%s'; enforcement disabled for this hook.\n",
+				     new_prog->name);
+				continue;
+			}
+
+			if (is_optional_ai_agent_kprobe_override_prog(new_prog)) {
+				ebpf_warning
+				    ("Skip optional AI Agent kprobe override program '%s'; syscall enforcement disabled for this hook.\n",
+				     new_prog->name);
+				continue;
 			}
 
 			if (memcmp(desc->name, "uprobe/", 7) &&
@@ -1349,6 +1407,14 @@ int ebpf_obj_load(struct ebpf_object *obj)
 		}
 
 		extended_map_preprocess(map);
+
+		int reused_fd = extended_map_reuse_fd(obj->name, map->name);
+		if (reused_fd >= 0) {
+			map->fd = reused_fd;
+			ebpf_info("reuse map fd:%d for obj:%s map:%s\n",
+				  map->fd, obj->name, map->name);
+			continue;
+		}
 
 		map->fd =
 		    bcc_create_map(map->def.type, map->name, map->def.key_size,
