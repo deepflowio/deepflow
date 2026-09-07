@@ -2106,7 +2106,8 @@ static int create_symbol_collect_task(pid_t pid, options_t * opts,
 	pthread_mutex_init(&task->mutex, NULL);
 	pthread_cond_init(&task->cond, NULL);
 	task->need_refresh = false;
-	task->ref_count = 1;	// The worker thread owns the base reference until it finishes and removes the task.
+	/* The creator and worker each own one reference. */
+	task->ref_count = 2;
 	task->stopped = false;
 	options_t *__opts = (options_t *) (task + 1);
 	*__opts = *opts;
@@ -2123,15 +2124,15 @@ static int create_symbol_collect_task(pid_t pid, options_t * opts,
 	if (ret < 0) {
 		/*
 		 * thread_pool_add_task() rolled the task back out of the pool
-		 * queue on failure, so no worker can ever see it. Release the
-		 * base reference set above: put_task_ref() drops the count to
-		 * zero and destroy_task() frees the task together with the
-		 * sockets that were moved into args. The local socket copies
-		 * below must be invalidated afterwards, otherwise the cleanup
+		 * queue on failure, so no worker can ever see it. Release both
+		 * reserved references; the second put_task_ref() frees the task
+		 * together with the sockets that were moved into args. The local socket
+		 * copies below must be invalidated afterwards, otherwise the cleanup
 		 * label would close the same fds a second time (double close,
 		 * which can silently close an unrelated fd once the number is
 		 * reused by another thread).
 		 */
+		put_task_ref(task, g_collect_pool);
 		put_task_ref(task, g_collect_pool);
 		task = NULL;	// put_task_ref() has already freed the task.
 		map_socket = -1;	// destroy_task() already closed it.
@@ -2166,6 +2167,8 @@ static int create_symbol_collect_task(pid_t pid, options_t * opts,
 			     "Miss HotSpot/OpenJ9 JVM dependency file.\n");
 	}
 
+	/* All creator-side accesses to task are complete. */
+	put_task_ref(task, g_collect_pool);
 	return ret;
 
 cleanup:

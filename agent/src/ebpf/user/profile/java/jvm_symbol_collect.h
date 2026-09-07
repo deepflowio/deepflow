@@ -138,12 +138,11 @@ struct task_s {
 	bool need_refresh;	/**< Whether the file needs to be refreshed */
 	int update_status;	/**< Symbol file update status */
 	/*
-	 * Reference count guarding task lifetime. The worker thread owns one
-	 * reference from task enqueue until it has finished and removed the task
-	 * from its slot. update_java_symbol_file() takes a temporary reference
-	 * (see get_ref_task_by_pid()) so that the worker never frees a task that
-	 * is still being used. destroy_task()/put_task_ref() drops the count and
-	 * only frees the task when it reaches zero.
+	 * Reference count guarding task lifetime. The task creator and worker each
+	 * own one reference while accessing the task. update_java_symbol_file()
+	 * takes a temporary reference (see get_ref_task_by_pid()) so that no thread
+	 * frees a task that is still being used. destroy_task()/put_task_ref() drops
+	 * the count and only frees the task when it reaches zero.
 	 */
 	volatile int ref_count;
 	/*
