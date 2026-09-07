@@ -137,6 +137,23 @@ struct task_s {
 	void *(*func) (void *);	/**< Callback function for task processing */
 	bool need_refresh;	/**< Whether the file needs to be refreshed */
 	int update_status;	/**< Symbol file update status */
+	/*
+	 * Reference count guarding task lifetime. The worker thread owns one
+	 * reference from task enqueue until it has finished and removed the task
+	 * from its slot. update_java_symbol_file() takes a temporary reference
+	 * (see get_ref_task_by_pid()) so that the worker never frees a task that
+	 * is still being used. destroy_task()/put_task_ref() drops the count and
+	 * only frees the task when it reaches zero.
+	 */
+	volatile int ref_count;
+	/*
+	 * Set to true (with update_status = -1 and need_refresh = false, under
+	 * task->mutex) right after the collector thread has exited, before the
+	 * worker removes the task from its slot. Waiters in
+	 * update_java_symbol_file() check it under task->mutex and give up
+	 * immediately instead of blocking forever on a collector that is gone.
+	 */
+	volatile bool stopped;
 	pthread_mutex_t mutex;	/**< Mutex for protecting tasks */
 	pthread_cond_t cond;	/**< Condition variable for notifying updates to files */
 	receiver_args_t args;	/**< Parameters for task processing */
