@@ -1500,7 +1500,8 @@ static int delete_method_unload_symbol(receiver_args_t * args)
 	return delete_count;
 }
 
-static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
+static int update_java_perf_map_file(receiver_args_t * args, char *addr_str,
+				     bool requested)
 {
 	if (addr_str != NULL) {
 		int ret = VEC_OK;
@@ -1516,7 +1517,7 @@ static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 
 	int unload_count = vec_len(unload_addrs);
 	if (args->map_fp != NULL &&
-	    ((args->task->need_refresh && unload_count > 0)
+	    ((requested && unload_count > 0)
 	     || unload_count >= UPDATE_SYMS_FILE_UNLOAD_HIGH_THRESH)) {
 		fclose(args->map_fp);
 		// Prevent repeated fclose() in destroy_task() when the entire thread exits.
@@ -1536,8 +1537,8 @@ static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 			return -1;
 		}
 		ebpf_debug
-		    ("=== file update args->task->need_refresh %d pid %d unload_count %d\n",
-		     args->task->need_refresh, args->task->pid, unload_count);
+		    ("=== file update requested %d pid %d unload_count %d\n",
+		     requested, args->task->pid, unload_count);
 	}
 
 	return 0;
@@ -1570,7 +1571,7 @@ static int symbol_msg_process(receiver_args_t * args, int sock_fd)
 	 * needs to be updated.
 	 */
 	if (args->replay_done && meta.type == METHOD_UNLOAD) {
-		if (update_java_perf_map_file(args, rcv_buf))
+		if (update_java_perf_map_file(args, rcv_buf, false))
 			return -1;
 	} else {
 		int written_count = fwrite(rcv_buf, sizeof(char), n, fp);
@@ -1721,6 +1722,17 @@ static void put_task_ref(symbol_collect_task_t *task,
 		destroy_task(task, pool);
 }
 
+static bool get_refresh_request(symbol_collect_task_t *task)
+{
+	bool requested;
+
+	pthread_mutex_lock(&task->mutex);
+	requested = task->need_refresh;
+	pthread_mutex_unlock(&task->mutex);
+
+	return requested;
+}
+
 static inline void refresh_symbol_file_and_notify(receiver_args_t *args,
 						  int ret_val)
 {
@@ -1815,7 +1827,10 @@ static void *ipc_receiver_main(void *arguments)
 			}
 		}
 
-		refresh_symbol_file_and_notify(args, update_java_perf_map_file(args, NULL));
+		bool requested = get_refresh_request(args->task);
+		int ret = update_java_perf_map_file(args, NULL, requested);
+		if (requested)
+			refresh_symbol_file_and_notify(args, ret);
 	}
 
 cleanup:
