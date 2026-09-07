@@ -1998,10 +1998,10 @@ static int thread_pool_add_task(symbol_collect_thread_pool_t * pool,
 		pool->thread_index = pool->thread_count;
 
 		if ((ret =
-		     pthread_create(&thread, NULL, &worker_thread, pool)) < 0) {
+		     pthread_create(&thread, NULL, &worker_thread, pool)) != 0) {
 			ebpf_warning(JAVA_LOG_TAG
 				     "Create worker thread failed with '%s(%d)'\n",
-				     strerror(errno), errno);
+				     strerror(ret), ret);
 			/*
 			 * No worker was created for this task. thread_count was
 			 * not incremented yet, so the reserved (but unused) slot
@@ -2319,6 +2319,8 @@ int start_java_symbol_collection(pid_t pid, const char *opts)
 
 int update_java_symbol_file(pid_t pid, bool * is_new_collector)
 {
+	*is_new_collector = false;
+
 	char opts[PERF_PATH_SZ * 2];
 	snprintf(opts, sizeof(opts),
 		 DF_AGENT_LOCAL_PATH_FMT ".map,"
