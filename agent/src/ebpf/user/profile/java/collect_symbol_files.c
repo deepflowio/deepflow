@@ -159,6 +159,11 @@ void java_syms_update_main(void *arg)
 				int ret;
 				collect_java_symbols(p->pid, &ret,
 						     p->gen_java_syms_file_err);
+
+				/* TEST ONLY: keep the symbolizer proc-info reference for 60 seconds. */
+				ebpf_warning("REPRO: hold p->use, pid=%d use=%lu\n",
+				     p->pid, AO_GET(&p->use));
+				usleep(60 * 1000 * 1000);
 				if (ret != JAVA_SYMS_COLLECT_ERR
 				    && ret != JAVA_CREATE_COLLECTOR_ERR) {
 					if (ret == JAVA_SYMS_NEED_UPDATE
