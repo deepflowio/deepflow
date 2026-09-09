@@ -275,6 +275,8 @@ enum {
 	SOCKOPT_GET_CPDBG_SHOW,
 
 	SOCKOPT_PRINT_MATCH_PIDS = 800,
+
+	SOCKOPT_GET_PROC_CACHE_RECLAIM = 900,
 };
 
 struct mem_block_head {

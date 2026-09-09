@@ -157,7 +157,8 @@ struct proc_cache_reader_slot {
 static struct proc_cache_reader_slot
 	proc_cache_readers[PROC_CACHE_READER_SLOTS];
 static pthread_mutex_t syms_cache_update_lock = PTHREAD_MUTEX_INITIALIZER;
-/* Owned and reaped only by the proc-events thread. */
+/* Protects retired_proc_caches from proc-events and control-thread access. */
+static pthread_mutex_t retired_proc_caches_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct symbolizer_proc_info *retired_proc_caches;
 static void *k_resolver;	// for kernel symbol cache
 static volatile u32 k_resolver_lock;
@@ -248,18 +249,115 @@ void free_proc_cache(struct symbolizer_proc_info *p)
 static void reap_retired_proc_caches(void)
 {
 	struct symbolizer_proc_info **link = &retired_proc_caches;
+	struct symbolizer_proc_info *reclaim_list = NULL;
 
+	pthread_mutex_lock(&retired_proc_caches_lock);
 	while (*link != NULL) {
 		struct symbolizer_proc_info *p = *link;
 
 		if (AO_GET(&p->use) == 0) {
 			*link = p->retired_next;
-			p->retired_next = NULL;
-			free_proc_cache(p);
+			p->retired_next = reclaim_list;
+			reclaim_list = p;
 		} else {
 			link = &p->retired_next;
 		}
 	}
+	pthread_mutex_unlock(&retired_proc_caches_lock);
+
+	/* Symbol-cache cleanup can be expensive; never perform it under the list lock. */
+	while (reclaim_list != NULL) {
+		struct symbolizer_proc_info *p = reclaim_list;
+		reclaim_list = p->retired_next;
+		p->retired_next = NULL;
+		free_proc_cache(p);
+	}
+}
+
+static u64 proc_cache_accounted_bytes(struct symbolizer_proc_info *p)
+{
+	u64 bytes = sizeof(*p);
+
+	thread_names_lock(p);
+	bytes += vec_mem_size(p->thread_names);
+	thread_names_unlock(p);
+
+	return bytes;
+}
+
+int collect_proc_cache_reclaim_stats(u32 older_than_secs,
+				     struct proc_cache_reclaim_stats **stats,
+				     size_t *stats_size)
+{
+	struct symbolizer_proc_info *p;
+	struct proc_cache_reclaim_stats *result;
+	u64 now_ns = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
+	u64 older_than_ns = (u64)older_than_secs * NS_IN_SEC;
+	u64 overdue_count = 0;
+	size_t size;
+
+	if (stats == NULL || stats_size == NULL)
+		return ETR_INVAL;
+	*stats = NULL;
+	*stats_size = 0;
+
+	pthread_mutex_lock(&retired_proc_caches_lock);
+	for (p = retired_proc_caches; p != NULL; p = p->retired_next) {
+		u64 wait_ns = now_ns >= p->retired_at_ns ?
+		    now_ns - p->retired_at_ns : 0;
+		if (wait_ns > older_than_ns)
+			overdue_count++;
+	}
+
+	if (overdue_count >
+	    (SIZE_MAX - sizeof(*result)) / sizeof(result->entries[0])) {
+		pthread_mutex_unlock(&retired_proc_caches_lock);
+		return ETR_INVAL;
+	}
+	size = sizeof(*result) +
+	    (size_t)overdue_count * sizeof(result->entries[0]);
+	result = calloc(1, size);
+	if (result == NULL) {
+		pthread_mutex_unlock(&retired_proc_caches_lock);
+		return ETR_NOMEM;
+	}
+
+	result->older_than_secs = older_than_secs;
+	result->active_count = __atomic_load_n(
+	    &syms_cache_hash.hash_elems_count, __ATOMIC_RELAXED);
+	/* Bihash is constrained by its arena size, not a fixed entry count. */
+	result->total_limit = 0;
+	result->hash_memory_limit_bytes = syms_cache_hash.memory_size;
+	for (p = retired_proc_caches; p != NULL; p = p->retired_next) {
+		u64 wait_ns = now_ns >= p->retired_at_ns ?
+		    now_ns - p->retired_at_ns : 0;
+		u64 accounted_bytes = proc_cache_accounted_bytes(p);
+		struct proc_cache_reclaim_entry *entry;
+
+		result->waiting_count++;
+		result->waiting_accounted_bytes += accounted_bytes;
+		if (wait_ns <= older_than_ns)
+			continue;
+
+		entry = &result->entries[result->entry_count++];
+		entry->pid = p->pid;
+		memcpy(entry->comm, p->comm, sizeof(entry->comm));
+		entry->comm[sizeof(entry->comm) - 1] = '\0';
+		entry->use = AO_GET(&p->use);
+		entry->start_time_msecs = p->stime;
+		entry->wait_secs = wait_ns / NS_IN_SEC;
+		entry->accounted_bytes = accounted_bytes;
+		entry->use_reason = PROC_USE_GET_REASON(p);
+		entry->has_syms_cache = AO_GET(&p->syms_cache) != 0;
+		result->overdue_count++;
+		result->overdue_accounted_bytes += accounted_bytes;
+	}
+	result->total_count = result->active_count + result->waiting_count;
+	pthread_mutex_unlock(&retired_proc_caches_lock);
+
+	*stats = result;
+	*stats_size = size;
+	return ETR_OK;
 }
 
 static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
@@ -277,8 +375,14 @@ static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 		if (AO_SUB_F(&p->use, 1) == 0) {
 			free_proc_cache(p);
 		} else {
+			pthread_mutex_lock(&retired_proc_caches_lock);
+			/* Record the first instant at which this object is retired. */
+			if (p->retired_at_ns == 0)
+				p->retired_at_ns =
+				    gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 			p->retired_next = retired_proc_caches;
 			retired_proc_caches = p;
+			pthread_mutex_unlock(&retired_proc_caches_lock);
 		}
 	}
 }
@@ -1148,6 +1252,26 @@ int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 int create_and_init_proc_info_caches(void)
 {
 	return 0;
+}
+
+int collect_proc_cache_reclaim_stats(u32 older_than_secs,
+				     struct proc_cache_reclaim_stats **stats,
+				     size_t *stats_size)
+{
+	struct proc_cache_reclaim_stats *result;
+
+	if (stats == NULL || stats_size == NULL)
+		return ETR_INVAL;
+	*stats = NULL;
+	*stats_size = 0;
+
+	result = calloc(1, sizeof(*result));
+	if (result == NULL)
+		return ETR_NOMEM;
+	result->older_than_secs = older_than_secs;
+	*stats = result;
+	*stats_size = sizeof(*result);
+	return ETR_OK;
 }
 
 void exec_proc_info_cache_update(void)

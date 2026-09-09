@@ -849,6 +849,34 @@ static struct tracer_sockopts socktrace_sockopts = {
 	.get = socktrace_sockopt_get,
 };
 
+static int proc_cache_reclaim_sockopt_get(sockoptid_t opt, const void *conf,
+					   size_t size, void **out,
+					   size_t *outsize)
+{
+	const struct proc_cache_reclaim_request *request = conf;
+	struct proc_cache_reclaim_stats *stats = NULL;
+	int ret;
+
+	if (opt != SOCKOPT_GET_PROC_CACHE_RECLAIM || request == NULL ||
+	    size != sizeof(*request))
+		return ETR_INVAL;
+
+	ret = collect_proc_cache_reclaim_stats(request->older_than_secs,
+					       &stats, outsize);
+	if (ret != ETR_OK)
+		return ret;
+
+	*out = stats;
+	return ETR_OK;
+}
+
+static struct tracer_sockopts proc_cache_reclaim_sockopts = {
+	.version = SOCKOPT_VERSION,
+	.get_opt_min = SOCKOPT_GET_PROC_CACHE_RECLAIM,
+	.get_opt_max = SOCKOPT_GET_PROC_CACHE_RECLAIM,
+	.get = proc_cache_reclaim_sockopt_get,
+};
+
 static int datadump_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 {
 	struct datadump_msg *msg = (struct datadump_msg *)conf;
@@ -3201,6 +3229,9 @@ int running_socket_tracer(tracer_callback_t handle,
 		return ret;
 
 	if ((ret = sockopt_register(&datadump_sockopts)) != ETR_OK)
+		return ret;
+
+	if ((ret = sockopt_register(&proc_cache_reclaim_sockopts)) != ETR_OK)
 		return ret;
 	ret =
 	    pthread_create(&proc_events_pthread, NULL,

@@ -21,14 +21,18 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <limits.h>
+#include <time.h>
 #include "tracer.h"
 #include "socket.h"
+#include "proc.h"
 
 #define DF_BPF_NAME           "deepflow-ebpfctl"
 #define DF_BPF_VERSION        "v1.0.0"
 #define LINUX_VER_LEN         128
 #define CMD_BUF_SZ	      256
 #define TIMEOUT_DEF	      60
+#define PROC_CACHE_RECLAIM_OLDER_THAN_DEF 60
+#define OPT_OLDER_THAN	      1000
 
 static char *match_str_def = ".*";
 static char *comm_str_def = "";
@@ -56,6 +60,7 @@ struct df_bpf_conf {
 	// For datadump config
 	int interval;
 	int timeout;
+	u32 older_than;
 	int pid;
 	int fd;
 	int l7_proto;
@@ -112,6 +117,18 @@ static void match_pids_help(void)
 	fprintf(stderr, "Usage:\n" "    %s match_pids print\n", DF_BPF_NAME);
 	fprintf(stderr, "For example:\n");
 	fprintf(stderr, "    %s match_pids print\n", DF_BPF_NAME);
+}
+
+static void proc_cache_reclaim_help(void)
+{
+	fprintf(stderr,
+		"Show process caches waiting for deferred reclamation\n"
+		"Usage:\n"
+		"    %s proc-cache-reclaim show [--older-than <SECONDS>]\n"
+		"Options:\n"
+		"    --older-than: list entries waiting longer than this value"
+		" (default: %d seconds)\n",
+		DF_BPF_NAME, PROC_CACHE_RECLAIM_OLDER_THAN_DEF);
 }
 
 static void cpdbg_help(void)
@@ -694,6 +711,142 @@ static inline void get_kernel_version(char *buf)
 		 major, minor, rev, num);
 }
 
+static const char *proc_use_reason_name(u32 reason)
+{
+	switch (reason) {
+	case PROC_USE_INC_REASON_HASH_QUERY:
+		return "HASH_QUERY";
+	case PROC_USE_INC_REASON_JAVA_TAST:
+		return "JAVA_TAST";
+	case PROC_USE_INC_REASON_UNKNOWN:
+	default:
+		return "UNKNOWN";
+	}
+}
+
+static void format_accounted_bytes(u64 bytes, char *buf, size_t size)
+{
+	if (bytes >= 1024ULL * 1024ULL)
+		snprintf(buf, size, "%.2f MiB",
+			 (double)bytes / (1024.0 * 1024.0));
+	else if (bytes >= 1024ULL)
+		snprintf(buf, size, "%.2f KiB", (double)bytes / 1024.0);
+	else
+		snprintf(buf, size, "%" PRIu64 " B", bytes);
+}
+
+static void format_start_time(u64 start_time_msecs, char *buf, size_t size)
+{
+	struct tm tm_info;
+	time_t seconds = (time_t)(start_time_msecs / 1000ULL);
+	char date_time[32];
+
+	if (start_time_msecs == 0 || localtime_r(&seconds, &tm_info) == NULL ||
+	    strftime(date_time, sizeof(date_time), "%Y-%m-%d %H:%M:%S",
+		     &tm_info) == 0) {
+		snprintf(buf, size, "unknown");
+		return;
+	}
+
+	snprintf(buf, size, "%s.%03u", date_time,
+		 (unsigned int)(start_time_msecs % 1000ULL));
+}
+
+static int proc_cache_reclaim_do_cmd(struct df_bpf_obj *obj,
+				      df_bpf_cmd_t cmd,
+				      struct df_bpf_conf *conf)
+{
+	struct proc_cache_reclaim_request request = {
+		.older_than_secs = conf->older_than,
+	};
+	struct proc_cache_reclaim_stats *stats = NULL;
+	size_t size, expected_size;
+	char waiting_memory[32], overdue_memory[32], hash_memory_limit[32];
+	int err;
+
+	if (cmd != DF_BPF_CMD_SHOW || conf->argc != 0)
+		return ETR_NOTSUPP;
+
+	err = df_bpf_getsockopt(SOCKOPT_GET_PROC_CACHE_RECLAIM,
+				&request, sizeof(request), (void **)&stats, &size);
+	if (err != ETR_OK)
+		return err;
+	if (stats == NULL || size < sizeof(*stats) ||
+	    stats->entry_count >
+	    (SIZE_MAX - sizeof(*stats)) / sizeof(stats->entries[0])) {
+		fprintf(stderr, "corrupted response.\n");
+		df_bpf_sockopt_msg_free(stats);
+		return ETR_INVAL;
+	}
+
+	expected_size = sizeof(*stats) +
+	    (size_t)stats->entry_count * sizeof(stats->entries[0]);
+	if (size != expected_size ||
+	    stats->entry_count != stats->overdue_count) {
+		fprintf(stderr, "corrupted response.\n");
+		df_bpf_sockopt_msg_free(stats);
+		return ETR_INVAL;
+	}
+
+	format_accounted_bytes(stats->waiting_accounted_bytes,
+			       waiting_memory, sizeof(waiting_memory));
+	format_accounted_bytes(stats->overdue_accounted_bytes,
+			       overdue_memory, sizeof(overdue_memory));
+	format_accounted_bytes(stats->hash_memory_limit_bytes,
+			       hash_memory_limit, sizeof(hash_memory_limit));
+	printf("Proc cache reclamation:\n");
+	printf("  active_count:             %" PRIu64 "\n",
+	       stats->active_count);
+	printf("  retired_count:            %" PRIu64 "\n",
+	       stats->waiting_count);
+	printf("  total_count:              %" PRIu64 "\n",
+	       stats->total_count);
+	if (stats->total_limit == 0)
+		printf("  total_limit:              not configured\n");
+	else
+		printf("  total_limit:              %" PRIu64 "\n",
+		       stats->total_limit);
+	printf("  hash_memory_limit:        %s\n", hash_memory_limit);
+	printf("  retired_accounted_memory: %s\n", waiting_memory);
+	printf("  older_than:               %u s\n", stats->older_than_secs);
+	printf("  overdue_total:            %" PRIu64 "\n",
+	       stats->overdue_count);
+	printf("  overdue_accounted_memory: %s\n", overdue_memory);
+
+	if (stats->entry_count == 0) {
+		printf("\nNo proc cache has waited longer than %u seconds.\n",
+		       stats->older_than_secs);
+	} else {
+		u32 i;
+		printf("\n%-10s %-16s %-8s %-10s %-23s %-12s %-9s %s\n",
+		       "PID", "COMM", "USE", "WAIT(s)", "START_TIME",
+		       "MEMORY", "SYMCACHE", "LAST_INC_REASON");
+		for (i = 0; i < stats->entry_count; i++) {
+			struct proc_cache_reclaim_entry *entry =
+			    &stats->entries[i];
+			char memory[32];
+			char start_time[32];
+			format_accounted_bytes(entry->accounted_bytes,
+					       memory, sizeof(memory));
+			format_start_time(entry->start_time_msecs,
+					  start_time, sizeof(start_time));
+			printf("%-10d %-16s %-8" PRIu64 " %-10" PRIu64
+			       " %-23s %-12s %-9s %s\n",
+			       entry->pid, entry->comm, entry->use,
+			       entry->wait_secs, start_time, memory,
+			       entry->has_syms_cache ? "yes" : "no",
+			       proc_use_reason_name(entry->use_reason));
+		}
+	}
+
+	printf("\nNote: total_count is active_count + retired_count and "
+	       "excludes proc_event_ring.\n");
+	printf("Accounted memory excludes BCC symbol-cache internals and shared "
+	       "mount-cache memory.\n");
+	df_bpf_sockopt_msg_free(stats);
+	return ETR_OK;
+}
+
 static int socktrace_do_cmd(struct df_bpf_obj *obj, df_bpf_cmd_t cmd,
 			    struct df_bpf_conf *conf)
 {
@@ -1117,13 +1270,20 @@ struct df_bpf_obj match_pids_obj = {
 	.do_cmd = match_pids_do_cmd,
 };
 
+struct df_bpf_obj proc_cache_reclaim_obj = {
+	.name = "proc-cache-reclaim",
+	.help = proc_cache_reclaim_help,
+	.do_cmd = proc_cache_reclaim_do_cmd,
+};
+
 static void usage(void)
 {
 	fprintf(stderr,
 		"Usage:\n"
 		"    " DF_BPF_NAME " [OPTIONS] OBJECT { COMMAND | help }\n"
 		"Parameters:\n"
-		"    OBJECT  := { tracer socktrace datadump cpdbg match_pids}\n"
+		"    OBJECT  := { tracer socktrace datadump cpdbg match_pids "
+		"proc-cache-reclaim }\n"
 		"    COMMAND := { show list set print}\n"
 		"Options:\n"
 		"    -v, --verbose\n"
@@ -1142,6 +1302,8 @@ static struct df_bpf_obj *df_bpf_obj_get(const char *name)
 		return &cpdbg_obj;
 	} else if (strcmp(name, "match_pids") == 0) {
 		return &match_pids_obj;
+	} else if (strcmp(name, "proc-cache-reclaim") == 0) {
+		return &proc_cache_reclaim_obj;
 	}
 
 	return NULL;
@@ -1193,6 +1355,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 		{"end-line", required_argument, NULL, 'e'},
 		{"ipaddr", required_argument, NULL, 'i'},
 		{"port", required_argument, NULL, 'p'},
+		{"older-than", required_argument, NULL, OPT_OLDER_THAN},
 		{NULL, 0, NULL, 0},
 	};
 
@@ -1200,6 +1363,7 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 	conf->af = AF_UNSPEC;
 	conf->only_stdout = false;
 	conf->timeout = TIMEOUT_DEF;
+	conf->older_than = PROC_CACHE_RECLAIM_OLDER_THAN_DEF;
 	conf->pid = 0;
 	conf->l7_proto = 0;
 	conf->match_str = match_str_def;
@@ -1262,6 +1426,21 @@ static int parse_args(int argc, char *argv[], struct df_bpf_conf *conf)
 				fprintf(stderr,
 					"Invalid option: --l7-proto, need >= 0\n");
 				return -1;
+			}
+			break;
+		case OPT_OLDER_THAN:
+			{
+				char *end = NULL;
+				unsigned long value;
+				errno = 0;
+				value = strtoul(optarg, &end, 10);
+				if (errno != 0 || end == optarg || *end != '\0' ||
+				    value > UINT32_MAX) {
+					fprintf(stderr,
+						"Invalid option: --older-than\n");
+					return -1;
+				}
+				conf->older_than = (u32)value;
 			}
 			break;
 		case 'c':{

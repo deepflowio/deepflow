@@ -60,10 +60,39 @@ enum proc_use_reason {
 	PROC_USE_INC_REASON_JAVA_TAST,
 };
 
+struct proc_cache_reclaim_request {
+	u32 older_than_secs;
+};
+
+struct proc_cache_reclaim_entry {
+	int32_t pid;
+	char comm[TASK_COMM_LEN];
+	u64 use;
+	u64 start_time_msecs;
+	u64 wait_secs;
+	u64 accounted_bytes;
+	u32 use_reason;
+	u8 has_syms_cache;
+};
+
+struct proc_cache_reclaim_stats {
+	u64 active_count;
+	u64 waiting_count;
+	u64 total_count;
+	/* Zero means that no fixed entry-count limit is configured. */
+	u64 total_limit;
+	u64 hash_memory_limit_bytes;
+	u64 waiting_accounted_bytes;
+	u64 overdue_count;
+	u64 overdue_accounted_bytes;
+	u32 older_than_secs;
+	u32 entry_count;
+	struct proc_cache_reclaim_entry entries[0];
+};
+
 struct symbolizer_proc_info {
 	int pid;
-	/* The process creation time since
-	 * system boot, (in milliseconds) */
+	/* Process start time since the Unix epoch, in milliseconds. */
 	u64 stime;
 	u64 netns_id;
 	/*
@@ -112,6 +141,8 @@ struct symbolizer_proc_info {
 	u64 mntns_id;
 	/* Link used only by the proc-events deferred-reclamation list. */
 	struct symbolizer_proc_info *retired_next;
+	/* CLOCK_MONOTONIC timestamp recorded when added to the retired list. */
+	u64 retired_at_ns;
 };
 
 #define PROC_USE_INC_REASON(P, REASON)        \
@@ -208,6 +239,9 @@ void free_proc_cache(struct symbolizer_proc_info *p);
 void symbolizer_kernel_lock(void);
 void symbolizer_kernel_unlock(void);
 #endif
+int collect_proc_cache_reclaim_stats(u32 older_than_secs,
+				     struct proc_cache_reclaim_stats **stats,
+				     size_t *stats_size);
 void exec_proc_info_cache_update(void);
 int create_and_init_proc_info_caches(void);
 /**
