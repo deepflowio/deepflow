@@ -214,6 +214,15 @@ struct socket_trace_stats {
 	uint64_t dropped_packets;
 	uint64_t kern_missed_packets;
 	uint64_t invalid_packets;
+
+	/* Proc-cache capacity and deferred-reclamation statistics. */
+	uint64_t proc_cache_active_count;
+	uint64_t proc_cache_retired_count;
+	uint64_t proc_cache_total_count;
+	uint64_t proc_cache_total_limit;
+	uint64_t proc_cache_rejected_total;
+	uint64_t proc_cache_reclaimed_total;
+	uint64_t proc_cache_oldest_wait_secs;
 };
 
 struct bpf_offset_param_array {

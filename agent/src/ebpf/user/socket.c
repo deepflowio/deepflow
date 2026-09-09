@@ -3551,6 +3551,16 @@ struct socket_trace_stats socket_tracer_stats(void)
 	clear_proc_exec_event_count();
 	clear_proc_exit_event_count();
 
+	struct proc_cache_runtime_stats proc_cache_stats;
+	collect_proc_cache_runtime_stats(&proc_cache_stats);
+	stats.proc_cache_active_count = proc_cache_stats.active_count;
+	stats.proc_cache_retired_count = proc_cache_stats.retired_count;
+	stats.proc_cache_total_count = proc_cache_stats.total_count;
+	stats.proc_cache_total_limit = proc_cache_stats.total_limit;
+	stats.proc_cache_rejected_total = proc_cache_stats.rejected_total;
+	stats.proc_cache_reclaimed_total = proc_cache_stats.reclaimed_total;
+	stats.proc_cache_oldest_wait_secs = proc_cache_stats.oldest_wait_secs;
+
 	return stats;
 }
 

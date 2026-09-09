@@ -5458,6 +5458,45 @@ inputs:
 
 线程和协程追踪的最大哈希表条目数。
 
+#### 最大进程缓存条目数 {#inputs.ebpf.tunning.proc_cache_max_entries}
+
+**标签**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.tunning.proc_cache_max_entries`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    tunning:
+      proc_cache_max_entries: 65536
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | entries |
+| Range | [1024, 262144] |
+
+**详细描述**:
+
+Agent 可同时分配的进程缓存对象最大数量，包括活动的 proc-info hash
+条目、初始化中的对象、通过 proc-event ring 中转的对象，以及在 retired
+回收链表中等待释放的对象。
+
+在 x86_64 上，每个 proc-info 结构体当前约占 240 字节。默认上限下，
+这些结构体约占 15 MiB；如果全部对象都处于活动状态，原始 hash KV 还会
+增加约 1 MiB。实际内存可能明显更高，因为该估算不包括线程名 vector、
+BCC 符号缓存、分配器开销、hash 扩容和碎片，以及共享 mount cache 数据。
+
+达到上限后，Agent 会跳过创建新的 proc-info 对象。已有条目仍可继续查询、
+删除和回收，不会影响目标进程运行。
+
 ## 资源 {#inputs.resources}
 
 ### 推送间隔 {#inputs.resources.push_interval}

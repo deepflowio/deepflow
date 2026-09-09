@@ -29,6 +29,18 @@
 #define TASK_COMM_LEN 16
 #endif
 
+/* Valid range and default value for proc_cache_max_entries. */
+#define PROC_CACHE_LIMIT_MIN 1024U
+#define PROC_CACHE_LIMIT_DEFAULT 65536U
+#define PROC_CACHE_LIMIT_MAX 262144U
+
+/*
+ * Maximum number of retired proc-cache details returned by one
+ * proc-cache-reclaim query. Summary counters still cover the complete retired
+ * list; this limit only prevents an excessively large control response.
+ */
+#define PROC_CACHE_RECLAIM_MAX_ENTRIES 1024U
+
 /*
  * symbol_caches_hash_t maps from pid to BCC symbol cache.
  */
@@ -79,15 +91,31 @@ struct proc_cache_reclaim_stats {
 	u64 active_count;
 	u64 waiting_count;
 	u64 total_count;
-	/* Zero means that no fixed entry-count limit is configured. */
 	u64 total_limit;
 	u64 hash_memory_limit_bytes;
 	u64 waiting_accounted_bytes;
 	u64 overdue_count;
 	u64 overdue_accounted_bytes;
+	u64 rejected_total;
+	u64 reclaimed_total;
+	u64 oldest_wait_secs;
+	u64 matched_count;
 	u32 older_than_secs;
+	u32 returned_count;
 	u32 entry_count;
+	u8 admission_paused;
+	u8 truncated;
 	struct proc_cache_reclaim_entry entries[0];
+};
+
+struct proc_cache_runtime_stats {
+	u64 active_count;
+	u64 retired_count;
+	u64 total_count;
+	u64 total_limit;
+	u64 rejected_total;
+	u64 reclaimed_total;
+	u64 oldest_wait_secs;
 };
 
 struct symbolizer_proc_info {
@@ -242,6 +270,8 @@ void symbolizer_kernel_unlock(void);
 int collect_proc_cache_reclaim_stats(u32 older_than_secs,
 				     struct proc_cache_reclaim_stats **stats,
 				     size_t *stats_size);
+int set_proc_cache_max_entries(u32 limit);
+void collect_proc_cache_runtime_stats(struct proc_cache_runtime_stats *stats);
 void exec_proc_info_cache_update(void);
 int create_and_init_proc_info_caches(void);
 /**

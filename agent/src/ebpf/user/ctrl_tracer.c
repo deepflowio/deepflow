@@ -762,6 +762,7 @@ static int proc_cache_reclaim_do_cmd(struct df_bpf_obj *obj,
 	struct proc_cache_reclaim_stats *stats = NULL;
 	size_t size, expected_size;
 	char waiting_memory[32], overdue_memory[32], hash_memory_limit[32];
+	double usage;
 	int err;
 
 	if (cmd != DF_BPF_CMD_SHOW || conf->argc != 0)
@@ -782,7 +783,11 @@ static int proc_cache_reclaim_do_cmd(struct df_bpf_obj *obj,
 	expected_size = sizeof(*stats) +
 	    (size_t)stats->entry_count * sizeof(stats->entries[0]);
 	if (size != expected_size ||
-	    stats->entry_count != stats->overdue_count) {
+	    stats->entry_count != stats->returned_count ||
+	    stats->returned_count > stats->matched_count ||
+	    stats->matched_count != stats->overdue_count ||
+	    stats->entry_count > PROC_CACHE_RECLAIM_MAX_ENTRIES ||
+	    stats->truncated != (stats->matched_count > stats->returned_count)) {
 		fprintf(stderr, "corrupted response.\n");
 		df_bpf_sockopt_msg_free(stats);
 		return ETR_INVAL;
@@ -794,6 +799,8 @@ static int proc_cache_reclaim_do_cmd(struct df_bpf_obj *obj,
 			       overdue_memory, sizeof(overdue_memory));
 	format_accounted_bytes(stats->hash_memory_limit_bytes,
 			       hash_memory_limit, sizeof(hash_memory_limit));
+	usage = stats->total_limit == 0 ? 0.0 :
+	    (double)stats->total_count * 100.0 / (double)stats->total_limit;
 	printf("Proc cache reclamation:\n");
 	printf("  active_count:             %" PRIu64 "\n",
 	       stats->active_count);
@@ -801,17 +808,28 @@ static int proc_cache_reclaim_do_cmd(struct df_bpf_obj *obj,
 	       stats->waiting_count);
 	printf("  total_count:              %" PRIu64 "\n",
 	       stats->total_count);
-	if (stats->total_limit == 0)
-		printf("  total_limit:              not configured\n");
-	else
-		printf("  total_limit:              %" PRIu64 "\n",
-		       stats->total_limit);
+	printf("  total_limit:              %" PRIu64 "\n",
+	       stats->total_limit);
+	printf("  usage:                    %.2f%%\n", usage);
+	printf("  admission_paused:         %s\n",
+	       stats->admission_paused ? "yes" : "no");
+	printf("  rejected_total:           %" PRIu64 "\n",
+	       stats->rejected_total);
+	printf("  reclaimed_total:          %" PRIu64 "\n",
+	       stats->reclaimed_total);
+	printf("  oldest_wait:              %" PRIu64 " s\n",
+	       stats->oldest_wait_secs);
 	printf("  hash_memory_limit:        %s\n", hash_memory_limit);
 	printf("  retired_accounted_memory: %s\n", waiting_memory);
 	printf("  older_than:               %u s\n", stats->older_than_secs);
 	printf("  overdue_total:            %" PRIu64 "\n",
 	       stats->overdue_count);
 	printf("  overdue_accounted_memory: %s\n", overdue_memory);
+	printf("  matched_count:            %" PRIu64 "\n",
+	       stats->matched_count);
+	printf("  returned_count:           %u\n", stats->returned_count);
+	printf("  truncated:                %s\n",
+	       stats->truncated ? "yes" : "no");
 
 	if (stats->entry_count == 0) {
 		printf("\nNo proc cache has waited longer than %u seconds.\n",
@@ -837,12 +855,16 @@ static int proc_cache_reclaim_do_cmd(struct df_bpf_obj *obj,
 			       entry->has_syms_cache ? "yes" : "no",
 			       proc_use_reason_name(entry->use_reason));
 		}
+		if (stats->truncated)
+			printf("\nOnly the first %u matching entries are shown.\n",
+			       stats->returned_count);
 	}
 
-	printf("\nNote: total_count is active_count + retired_count and "
-	       "excludes proc_event_ring.\n");
-	printf("Accounted memory excludes BCC symbol-cache internals and shared "
-	       "mount-cache memory.\n");
+	printf("\nNote: total_count includes active, initializing, "
+	       "proc_event_ring, and retired objects.\n");
+	printf("Accounted memory excludes BCC symbol-cache internals, allocator "
+	       "overhead, hash growth/fragmentation, and shared mount-cache "
+	       "memory.\n");
 	df_bpf_sockopt_msg_free(stats);
 	return ETR_OK;
 }

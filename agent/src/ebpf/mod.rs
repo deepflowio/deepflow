@@ -492,6 +492,15 @@ pub struct SK_TRACE_STATS {
     pub dropped_packets: u64,
     pub kern_missed_packets: u64,
     pub invalid_packets: u64,
+
+    // Proc-cache capacity and deferred-reclamation statistics.
+    pub proc_cache_active_count: u64,
+    pub proc_cache_retired_count: u64,
+    pub proc_cache_total_count: u64,
+    pub proc_cache_total_limit: u64,
+    pub proc_cache_rejected_total: u64,
+    pub proc_cache_reclaimed_total: u64,
+    pub proc_cache_oldest_wait_secs: u64,
 }
 
 #[repr(C)]
@@ -637,6 +646,8 @@ extern "C" {
     pub fn set_bpf_map_prealloc(enabled: bool) -> c_void;
 
     pub fn set_kick_kern_nice(nice: c_int) -> c_int;
+    // Set the maximum number of allocated proc-cache objects.
+    pub fn set_proc_cache_max_entries(limit: c_uint) -> c_int;
 
     // Parameter descriptions:
     // callback: Callback interface from Rust to C; return values refer to definitions of TRACER_CALLBACK_FLAG_*.
