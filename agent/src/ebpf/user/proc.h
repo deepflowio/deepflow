@@ -54,6 +54,12 @@ struct task_comm_info_s {
 	char comm[TASK_COMM_LEN + 1];
 };
 
+enum proc_use_reason {
+	PROC_USE_INC_REASON_UNKNOWN,
+	PROC_USE_INC_REASON_HASH_QUERY,
+	PROC_USE_INC_REASON_JAVA_TAST,
+};
+
 struct symbolizer_proc_info {
 	int pid;
 	/* The process creation time since
@@ -92,6 +98,8 @@ struct symbolizer_proc_info {
 	char container_id[CONTAINER_ID_SIZE];
 	/* reference counting */
 	u64 use;
+	/* Last non-temporary reason for incrementing use. */
+	enum proc_use_reason use_reason;
 	/* Has the process exited? */
 	u64 is_exit;
 	/* Protect symbolizer_proc_info from concurrent access by multiple threads. */
@@ -105,6 +113,16 @@ struct symbolizer_proc_info {
 	/* Link used only by the proc-events deferred-reclamation list. */
 	struct symbolizer_proc_info *retired_next;
 };
+
+#define PROC_USE_INC_REASON(P, REASON)        \
+	do {                                   \
+		AO_INC(&(P)->use);               \
+		__atomic_store_n(&(P)->use_reason, \
+				 (REASON), __ATOMIC_RELEASE); \
+	} while (0)
+
+#define PROC_USE_GET_REASON(P) \
+	__atomic_load_n(&(P)->use_reason, __ATOMIC_ACQUIRE)
 
 static inline void thread_names_lock(struct symbolizer_proc_info *p)
 {

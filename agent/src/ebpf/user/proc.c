@@ -223,7 +223,7 @@ find_proc_info_and_get_ref(struct symbolizer_cache_kvp *kv)
 				      (symbol_caches_hash_kv *)kv) == 0) {
 		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
 		if (p != NULL)
-			AO_INC(&p->use);
+			PROC_USE_INC_REASON(p, PROC_USE_INC_REASON_HASH_QUERY);
 	}
 	proc_cache_ref_acquire_exit(slot);
 
@@ -609,6 +609,7 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	get_mount_ns_id(pid, &p->mntns_id);
 	mount_info_cache_add_if_absent(pid, p->mntns_id);
 	p->use = 1;
+	p->use_reason = PROC_USE_INC_REASON_UNKNOWN;
 
 	return ETR_OK;
 }

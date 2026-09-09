@@ -128,7 +128,7 @@ void add_java_syms_update_task(struct symbolizer_proc_info *p_info)
 	task->p = p_info;
 
 	pthread_mutex_lock(&list_lock);
-	AO_INC(&p_info->use);
+	PROC_USE_INC_REASON(p_info, PROC_USE_INC_REASON_JAVA_TAST);
 	list_add_tail(&task->list, &java_syms_update_tasks_head);
 	pthread_mutex_unlock(&list_lock);
 }
