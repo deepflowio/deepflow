@@ -135,9 +135,32 @@ u64 get_java_syms_fetch_delay(void)
  * You can obtain process information using the process PID.
  */
 symbol_caches_hash_t syms_cache_hash;
+/*
+ * The bihash protects its own buckets, but not the lifetime of objects stored
+ * in it. Readers announce the short hash_search() -> AO_INC() window. After an
+ * entry is removed, the remover waits for these windows to close before the
+ * hash reference can be handed to proc_event_ring or released.
+ *
+ * This is a small userspace grace-period scheme, not a complete RCU
+ * implementation. Each known reader has a cache-line-separated slot so hot
+ * paths do not contend on one global atomic counter. The mutex serializes
+ * update-side search-and-delete and protects the infrequent full-table walk;
+ * hot-path readers never take it.
+ */
+#define PROC_CACHE_READER_SLOTS \
+	(THREAD_SOCK_READER_IDX_BASE + MAX_CPU_NR)
+
+struct proc_cache_reader_slot {
+	volatile u64 active;
+} __attribute__ ((aligned(CLIB_CACHE_LINE_BYTES)));
+
+static struct proc_cache_reader_slot
+	proc_cache_readers[PROC_CACHE_READER_SLOTS];
+static pthread_mutex_t syms_cache_update_lock = PTHREAD_MUTEX_INITIALIZER;
 static void *k_resolver;	// for kernel symbol cache
 static volatile u32 k_resolver_lock;
 static u64 sys_btime_msecs;	// system boot time(milliseconds)
+extern __thread uword thread_index;
 
 void symbolizer_kernel_lock(void)
 {
@@ -153,6 +176,56 @@ void symbolizer_kernel_unlock(void)
 static bool inline enable_proc_info_cache(void)
 {
 	return (syms_cache_hash.buckets != NULL);
+}
+
+static inline struct proc_cache_reader_slot *proc_cache_ref_acquire_enter(void)
+{
+	/*
+	 * All current proc-cache users have an index in this range. Falling back to
+	 * slot 0 keeps a future or external caller safe even if it has not yet been
+	 * assigned a dedicated index; counters, unlike boolean flags, may be shared.
+	 */
+	uword idx = thread_index;
+	if (unlikely(idx >= ARRAY_SIZE(proc_cache_readers)))
+		idx = THREAD_PROFILER_READER_IDX;
+
+	struct proc_cache_reader_slot *slot = &proc_cache_readers[idx];
+	AO_INC(&slot->active);
+	return slot;
+}
+
+static inline void proc_cache_ref_acquire_exit(struct proc_cache_reader_slot *slot)
+{
+	AO_DEC(&slot->active);
+}
+
+static inline void synchronize_proc_cache_ref_acquirers(void)
+{
+	uword i;
+	for (i = 0; i < ARRAY_SIZE(proc_cache_readers); i++) {
+		while (__atomic_load_n(&proc_cache_readers[i].active,
+				       __ATOMIC_SEQ_CST) != 0)
+			CLIB_PAUSE();
+	}
+}
+
+static inline struct symbolizer_proc_info *
+find_proc_info_and_get_ref(struct symbolizer_cache_kvp *kv)
+{
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_proc_info *p = NULL;
+	struct proc_cache_reader_slot *slot;
+
+	slot = proc_cache_ref_acquire_enter();
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *)kv,
+				      (symbol_caches_hash_kv *)kv) == 0) {
+		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
+		if (p != NULL)
+			AO_INC(&p->use);
+	}
+	proc_cache_ref_acquire_exit(slot);
+
+	return p;
 }
 
 void free_proc_cache(struct symbolizer_proc_info *p)
@@ -234,6 +307,7 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 static inline int __del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 {
 	symbol_caches_hash_t *h = &syms_cache_hash;
+	pthread_mutex_lock(&syms_cache_update_lock);
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) kv,
 				      (symbol_caches_hash_kv *) kv) == 0) {
 		struct symbolizer_proc_info *p;
@@ -247,9 +321,13 @@ static inline int __del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 		if (symbol_caches_hash_add_del
 		    (h, (symbol_caches_hash_kv *) kv, 0 /* delete */ )) {
 			ebpf_warning("failed.(pid %d)\n", (pid_t) kv->k.pid);
+			pthread_mutex_unlock(&syms_cache_update_lock);
 			return -1;
 		} else {
 			__sync_fetch_and_add(&h->hash_elems_count, -1);
+			pthread_mutex_unlock(&syms_cache_update_lock);
+			/* The old value is no longer discoverable by a new reader. */
+			synchronize_proc_cache_ref_acquirers();
 			if (p)
 				free_symbolizer_cache_kvp(kv);
 			return 0;
@@ -259,6 +337,7 @@ static inline int __del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 		    ("The process with PID %d does not exist in the cache."
 		     " Failed to clean up process information.\n", kv->k.pid);
 	}
+	pthread_mutex_unlock(&syms_cache_update_lock);
 
 	return -1;
 }
@@ -293,7 +372,6 @@ int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 			     int mount_size, fs_type_t *file_type)
 {
 	int ret = -1;
-	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv;
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
@@ -302,11 +380,8 @@ int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 	memset(name, 0, name_size);
 	memset(mount_point, 0, mount_size);
 	memset(mount_source, 0, mount_size);
-	struct symbolizer_proc_info *p = NULL;
-	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
-				      (symbol_caches_hash_kv *) & kv) == 0) {
-		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
-		AO_INC(&p->use);
+	struct symbolizer_proc_info *p = find_proc_info_and_get_ref(&kv);
+	if (p != NULL) {
 		if (strlen(p->container_id) > 0) {
 			memcpy_s_inline((void *)cid, cid_size, p->container_id,
 					sizeof(p->container_id));
@@ -354,6 +429,7 @@ static void add_proc_event_to_queue(pid_t pid, enum proc_act_type type)
 {
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv = {};
+	bool removed = false;
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
 	if (type == PROC_EXEC) {
@@ -362,6 +438,7 @@ static void add_proc_event_to_queue(pid_t pid, enum proc_act_type type)
 		__sync_fetch_and_add(&proc_exit_event_count, 1);
 	}
 
+	pthread_mutex_lock(&syms_cache_update_lock);
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		struct symbolizer_proc_info *p;
@@ -375,11 +452,18 @@ static void add_proc_event_to_queue(pid_t pid, enum proc_act_type type)
 		if (symbol_caches_hash_add_del
 		    (h, (symbol_caches_hash_kv *) & kv, 0 /* delete */ )) {
 			ebpf_warning("failed.(pid %d)\n", (pid_t) kv.k.pid);
+			pthread_mutex_unlock(&syms_cache_update_lock);
 			return;
 		} else {
 			__sync_fetch_and_add(&h->hash_elems_count, -1);
+			removed = true;
 		}
 	}
+	pthread_mutex_unlock(&syms_cache_update_lock);
+
+	/* The old value is no longer discoverable by a new reader. */
+	if (removed)
+		synchronize_proc_cache_ref_acquirers();
 
 	add_proc_ev_info_to_ring(type, &kv);
 }
@@ -438,7 +522,6 @@ u64 get_pid_stime(pid_t pid)
 {
 	ASSERT(pid >= 0);
 
-	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv;
 
 	if (pid == 0)
@@ -446,9 +529,11 @@ u64 get_pid_stime(pid_t pid)
 
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
-	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
-				      (symbol_caches_hash_kv *) & kv) == 0) {
-		return cache_process_stime(&kv);
+	struct symbolizer_proc_info *p = find_proc_info_and_get_ref(&kv);
+	if (p != NULL) {
+		u64 stime = p->stime;
+		AO_DEC(&p->use);
+		return stime;
 	}
 
 	return 0;
@@ -518,7 +603,6 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 
 	*stime = *netns_id = 0;
 	*ptr = NULL;
-	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv;
 
 	if (pid == 0) {
@@ -528,13 +612,10 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
-	struct symbolizer_proc_info *p = NULL;
-	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
-				      (symbol_caches_hash_kv *) & kv) != 0) {
+	struct symbolizer_proc_info *p = find_proc_info_and_get_ref(&kv);
+	if (p == NULL) {
 		return;
 	} else {
-		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
-		AO_INC(&p->use);
 		symbolizer_proc_lock(p);
 		u64 curr_time = current_sys_time_secs();
 		if (!p->verified) {
@@ -676,10 +757,8 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 	struct symbolizer_cache_kvp kv;
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
-	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
-				      (symbol_caches_hash_kv *) & kv) == 0) {
-		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
-		AO_INC(&p->use);
+	p = find_proc_info_and_get_ref(&kv);
+	if (p != NULL) {
 		symbolizer_proc_lock(p);
 		u64 curr_time = current_sys_time_secs();
 		if (p->verified) {
@@ -894,9 +973,12 @@ void check_and_update_proc_info(bool output_log)
 	u64 elems_count = 0, clear_count = 0;
 	struct symbolizer_cache_kvp *kv;
 	symbol_caches_hash_t *h = &syms_cache_hash;
+	/* The callback dereferences values directly while walking the hash. */
+	pthread_mutex_lock(&syms_cache_update_lock);
 	symbol_caches_hash_foreach_key_value_pair(h,
 						  check_proc_kvp_cb,
 						  (void *)&elems_count);
+	pthread_mutex_unlock(&syms_cache_update_lock);
 	vec_foreach(kv, clear_procs) {
 		if (__del_proc_info_from_cache(kv) == 0)
 			clear_count++;
