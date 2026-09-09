@@ -157,6 +157,8 @@ struct proc_cache_reader_slot {
 static struct proc_cache_reader_slot
 	proc_cache_readers[PROC_CACHE_READER_SLOTS];
 static pthread_mutex_t syms_cache_update_lock = PTHREAD_MUTEX_INITIALIZER;
+/* Owned and reaped only by the proc-events thread. */
+static struct symbolizer_proc_info *retired_proc_caches;
 static void *k_resolver;	// for kernel symbol cache
 static volatile u32 k_resolver_lock;
 static u64 sys_btime_msecs;	// system boot time(milliseconds)
@@ -243,17 +245,41 @@ void free_proc_cache(struct symbolizer_proc_info *p)
 	clib_mem_free((void *)p);
 }
 
+static void reap_retired_proc_caches(void)
+{
+	struct symbolizer_proc_info **link = &retired_proc_caches;
+
+	while (*link != NULL) {
+		struct symbolizer_proc_info *p = *link;
+
+		if (AO_GET(&p->use) == 0) {
+			*link = p->retired_next;
+			p->retired_next = NULL;
+			free_proc_cache(p);
+		} else {
+			link = &p->retired_next;
+		}
+	}
+}
+
 static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 {
 	if (kv->v.proc_info_p) {
 		struct symbolizer_proc_info *p;
 		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
-		AO_DEC(&p->use);
-		/* Ensure that all tasks are completed before releasing. */
-		while (AO_GET(&p->use) != 0)
-			CLIB_PAUSE();
-		free_proc_cache(p);
 		kv->v.proc_info_p = 0;
+
+		/*
+		 * Drop the hash/ring ownership reference. Existing readers release
+		 * their references normally; proc-events reclaims the object later
+		 * instead of blocking here.
+		 */
+		if (AO_SUB_F(&p->use, 1) == 0) {
+			free_proc_cache(p);
+		} else {
+			p->retired_next = retired_proc_caches;
+			retired_proc_caches = p;
+		}
 	}
 }
 
@@ -506,6 +532,8 @@ void exec_proc_info_cache_update(void)
 			clib_mem_free(ev_info);
 		}
 	} while (nr > 0);
+
+	reap_retired_proc_caches();
 }
 
 static int init_symbol_cache(const char *name)

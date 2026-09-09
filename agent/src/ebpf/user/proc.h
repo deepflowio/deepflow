@@ -102,6 +102,8 @@ struct symbolizer_proc_info {
 	volatile uword syms_cache;
 	/* Used to look up mount information from the mount cache. */
 	u64 mntns_id;
+	/* Link used only by the proc-events deferred-reclamation list. */
+	struct symbolizer_proc_info *retired_next;
 };
 
 static inline void thread_names_lock(struct symbolizer_proc_info *p)
