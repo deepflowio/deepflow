@@ -4076,6 +4076,12 @@ inputs:
       #     transferred through the proc-event ring, and objects waiting in the
       #     retired reclaim list.
       #
+      #     A retired object continues to consume one entry until its reference
+      #     count reaches zero. Its BCC symbol cache is detached and reclaimed
+      #     independently, so a delayed reference normally retains only the
+      #     proc-info object and its directly accounted data, not the large symbol
+      #     cache.
+      #
       #     The valid range is 1,024 to 262,144 entries, and the default is 65,536.
       #     On x86_64, one proc-info structure currently occupies about 240 bytes.
       #     Across the configurable range, the structures occupy about 240 KiB to
@@ -4093,6 +4099,10 @@ inputs:
       #     Agent 可同时分配的进程缓存对象最大数量，包括活动的 proc-info hash
       #     条目、初始化中的对象、通过 proc-event ring 中转的对象，以及在 retired
       #     回收链表中等待释放的对象。
+      #
+      #     retired 对象在引用计数归零前仍占用一个条目，但其 BCC 符号缓存会被独立
+      #     摘除并回收。因此，滞后引用通常只会保留 proc-info 对象及其可直接核算的
+      #     数据，不会长期保留大块符号缓存。
       #
       #     合法范围为 1,024～262,144 个条目，默认值为 65,536。
       #     在 x86_64 上，每个 proc-info 结构体当前约占 240 字节。

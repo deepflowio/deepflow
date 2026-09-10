@@ -862,6 +862,8 @@ static int proc_cache_reclaim_do_cmd(struct df_bpf_obj *obj,
 
 	printf("\nNote: total_count includes active, initializing, "
 	       "proc_event_ring, and retired objects.\n");
+	printf("Retired BCC symbol caches are reclaimed independently; "
+	       "SYMCACHE=yes means resolver cleanup is still pending.\n");
 	printf("Accounted memory excludes BCC symbol-cache internals, allocator "
 	       "overhead, hash growth/fragmentation, and shared mount-cache "
 	       "memory.\n");

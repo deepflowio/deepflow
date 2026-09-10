@@ -160,6 +160,8 @@ static pthread_mutex_t syms_cache_update_lock = PTHREAD_MUTEX_INITIALIZER;
 /* Protects retired_proc_caches from proc-events and control-thread access. */
 static pthread_mutex_t retired_proc_caches_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct symbolizer_proc_info *retired_proc_caches;
+/* Bounds detached symcache cleanup work in one proc-events loop iteration. */
+#define PROC_SYMCACHE_RECLAIM_BURST 32U
 /*
  * Current number of proc-cache objects that have not been freed. This includes
  * objects being initialized, active hash entries, objects in the proc-event
@@ -410,18 +412,36 @@ find_proc_info_and_get_ref(struct symbolizer_cache_kvp *kv)
 	return p;
 }
 
+static void destroy_proc_symcache(void *resolver, int pid)
+{
+	if (resolver == NULL)
+		return;
+
+	bcc_free_symcache(resolver, pid);
+	free_symcache_count++;
+}
+
+static void free_proc_symcache(struct symbolizer_proc_info *p)
+{
+	void *resolver;
+
+	pthread_mutex_lock(&p->mutex);
+	resolver = symbolizer_proc_symcache_exchange(p, NULL);
+	pthread_mutex_unlock(&p->mutex);
+
+	/* No reader can accept the detached resolver after the mutex handoff. */
+	destroy_proc_symcache(resolver, (int)p->pid);
+}
+
 void free_proc_cache(struct symbolizer_proc_info *p)
 {
 	int pid = (int)p->pid;
-	if (p->syms_cache) {
-		bcc_free_symcache((void *)p->syms_cache, p->pid);
-		free_symcache_count++;
-	}
+	free_proc_symcache(p);
 
 	vec_free(p->thread_names);
 	p->thread_names = NULL;
-	p->syms_cache = 0;
 	mount_info_cache_remove(pid, p->mntns_id);
+	pthread_mutex_destroy(&p->mutex);
 	clib_mem_free((void *)p);
 	release_proc_cache_slot();
 }
@@ -430,6 +450,12 @@ static void reap_retired_proc_caches(void)
 {
 	struct symbolizer_proc_info **link = &retired_proc_caches;
 	struct symbolizer_proc_info *reclaim_list = NULL;
+	struct {
+		void *resolver;
+		int pid;
+	} detached_symcaches[PROC_SYMCACHE_RECLAIM_BURST];
+	u32 detached_count = 0;
+	u32 i;
 
 	pthread_mutex_lock(&retired_proc_caches_lock);
 	while (*link != NULL) {
@@ -441,6 +467,24 @@ static void reap_retired_proc_caches(void)
 			reclaim_list = p;
 			decrement_proc_cache_retired_count();
 		} else {
+			/*
+			 * Do not wait for a busy resolver while holding the list lock.
+			 * A later reaper pass will retry it. Actual BCC cleanup is also
+			 * deferred until after the list lock is released.
+			 */
+			if (detached_count < ARRAY_SIZE(detached_symcaches)
+			    && pthread_mutex_trylock(&p->mutex) == 0) {
+				void *resolver =
+				    symbolizer_proc_symcache_exchange(p, NULL);
+				pthread_mutex_unlock(&p->mutex);
+				if (resolver != NULL) {
+					detached_symcaches[detached_count].resolver =
+					    resolver;
+					detached_symcaches[detached_count].pid =
+					    (int)p->pid;
+					detached_count++;
+				}
+			}
 			link = &p->retired_next;
 		}
 	}
@@ -455,6 +499,10 @@ static void reap_retired_proc_caches(void)
 		__atomic_add_fetch(&proc_cache_reclaimed_total, 1,
 				   __ATOMIC_RELAXED);
 	}
+
+	for (i = 0; i < detached_count; i++)
+		destroy_proc_symcache(detached_symcaches[i].resolver,
+				      detached_symcaches[i].pid);
 }
 
 void collect_proc_cache_runtime_stats(struct proc_cache_runtime_stats *stats)
@@ -585,7 +633,7 @@ int collect_proc_cache_reclaim_stats(u32 older_than_secs,
 		entry->wait_secs = wait_ns / NS_IN_SEC;
 		entry->accounted_bytes = accounted_bytes;
 		entry->use_reason = PROC_USE_GET_REASON(p);
-		entry->has_syms_cache = AO_GET(&p->syms_cache) != 0;
+		entry->has_syms_cache = symbolizer_proc_symcache_load(p) != NULL;
 	}
 	pthread_mutex_unlock(&retired_proc_caches_lock);
 
@@ -600,6 +648,8 @@ static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 		struct symbolizer_proc_info *p;
 		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
 		kv->v.proc_info_p = 0;
+		/* An object that loses its ownership reference is terminal. */
+		symbolizer_proc_mark_exit(p);
 
 		/*
 		 * Drop the hash/ring ownership reference. Existing readers release
@@ -685,7 +735,7 @@ static inline int __del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
 		if (p != NULL) {
 			AO_INC(&p->use);
-			p->is_exit = 1;
+			symbolizer_proc_mark_exit(p);
 			AO_DEC(&p->use);
 		}
 
@@ -818,7 +868,7 @@ static void add_proc_event_to_queue(pid_t pid, enum proc_act_type type)
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
 		if (p != NULL) {
 			AO_INC(&p->use);
-			p->is_exit = 1;
+			symbolizer_proc_mark_exit(p);
 			AO_DEC(&p->use);
 		}
 
@@ -933,7 +983,7 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->need_new_symbol_collector = true;
 	p->lock = 0;
 	pthread_mutex_init(&p->mutex, NULL);
-	p->syms_cache = 0;
+	symbolizer_proc_symcache_store(p, NULL);
 	p->thread_names = NULL;
 	p->thread_names_lock = 0;
 	p->netns_id = get_netns_id_from_pid(pid);
@@ -1062,20 +1112,24 @@ static void *symbols_cache_update(symbol_caches_hash_t * h,
 	 * symcache_resolve(), which protects resolver use with p->mutex.
 	 */
 	pthread_mutex_lock(&p->mutex);
-	resolver = (void *)p->syms_cache;
+	resolver = symbolizer_proc_symcache_load(p);
+
+	/* A retired object must never recreate a detached resolver. */
+	if (symbolizer_proc_is_exit(p))
+		goto unlock;
 
 	if (p->is_java && !p->cache_need_update)
 		goto unlock;
 
-	p->syms_cache = 0;
+	symbolizer_proc_symcache_store(p, NULL);
 	if (resolver != NULL)
 		bcc_free_symcache(resolver, kv->k.pid);
 
 	resolver = bcc_symcache_new((int)kv->k.pid, &lazy_opt);
-	p->syms_cache = pointer_to_uword(resolver);
+	symbolizer_proc_symcache_store(p, resolver);
 
 	if (resolver == NULL) {
-		p->syms_cache = 0;
+		symbolizer_proc_symcache_store(p, NULL);
 		goto unlock;
 	}
 
@@ -1164,7 +1218,7 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			 * mbols table of the Java process after a delay.
 			 */
 			if ((p->unknown_syms_found
-			     || (void *)p->syms_cache == NULL)
+			     || symbolizer_proc_symcache_load(p) == NULL)
 			    && p->update_syms_table_time == 0) {
 				/*
 				 * If an exception occurs during the process of generating
@@ -1202,10 +1256,14 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			if (p->update_syms_table_time > 0
 			    && curr_time >= p->update_syms_table_time) {
 				if (p->is_java) {
+					void *resolver;
+
 					java_expired_update(h, &kv, p);
+					resolver =
+					    symbolizer_proc_symcache_load(p);
 					symbolizer_proc_unlock(p);
 					AO_DEC(&p->use);
-					return (void *)p->syms_cache;
+					return resolver;
 				} else {
 					void *ret =
 					    symbols_cache_update(h, &kv, p);
@@ -1221,10 +1279,11 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			return NULL;
 		}
 
-		if (p->syms_cache) {
+		void *resolver = symbolizer_proc_symcache_load(p);
+		if (resolver != NULL) {
 			symbolizer_proc_unlock(p);
 			AO_DEC(&p->use);
-			return (void *)p->syms_cache;
+			return resolver;
 		}
 
 		symbolizer_proc_unlock(p);
@@ -1346,7 +1405,7 @@ static int check_proc_kvp_cb(symbol_caches_hash_kv * kvp, void *ctx)
 		pid = p->pid;
 		if ((p->stime == 0) ||
 		    (p->stime != 0 && p->stime != get_process_starttime(pid))) {
-			p->is_exit = 1;
+			symbolizer_proc_mark_exit(p);
 			del_proc = true;
 		}
 		AO_DEC(&p->use);

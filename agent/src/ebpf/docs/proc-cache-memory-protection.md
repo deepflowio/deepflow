@@ -14,13 +14,17 @@ DeepFlow Agent 使用 `symbolizer_proc_info` 保存进程启动时间、进程�
 
 进程退出或 exec 后，对象会先从 hash 中删除。如果仍有查询或 Java symbol task 持有引用，
 对象不能立即释放，只能进入 `retired_proc_caches`，等待引用计数 `use` 归零后再回收。
+对象进入 retired list 后，reaper 会在 `p->mutex` 保护下独立摘除 BCC symbol cache，并在全局
+retired-list 锁外调用 `bcc_free_symcache()`。因此，引用尚未归零时只保留 Proc Cache 对象本体
+及其直接数据，不需要让大块 BCC symbol cache 一直等待最终引用归还。
 
 延迟回收解决了删除线程等待引用归零时长期自旋的问题，但同时引入了新的容量风险：
 
 1. 大量进程快速创建和退出时，Proc Cache 对象可能快速创建。
 2. 如果某类引用长期不归还，`retired_proc_caches` 会持续积累。
 3. bihash 的内存参数不是 Proc Cache 对象数量限制，不能阻止对象无限创建。
-4. Proc Cache 还可能持有 BCC symbol cache，其真实内存远大于结构体本身。
+4. 活动 Proc Cache 可能持有 BCC symbol cache，其真实内存远大于结构体本身；retired 对象则
+   需要尽快独立释放这部分内存。
 
 因此需要为所有已经创建、但尚未真正释放的 Proc Cache 对象设置统一上限。
 
@@ -92,6 +96,10 @@ sizeof(struct symbolizer_proc_info) = 240 bytes
 - bihash 扩容空间；
 - 关联但可能共享的 mount cache 数据。
 
+BCC symbol cache 主要由活动对象持有。对象进入 retired list 后，reaper 会尝试将其独立摘除
+和释放；如果 resolver 当时正在被使用，本轮通过 `pthread_mutex_trylock()` 跳过，后续扫描
+继续重试。
+
 ### 3.4 已有活动数量统计
 
 `syms_cache_hash.hash_elems_count` 表示当前 hash 中的活动 Proc Cache 数量。成功加入 hash 后
@@ -138,7 +146,7 @@ sizeof(struct symbolizer_proc_info) = 240 bytes
 RESERVED    已预留总量名额，正在分配或初始化
 ACTIVE      已加入 proc info hash
 IN_FLIGHT   已从 hash 删除，正在 proc event ring 中转
-RETIRED     已离开 hash，但仍有引用，等待回收
+RETIRED     已离开 hash但仍有引用；对象等待回收，BCC symbol cache 可先释放
 FREED       已执行 free_proc_cache()，不再占用名额
 ```
 
@@ -200,7 +208,8 @@ retired_count = 持续增长
 ```
 
 进程退出后会离开 hash，空出来的 active 名额又会被新进程使用。如果旧对象由于引用泄漏停留
-在 retired list，总内存仍会持续增长。
+在 retired list，Proc Cache 对象和名额仍会持续增长。BCC symbol cache 的提前释放可以显著
+降低单个 retired 对象的滞留内存，但不能替代对象总量限制。
 
 因此必须限制 active、in-flight 和 retired 的总和，而不是仅限制 hash 条目数。
 
@@ -502,22 +511,31 @@ p->retired_at_ns = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 wait_ns = monotonic_now_ns - retired_at_ns
 ```
 
-### 11.3 回收锁范围
+### 11.3 对象和 BCC symbol cache 分级回收
 
-reaper 应在锁内摘除所有 `use == 0` 的对象，放到局部回收链表；释放 BCC symbol cache 等耗时
-操作必须在解锁后进行：
+reaper 对 retired 对象执行两级回收：
+
+1. `use == 0` 时，从 retired list 摘除对象，并在全局锁外调用 `free_proc_cache()`；
+2. `use != 0` 时，对象不能释放，但可以使用 `pthread_mutex_trylock(&p->mutex)` 尝试摘除
+   `p->syms_cache`，然后在全局锁外调用 `bcc_free_symcache()`。
+
+`p->mutex` 是 resolver 生命周期锁。它保证已经开始的 `bcc_symcache_resolve()` 完成后才能摘除
+resolver；如果 reader 正在使用 resolver，`trylock` 立即失败，本轮不会等待，后续 reaper 扫描
+继续重试。单轮最多摘除 `PROC_SYMCACHE_RECLAIM_BURST`（当前为 32）个 resolver，避免一次循环
+执行过多 BCC 清理工作。
 
 ```text
 lock retired list
-    -> 找到 use == 0 的对象
-    -> 从全局链表摘除
-    -> retired_count--
+    -> use == 0: 从全局链表摘除对象，retired_count--
+    -> use != 0: trylock(p->mutex)，摘除 syms_cache，保留对象
 unlock retired list
-    -> free_proc_cache()
-    -> total_count--
+    -> 完整释放 use == 0 的对象，total_count--
+    -> 释放已摘除的 BCC symbol cache
 ```
 
-这样控制命令和新 retired 对象插入不会被耗时释放长期阻塞。
+实际的 `free_proc_cache()` 和 `bcc_free_symcache()` 都不在 `retired_proc_caches_lock` 内执行，因此
+控制命令和新 retired 对象插入不会被耗时释放长期阻塞。提前释放 symbol cache 不会减少
+`total_count`；只有 Proc Cache 对象最终释放后才归还容量名额。
 
 ## 12. 日志设计
 
@@ -619,16 +637,16 @@ Proc cache reclamation:
 | 字段 | 通俗解释 |
 | --- | --- |
 | `active_count` | 当前仍在 proc info hash 中、可以通过 PID 查询到的缓存条目数。它通常接近 Agent 当前管理的进程数，但可能包含尚未被周期清理的旧条目，因此不等同于操作系统此刻准确的存活进程数。 |
-| `retired_count` | 已经从 hash 删除，但因为 `use` 仍大于 0 而暂时不能释放的缓存数量。短时间等待是正常现象；持续很久通常表示某个引用没有及时归还。 |
+| `retired_count` | 已经从 hash 删除，但因为 `use` 仍大于 0 而暂时不能释放的 Proc Cache 对象数量。其 BCC symbol cache 可以已经提前释放；短时间等待是正常现象，持续很久通常表示某个引用没有及时归还。 |
 | `total_count` | Agent 已经创建且尚未真正释放的 Proc Cache 总数，包括 active、ring 中转、初始化中和 retired 对象。这是容量保护实际检查的数字。 |
 | `total_limit` | 配置允许存在的 Proc Cache 最大总数。默认是 65,536。 |
 | `usage` | Proc Cache 名额使用率，即 `total_count / total_limit`。这是“对象数量使用率”，不是 Agent 的内存或 RSS 使用率。 |
 | `admission_paused` | 是否已经暂停为新进程创建 Proc Cache。`yes` 只表示新 Proc Cache 被拒绝，不表示目标进程被暂停，也不表示整个 Agent 停止采集。已有缓存仍可查询、删除和回收。 |
 | `rejected_total` | Agent 启动以来，因为达到容量限制而被拒绝的 Proc Cache 创建尝试累计次数。它统计的是“尝试次数”，不一定等于不同进程的数量。 |
-| `waiting_accounted_memory` | 所有 retired 对象当前能够核算的内存总量。第一阶段只统计 Proc Cache 结构体和 `thread_names` vector，不包含 BCC symbol cache 等内部内存，所以实际占用可能更大。 |
+| `waiting_accounted_memory` | 所有 retired 对象当前能够核算的内存总量，只统计 Proc Cache 结构体和 `thread_names` vector。它不包含 BCC symbol cache；reaper 通常会提前释放后者，明细中的 `SYMCACHE=yes` 表示该对象的 resolver 尚未完成摘除。 |
 | `older_than` | 本次命令使用的等待时间筛选条件。例如 `60 s` 表示下面只关注进入 retired list 超过 60 秒的对象。它不是回收周期，也不是到期后强制释放的超时时间。 |
 | `overdue_count` | retired 对象中，等待时间严格超过 `older_than` 的对象数。它是 `retired_count` 的子集。 |
-| `overdue_accounted_memory` | 上述 overdue 对象能够核算的内存总量，统计范围同样不包含 BCC symbol cache 内部内存。 |
+| `overdue_accounted_memory` | 上述 overdue 对象能够核算的内存总量，统计范围同样不包含 BCC symbol cache。可结合明细中的 `SYMCACHE` 判断是否仍有未核算的 resolver。 |
 
 字段之间的关系为：
 
@@ -658,7 +676,8 @@ Agent 最多允许同时存在 65,536 个 Proc Cache，目前名额已经全部�
 这不会暂停目标进程，也不会停止现有 Proc Cache 的查询和回收。
 
 等待释放的对象中，可核算内存为 3.10 MiB；其中 18 个已经等待超过 60 秒，
-这 18 个对象可核算的内存为 420.00 KiB。实际内存还可能包含未被统计的 BCC symbol cache。
+这 18 个对象可核算的内存为 420.00 KiB。reaper 会独立释放它们的 BCC symbol cache；如果某条
+明细仍显示 SYMCACHE=yes，说明该 resolver 尚未成功摘除，其内部内存未计入上述数字。
 ```
 
 判断是否存在问题时，不能只看 `retired_count`。应重点联合观察：
@@ -692,6 +711,13 @@ JAVA_TAST
 
 该值表示最近一次重要的 `use` 增加原因，不代表每种原因当前分别持有多少引用。
 
+`SYMCACHE` 表示 retired 对象当前是否仍持有 BCC resolver：
+
+```text
+yes  resolver 尚未被 reaper 摘除，通常是尚未执行下一轮扫描或本轮 trylock 失败
+no   resolver 已经提前摘除并释放，但 Proc Cache 对象仍在等待 use 归零
+```
+
 ### 13.3 明细数量限制
 
 控制命令不能因为 retired list 较大而构造无限大的 socket 响应。建议最多返回 1,024 条明细，
@@ -724,6 +750,9 @@ allocator overhead
 hash expansion and fragmentation
 shared mount-cache memory
 ```
+
+对于 retired 对象，BCC symbol cache 会被 reaper 独立回收，但采集统计时仍可能存在一个尚未
+摘除的短暂窗口。因此该数值始终只表示“可直接核算的内存”，不能当作精确 RSS。
 
 ## 14. 运行时指标
 
@@ -813,7 +842,9 @@ ring 满不能遗失已经从 hash 删除的对象所有权。实施时必须确
 ### 16.4 引用永久不归还
 
 永久引用会使对象永久停留在 retired list，但总对象数量最多为配置上限。达到上限后新进程的
-Proc Cache 创建被拒绝，通过 `WAIT(s)`、`USE` 和 `LAST_INC_REASON` 定位泄漏来源。
+Proc Cache 创建被拒绝，通过 `WAIT(s)`、`USE` 和 `LAST_INC_REASON` 定位泄漏来源。对象持有的
+BCC symbol cache 会由 reaper 提前摘除和释放，因此永久引用不会同时永久保留这块大内存；
+对象本体和容量名额仍必须等待引用归零。
 
 ### 16.5 配置动态调低
 
@@ -834,9 +865,10 @@ Proc Cache 创建被拒绝，通过 `WAIT(s)`、`USE` 和 `LAST_INC_REASON` 定�
 
 不采用。retired list 可以在 active 名额反复复用时持续增长。
 
-### 17.3 retired 达到上限后直接释放
+### 17.3 retired 达到上限后直接释放对象
 
-不采用。仍有引用时会产生 UAF。
+不采用。仍有引用时释放 `symbolizer_proc_info` 会产生 UAF。只提前释放 BCC symbol cache 是安全
+的，但必须使用 `p->mutex` 与所有 resolve/update 路径同步；对象本体仍等待 `use == 0`。
 
 ### 17.4 retired 达到上限后丢弃指针
 

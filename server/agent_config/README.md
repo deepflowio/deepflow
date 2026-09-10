@@ -5641,6 +5641,11 @@ proc-info hash entries, objects under initialization, objects being
 transferred through the proc-event ring, and objects waiting in the
 retired reclaim list.
 
+A retired object continues to consume one entry until its reference
+count reaches zero. Its BCC symbol cache is detached and reclaimed
+independently, so a delayed reference normally retains only the proc-info
+object and its directly accounted data, not the large symbol cache.
+
 The valid range is 1,024 to 262,144 entries, and the default is 65,536.
 On x86_64, one proc-info structure currently occupies about 240 bytes.
 Across the configurable range, the structures occupy about 240 KiB to
@@ -11829,4 +11834,3 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
-

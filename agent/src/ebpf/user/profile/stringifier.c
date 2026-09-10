@@ -344,8 +344,8 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 
 			pthread_mutex_lock(&p->mutex);
 			/* Validate the resolver while replacement is excluded. */
-			if (p->is_exit || resolver == NULL
-			    || ((u64) resolver != (u64) p->syms_cache)) {
+			if (symbolizer_proc_is_exit(p) || resolver == NULL
+			    || resolver != symbolizer_proc_symcache_load(p)) {
 				pthread_mutex_unlock(&p->mutex);
 				return (-1);
 			}
@@ -389,8 +389,8 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 				 */
 				symbolizer_proc_lock(p);
 				pthread_mutex_lock(&p->mutex);
-				if (!p->is_exit && p->is_java
-				    && ((u64) resolver == (u64) p->syms_cache))
+				if (!symbolizer_proc_is_exit(p) && p->is_java
+				    && resolver == symbolizer_proc_symcache_load(p))
 					p->unknown_syms_found = true;
 				pthread_mutex_unlock(&p->mutex);
 				symbolizer_proc_unlock(p);

@@ -173,6 +173,34 @@ struct symbolizer_proc_info {
 	u64 retired_at_ns;
 };
 
+static inline bool symbolizer_proc_is_exit(struct symbolizer_proc_info *p)
+{
+	return __atomic_load_n(&p->is_exit, __ATOMIC_ACQUIRE) != 0;
+}
+
+static inline void symbolizer_proc_mark_exit(struct symbolizer_proc_info *p)
+{
+	__atomic_store_n(&p->is_exit, 1, __ATOMIC_RELEASE);
+}
+
+static inline void *symbolizer_proc_symcache_load(struct symbolizer_proc_info *p)
+{
+	return (void *)__atomic_load_n(&p->syms_cache, __ATOMIC_ACQUIRE);
+}
+
+static inline void symbolizer_proc_symcache_store(struct symbolizer_proc_info *p,
+						   void *resolver)
+{
+	__atomic_store_n(&p->syms_cache, (uword)resolver, __ATOMIC_RELEASE);
+}
+
+static inline void *symbolizer_proc_symcache_exchange(
+	struct symbolizer_proc_info *p, void *resolver)
+{
+	return (void *)__atomic_exchange_n(&p->syms_cache, (uword)resolver,
+					   __ATOMIC_ACQ_REL);
+}
+
 #define PROC_USE_INC_REASON(P, REASON)        \
 	do {                                   \
 		AO_INC(&(P)->use);               \
