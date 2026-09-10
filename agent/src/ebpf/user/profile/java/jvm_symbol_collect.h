@@ -172,7 +172,6 @@ typedef struct {
  */
 typedef struct {
 	task_thread_t *threads;	/**< Array for managing threads */
-	int thread_index;       /**< Index of the most recent thread */
 	pthread_mutex_t lock;	/**< Thread pool lock */
 	pthread_cond_t cond;	/**< Condition variable for waking up threads to execute tasks */
 	struct list_head task_list_head; /**< Queue of tasks waiting to be processed */

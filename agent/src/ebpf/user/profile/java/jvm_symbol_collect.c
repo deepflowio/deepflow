@@ -1848,7 +1848,27 @@ static void *worker_thread(void *arg)
 {
 	symbol_collect_thread_pool_t *pool = arg;
 	pthread_t thread = pthread_self();
-	int thread_idx = pool->thread_index;
+	int thread_idx = -1;
+
+	/*
+	 * thread_pool_add_task() holds pool->lock until the new slot and
+	 * thread_count are fully published. Find this worker's slot only after
+	 * acquiring the same lock instead of reading a shared startup index.
+	 */
+	pthread_mutex_lock(&pool->lock);
+	for (int i = 0; i < pool->thread_count; i++) {
+		if (pthread_equal(pool->threads[i].thread, thread)) {
+			thread_idx = i;
+			break;
+		}
+	}
+	pthread_mutex_unlock(&pool->lock);
+
+	if (thread_idx < 0) {
+		ebpf_warning(JAVA_LOG_TAG "Worker thread slot not found.\n");
+		return NULL;
+	}
+
 	// Worker threads never exit.
 	while (1) {
 		pthread_mutex_lock(&pool->lock);
@@ -1862,10 +1882,6 @@ static void *worker_thread(void *arg)
 			pthread_exit(NULL);
 		}
 
-		if (pool->threads[thread_idx].thread != thread) {
-			pthread_mutex_unlock(&pool->lock);
-			pthread_exit(NULL);
-		}
 		// Get task from queue
 		symbol_collect_task_t *task;
 		task = list_first_entry(&pool->task_list_head,
@@ -1994,8 +2010,6 @@ static int thread_pool_add_task(symbol_collect_thread_pool_t * pool,
 			return -1;
 		}
 		pool->threads = new_threads;
-		/* Reserve the new slot; the task itself stays on the queue. */
-		pool->thread_index = pool->thread_count;
 
 		if ((ret =
 		     pthread_create(&thread, NULL, &worker_thread, pool)) != 0) {
