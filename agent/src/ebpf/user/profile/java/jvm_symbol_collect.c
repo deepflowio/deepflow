@@ -1648,14 +1648,44 @@ int epoll_events_process(receiver_args_t * args, int epoll_fd,
 	return 0;
 }
 
+/* Initialize the task condition variable to use CLOCK_MONOTONIC deadlines. */
+static int init_task_synchronization(symbol_collect_task_t *task)
+{
+	pthread_condattr_t cond_attr;
+	int ret;
+
+	ret = pthread_mutex_init(&task->mutex, NULL);
+	if (ret != 0)
+		return ret;
+
+	ret = pthread_condattr_init(&cond_attr);
+	if (ret != 0)
+		goto destroy_mutex;
+
+	ret = pthread_condattr_setclock(&cond_attr, CLOCK_MONOTONIC);
+	if (ret != 0)
+		goto destroy_cond_attr;
+
+	ret = pthread_cond_init(&task->cond, &cond_attr);
+	pthread_condattr_destroy(&cond_attr);
+	if (ret != 0)
+		goto destroy_mutex;
+
+	return 0;
+
+destroy_cond_attr:
+	pthread_condattr_destroy(&cond_attr);
+destroy_mutex:
+	pthread_mutex_destroy(&task->mutex);
+	return ret;
+}
+
 /*
- * Releases one reference held on the task. The worker thread and
- * update_java_symbol_file() both hold references while using a task, so a task
- * is never freed while another thread is still touching it. Only the last
- * reference releases the task resources.
+ * Free the task resources after put_task_ref() determines that the final
+ * creator, worker, or refresh-waiter reference has been released.
  */
 static void destroy_task(symbol_collect_task_t * task,
-			symbol_collect_thread_pool_t * pool)
+			 symbol_collect_thread_pool_t * pool)
 {
 	receiver_args_t *args = (receiver_args_t *) & task->args;
 	if (args->map_fp) {
@@ -1698,6 +1728,8 @@ static void destroy_task(symbol_collect_task_t * task,
 	ebpf_debug(JAVA_LOG_TAG "All resources cleaned up for symbol table"
 		   " management task (associated with JAVA PID: %d).\n",
 		   args->pid);
+	pthread_cond_destroy(&task->cond);
+	pthread_mutex_destroy(&task->mutex);
 	free(task);
 }
 
@@ -2035,10 +2067,11 @@ static int thread_pool_add_task(symbol_collect_thread_pool_t * pool,
 		pool->threads[pool->thread_count].index = pool->thread_count;
 		pool->thread_count = new_count;
 
-		if (pthread_detach(thread) != 0) {
+		int detach_ret = pthread_detach(thread);
+		if (detach_ret != 0) {
 			ebpf_warning(JAVA_LOG_TAG
 				     "Failed to detach thread with '%s(%d)'\n",
-				     strerror(errno), errno);
+				     strerror(detach_ret), detach_ret);
 			/*
 			 * A failed pthread_detach() does not revert the thread to
 			 * "undetached" and does not terminate it: it merely leaves
@@ -2117,8 +2150,13 @@ static int create_symbol_collect_task(pid_t pid, options_t * opts,
 		goto cleanup;
 	}
 	task->func = ipc_receiver_main;
-	pthread_mutex_init(&task->mutex, NULL);
-	pthread_cond_init(&task->cond, NULL);
+	int sync_ret = init_task_synchronization(task);
+	if (sync_ret != 0) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "Failed to initialize task synchronization with '%s(%d)'\n",
+			     strerror(sync_ret), sync_ret);
+		goto cleanup;
+	}
 	task->need_refresh = false;
 	/* The creator and worker each own one reference. */
 	task->ref_count = 2;
@@ -2383,27 +2421,50 @@ int update_java_symbol_file(pid_t pid, bool * is_new_collector)
 	task->need_refresh = true;
 	// Refresh the file again; needs to wait for completion.
 	/*
-	 * Use a predicate loop with a bounded timeout:
-	 * - The predicate loop handles spurious wakeups from pthread_cond_wait.
+	 * Use a predicate loop with one CLOCK_MONOTONIC deadline:
+	 * - The predicate loop handles spurious wakeups from pthread_cond_timedwait.
+	 * - Reusing one absolute deadline bounds the whole operation even after a
+	 *   spurious wakeup, and CLOCK_MONOTONIC prevents wall-clock adjustments
+	 *   from extending or shortening the wait.
 	 * - The timeout prevents this thread from sleeping forever if the collector
-	 *   thread (ipc_receiver_main) exits unexpectedly or hangs. Otherwise,
-	 *   java_syms_update_main() would retain p->use forever and make the
-	 *   proc-events thread spin indefinitely in free_symbolizer_cache_kvp() at
-	 *   while (AO_GET(&p->use) != 0).
+	 *   thread (ipc_receiver_main) exits unexpectedly or hangs.
 	 *   On the normal path, the collector signals the waiter, and the worker
-	 *   broadcasts to all waiters during cleanup. ETIMEDOUT is therefore only
-	 *   expected under exceptional conditions.
+	 *   broadcasts to all waiters during cleanup.
 	 */
-	int refresh_rc = 0;
-	while (task->need_refresh) {
-		struct timespec ts;
-		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_sec += JAVA_SYMS_REFRESH_TIMEOUT_SECS;
-		refresh_rc = pthread_cond_timedwait(&task->cond, &task->mutex, &ts);
-		if (refresh_rc == ETIMEDOUT) {
-			ebpf_warning(JAVA_LOG_TAG
-				     "Wait java symbol refresh timeout for pid %d. Give up waiting to avoid blocking symbol update.\n",
-				     pid);
+	struct timespec deadline;
+	if (clock_gettime(CLOCK_MONOTONIC, &deadline) != 0) {
+		int clock_err = errno;
+		ebpf_warning(JAVA_LOG_TAG
+			     "Get java symbol refresh deadline failed for pid %d "
+			     "with '%s(%d)'\n", pid, strerror(clock_err),
+			     clock_err);
+		task->need_refresh = false;
+		task->update_status = -1;
+	} else {
+		deadline.tv_sec += JAVA_SYMS_REFRESH_TIMEOUT_SECS;
+		while (task->need_refresh && !task->stopped) {
+			int refresh_rc =
+			    pthread_cond_timedwait(&task->cond, &task->mutex,
+						   &deadline);
+
+			/* A completion signal may race with the absolute deadline. */
+			if (!task->need_refresh || task->stopped)
+				break;
+
+			if (refresh_rc == 0)
+				continue;
+
+			if (refresh_rc == ETIMEDOUT) {
+				ebpf_warning(JAVA_LOG_TAG
+					     "Wait java symbol refresh timeout for "
+					     "pid %d. Give up waiting to avoid "
+					     "blocking symbol update.\n", pid);
+			} else {
+				ebpf_warning(JAVA_LOG_TAG
+					     "Wait java symbol refresh failed for "
+					     "pid %d with '%s(%d)'\n", pid,
+					     strerror(refresh_rc), refresh_rc);
+			}
 			task->need_refresh = false;
 			task->update_status = -1;
 			break;

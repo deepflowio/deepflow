@@ -154,7 +154,7 @@ struct task_s {
 	 */
 	volatile bool stopped;
 	pthread_mutex_t mutex;	/**< Mutex for protecting tasks */
-	pthread_cond_t cond;	/**< Condition variable for notifying updates to files */
+	pthread_cond_t cond;	/**< CLOCK_MONOTONIC condition for refresh completion */
 	receiver_args_t args;	/**< Parameters for task processing */
 };
 
