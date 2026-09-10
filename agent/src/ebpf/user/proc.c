@@ -1055,18 +1055,28 @@ static void *symbols_cache_update(symbol_caches_hash_t * h,
 				  struct symbolizer_cache_kvp *kv,
 				  struct symbolizer_proc_info *p)
 {
+	void *resolver;
+
+	/*
+	 * The caller holds p->lock. Serialize resolver replacement with
+	 * symcache_resolve(), which protects resolver use with p->mutex.
+	 */
+	pthread_mutex_lock(&p->mutex);
+	resolver = (void *)p->syms_cache;
+
 	if (p->is_java && !p->cache_need_update)
-		goto exit;
+		goto unlock;
 
-	if (p->syms_cache)
-		bcc_free_symcache((void *)p->syms_cache, kv->k.pid);
+	p->syms_cache = 0;
+	if (resolver != NULL)
+		bcc_free_symcache(resolver, kv->k.pid);
 
-	p->syms_cache =
-	    pointer_to_uword(bcc_symcache_new((int)kv->k.pid, &lazy_opt));
+	resolver = bcc_symcache_new((int)kv->k.pid, &lazy_opt);
+	p->syms_cache = pointer_to_uword(resolver);
 
-	if (p->syms_cache <= 0) {
+	if (resolver == NULL) {
 		p->syms_cache = 0;
-		goto exit;
+		goto unlock;
 	}
 
 	if (p->need_new_symbol_collector)
@@ -1074,7 +1084,10 @@ static void *symbols_cache_update(symbol_caches_hash_t * h,
 
 	add_symcache_count++;
 
-exit:
+unlock:
+	pthread_mutex_unlock(&p->mutex);
+
+	/* These fields remain protected by the caller-held p->lock. */
 	p->unknown_syms_found = false;
 	p->update_syms_table_time = 0;
 	p->new_java_syms_file = false;
@@ -1082,7 +1095,7 @@ exit:
 	p->cache_need_update = false;
 	CLIB_MEMORY_STORE_BARRIER();
 
-	return (void *)p->syms_cache;
+	return resolver;
 }
 
 static inline void java_expired_update(symbol_caches_hash_t * h,

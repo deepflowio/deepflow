@@ -161,7 +161,7 @@ struct symbolizer_proc_info {
 	u64 is_exit;
 	/* Protect symbolizer_proc_info from concurrent access by multiple threads. */
 	u32 lock;
-	/* Multithreaded symbol resolution protection. */
+	/* Serializes use, replacement, and teardown of syms_cache. */
 	pthread_mutex_t mutex;
 	/* Recording symbol resolution cache. */
 	volatile uword syms_cache;
