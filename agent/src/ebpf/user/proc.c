@@ -160,12 +160,41 @@ static pthread_mutex_t syms_cache_update_lock = PTHREAD_MUTEX_INITIALIZER;
 /* Protects retired_proc_caches from proc-events and control-thread access. */
 static pthread_mutex_t retired_proc_caches_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct symbolizer_proc_info *retired_proc_caches;
+/*
+ * Current number of proc-cache objects that have not been freed. This includes
+ * objects being initialized, active hash entries, objects in the proc-event
+ * ring, and objects waiting in the retired list.
+ */
 static volatile u64 proc_cache_total_count;
+/*
+ * Maximum number of proc-cache objects allowed. New object creation is rejected
+ * when proc_cache_total_count reaches this limit.
+ */
 static volatile u64 proc_cache_total_limit = PROC_CACHE_LIMIT_DEFAULT;
+/*
+ * Total number of proc-cache creation attempts rejected because the capacity
+ * limit was reached since the Agent started.
+ */
 static volatile u64 proc_cache_rejected_total;
+/*
+ * Total number of proc-cache objects freed by the retired-list reaper since the
+ * Agent started.
+ */
 static volatile u64 proc_cache_reclaimed_total;
+/*
+ * Current number of objects in retired_proc_caches that are waiting for their
+ * outstanding references to be released.
+ */
 static volatile u64 proc_cache_retired_count;
+/*
+ * Indicates whether creation of new proc-cache objects is currently paused
+ * because the capacity limit has been reached.
+ */
 static volatile u32 proc_cache_admission_paused;
+/*
+ * CLOCK_MONOTONIC timestamp, in nanoseconds, of the most recent "proc cache
+ * limit reached" warning. It is used only to rate-limit repeated warnings.
+ */
 static volatile u64 proc_cache_limit_last_warn_ns;
 /* Serializes admission against a concurrent limit update; never used by readers. */
 static pthread_mutex_t proc_cache_limit_update_lock = PTHREAD_MUTEX_INITIALIZER;

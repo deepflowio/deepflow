@@ -5641,12 +5641,15 @@ proc-info hash entries, objects under initialization, objects being
 transferred through the proc-event ring, and objects waiting in the
 retired reclaim list.
 
+The valid range is 1,024 to 262,144 entries, and the default is 65,536.
 On x86_64, one proc-info structure currently occupies about 240 bytes.
-At the default limit, these structures occupy about 15 MiB; active hash
-KVs add about 1 MiB if every object is active. Actual usage can be much
-higher because this estimate excludes thread-name vectors, BCC symbol
-caches, allocator overhead, hash growth and fragmentation, and shared
-mount-cache data.
+Across the configurable range, the structures occupy about 240 KiB to
+60 MiB (15 MiB at the default). If every object is active, raw hash KVs
+add about 16 KiB to 4 MiB (1 MiB at the default), for a combined base
+estimate of about 256 KiB to 64 MiB. Actual usage can be much higher
+because this estimate excludes thread-name vectors, BCC symbol caches,
+allocator overhead, hash bucket allocation/growth and fragmentation, and
+shared mount-cache data.
 
 When the limit is reached, new proc-info objects are skipped. Existing
 entries continue to be queried, deleted, and reclaimed; target processes

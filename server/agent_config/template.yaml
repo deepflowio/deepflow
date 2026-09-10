@@ -4076,12 +4076,15 @@ inputs:
       #     transferred through the proc-event ring, and objects waiting in the
       #     retired reclaim list.
       #
+      #     The valid range is 1,024 to 262,144 entries, and the default is 65,536.
       #     On x86_64, one proc-info structure currently occupies about 240 bytes.
-      #     At the default limit, these structures occupy about 15 MiB; active hash
-      #     KVs add about 1 MiB if every object is active. Actual usage can be much
-      #     higher because this estimate excludes thread-name vectors, BCC symbol
-      #     caches, allocator overhead, hash growth and fragmentation, and shared
-      #     mount-cache data.
+      #     Across the configurable range, the structures occupy about 240 KiB to
+      #     60 MiB (15 MiB at the default). If every object is active, raw hash KVs
+      #     add about 16 KiB to 4 MiB (1 MiB at the default), for a combined base
+      #     estimate of about 256 KiB to 64 MiB. Actual usage can be much higher
+      #     because this estimate excludes thread-name vectors, BCC symbol caches,
+      #     allocator overhead, hash bucket allocation/growth and fragmentation, and
+      #     shared mount-cache data.
       #
       #     When the limit is reached, new proc-info objects are skipped. Existing
       #     entries continue to be queried, deleted, and reclaimed; target processes
@@ -4091,10 +4094,13 @@ inputs:
       #     条目、初始化中的对象、通过 proc-event ring 中转的对象，以及在 retired
       #     回收链表中等待释放的对象。
       #
-      #     在 x86_64 上，每个 proc-info 结构体当前约占 240 字节。默认上限下，
-      #     这些结构体约占 15 MiB；如果全部对象都处于活动状态，原始 hash KV 还会
-      #     增加约 1 MiB。实际内存可能明显更高，因为该估算不包括线程名 vector、
-      #     BCC 符号缓存、分配器开销、hash 扩容和碎片，以及共享 mount cache 数据。
+      #     合法范围为 1,024～262,144 个条目，默认值为 65,536。
+      #     在 x86_64 上，每个 proc-info 结构体当前约占 240 字节。
+      #     在整个可配置范围内，这些结构体约占 240 KiB～60 MiB（默认值约 15 MiB）。
+      #     如果所有对象都处于活动状态，原始 hash KV 还会增加约 16 KiB～4 MiB
+      #     （默认值约 1 MiB），两者基础占用合计约 256 KiB～64 MiB。实际内存可能
+      #     明显更高，因为该估算不包括线程名 vector、BCC 符号缓存、分配器开销、
+      #     hash bucket 分配、扩容和碎片，以及共享 mount cache 数据。
       #
       #     达到上限后，Agent 会跳过创建新的 proc-info 对象。已有条目仍可继续查询、
       #     删除和回收，不会影响目标进程运行。
