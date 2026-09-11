@@ -295,6 +295,41 @@ impl OwnedCountable for SyncEbpfCounter {
                 CounterValue::Unsigned(ebpf_counter.proc_exit_event_count as u64),
             ),
             (
+                "proc_cache_active_count",
+                CounterType::Gauged,
+                CounterValue::Unsigned(ebpf_counter.proc_cache_active_count),
+            ),
+            (
+                "proc_cache_retired_count",
+                CounterType::Gauged,
+                CounterValue::Unsigned(ebpf_counter.proc_cache_retired_count),
+            ),
+            (
+                "proc_cache_total_count",
+                CounterType::Gauged,
+                CounterValue::Unsigned(ebpf_counter.proc_cache_total_count),
+            ),
+            (
+                "proc_cache_total_limit",
+                CounterType::Gauged,
+                CounterValue::Unsigned(ebpf_counter.proc_cache_total_limit),
+            ),
+            (
+                "proc_cache_rejected_total",
+                CounterType::Gauged,
+                CounterValue::Unsigned(ebpf_counter.proc_cache_rejected_total),
+            ),
+            (
+                "proc_cache_reclaimed_total",
+                CounterType::Gauged,
+                CounterValue::Unsigned(ebpf_counter.proc_cache_reclaimed_total),
+            ),
+            (
+                "proc_cache_oldest_wait_secs",
+                CounterType::Gauged,
+                CounterValue::Unsigned(ebpf_counter.proc_cache_oldest_wait_secs),
+            ),
+            (
                 "rx_packets",
                 CounterType::Counted,
                 CounterValue::Unsigned(ebpf_counter.rx_packets as u64),
@@ -1119,6 +1154,14 @@ impl EbpfCollector {
             }
         }
 
+        if ebpf::set_proc_cache_max_entries(config.ebpf.tunning.proc_cache_max_entries) != 0 {
+            warn!(
+                "Invalid eBPF proc cache limit: {}",
+                config.ebpf.tunning.proc_cache_max_entries
+            );
+            return Err(Error::EbpfInitError);
+        }
+
         if ebpf::running_socket_tracer(
             Self::ebpf_l7_callback,                              /* 回调接口 rust -> C */
             config.ebpf.tunning.userspace_worker_threads as i32, /* 工作线程数，是指用户态有多少线程参与数据处理 */
@@ -1514,6 +1557,12 @@ impl EbpfCollector {
 
     pub fn on_config_change(&mut self, config: &EbpfConfig) {
         unsafe {
+            if ebpf::set_proc_cache_max_entries(config.ebpf.tunning.proc_cache_max_entries) != 0 {
+                warn!(
+                    "Failed to update eBPF proc cache limit to {}",
+                    config.ebpf.tunning.proc_cache_max_entries
+                );
+            }
             let ecfg = &config.ebpf.profile;
             let is_uprobe_meltdown = crate::utils::guard::is_kernel_ebpf_uprobe_meltdown();
             let restart_cprofiler = ebpf::dwarf_available()

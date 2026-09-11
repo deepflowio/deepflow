@@ -135,9 +135,76 @@ u64 get_java_syms_fetch_delay(void)
  * You can obtain process information using the process PID.
  */
 symbol_caches_hash_t syms_cache_hash;
+/*
+ * The bihash protects its own buckets, but not the lifetime of objects stored
+ * in it. Readers announce the short hash_search() -> AO_INC() window. After an
+ * entry is removed, the remover waits for these windows to close before the
+ * hash reference can be handed to proc_event_ring or released.
+ *
+ * This is a small userspace grace-period scheme, not a complete RCU
+ * implementation. Each known reader has a cache-line-separated slot so hot
+ * paths do not contend on one global atomic counter. The mutex serializes
+ * update-side search-and-delete and protects the infrequent full-table walk;
+ * hot-path readers never take it.
+ */
+#define PROC_CACHE_READER_SLOTS \
+	(THREAD_SOCK_READER_IDX_BASE + MAX_CPU_NR)
+
+struct proc_cache_reader_slot {
+	volatile u64 active;
+} __attribute__ ((aligned(CLIB_CACHE_LINE_BYTES)));
+
+static struct proc_cache_reader_slot
+	proc_cache_readers[PROC_CACHE_READER_SLOTS];
+static pthread_mutex_t syms_cache_update_lock = PTHREAD_MUTEX_INITIALIZER;
+/* Protects retired_proc_caches from proc-events and control-thread access. */
+static pthread_mutex_t retired_proc_caches_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct symbolizer_proc_info *retired_proc_caches;
+/* Bounds detached symcache cleanup work in one proc-events loop iteration. */
+#define PROC_SYMCACHE_RECLAIM_BURST 32U
+/*
+ * Current number of proc-cache objects that have not been freed. This includes
+ * objects being initialized, active hash entries, objects in the proc-event
+ * ring, and objects waiting in the retired list.
+ */
+static volatile u64 proc_cache_total_count;
+/*
+ * Maximum number of proc-cache objects allowed. New object creation is rejected
+ * when proc_cache_total_count reaches this limit.
+ */
+static volatile u64 proc_cache_total_limit = PROC_CACHE_LIMIT_DEFAULT;
+/*
+ * Total number of proc-cache creation attempts rejected because the capacity
+ * limit was reached since the Agent started.
+ */
+static volatile u64 proc_cache_rejected_total;
+/*
+ * Total number of proc-cache objects freed by the retired-list reaper since the
+ * Agent started.
+ */
+static volatile u64 proc_cache_reclaimed_total;
+/*
+ * Current number of objects in retired_proc_caches that are waiting for their
+ * outstanding references to be released.
+ */
+static volatile u64 proc_cache_retired_count;
+/*
+ * Indicates whether creation of new proc-cache objects is currently paused
+ * because the capacity limit has been reached.
+ */
+static volatile u32 proc_cache_admission_paused;
+/*
+ * CLOCK_MONOTONIC timestamp, in nanoseconds, of the most recent "proc cache
+ * limit reached" warning. It is used only to rate-limit repeated warnings.
+ */
+static volatile u64 proc_cache_limit_last_warn_ns;
+/* Serializes admission against a concurrent limit update; never used by readers. */
+static pthread_mutex_t proc_cache_limit_update_lock = PTHREAD_MUTEX_INITIALIZER;
+#define PROC_CACHE_LIMIT_WARN_INTERVAL_NS (2ULL * 60 * 60 * NS_IN_SEC)
 static void *k_resolver;	// for kernel symbol cache
 static volatile u32 k_resolver_lock;
 static u64 sys_btime_msecs;	// system boot time(milliseconds)
+extern __thread uword thread_index;
 
 void symbolizer_kernel_lock(void)
 {
@@ -155,19 +222,424 @@ static bool inline enable_proc_info_cache(void)
 	return (syms_cache_hash.buckets != NULL);
 }
 
+static inline u64 proc_cache_active_count(void)
+{
+	return __atomic_load_n(&syms_cache_hash.hash_elems_count,
+			       __ATOMIC_RELAXED);
+}
+
+static void update_proc_cache_admission_state(void)
+{
+	u64 total = __atomic_load_n(&proc_cache_total_count, __ATOMIC_ACQUIRE);
+	u64 limit = __atomic_load_n(&proc_cache_total_limit, __ATOMIC_ACQUIRE);
+	u64 rejected = __atomic_load_n(&proc_cache_rejected_total,
+				       __ATOMIC_RELAXED);
+
+	if (total >= limit) {
+		u64 now_ns = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
+		u32 was_paused = __atomic_exchange_n(&proc_cache_admission_paused,
+						      1, __ATOMIC_ACQ_REL);
+		u64 last_warn = __atomic_load_n(&proc_cache_limit_last_warn_ns,
+						 __ATOMIC_ACQUIRE);
+		bool should_warn = was_paused == 0;
+
+		if (should_warn) {
+			__atomic_store_n(&proc_cache_limit_last_warn_ns, now_ns,
+					 __ATOMIC_RELEASE);
+		} else if (last_warn != 0 && now_ns >= last_warn &&
+			   now_ns - last_warn >=
+			   PROC_CACHE_LIMIT_WARN_INTERVAL_NS) {
+			should_warn = __atomic_compare_exchange_n(
+			    &proc_cache_limit_last_warn_ns, &last_warn, now_ns,
+			    false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
+		}
+
+		if (should_warn)
+			ebpf_warning("Proc cache limit reached: total=%lu "
+				     "limit=%lu active=%lu retired=%lu "
+				     "rejected=%lu\n",
+				     (unsigned long)total, (unsigned long)limit,
+				     (unsigned long)proc_cache_active_count(),
+				     (unsigned long)__atomic_load_n(
+					 &proc_cache_retired_count,
+					 __ATOMIC_RELAXED),
+				     (unsigned long)rejected);
+		return;
+	}
+
+	u32 paused = __atomic_load_n(&proc_cache_admission_paused,
+				     __ATOMIC_ACQUIRE);
+	if (paused != 0 && __atomic_compare_exchange_n(
+		&proc_cache_admission_paused, &paused, 0, false,
+		__ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+		__atomic_store_n(&proc_cache_limit_last_warn_ns, 0,
+				 __ATOMIC_RELEASE);
+		ebpf_info("Proc cache capacity recovered: total=%lu limit=%lu "
+			  "rejected=%lu\n",
+			  (unsigned long)total, (unsigned long)limit,
+			  (unsigned long)rejected);
+	}
+}
+
+static bool try_reserve_proc_cache_slot(void)
+{
+	u64 count;
+	bool reserved = false;
+
+	pthread_mutex_lock(&proc_cache_limit_update_lock);
+	count = __atomic_load_n(&proc_cache_total_count, __ATOMIC_ACQUIRE);
+	for (;;) {
+		u64 limit = __atomic_load_n(&proc_cache_total_limit,
+					    __ATOMIC_ACQUIRE);
+
+		if (count >= limit) {
+			__atomic_add_fetch(&proc_cache_rejected_total, 1,
+					   __ATOMIC_RELAXED);
+			break;
+		}
+
+		if (__atomic_compare_exchange_n(&proc_cache_total_count, &count,
+						count + 1, false,
+						__ATOMIC_ACQ_REL,
+						__ATOMIC_ACQUIRE)) {
+			reserved = true;
+			break;
+		}
+	}
+	pthread_mutex_unlock(&proc_cache_limit_update_lock);
+	update_proc_cache_admission_state();
+	return reserved;
+}
+
+static void release_proc_cache_slot(void)
+{
+	u64 count = __atomic_load_n(&proc_cache_total_count, __ATOMIC_ACQUIRE);
+
+	for (;;) {
+		if (unlikely(count == 0)) {
+			ebpf_error("Proc cache total count underflow.\n");
+			return;
+		}
+		if (__atomic_compare_exchange_n(&proc_cache_total_count, &count,
+						count - 1, false,
+						__ATOMIC_ACQ_REL,
+						__ATOMIC_ACQUIRE))
+			break;
+	}
+	update_proc_cache_admission_state();
+}
+
+static void decrement_proc_cache_retired_count(void)
+{
+	u64 count = __atomic_load_n(&proc_cache_retired_count,
+				    __ATOMIC_ACQUIRE);
+
+	for (;;) {
+		if (unlikely(count == 0)) {
+			ebpf_error("Proc cache retired count underflow.\n");
+			return;
+		}
+		if (__atomic_compare_exchange_n(&proc_cache_retired_count, &count,
+						count - 1, false,
+						__ATOMIC_ACQ_REL,
+						__ATOMIC_ACQUIRE))
+			return;
+	}
+}
+
+int set_proc_cache_max_entries(u32 limit)
+{
+	if (limit < PROC_CACHE_LIMIT_MIN || limit > PROC_CACHE_LIMIT_MAX) {
+		ebpf_warning("Invalid proc cache limit %u; expected [%u, %u].\n",
+			     limit, PROC_CACHE_LIMIT_MIN, PROC_CACHE_LIMIT_MAX);
+		return ETR_INVAL;
+	}
+
+	pthread_mutex_lock(&proc_cache_limit_update_lock);
+	__atomic_store_n(&proc_cache_total_limit, limit, __ATOMIC_RELEASE);
+	pthread_mutex_unlock(&proc_cache_limit_update_lock);
+	update_proc_cache_admission_state();
+	return ETR_OK;
+}
+
+static inline struct proc_cache_reader_slot *proc_cache_ref_acquire_enter(void)
+{
+	/*
+	 * All current proc-cache users have an index in this range. Falling back to
+	 * slot 0 keeps a future or external caller safe even if it has not yet been
+	 * assigned a dedicated index; counters, unlike boolean flags, may be shared.
+	 */
+	uword idx = thread_index;
+	if (unlikely(idx >= ARRAY_SIZE(proc_cache_readers)))
+		idx = THREAD_PROFILER_READER_IDX;
+
+	struct proc_cache_reader_slot *slot = &proc_cache_readers[idx];
+	AO_INC(&slot->active);
+	return slot;
+}
+
+static inline void proc_cache_ref_acquire_exit(struct proc_cache_reader_slot *slot)
+{
+	AO_DEC(&slot->active);
+}
+
+static inline void synchronize_proc_cache_ref_acquirers(void)
+{
+	uword i;
+	for (i = 0; i < ARRAY_SIZE(proc_cache_readers); i++) {
+		while (__atomic_load_n(&proc_cache_readers[i].active,
+				       __ATOMIC_SEQ_CST) != 0)
+			CLIB_PAUSE();
+	}
+}
+
+static inline struct symbolizer_proc_info *
+find_proc_info_and_get_ref(struct symbolizer_cache_kvp *kv)
+{
+	symbol_caches_hash_t *h = &syms_cache_hash;
+	struct symbolizer_proc_info *p = NULL;
+	struct proc_cache_reader_slot *slot;
+
+	slot = proc_cache_ref_acquire_enter();
+	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *)kv,
+				      (symbol_caches_hash_kv *)kv) == 0) {
+		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
+		if (p != NULL)
+			PROC_USE_INC_REASON(p, PROC_USE_INC_REASON_HASH_QUERY);
+	}
+	proc_cache_ref_acquire_exit(slot);
+
+	return p;
+}
+
+static void destroy_proc_symcache(void *resolver, int pid)
+{
+	if (resolver == NULL)
+		return;
+
+	bcc_free_symcache(resolver, pid);
+	free_symcache_count++;
+}
+
+static void free_proc_symcache(struct symbolizer_proc_info *p)
+{
+	void *resolver;
+
+	pthread_mutex_lock(&p->mutex);
+	resolver = symbolizer_proc_symcache_exchange(p, NULL);
+	pthread_mutex_unlock(&p->mutex);
+
+	/* No reader can accept the detached resolver after the mutex handoff. */
+	destroy_proc_symcache(resolver, (int)p->pid);
+}
+
 void free_proc_cache(struct symbolizer_proc_info *p)
 {
 	int pid = (int)p->pid;
-	if (p->syms_cache) {
-		bcc_free_symcache((void *)p->syms_cache, p->pid);
-		free_symcache_count++;
-	}
+	free_proc_symcache(p);
 
 	vec_free(p->thread_names);
 	p->thread_names = NULL;
-	p->syms_cache = 0;
 	mount_info_cache_remove(pid, p->mntns_id);
+	pthread_mutex_destroy(&p->mutex);
 	clib_mem_free((void *)p);
+	release_proc_cache_slot();
+}
+
+static void reap_retired_proc_caches(void)
+{
+	struct symbolizer_proc_info **link = &retired_proc_caches;
+	struct symbolizer_proc_info *reclaim_list = NULL;
+	struct {
+		void *resolver;
+		int pid;
+	} detached_symcaches[PROC_SYMCACHE_RECLAIM_BURST];
+	u32 detached_count = 0;
+	u32 i;
+
+	pthread_mutex_lock(&retired_proc_caches_lock);
+	while (*link != NULL) {
+		struct symbolizer_proc_info *p = *link;
+
+		if (AO_GET(&p->use) == 0) {
+			*link = p->retired_next;
+			p->retired_next = reclaim_list;
+			reclaim_list = p;
+			decrement_proc_cache_retired_count();
+		} else {
+			/*
+			 * Do not wait for a busy resolver while holding the list lock.
+			 * A later reaper pass will retry it. Actual BCC cleanup is also
+			 * deferred until after the list lock is released.
+			 */
+			if (detached_count < ARRAY_SIZE(detached_symcaches)
+			    && pthread_mutex_trylock(&p->mutex) == 0) {
+				void *resolver =
+				    symbolizer_proc_symcache_exchange(p, NULL);
+				pthread_mutex_unlock(&p->mutex);
+				if (resolver != NULL) {
+					detached_symcaches[detached_count].resolver =
+					    resolver;
+					detached_symcaches[detached_count].pid =
+					    (int)p->pid;
+					detached_count++;
+				}
+			}
+			link = &p->retired_next;
+		}
+	}
+	pthread_mutex_unlock(&retired_proc_caches_lock);
+
+	/* Symbol-cache cleanup can be expensive; never perform it under the list lock. */
+	while (reclaim_list != NULL) {
+		struct symbolizer_proc_info *p = reclaim_list;
+		reclaim_list = p->retired_next;
+		p->retired_next = NULL;
+		free_proc_cache(p);
+		__atomic_add_fetch(&proc_cache_reclaimed_total, 1,
+				   __ATOMIC_RELAXED);
+	}
+
+	for (i = 0; i < detached_count; i++)
+		destroy_proc_symcache(detached_symcaches[i].resolver,
+				      detached_symcaches[i].pid);
+}
+
+void collect_proc_cache_runtime_stats(struct proc_cache_runtime_stats *stats)
+{
+	struct symbolizer_proc_info *p;
+	u64 now_ns;
+
+	if (stats == NULL)
+		return;
+
+	memset(stats, 0, sizeof(*stats));
+	stats->active_count = proc_cache_active_count();
+	stats->retired_count = __atomic_load_n(&proc_cache_retired_count,
+					      __ATOMIC_RELAXED);
+	stats->total_count = __atomic_load_n(&proc_cache_total_count,
+					    __ATOMIC_ACQUIRE);
+	stats->total_limit = __atomic_load_n(&proc_cache_total_limit,
+					    __ATOMIC_ACQUIRE);
+	stats->rejected_total = __atomic_load_n(&proc_cache_rejected_total,
+					       __ATOMIC_RELAXED);
+	stats->reclaimed_total = __atomic_load_n(&proc_cache_reclaimed_total,
+					        __ATOMIC_RELAXED);
+
+	/* This scan runs only when diagnostics/metrics are collected. */
+	now_ns = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
+	pthread_mutex_lock(&retired_proc_caches_lock);
+	for (p = retired_proc_caches; p != NULL; p = p->retired_next) {
+		u64 wait_ns = now_ns >= p->retired_at_ns ?
+		    now_ns - p->retired_at_ns : 0;
+		u64 wait_secs = wait_ns / NS_IN_SEC;
+		if (wait_secs > stats->oldest_wait_secs)
+			stats->oldest_wait_secs = wait_secs;
+	}
+	pthread_mutex_unlock(&retired_proc_caches_lock);
+}
+
+static u64 proc_cache_accounted_bytes(struct symbolizer_proc_info *p)
+{
+	u64 bytes = sizeof(*p);
+
+	thread_names_lock(p);
+	bytes += vec_mem_size(p->thread_names);
+	thread_names_unlock(p);
+
+	return bytes;
+}
+
+int collect_proc_cache_reclaim_stats(u32 older_than_secs,
+				     struct proc_cache_reclaim_stats **stats,
+				     size_t *stats_size)
+{
+	struct symbolizer_proc_info *p;
+	struct proc_cache_reclaim_stats *result;
+	u64 now_ns = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
+	u64 older_than_ns = (u64)older_than_secs * NS_IN_SEC;
+	u64 matched_count = 0;
+	u64 returned_count;
+	size_t size;
+
+	if (stats == NULL || stats_size == NULL)
+		return ETR_INVAL;
+	*stats = NULL;
+	*stats_size = 0;
+
+	pthread_mutex_lock(&retired_proc_caches_lock);
+	for (p = retired_proc_caches; p != NULL; p = p->retired_next) {
+		u64 wait_ns = now_ns >= p->retired_at_ns ?
+		    now_ns - p->retired_at_ns : 0;
+		if (wait_ns > older_than_ns)
+			matched_count++;
+	}
+
+	returned_count = matched_count > PROC_CACHE_RECLAIM_MAX_ENTRIES ?
+	    PROC_CACHE_RECLAIM_MAX_ENTRIES : matched_count;
+	if (returned_count >
+	    (SIZE_MAX - sizeof(*result)) / sizeof(result->entries[0])) {
+		pthread_mutex_unlock(&retired_proc_caches_lock);
+		return ETR_INVAL;
+	}
+	size = sizeof(*result) +
+	    (size_t)returned_count * sizeof(result->entries[0]);
+	result = calloc(1, size);
+	if (result == NULL) {
+		pthread_mutex_unlock(&retired_proc_caches_lock);
+		return ETR_NOMEM;
+	}
+
+	result->older_than_secs = older_than_secs;
+	result->active_count = __atomic_load_n(
+	    &syms_cache_hash.hash_elems_count, __ATOMIC_RELAXED);
+	result->total_count = __atomic_load_n(&proc_cache_total_count,
+					    __ATOMIC_ACQUIRE);
+	result->total_limit = __atomic_load_n(&proc_cache_total_limit,
+					    __ATOMIC_ACQUIRE);
+	result->rejected_total = __atomic_load_n(&proc_cache_rejected_total,
+					       __ATOMIC_RELAXED);
+	result->reclaimed_total = __atomic_load_n(&proc_cache_reclaimed_total,
+					        __ATOMIC_RELAXED);
+	result->admission_paused = result->total_count >= result->total_limit;
+	result->matched_count = matched_count;
+	result->returned_count = returned_count;
+	result->truncated = matched_count > returned_count;
+	result->hash_memory_limit_bytes = syms_cache_hash.memory_size;
+	for (p = retired_proc_caches; p != NULL; p = p->retired_next) {
+		u64 wait_ns = now_ns >= p->retired_at_ns ?
+		    now_ns - p->retired_at_ns : 0;
+		u64 accounted_bytes = proc_cache_accounted_bytes(p);
+		struct proc_cache_reclaim_entry *entry;
+
+		result->waiting_count++;
+		result->waiting_accounted_bytes += accounted_bytes;
+		if (wait_ns / NS_IN_SEC > result->oldest_wait_secs)
+			result->oldest_wait_secs = wait_ns / NS_IN_SEC;
+		if (wait_ns <= older_than_ns)
+			continue;
+
+		result->overdue_count++;
+		result->overdue_accounted_bytes += accounted_bytes;
+		if (result->entry_count >= returned_count)
+			continue;
+
+		entry = &result->entries[result->entry_count++];
+		entry->pid = p->pid;
+		memcpy(entry->comm, p->comm, sizeof(entry->comm));
+		entry->comm[sizeof(entry->comm) - 1] = '\0';
+		entry->use = AO_GET(&p->use);
+		entry->start_time_msecs = p->stime;
+		entry->wait_secs = wait_ns / NS_IN_SEC;
+		entry->accounted_bytes = accounted_bytes;
+		entry->use_reason = PROC_USE_GET_REASON(p);
+		entry->has_syms_cache = symbolizer_proc_symcache_load(p) != NULL;
+	}
+	pthread_mutex_unlock(&retired_proc_caches_lock);
+
+	*stats = result;
+	*stats_size = size;
+	return ETR_OK;
 }
 
 static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
@@ -175,18 +647,33 @@ static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 	if (kv->v.proc_info_p) {
 		struct symbolizer_proc_info *p;
 		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
-		AO_DEC(&p->use);
-		/* Ensure that all tasks are completed before releasing. */
-		while (AO_GET(&p->use) != 0)
-			CLIB_PAUSE();
-		free_proc_cache(p);
 		kv->v.proc_info_p = 0;
+		/* An object that loses its ownership reference is terminal. */
+		symbolizer_proc_mark_exit(p);
+
+		/*
+		 * Drop the hash/ring ownership reference. Existing readers release
+		 * their references normally; proc-events reclaims the object later
+		 * instead of blocking here.
+		 */
+		if (AO_SUB_F(&p->use, 1) == 0) {
+			free_proc_cache(p);
+		} else {
+			pthread_mutex_lock(&retired_proc_caches_lock);
+			/* Record the first instant at which this object is retired. */
+			if (p->retired_at_ns == 0)
+				p->retired_at_ns =
+				    gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
+			p->retired_next = retired_proc_caches;
+			retired_proc_caches = p;
+			__atomic_add_fetch(&proc_cache_retired_count, 1,
+					   __ATOMIC_RELAXED);
+			pthread_mutex_unlock(&retired_proc_caches_lock);
+		}
 	}
 }
 
-static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
-								  symbolizer_cache_kvp
-								  *kv)
+static inline void add_proc_info_to_cache(struct symbolizer_cache_kvp *kv)
 {
 	pid_t pid = (pid_t) kv->k.pid;
 	if (kv->v.proc_info_p) {
@@ -196,18 +683,23 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 	}
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_proc_info *p = NULL;
+	if (!try_reserve_proc_cache_slot())
+		return;
+
 	p = clib_mem_alloc_aligned("sym_proc_info",
 				   sizeof(struct
 					  symbolizer_proc_info), 0, NULL);
 	if (p == NULL) {
 		/* exit process */
 		ebpf_warning("Failed to build process information table.\n");
-		return NULL;
+		release_proc_cache_slot();
+		return;
 	}
 
 	if (config_symbolizer_proc_info(p, pid) != ETR_OK) {
 		clib_mem_free(p);
-		return NULL;
+		release_proc_cache_slot();
+		return;
 	}
 
 	kv->v.proc_info_p = pointer_to_uword(p);
@@ -221,35 +713,40 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 			    ("symbol_caches_hash_add_del() failed.(pid %d), return %d\n",
 			     pid, ret);
 		free_symbolizer_cache_kvp(kv);
-		return NULL;
-	} else {
-		__sync_fetch_and_add(&h->hash_elems_count, 1);
-		// Associate mount information when a new process starts.
-		mount_info_cache_add_if_absent(pid, p->mntns_id);
+		return;
 	}
 
-	return p;
+	/*
+	 * p is now visible through the hash and may be removed and reclaimed by
+	 * another thread. Do not dereference it below without a separate reference.
+	 */
+	__sync_fetch_and_add(&h->hash_elems_count, 1);
 }
 
 static inline int __del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 {
 	symbol_caches_hash_t *h = &syms_cache_hash;
+	pthread_mutex_lock(&syms_cache_update_lock);
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) kv,
 				      (symbol_caches_hash_kv *) kv) == 0) {
 		struct symbolizer_proc_info *p;
 		p = (struct symbolizer_proc_info *)kv->v.proc_info_p;
 		if (p != NULL) {
 			AO_INC(&p->use);
-			p->is_exit = 1;
+			symbolizer_proc_mark_exit(p);
 			AO_DEC(&p->use);
 		}
 
 		if (symbol_caches_hash_add_del
 		    (h, (symbol_caches_hash_kv *) kv, 0 /* delete */ )) {
 			ebpf_warning("failed.(pid %d)\n", (pid_t) kv->k.pid);
+			pthread_mutex_unlock(&syms_cache_update_lock);
 			return -1;
 		} else {
 			__sync_fetch_and_add(&h->hash_elems_count, -1);
+			pthread_mutex_unlock(&syms_cache_update_lock);
+			/* The old value is no longer discoverable by a new reader. */
+			synchronize_proc_cache_ref_acquirers();
 			if (p)
 				free_symbolizer_cache_kvp(kv);
 			return 0;
@@ -259,6 +756,7 @@ static inline int __del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
 		    ("The process with PID %d does not exist in the cache."
 		     " Failed to clean up process information.\n", kv->k.pid);
 	}
+	pthread_mutex_unlock(&syms_cache_update_lock);
 
 	return -1;
 }
@@ -293,7 +791,6 @@ int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 			     int mount_size, fs_type_t *file_type)
 {
 	int ret = -1;
-	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv;
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
@@ -302,11 +799,8 @@ int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 	memset(name, 0, name_size);
 	memset(mount_point, 0, mount_size);
 	memset(mount_source, 0, mount_size);
-	struct symbolizer_proc_info *p = NULL;
-	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
-				      (symbol_caches_hash_kv *) & kv) == 0) {
-		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
-		AO_INC(&p->use);
+	struct symbolizer_proc_info *p = find_proc_info_and_get_ref(&kv);
+	if (p != NULL) {
 		if (strlen(p->container_id) > 0) {
 			memcpy_s_inline((void *)cid, cid_size, p->container_id,
 					sizeof(p->container_id));
@@ -338,6 +832,8 @@ static inline int add_proc_ev_info_to_ring(enum proc_act_type type,
 	struct proc_event_info *ev_info;
 	ev_info = clib_mem_alloc_aligned("proc-cache-kvp",
 					 sizeof(*ev_info), 0, NULL);
+	if (ev_info == NULL)
+		return -1;
 	ev_info->type = type;
 	ev_info->kv = *kv;
 	int nr = ring_mp_enqueue_burst(proc_event_ring, (void **)&ev_info, 1,
@@ -354,6 +850,7 @@ static void add_proc_event_to_queue(pid_t pid, enum proc_act_type type)
 {
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv = {};
+	bool removed = false;
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
 	if (type == PROC_EXEC) {
@@ -362,26 +859,41 @@ static void add_proc_event_to_queue(pid_t pid, enum proc_act_type type)
 		__sync_fetch_and_add(&proc_exit_event_count, 1);
 	}
 
+	pthread_mutex_lock(&syms_cache_update_lock);
 	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
 				      (symbol_caches_hash_kv *) & kv) == 0) {
 		struct symbolizer_proc_info *p;
 		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
 		if (p != NULL) {
 			AO_INC(&p->use);
-			p->is_exit = 1;
+			symbolizer_proc_mark_exit(p);
 			AO_DEC(&p->use);
 		}
 
 		if (symbol_caches_hash_add_del
 		    (h, (symbol_caches_hash_kv *) & kv, 0 /* delete */ )) {
 			ebpf_warning("failed.(pid %d)\n", (pid_t) kv.k.pid);
+			pthread_mutex_unlock(&syms_cache_update_lock);
 			return;
 		} else {
 			__sync_fetch_and_add(&h->hash_elems_count, -1);
+			removed = true;
 		}
 	}
+	pthread_mutex_unlock(&syms_cache_update_lock);
 
-	add_proc_ev_info_to_ring(type, &kv);
+	/* The old value is no longer discoverable by a new reader. */
+	if (removed)
+		synchronize_proc_cache_ref_acquirers();
+
+	if (add_proc_ev_info_to_ring(type, &kv) != 0 &&
+	    kv.v.proc_info_p != 0) {
+		/*
+		 * The entry has already left the hash and its reader grace period
+		 * has completed. Keep ownership local when the ring cannot accept it.
+		 */
+		free_symbolizer_cache_kvp(&kv);
+	}
 }
 
 /*
@@ -422,6 +934,8 @@ void exec_proc_info_cache_update(void)
 			clib_mem_free(ev_info);
 		}
 	} while (nr > 0);
+
+	reap_retired_proc_caches();
 }
 
 static int init_symbol_cache(const char *name)
@@ -438,7 +952,6 @@ u64 get_pid_stime(pid_t pid)
 {
 	ASSERT(pid >= 0);
 
-	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv;
 
 	if (pid == 0)
@@ -446,9 +959,11 @@ u64 get_pid_stime(pid_t pid)
 
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
-	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
-				      (symbol_caches_hash_kv *) & kv) == 0) {
-		return cache_process_stime(&kv);
+	struct symbolizer_proc_info *p = find_proc_info_and_get_ref(&kv);
+	if (p != NULL) {
+		u64 stime = p->stime;
+		AO_DEC(&p->use);
+		return stime;
 	}
 
 	return 0;
@@ -466,7 +981,7 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	p->need_new_symbol_collector = true;
 	p->lock = 0;
 	pthread_mutex_init(&p->mutex, NULL);
-	p->syms_cache = 0;
+	symbolizer_proc_symcache_store(p, NULL);
 	p->thread_names = NULL;
 	p->thread_names_lock = 0;
 	p->netns_id = get_netns_id_from_pid(pid);
@@ -494,8 +1009,13 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	}
 
 	get_mount_ns_id(pid, &p->mntns_id);
+	/*
+	 * Associate the mount namespace once, before p is published. Despite its
+	 * name, add_if_absent increments proc_count when the entry already exists.
+	 */
 	mount_info_cache_add_if_absent(pid, p->mntns_id);
 	p->use = 1;
+	p->use_reason = PROC_USE_INC_REASON_UNKNOWN;
 
 	return ETR_OK;
 }
@@ -518,7 +1038,6 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 
 	*stime = *netns_id = 0;
 	*ptr = NULL;
-	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_cache_kvp kv;
 
 	if (pid == 0) {
@@ -528,13 +1047,10 @@ void get_process_info_by_pid(pid_t pid, u64 * stime, u64 * netns_id, char *name,
 
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
-	struct symbolizer_proc_info *p = NULL;
-	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
-				      (symbol_caches_hash_kv *) & kv) != 0) {
+	struct symbolizer_proc_info *p = find_proc_info_and_get_ref(&kv);
+	if (p == NULL) {
 		return;
 	} else {
-		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
-		AO_INC(&p->use);
 		symbolizer_proc_lock(p);
 		u64 curr_time = current_sys_time_secs();
 		if (!p->verified) {
@@ -591,18 +1107,32 @@ static void *symbols_cache_update(symbol_caches_hash_t * h,
 				  struct symbolizer_cache_kvp *kv,
 				  struct symbolizer_proc_info *p)
 {
+	void *resolver;
+
+	/*
+	 * The caller holds p->lock. Serialize resolver replacement with
+	 * symcache_resolve(), which protects resolver use with p->mutex.
+	 */
+	pthread_mutex_lock(&p->mutex);
+	resolver = symbolizer_proc_symcache_load(p);
+
+	/* A retired object must never recreate a detached resolver. */
+	if (symbolizer_proc_is_exit(p))
+		goto unlock;
+
 	if (p->is_java && !p->cache_need_update)
-		goto exit;
+		goto unlock;
 
-	if (p->syms_cache)
-		bcc_free_symcache((void *)p->syms_cache, kv->k.pid);
+	symbolizer_proc_symcache_store(p, NULL);
+	if (resolver != NULL)
+		bcc_free_symcache(resolver, kv->k.pid);
 
-	p->syms_cache =
-	    pointer_to_uword(bcc_symcache_new((int)kv->k.pid, &lazy_opt));
+	resolver = bcc_symcache_new((int)kv->k.pid, &lazy_opt);
+	symbolizer_proc_symcache_store(p, resolver);
 
-	if (p->syms_cache <= 0) {
-		p->syms_cache = 0;
-		goto exit;
+	if (resolver == NULL) {
+		symbolizer_proc_symcache_store(p, NULL);
+		goto unlock;
 	}
 
 	if (p->need_new_symbol_collector)
@@ -610,7 +1140,10 @@ static void *symbols_cache_update(symbol_caches_hash_t * h,
 
 	add_symcache_count++;
 
-exit:
+unlock:
+	pthread_mutex_unlock(&p->mutex);
+
+	/* These fields remain protected by the caller-held p->lock. */
 	p->unknown_syms_found = false;
 	p->update_syms_table_time = 0;
 	p->new_java_syms_file = false;
@@ -618,7 +1151,7 @@ exit:
 	p->cache_need_update = false;
 	CLIB_MEMORY_STORE_BARRIER();
 
-	return (void *)p->syms_cache;
+	return resolver;
 }
 
 static inline void java_expired_update(symbol_caches_hash_t * h,
@@ -676,10 +1209,8 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 	struct symbolizer_cache_kvp kv;
 	kv.k.pid = (u64) pid;
 	kv.v.proc_info_p = 0;
-	if (symbol_caches_hash_search(h, (symbol_caches_hash_kv *) & kv,
-				      (symbol_caches_hash_kv *) & kv) == 0) {
-		p = (struct symbolizer_proc_info *)kv.v.proc_info_p;
-		AO_INC(&p->use);
+	p = find_proc_info_and_get_ref(&kv);
+	if (p != NULL) {
 		symbolizer_proc_lock(p);
 		u64 curr_time = current_sys_time_secs();
 		if (p->verified) {
@@ -689,7 +1220,7 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			 * mbols table of the Java process after a delay.
 			 */
 			if ((p->unknown_syms_found
-			     || (void *)p->syms_cache == NULL)
+			     || symbolizer_proc_symcache_load(p) == NULL)
 			    && p->update_syms_table_time == 0) {
 				/*
 				 * If an exception occurs during the process of generating
@@ -727,10 +1258,14 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			if (p->update_syms_table_time > 0
 			    && curr_time >= p->update_syms_table_time) {
 				if (p->is_java) {
+					void *resolver;
+
 					java_expired_update(h, &kv, p);
+					resolver =
+					    symbolizer_proc_symcache_load(p);
 					symbolizer_proc_unlock(p);
 					AO_DEC(&p->use);
-					return (void *)p->syms_cache;
+					return resolver;
 				} else {
 					void *ret =
 					    symbols_cache_update(h, &kv, p);
@@ -746,10 +1281,11 @@ void *get_symbol_cache(pid_t pid, bool new_cache)
 			return NULL;
 		}
 
-		if (p->syms_cache) {
+		void *resolver = symbolizer_proc_symcache_load(p);
+		if (resolver != NULL) {
 			symbolizer_proc_unlock(p);
 			AO_DEC(&p->use);
-			return (void *)p->syms_cache;
+			return resolver;
 		}
 
 		symbolizer_proc_unlock(p);
@@ -793,6 +1329,8 @@ int create_and_init_proc_info_caches(void)
 		if (entry->d_type == DT_DIR && pid > 0 && is_process(pid)) {
 			struct symbolizer_cache_kvp sym;
 			sym.k.pid = pid;
+			if (!try_reserve_proc_cache_slot())
+				continue;
 
 			struct symbolizer_proc_info *p =
 			    clib_mem_alloc_aligned("sym_proc_info",
@@ -803,11 +1341,14 @@ int create_and_init_proc_info_caches(void)
 				/* exit process */
 				ebpf_error
 				    ("Failed to build process information table.\n");
+				release_proc_cache_slot();
+				closedir(fddir);
 				return ETR_NOMEM;
 			}
 
 			if (config_symbolizer_proc_info(p, pid) != ETR_OK) {
 				clib_mem_free(p);
+				release_proc_cache_slot();
 				continue;
 			}
 
@@ -818,6 +1359,7 @@ int create_and_init_proc_info_caches(void)
 				ebpf_warning
 				    ("symbol_caches_hash_add_del() failed.(pid %d)\n",
 				     pid);
+				free_proc_cache(p);
 			} else {
 				ebpf_debug
 				    ("Process '%s'(pid %d start time %lu) has been"
@@ -865,7 +1407,7 @@ static int check_proc_kvp_cb(symbol_caches_hash_kv * kvp, void *ctx)
 		pid = p->pid;
 		if ((p->stime == 0) ||
 		    (p->stime != 0 && p->stime != get_process_starttime(pid))) {
-			p->is_exit = 1;
+			symbolizer_proc_mark_exit(p);
 			del_proc = true;
 		}
 		AO_DEC(&p->use);
@@ -894,9 +1436,12 @@ void check_and_update_proc_info(bool output_log)
 	u64 elems_count = 0, clear_count = 0;
 	struct symbolizer_cache_kvp *kv;
 	symbol_caches_hash_t *h = &syms_cache_hash;
+	/* The callback dereferences values directly while walking the hash. */
+	pthread_mutex_lock(&syms_cache_update_lock);
 	symbol_caches_hash_foreach_key_value_pair(h,
 						  check_proc_kvp_cb,
 						  (void *)&elems_count);
+	pthread_mutex_unlock(&syms_cache_update_lock);
 	vec_foreach(kv, clear_procs) {
 		if (__del_proc_info_from_cache(kv) == 0)
 			clear_count++;
@@ -1007,6 +1552,8 @@ int creat_ksyms_cache(void)
 }
 
 #else /* defined AARCH64_MUSL */
+static volatile u64 proc_cache_total_limit = PROC_CACHE_LIMIT_DEFAULT;
+
 /* pid : The process ID (PID) that occurs when a process exits. */
 void update_proc_info_cache(pid_t pid, enum proc_act_type type)
 {
@@ -1037,6 +1584,45 @@ int get_proc_info_from_cache(pid_t pid, uint8_t * cid, int cid_size,
 int create_and_init_proc_info_caches(void)
 {
 	return 0;
+}
+
+int collect_proc_cache_reclaim_stats(u32 older_than_secs,
+				     struct proc_cache_reclaim_stats **stats,
+				     size_t *stats_size)
+{
+	struct proc_cache_reclaim_stats *result;
+
+	if (stats == NULL || stats_size == NULL)
+		return ETR_INVAL;
+	*stats = NULL;
+	*stats_size = 0;
+
+	result = calloc(1, sizeof(*result));
+	if (result == NULL)
+		return ETR_NOMEM;
+	result->older_than_secs = older_than_secs;
+	result->total_limit = __atomic_load_n(&proc_cache_total_limit,
+					    __ATOMIC_ACQUIRE);
+	*stats = result;
+	*stats_size = sizeof(*result);
+	return ETR_OK;
+}
+
+int set_proc_cache_max_entries(u32 limit)
+{
+	if (limit < PROC_CACHE_LIMIT_MIN || limit > PROC_CACHE_LIMIT_MAX)
+		return ETR_INVAL;
+	__atomic_store_n(&proc_cache_total_limit, limit, __ATOMIC_RELEASE);
+	return ETR_OK;
+}
+
+void collect_proc_cache_runtime_stats(struct proc_cache_runtime_stats *stats)
+{
+	if (stats == NULL)
+		return;
+	memset(stats, 0, sizeof(*stats));
+	stats->total_limit = __atomic_load_n(&proc_cache_total_limit,
+					    __ATOMIC_ACQUIRE);
 }
 
 void exec_proc_info_cache_update(void)

@@ -340,10 +340,15 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 	} else {
 		struct symbolizer_proc_info *p = info_p;
 		if (p) {
-			if (p->is_exit
-			    || ((u64) resolver != (u64) p->syms_cache))
-				return (-1);
+			bool mark_unknown = false;
+
 			pthread_mutex_lock(&p->mutex);
+			/* Validate the resolver while replacement is excluded. */
+			if (symbolizer_proc_is_exit(p) || resolver == NULL
+			    || resolver != symbolizer_proc_symcache_load(p)) {
+				pthread_mutex_unlock(&p->mutex);
+				return (-1);
+			}
 			ret = bcc_symcache_resolve(resolver, address, sym);
 			if (ret == 0) {
 				*sym_ptr = proc_symbol_name_fetch(pid, sym);
@@ -372,17 +377,24 @@ static inline int symcache_resolve(pid_t pid, void *resolver, u64 address,
 				int len = strlen(format_str);
 				*sym_ptr =
 				    create_symbol_str(len, format_str, "");
-				if (info_p) {
-					struct symbolizer_proc_info *p = info_p;
-					symbolizer_proc_lock(p);
-					if (p->is_java
-					    && strstr(format_str, "perf-")) {
-						p->unknown_syms_found = true;
-					}
-					symbolizer_proc_unlock(p);
-				}
+				mark_unknown = p->is_java
+				    && strstr(format_str, "perf-") != NULL;
 			}
 			pthread_mutex_unlock(&p->mutex);
+
+			if (mark_unknown) {
+				/*
+				 * Recheck under the update lock order. This avoids
+				 * marking a replacement resolver with an old miss.
+				 */
+				symbolizer_proc_lock(p);
+				pthread_mutex_lock(&p->mutex);
+				if (!symbolizer_proc_is_exit(p) && p->is_java
+				    && resolver == symbolizer_proc_symcache_load(p))
+					p->unknown_syms_found = true;
+				pthread_mutex_unlock(&p->mutex);
+				symbolizer_proc_unlock(p);
+			}
 		}
 	}
 

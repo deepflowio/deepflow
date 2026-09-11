@@ -29,6 +29,18 @@
 #define TASK_COMM_LEN 16
 #endif
 
+/* Valid range and default value for proc_cache_max_entries. */
+#define PROC_CACHE_LIMIT_MIN 1024U
+#define PROC_CACHE_LIMIT_DEFAULT 65536U
+#define PROC_CACHE_LIMIT_MAX 262144U
+
+/*
+ * Maximum number of retired proc-cache details returned by one
+ * proc-cache-reclaim query. Summary counters still cover the complete retired
+ * list; this limit only prevents an excessively large control response.
+ */
+#define PROC_CACHE_RECLAIM_MAX_ENTRIES 1024U
+
 /*
  * symbol_caches_hash_t maps from pid to BCC symbol cache.
  */
@@ -54,10 +66,61 @@ struct task_comm_info_s {
 	char comm[TASK_COMM_LEN + 1];
 };
 
+enum proc_use_reason {
+	PROC_USE_INC_REASON_UNKNOWN,
+	PROC_USE_INC_REASON_HASH_QUERY,
+	PROC_USE_INC_REASON_JAVA_TAST,
+};
+
+struct proc_cache_reclaim_request {
+	u32 older_than_secs;
+};
+
+struct proc_cache_reclaim_entry {
+	int32_t pid;
+	char comm[TASK_COMM_LEN];
+	u64 use;
+	u64 start_time_msecs;
+	u64 wait_secs;
+	u64 accounted_bytes;
+	u32 use_reason;
+	u8 has_syms_cache;
+};
+
+struct proc_cache_reclaim_stats {
+	u64 active_count;
+	u64 waiting_count;
+	u64 total_count;
+	u64 total_limit;
+	u64 hash_memory_limit_bytes;
+	u64 waiting_accounted_bytes;
+	u64 overdue_count;
+	u64 overdue_accounted_bytes;
+	u64 rejected_total;
+	u64 reclaimed_total;
+	u64 oldest_wait_secs;
+	u64 matched_count;
+	u32 older_than_secs;
+	u32 returned_count;
+	u32 entry_count;
+	u8 admission_paused;
+	u8 truncated;
+	struct proc_cache_reclaim_entry entries[0];
+};
+
+struct proc_cache_runtime_stats {
+	u64 active_count;
+	u64 retired_count;
+	u64 total_count;
+	u64 total_limit;
+	u64 rejected_total;
+	u64 reclaimed_total;
+	u64 oldest_wait_secs;
+};
+
 struct symbolizer_proc_info {
 	int pid;
-	/* The process creation time since
-	 * system boot, (in milliseconds) */
+	/* Process start time since the Unix epoch, in milliseconds. */
 	u64 stime;
 	u64 netns_id;
 	/*
@@ -92,17 +155,61 @@ struct symbolizer_proc_info {
 	char container_id[CONTAINER_ID_SIZE];
 	/* reference counting */
 	u64 use;
+	/* Last non-temporary reason for incrementing use. */
+	enum proc_use_reason use_reason;
 	/* Has the process exited? */
 	u64 is_exit;
 	/* Protect symbolizer_proc_info from concurrent access by multiple threads. */
 	u32 lock;
-	/* Multithreaded symbol resolution protection. */
+	/* Serializes use, replacement, and teardown of syms_cache. */
 	pthread_mutex_t mutex;
 	/* Recording symbol resolution cache. */
 	volatile uword syms_cache;
 	/* Used to look up mount information from the mount cache. */
 	u64 mntns_id;
+	/* Link used only by the proc-events deferred-reclamation list. */
+	struct symbolizer_proc_info *retired_next;
+	/* CLOCK_MONOTONIC timestamp recorded when added to the retired list. */
+	u64 retired_at_ns;
 };
+
+static inline bool symbolizer_proc_is_exit(struct symbolizer_proc_info *p)
+{
+	return __atomic_load_n(&p->is_exit, __ATOMIC_ACQUIRE) != 0;
+}
+
+static inline void symbolizer_proc_mark_exit(struct symbolizer_proc_info *p)
+{
+	__atomic_store_n(&p->is_exit, 1, __ATOMIC_RELEASE);
+}
+
+static inline void *symbolizer_proc_symcache_load(struct symbolizer_proc_info *p)
+{
+	return (void *)__atomic_load_n(&p->syms_cache, __ATOMIC_ACQUIRE);
+}
+
+static inline void symbolizer_proc_symcache_store(struct symbolizer_proc_info *p,
+						   void *resolver)
+{
+	__atomic_store_n(&p->syms_cache, (uword)resolver, __ATOMIC_RELEASE);
+}
+
+static inline void *symbolizer_proc_symcache_exchange(
+	struct symbolizer_proc_info *p, void *resolver)
+{
+	return (void *)__atomic_exchange_n(&p->syms_cache, (uword)resolver,
+					   __ATOMIC_ACQ_REL);
+}
+
+#define PROC_USE_INC_REASON(P, REASON)        \
+	do {                                   \
+		AO_INC(&(P)->use);               \
+		__atomic_store_n(&(P)->use_reason, \
+				 (REASON), __ATOMIC_RELEASE); \
+	} while (0)
+
+#define PROC_USE_GET_REASON(P) \
+	__atomic_load_n(&(P)->use_reason, __ATOMIC_ACQUIRE)
 
 static inline void thread_names_lock(struct symbolizer_proc_info *p)
 {
@@ -188,6 +295,11 @@ void free_proc_cache(struct symbolizer_proc_info *p);
 void symbolizer_kernel_lock(void);
 void symbolizer_kernel_unlock(void);
 #endif
+int collect_proc_cache_reclaim_stats(u32 older_than_secs,
+				     struct proc_cache_reclaim_stats **stats,
+				     size_t *stats_size);
+int set_proc_cache_max_entries(u32 limit);
+void collect_proc_cache_runtime_stats(struct proc_cache_runtime_stats *stats);
 void exec_proc_info_cache_update(void);
 int create_and_init_proc_info_caches(void);
 /**
