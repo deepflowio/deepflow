@@ -673,9 +673,7 @@ static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 	}
 }
 
-static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
-								  symbolizer_cache_kvp
-								  *kv)
+static inline void add_proc_info_to_cache(struct symbolizer_cache_kvp *kv)
 {
 	pid_t pid = (pid_t) kv->k.pid;
 	if (kv->v.proc_info_p) {
@@ -686,7 +684,7 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 	symbol_caches_hash_t *h = &syms_cache_hash;
 	struct symbolizer_proc_info *p = NULL;
 	if (!try_reserve_proc_cache_slot())
-		return NULL;
+		return;
 
 	p = clib_mem_alloc_aligned("sym_proc_info",
 				   sizeof(struct
@@ -695,13 +693,13 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 		/* exit process */
 		ebpf_warning("Failed to build process information table.\n");
 		release_proc_cache_slot();
-		return NULL;
+		return;
 	}
 
 	if (config_symbolizer_proc_info(p, pid) != ETR_OK) {
 		clib_mem_free(p);
 		release_proc_cache_slot();
-		return NULL;
+		return;
 	}
 
 	kv->v.proc_info_p = pointer_to_uword(p);
@@ -715,14 +713,14 @@ static inline struct symbolizer_proc_info *add_proc_info_to_cache(struct
 			    ("symbol_caches_hash_add_del() failed.(pid %d), return %d\n",
 			     pid, ret);
 		free_symbolizer_cache_kvp(kv);
-		return NULL;
-	} else {
-		__sync_fetch_and_add(&h->hash_elems_count, 1);
-		// Associate mount information when a new process starts.
-		mount_info_cache_add_if_absent(pid, p->mntns_id);
+		return;
 	}
 
-	return p;
+	/*
+	 * p is now visible through the hash and may be removed and reclaimed by
+	 * another thread. Do not dereference it below without a separate reference.
+	 */
+	__sync_fetch_and_add(&h->hash_elems_count, 1);
 }
 
 static inline int __del_proc_info_from_cache(struct symbolizer_cache_kvp *kv)
@@ -1011,6 +1009,10 @@ static int config_symbolizer_proc_info(struct symbolizer_proc_info *p, int pid)
 	}
 
 	get_mount_ns_id(pid, &p->mntns_id);
+	/*
+	 * Associate the mount namespace once, before p is published. Despite its
+	 * name, add_if_absent increments proc_count when the entry already exists.
+	 */
 	mount_info_cache_add_if_absent(pid, p->mntns_id);
 	p->use = 1;
 	p->use_reason = PROC_USE_INC_REASON_UNKNOWN;
