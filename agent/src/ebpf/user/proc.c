@@ -1167,8 +1167,7 @@ static inline void java_expired_update(symbol_caches_hash_t * h,
 	if (AO_GET(&p->new_java_syms_file)) {
 		symbols_cache_update(h, kv, p);
 	} else {
-		if (!p->add_task_list) {
-			add_java_syms_update_task(p);
+		if (!p->add_task_list && add_java_syms_update_task(p)) {
 			p->add_task_list = true;
 		}
 	}
