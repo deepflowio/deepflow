@@ -459,7 +459,8 @@ total_count >= total_limit
 
 1. 旧对象从 hash 删除；
 2. 旧对象进入 IN_FLIGHT；
-3. 旧对象根据 `use` 被立即释放或加入 retired list；
+3. 旧对象根据 `use` 被立即释放或加入 retired list；producer 在 ring 入队失败时始终延迟到
+   `proc-events` 回收，避免在 producer 线程销毁 mount cache；
 4. 再尝试为新进程镜像预留和创建 Proc Cache。
 
 如果总量仍达到限制，新对象创建失败，但旧对象必须保持可回收状态。
@@ -631,7 +632,7 @@ Proc cache reclamation:
 | 字段 | 通俗解释 |
 | --- | --- |
 | `active_count` | 当前仍在 proc info hash 中、可以通过 PID 查询到的缓存条目数。它通常接近 Agent 当前管理的进程数，但可能包含尚未被周期清理的旧条目，因此不等同于操作系统此刻准确的存活进程数。 |
-| `retired_count` | 已经从 hash 删除，但因为 `use` 仍大于 0 而暂时不能释放的 Proc Cache 对象数量。其 BCC symbol cache 可以已经提前释放；短时间等待是正常现象，持续很久通常表示某个引用没有及时归还。 |
+| `retired_count` | 已经从 hash 删除并等待 `proc-events` 回收的 Proc Cache 对象数量。通常表示 `use` 仍大于 0；producer 在 ring 入队失败时也会短暂放入一个 `use == 0` 的对象，避免跨线程销毁 mount cache。其 BCC symbol cache 可以已经提前释放；短时间等待是正常现象，持续很久通常表示某个引用没有及时归还。 |
 | `total_count` | Agent 已经创建且尚未真正释放的 Proc Cache 总数，包括 active、ring 中转、初始化中和 retired 对象。这是容量保护实际检查的数字。 |
 | `total_limit` | 配置允许存在的 Proc Cache 最大总数。默认是 65,536。 |
 | `usage` | Proc Cache 名额使用率，即 `total_count / total_limit`。这是“对象数量使用率”，不是 Agent 的内存或 RSS 使用率。 |

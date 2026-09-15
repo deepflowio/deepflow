@@ -613,7 +613,8 @@ int collect_proc_cache_reclaim_stats(u32 older_than_secs,
 	return ETR_OK;
 }
 
-static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
+static void release_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv,
+					 bool force_defer)
 {
 	if (kv->v.proc_info_p) {
 		struct symbolizer_proc_info *p;
@@ -623,11 +624,11 @@ static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 		symbolizer_proc_mark_exit(p);
 
 		/*
-		 * Drop the hash/ring ownership reference. Existing readers release
-		 * their references normally; proc-events reclaims the object later
-		 * instead of blocking here.
+		 * Drop the hash/ring ownership reference. A producer that failed to
+		 * enqueue must defer final destruction to proc-events, even if no reader
+		 * remains, so mount-cache destruction stays on the consumer thread.
 		 */
-		if (AO_SUB_F(&p->use, 1) == 0) {
+		if (AO_SUB_F(&p->use, 1) == 0 && !force_defer) {
 			free_proc_cache(p);
 		} else {
 			pthread_mutex_lock(&retired_proc_caches_lock);
@@ -642,6 +643,16 @@ static void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
 			pthread_mutex_unlock(&retired_proc_caches_lock);
 		}
 	}
+}
+
+static inline void free_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
+{
+	release_symbolizer_cache_kvp(kv, false);
+}
+
+static inline void defer_symbolizer_cache_kvp(struct symbolizer_cache_kvp *kv)
+{
+	release_symbolizer_cache_kvp(kv, true);
 }
 
 static inline void add_proc_info_to_cache(struct symbolizer_cache_kvp *kv)
@@ -861,9 +872,10 @@ static void add_proc_event_to_queue(pid_t pid, enum proc_act_type type)
 	    kv.v.proc_info_p != 0) {
 		/*
 		 * The entry has already left the hash and its reader grace period
-		 * has completed. Keep ownership local when the ring cannot accept it.
+		 * has completed. Defer final destruction to proc-events so the
+		 * producer cannot race with mount-cache traversal.
 		 */
-		free_symbolizer_cache_kvp(&kv);
+		defer_symbolizer_cache_kvp(&kv);
 	}
 }
 
