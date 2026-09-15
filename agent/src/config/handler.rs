@@ -58,6 +58,7 @@ use super::{
         HttpEndpointMatchRule, Iso8583ParseConfig, OracleConfig, PcapStream, PortConfig,
         ProcessorsFlowLogTunning, RequestLog, RequestLogTunning, SelfLoadCircuitBreaker,
         SessionTimeout, TagFilterOperator, Timeouts, UserConfig, GRPC_BUFFER_SIZE_MIN,
+        PROC_CACHE_LIMIT_MAX, PROC_CACHE_LIMIT_MIN,
     },
     ConfigError, KubernetesPollerType, TrafficOverflowAction,
 };
@@ -3041,6 +3042,30 @@ impl ConfigHandler {
         #[cfg(any(target_os = "linux", target_os = "android"))]
         let mut cpu_set = CpuSet::new();
 
+        let requested_proc_cache_limit = new_config
+            .user_config
+            .inputs
+            .ebpf
+            .tunning
+            .proc_cache_max_entries;
+        if !(PROC_CACHE_LIMIT_MIN..=PROC_CACHE_LIMIT_MAX).contains(&requested_proc_cache_limit) {
+            let current_proc_cache_limit = config.inputs.ebpf.tunning.proc_cache_max_entries;
+            warn!(
+                "Reject inputs.ebpf.tunning.proc_cache_max_entries {:?}; expected [{}, {}].",
+                requested_proc_cache_limit, PROC_CACHE_LIMIT_MIN, PROC_CACHE_LIMIT_MAX,
+            );
+            new_config
+                .user_config
+                .inputs
+                .ebpf
+                .tunning
+                .proc_cache_max_entries = current_proc_cache_limit;
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            {
+                new_config.ebpf.ebpf.tunning.proc_cache_max_entries = current_proc_cache_limit;
+            }
+        }
+
         if first_run {
             info!("{:#?}", &new_config.user_config);
         }
@@ -3782,6 +3807,14 @@ impl ConfigHandler {
                 )
             ]
         );
+
+        if tunning.proc_cache_max_entries != new_tunning.proc_cache_max_entries {
+            info!(
+                "Update inputs.ebpf.tunning.proc_cache_max_entries from {:?} to {:?}.",
+                tunning.proc_cache_max_entries, new_tunning.proc_cache_max_entries
+            );
+            tunning.proc_cache_max_entries = new_tunning.proc_cache_max_entries;
+        }
 
         let integration = &mut config.inputs.integration;
         let new_integration = &mut new_config.user_config.inputs.integration;

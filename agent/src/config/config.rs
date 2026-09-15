@@ -1247,7 +1247,12 @@ pub struct EbpfTunning {
     pub max_socket_entries: u32,
     pub socket_map_reclaim_threshold: u32,
     pub max_trace_entries: u32,
+    pub proc_cache_max_entries: u32,
 }
+
+pub const PROC_CACHE_LIMIT_MIN: u32 = 1024;
+pub const PROC_CACHE_LIMIT_DEFAULT: u32 = 65536;
+pub const PROC_CACHE_LIMIT_MAX: u32 = 262144;
 
 impl Default for EbpfTunning {
     fn default() -> Self {
@@ -1261,6 +1266,7 @@ impl Default for EbpfTunning {
             max_socket_entries: 131072,
             socket_map_reclaim_threshold: 120000,
             max_trace_entries: 131072,
+            proc_cache_max_entries: PROC_CACHE_LIMIT_DEFAULT,
         }
     }
 }
@@ -3219,6 +3225,16 @@ impl UserConfig {
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
+        if !(PROC_CACHE_LIMIT_MIN..=PROC_CACHE_LIMIT_MAX)
+            .contains(&self.inputs.ebpf.tunning.proc_cache_max_entries)
+        {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "inputs.ebpf.tunning.proc_cache_max_entries({}) not in [{}, {}]",
+                self.inputs.ebpf.tunning.proc_cache_max_entries,
+                PROC_CACHE_LIMIT_MIN,
+                PROC_CACHE_LIMIT_MAX,
+            )));
+        }
         if self.global.communication.proactive_request_interval < Duration::from_secs(1)
             || self.global.communication.proactive_request_interval > Duration::from_secs(60 * 60)
         {
@@ -3988,6 +4004,21 @@ mod tests {
 
         let disabled_debug: Debug = serde_yaml::from_str("beacon_enabled: false").unwrap();
         assert!(!disabled_debug.beacon_enabled);
+    }
+
+    #[test]
+    fn validate_proc_cache_max_entries() {
+        let mut config = UserConfig::default();
+
+        for limit in [PROC_CACHE_LIMIT_MIN, PROC_CACHE_LIMIT_MAX] {
+            config.inputs.ebpf.tunning.proc_cache_max_entries = limit;
+            assert!(config.validate().is_ok());
+        }
+
+        for limit in [0, PROC_CACHE_LIMIT_MIN - 1, PROC_CACHE_LIMIT_MAX + 1] {
+            config.inputs.ebpf.tunning.proc_cache_max_entries = limit;
+            assert!(config.validate().is_err());
+        }
     }
 
     #[test]

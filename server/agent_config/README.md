@@ -5609,6 +5609,57 @@ inputs:
 
 Set the maximum value of hash table entries for thread/coroutine tracking sessions.
 
+#### Maximum Proc Cache Entries {#inputs.ebpf.tunning.proc_cache_max_entries}
+
+**Tags**:
+
+`hot_update`
+
+**FQCN**:
+
+`inputs.ebpf.tunning.proc_cache_max_entries`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    tunning:
+      proc_cache_max_entries: 65536
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | int |
+| Unit | entries |
+| Range | [1024, 262144] |
+
+**Description**:
+
+Maximum number of allocated process-cache objects. This includes active
+proc-info hash entries, objects under initialization, objects being
+transferred through the proc-event ring, and objects waiting in the
+retired reclaim list.
+
+A retired object continues to consume one entry until its reference
+count reaches zero. Its BCC symbol cache is detached and reclaimed
+independently, so a delayed reference normally retains only the proc-info
+object and its directly accounted data, not the large symbol cache.
+
+The valid range is 1,024 to 262,144 entries, and the default is 65,536.
+On x86_64, one proc-info structure currently occupies about 240 bytes.
+Across the configurable range, the structures occupy about 240 KiB to
+60 MiB (15 MiB at the default). If every object is active, raw hash KVs
+add about 16 KiB to 4 MiB (1 MiB at the default), for a combined base
+estimate of about 256 KiB to 64 MiB. Actual usage can be much higher
+because this estimate excludes thread-name vectors, BCC symbol caches,
+allocator overhead, hash bucket allocation/growth and fragmentation, and
+shared mount-cache data.
+
+When the limit is reached, new proc-info objects are skipped. Existing
+entries continue to be queried, deleted, and reclaimed; target processes
+are not affected.
+
 ## Resources {#inputs.resources}
 
 ### Push Interval {#inputs.resources.push_interval}
@@ -11783,4 +11834,3 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
-

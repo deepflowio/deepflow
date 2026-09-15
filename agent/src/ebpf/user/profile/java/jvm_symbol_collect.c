@@ -46,6 +46,11 @@
 
 #define SYM_COLLECT_MAX_EVENTS 4
 #define JAVA_PREFLIGHT_VERSION_TIMEOUT_MS 5000
+// Timeout (seconds) for waiting a Java symbol file refresh to complete.
+// Guards against ipc_receiver_main exiting/hanging without notifying, so that
+// update_java_symbol_file() callers (e.g. java_syms_update_main) never hold
+// a symbolizer_proc_info (p->use) forever and proc-events never spins forever.
+#define JAVA_SYMS_REFRESH_TIMEOUT_SECS 10
 
 // Use thread pool to manage threads for obtaining Java symbols.
 symbol_collect_thread_pool_t *g_collect_pool;
@@ -1495,7 +1500,8 @@ static int delete_method_unload_symbol(receiver_args_t * args)
 	return delete_count;
 }
 
-static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
+static int update_java_perf_map_file(receiver_args_t * args, char *addr_str,
+				     bool requested)
 {
 	if (addr_str != NULL) {
 		int ret = VEC_OK;
@@ -1511,7 +1517,7 @@ static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 
 	int unload_count = vec_len(unload_addrs);
 	if (args->map_fp != NULL &&
-	    ((args->task->need_refresh && unload_count > 0)
+	    ((requested && unload_count > 0)
 	     || unload_count >= UPDATE_SYMS_FILE_UNLOAD_HIGH_THRESH)) {
 		fclose(args->map_fp);
 		// Prevent repeated fclose() in destroy_task() when the entire thread exits.
@@ -1531,8 +1537,8 @@ static int update_java_perf_map_file(receiver_args_t * args, char *addr_str)
 			return -1;
 		}
 		ebpf_debug
-		    ("=== file update args->task->need_refresh %d pid %d unload_count %d\n",
-		     args->task->need_refresh, args->task->pid, unload_count);
+		    ("=== file update requested %d pid %d unload_count %d\n",
+		     requested, args->task->pid, unload_count);
 	}
 
 	return 0;
@@ -1565,7 +1571,7 @@ static int symbol_msg_process(receiver_args_t * args, int sock_fd)
 	 * needs to be updated.
 	 */
 	if (args->replay_done && meta.type == METHOD_UNLOAD) {
-		if (update_java_perf_map_file(args, rcv_buf))
+		if (update_java_perf_map_file(args, rcv_buf, false))
 			return -1;
 	} else {
 		int written_count = fwrite(rcv_buf, sizeof(char), n, fp);
@@ -1642,8 +1648,44 @@ int epoll_events_process(receiver_args_t * args, int epoll_fd,
 	return 0;
 }
 
-static int destroy_task(symbol_collect_task_t * task,
-			symbol_collect_thread_pool_t * pool)
+/* Initialize the task condition variable to use CLOCK_MONOTONIC deadlines. */
+static int init_task_synchronization(symbol_collect_task_t *task)
+{
+	pthread_condattr_t cond_attr;
+	int ret;
+
+	ret = pthread_mutex_init(&task->mutex, NULL);
+	if (ret != 0)
+		return ret;
+
+	ret = pthread_condattr_init(&cond_attr);
+	if (ret != 0)
+		goto destroy_mutex;
+
+	ret = pthread_condattr_setclock(&cond_attr, CLOCK_MONOTONIC);
+	if (ret != 0)
+		goto destroy_cond_attr;
+
+	ret = pthread_cond_init(&task->cond, &cond_attr);
+	pthread_condattr_destroy(&cond_attr);
+	if (ret != 0)
+		goto destroy_mutex;
+
+	return 0;
+
+destroy_cond_attr:
+	pthread_condattr_destroy(&cond_attr);
+destroy_mutex:
+	pthread_mutex_destroy(&task->mutex);
+	return ret;
+}
+
+/*
+ * Free the task resources after put_task_ref() determines that the final
+ * creator, worker, or refresh-waiter reference has been released.
+ */
+static void destroy_task(symbol_collect_task_t * task,
+			 symbol_collect_thread_pool_t * pool)
 {
 	receiver_args_t *args = (receiver_args_t *) & task->args;
 	if (args->map_fp) {
@@ -1686,8 +1728,41 @@ static int destroy_task(symbol_collect_task_t * task,
 	ebpf_debug(JAVA_LOG_TAG "All resources cleaned up for symbol table"
 		   " management task (associated with JAVA PID: %d).\n",
 		   args->pid);
+	pthread_cond_destroy(&task->cond);
+	pthread_mutex_destroy(&task->mutex);
 	free(task);
-	return 0;
+}
+
+/*
+ * Drops one reference and frees the task when the last reference is released.
+ * Uses the pool lock so that the ref_count update on the worker side is ordered
+ * against get_ref_task_by_pid()/removal of the task from the pool slot.
+ */
+static void put_task_ref(symbol_collect_task_t *task,
+			 symbol_collect_thread_pool_t *pool)
+{
+	bool free_task = false;
+
+	pthread_mutex_lock(&pool->lock);
+	if (task->ref_count > 0)
+		task->ref_count--;
+	if (task->ref_count == 0)
+		free_task = true;
+	pthread_mutex_unlock(&pool->lock);
+
+	if (free_task)
+		destroy_task(task, pool);
+}
+
+static bool get_refresh_request(symbol_collect_task_t *task)
+{
+	bool requested;
+
+	pthread_mutex_lock(&task->mutex);
+	requested = task->need_refresh;
+	pthread_mutex_unlock(&task->mutex);
+
+	return requested;
 }
 
 static inline void refresh_symbol_file_and_notify(receiver_args_t *args,
@@ -1696,13 +1771,21 @@ static inline void refresh_symbol_file_and_notify(receiver_args_t *args,
 	if (!(args != NULL && args->task != NULL))
 		return;
 
+	/*
+	 * Checking and clearing need_refresh and signaling the condition variable
+	 * must use the same task->mutex as setting need_refresh and waiting in
+	 * update_java_symbol_file(); otherwise, a wakeup can be lost. The refresh
+	 * requester could be preempted after setting need_refresh outside the lock,
+	 * while the collector checks it, signals, and clears it. The requester would
+	 * then enter cond_wait and sleep forever.
+	 */
+	pthread_mutex_lock(&args->task->mutex);
 	if (args->task->need_refresh) {
-		pthread_mutex_lock(&args->task->mutex);
 		args->task->update_status = ret_val;
 		args->task->need_refresh = false;
 		pthread_cond_signal(&args->task->cond);
-		pthread_mutex_unlock(&args->task->mutex);
 	}
+	pthread_mutex_unlock(&args->task->mutex);
 }
 	
 static void *ipc_receiver_main(void *arguments)
@@ -1776,7 +1859,10 @@ static void *ipc_receiver_main(void *arguments)
 			}
 		}
 
-		refresh_symbol_file_and_notify(args, update_java_perf_map_file(args, NULL));
+		bool requested = get_refresh_request(args->task);
+		int ret = update_java_perf_map_file(args, NULL, requested);
+		if (requested)
+			refresh_symbol_file_and_notify(args, ret);
 	}
 
 cleanup:
@@ -1794,10 +1880,31 @@ static void *worker_thread(void *arg)
 {
 	symbol_collect_thread_pool_t *pool = arg;
 	pthread_t thread = pthread_self();
-	int thread_idx = pool->thread_index;
+	int thread_idx = -1;
 
+	/*
+	 * thread_pool_add_task() holds pool->lock until the new slot and
+	 * thread_count are fully published. Find this worker's slot only after
+	 * acquiring the same lock instead of reading a shared startup index.
+	 */
+	pthread_mutex_lock(&pool->lock);
+	for (int i = 0; i < pool->thread_count; i++) {
+		if (pthread_equal(pool->threads[i].thread, thread)) {
+			thread_idx = i;
+			break;
+		}
+	}
+	pthread_mutex_unlock(&pool->lock);
+
+	if (thread_idx < 0) {
+		ebpf_warning(JAVA_LOG_TAG "Worker thread slot not found.\n");
+		return NULL;
+	}
+
+	// Worker threads never exit.
 	while (1) {
 		pthread_mutex_lock(&pool->lock);
+		// If a task is pending, skip this wait and pick up the task directly.
 		while (pool->pending_tasks <= 0 && !pool->stop) {
 			pthread_cond_wait(&pool->cond, &pool->lock);
 		}
@@ -1807,10 +1914,6 @@ static void *worker_thread(void *arg)
 			pthread_exit(NULL);
 		}
 
-		if (pool->threads[thread_idx].thread != thread) {
-			pthread_mutex_unlock(&pool->lock);
-			pthread_exit(NULL);
-		}
 		// Get task from queue
 		symbol_collect_task_t *task;
 		task = list_first_entry(&pool->task_list_head,
@@ -1830,11 +1933,28 @@ static void *worker_thread(void *arg)
 		ebpf_debug(JAVA_LOG_TAG
 			   "Thread %ld finished task for java processes (PID: %d)\n",
 			   task->thread, task->pid);
+
+		/*
+		 * The collector (ipc_receiver_main) has exited. Mark the task as
+		 * stopped under task->mutex and wake every waiter, otherwise a
+		 * concurrent update_java_symbol_file() waiting on task->cond would
+		 * block forever (no collector thread is left to refresh/signal).
+		 * Waiters wake up, observe stopped/need_refresh==false and return
+		 * immediately. This must happen before the task is removed from the
+		 * pool slot and before its worker reference is released below.
+		 */
+		pthread_mutex_lock(&task->mutex);
+		task->stopped = true;
+		task->update_status = -1;
+		task->need_refresh = false;
+		pthread_cond_broadcast(&task->cond);
+		pthread_mutex_unlock(&task->mutex);
+
 		pthread_mutex_lock(&pool->lock);
 		pool->threads[thread_idx].task = NULL;
 		pool->task_count--;
 		pthread_mutex_unlock(&pool->lock);
-		destroy_task(task, pool);
+		put_task_ref(task, pool);
 	}
 
 	return NULL;
@@ -1892,42 +2012,89 @@ static int thread_pool_add_task(symbol_collect_thread_pool_t * pool,
 	if (pool->task_count > pool->thread_count) {
 		int ret;
 		pthread_t thread;
-		pool->thread_index = pool->thread_count;
-
-		if ((ret =
-		     pthread_create(&thread, NULL, &worker_thread, pool)) < 0) {
-			ebpf_warning(JAVA_LOG_TAG
-				     "Create worker thread failed with '%s(%d)'\n",
-				     strerror(errno), errno);
-			pthread_mutex_unlock(&pool->lock);
-			return -2;
-		}
-
-		if (pthread_detach(thread) != 0) {
-			ebpf_warning(JAVA_LOG_TAG
-				     "Failed to detach thread with '%s(%d)'\n",
-				     strerror(errno), errno);
-			pthread_mutex_unlock(&pool->lock);
-			return -1;
-		}
-
-		task_thread_t *new_threads = realloc(pool->threads,
-						     (++pool->thread_count) *
-						     sizeof(task_thread_t));
+		int new_count = pool->thread_count + 1;
+		/*
+		 * Grow the slot array first and reserve the new slot, then
+		 * create the thread. This ordering keeps the failure paths
+		 * consistent: pool->thread_count is only published after the
+		 * thread exists and is detached, so concurrent readers that
+		 * iterate pool->threads[0..thread_count) never see a slot that
+		 * is not backed by a live worker.
+		 */
+		task_thread_t *new_threads =
+		    realloc(pool->threads, new_count * sizeof(task_thread_t));
 		if (new_threads == NULL) {
 			ebpf_warning
 			    (JAVA_LOG_TAG
 			     "Failed to reallocate memory for threads with '%s(%d)'\n",
 			     strerror(errno), errno);
+			/*
+			 * Roll back the enqueue done above: the task was not
+			 * actually handed to any worker. Leaving it queued
+			 * would create a dangling entry nobody consumes, and
+			 * create_symbol_collect_task() would free it while it
+			 * is still linked, corrupting the queue.
+			 */
+			list_head_del(&task->list);
+			pool->task_count--;
+			pool->pending_tasks--;
 			pthread_mutex_unlock(&pool->lock);
 			return -1;
 		}
-
 		pool->threads = new_threads;
-		pool->threads[pool->thread_count - 1].task = NULL;
-		pool->threads[pool->thread_count - 1].thread = thread;
-		pool->threads[pool->thread_count - 1].index =
-		    pool->thread_count - 1;
+
+		if ((ret =
+		     pthread_create(&thread, NULL, &worker_thread, pool)) != 0) {
+			ebpf_warning(JAVA_LOG_TAG
+				     "Create worker thread failed with '%s(%d)'\n",
+				     strerror(ret), ret);
+			/*
+			 * No worker was created for this task. thread_count was
+			 * not incremented yet, so the reserved (but unused) slot
+			 * is simply ignored; it will be reused on the next
+			 * successful grow. Roll the task back out of the queue so
+			 * the caller can free it.
+			 */
+			list_head_del(&task->list);
+			pool->task_count--;
+			pool->pending_tasks--;
+			pthread_mutex_unlock(&pool->lock);
+			return -2;
+		}
+		/* From here on the worker is live and owns its reserved slot. */
+		pool->threads[pool->thread_count].task = NULL;
+		pool->threads[pool->thread_count].thread = thread;
+		pool->threads[pool->thread_count].index = pool->thread_count;
+		pool->thread_count = new_count;
+
+		int detach_ret = pthread_detach(thread);
+		if (detach_ret != 0) {
+			ebpf_warning(JAVA_LOG_TAG
+				     "Failed to detach thread with '%s(%d)'\n",
+				     strerror(detach_ret), detach_ret);
+			/*
+			 * A failed pthread_detach() does not revert the thread to
+			 * "undetached" and does not terminate it: it merely leaves
+			 * the worker in its original joinable state. Because the
+			 * thread is already running, its slot was published above
+			 * and pool->thread_count already includes it, so it keeps
+			 * running and will be reused by later add_task() calls.
+			 * The only lasting effect is that this worker stays
+			 * joinable, and this pool never joins workers (it has no
+			 * stop/join shutdown path), so no zombie accumulates while
+			 * the process runs; on process exit the kernel reclaims
+			 * every thread regardless. If a stop/join teardown is ever
+			 * added later, this one joinable worker would need to be
+			 * joined (or cancelled) there - until then it is harmless.
+			 * Roll the task back out of the queue so the caller can
+			 * free it.
+			 */
+			list_head_del(&task->list);
+			pool->task_count--;
+			pool->pending_tasks--;
+			pthread_mutex_unlock(&pool->lock);
+			return -1;
+		}
 		ebpf_debug(JAVA_LOG_TAG
 			   "Created new thread. Current thread count: %d\n",
 			   pool->thread_count);
@@ -1983,9 +2150,17 @@ static int create_symbol_collect_task(pid_t pid, options_t * opts,
 		goto cleanup;
 	}
 	task->func = ipc_receiver_main;
-	pthread_mutex_init(&task->mutex, NULL);
-	pthread_cond_init(&task->cond, NULL);
+	int sync_ret = init_task_synchronization(task);
+	if (sync_ret != 0) {
+		ebpf_warning(JAVA_LOG_TAG
+			     "Failed to initialize task synchronization with '%s(%d)'\n",
+			     strerror(sync_ret), sync_ret);
+		goto cleanup;
+	}
 	task->need_refresh = false;
+	/* The creator and worker each own one reference. */
+	task->ref_count = 2;
+	task->stopped = false;
 	options_t *__opts = (options_t *) (task + 1);
 	*__opts = *opts;
 
@@ -1999,6 +2174,21 @@ static int create_symbol_collect_task(pid_t pid, options_t * opts,
 
 	ret = thread_pool_add_task(g_collect_pool, task);
 	if (ret < 0) {
+		/*
+		 * thread_pool_add_task() rolled the task back out of the pool
+		 * queue on failure, so no worker can ever see it. Release both
+		 * reserved references; the second put_task_ref() frees the task
+		 * together with the sockets that were moved into args. The local socket
+		 * copies below must be invalidated afterwards, otherwise the cleanup
+		 * label would close the same fds a second time (double close,
+		 * which can silently close an unrelated fd once the number is
+		 * reused by another thread).
+		 */
+		put_task_ref(task, g_collect_pool);
+		put_task_ref(task, g_collect_pool);
+		task = NULL;	// put_task_ref() has already freed the task.
+		map_socket = -1;	// destroy_task() already closed it.
+		log_socket = -1;
 		goto cleanup;
 	}
 
@@ -2029,9 +2219,18 @@ static int create_symbol_collect_task(pid_t pid, options_t * opts,
 			     "Miss HotSpot/OpenJ9 JVM dependency file.\n");
 	}
 
+	/* All creator-side accesses to task are complete. */
+	put_task_ref(task, g_collect_pool);
 	return ret;
 
 cleanup:
+	/*
+	 * Only tasks that never acquired a reference reach here: either task is
+	 * NULL, or it was allocated but failed before ref_count was set to 1
+	 * (lines above), or the failed enqueue path already released the base
+	 * reference and set task to NULL. Never free a task whose reference was
+	 * handed to the pool/worker here - that would double-free it.
+	 */
 	if (task)
 		free(task);
 
@@ -2108,7 +2307,15 @@ static int symbol_collect_thread_pool_init(void)
 	return 0;
 }
 
-static symbol_collect_task_t *get_task_by_pid(pid_t pid)
+/*
+ * Looks up the task for pid under the pool lock and, on success, takes one
+ * reference on it before returning. The caller must release the reference with
+ * put_task_ref() when done. Taking the reference while still holding the pool
+ * lock closes the race where the worker finishes the task, removes it from the
+ * slot and releases its own reference immediately afterwards: the returned
+ * pointer stays valid until the caller drops its own reference.
+ */
+static symbol_collect_task_t *get_ref_task_by_pid(pid_t pid)
 {
 	if (g_collect_pool == NULL)
 		return NULL;
@@ -2123,6 +2330,8 @@ static symbol_collect_task_t *get_task_by_pid(pid_t pid)
 			break;
 		}
 	}
+	if (task != NULL)
+		task->ref_count++;
 	pthread_mutex_unlock(&g_collect_pool->lock);
 
 	return task;
@@ -2165,12 +2374,14 @@ int start_java_symbol_collection(pid_t pid, const char *opts)
 
 int update_java_symbol_file(pid_t pid, bool * is_new_collector)
 {
+	*is_new_collector = false;
+
 	char opts[PERF_PATH_SZ * 2];
 	snprintf(opts, sizeof(opts),
 		 DF_AGENT_LOCAL_PATH_FMT ".map,"
 		 DF_AGENT_LOCAL_PATH_FMT ".log", pid, pid);
 
-	symbol_collect_task_t *task = get_task_by_pid(pid);
+	symbol_collect_task_t *task = get_ref_task_by_pid(pid);
 	if (task == NULL) {
 		*is_new_collector = true;
 		return start_java_symbol_collection(pid, opts);
@@ -2181,6 +2392,7 @@ int update_java_symbol_file(pid_t pid, bool * is_new_collector)
 		ebpf_warning("The process with PID %d no longer exists.\n",
 			     pid);
 		task->args.attach_ret = -1;	// Force the thread to exit the task it is executing. 
+		put_task_ref(task, g_collect_pool);
 		return -1;
 	}
 	// The task is stale and needs to be cleaned up.
@@ -2188,16 +2400,81 @@ int update_java_symbol_file(pid_t pid, bool * is_new_collector)
 		task->args.attach_ret = -1;
 		ebpf_warning("The task for the process with PID %d"
 			     " is invalid and needs to be recreated.\n", pid);
+		put_task_ref(task, g_collect_pool);
 		return -1;
 	}
-	// Notify to refresh the file
+	// Set need_refresh and wait on the condition variable under the same lock;
+	// otherwise, the collector could check, signal, and clear the flag before
+	// this thread sleeps, causing a lost wakeup.
+	pthread_mutex_lock(&task->mutex);
+	/*
+	 * The collector thread may have already exited and removed this task from
+	 * the pool after get_ref_task_by_pid() returned (we hold a reference, so
+	 * the task is alive, but no collector is left to refresh it). Do not wait
+	 * on a task that can never complete the refresh; bail out immediately.
+	 */
+	if (task->stopped) {
+		pthread_mutex_unlock(&task->mutex);
+		put_task_ref(task, g_collect_pool);
+		return -1;
+	}
 	task->need_refresh = true;
 	// Refresh the file again; needs to wait for completion.
-	pthread_mutex_lock(&task->mutex);
-	pthread_cond_wait(&task->cond, &task->mutex);
+	/*
+	 * Use a predicate loop with one CLOCK_MONOTONIC deadline:
+	 * - The predicate loop handles spurious wakeups from pthread_cond_timedwait.
+	 * - Reusing one absolute deadline bounds the whole operation even after a
+	 *   spurious wakeup, and CLOCK_MONOTONIC prevents wall-clock adjustments
+	 *   from extending or shortening the wait.
+	 * - The timeout prevents this thread from sleeping forever if the collector
+	 *   thread (ipc_receiver_main) exits unexpectedly or hangs.
+	 *   On the normal path, the collector signals the waiter, and the worker
+	 *   broadcasts to all waiters during cleanup.
+	 */
+	struct timespec deadline;
+	if (clock_gettime(CLOCK_MONOTONIC, &deadline) != 0) {
+		int clock_err = errno;
+		ebpf_warning(JAVA_LOG_TAG
+			     "Get java symbol refresh deadline failed for pid %d "
+			     "with '%s(%d)'\n", pid, strerror(clock_err),
+			     clock_err);
+		task->need_refresh = false;
+		task->update_status = -1;
+	} else {
+		deadline.tv_sec += JAVA_SYMS_REFRESH_TIMEOUT_SECS;
+		while (task->need_refresh && !task->stopped) {
+			int refresh_rc =
+			    pthread_cond_timedwait(&task->cond, &task->mutex,
+						   &deadline);
+
+			/* A completion signal may race with the absolute deadline. */
+			if (!task->need_refresh || task->stopped)
+				break;
+
+			if (refresh_rc == 0)
+				continue;
+
+			if (refresh_rc == ETIMEDOUT) {
+				ebpf_warning(JAVA_LOG_TAG
+					     "Wait java symbol refresh timeout for "
+					     "pid %d. Give up waiting to avoid "
+					     "blocking symbol update.\n", pid);
+			} else {
+				ebpf_warning(JAVA_LOG_TAG
+					     "Wait java symbol refresh failed for "
+					     "pid %d with '%s(%d)'\n", pid,
+					     strerror(refresh_rc), refresh_rc);
+			}
+			task->need_refresh = false;
+			task->update_status = -1;
+			break;
+		}
+	}
+	int refresh_status = task->update_status;
 	pthread_mutex_unlock(&task->mutex);
+	put_task_ref(task, g_collect_pool);
 	*is_new_collector = false;
-	return task->update_status;
+	return refresh_status;
 }
 
 void show_collect_pool(void)

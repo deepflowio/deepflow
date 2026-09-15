@@ -112,7 +112,7 @@ void clean_local_java_symbols_files(int pid)
 }
 
 /* Called by 'cp_reader' thread */
-void add_java_syms_update_task(struct symbolizer_proc_info *p_info)
+bool add_java_syms_update_task(struct symbolizer_proc_info *p_info)
 {
 	// To ensure that 'java_syms_update_tasks_head' has been initialized.
 	while (!AO_GET(&tasks_list_init_done))
@@ -123,14 +123,16 @@ void add_java_syms_update_task(struct symbolizer_proc_info *p_info)
 	    clib_mem_alloc_aligned("java_update_task", sizeof(*task), 0, NULL);
 	if (task == NULL) {
 		ebpf_warning("java_update_task alloc memory failed.\n");
+		return false;
 	}
 	memset(task, 0, sizeof(*task));
 	task->p = p_info;
 
 	pthread_mutex_lock(&list_lock);
-	AO_INC(&p_info->use);
+	PROC_USE_INC_REASON(p_info, PROC_USE_INC_REASON_JAVA_TAST);
 	list_add_tail(&task->list, &java_syms_update_tasks_head);
 	pthread_mutex_unlock(&list_lock);
+	return true;
 }
 
 void java_syms_update_main(void *arg)
