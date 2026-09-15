@@ -43,6 +43,7 @@
 #include "utils.h"
 #include "symbol.h"
 #include "proc.h"
+#include "proc_cache_admission.h"
 #include "tracer.h"
 #include "load.h"
 #if defined __x86_64__
@@ -200,7 +201,6 @@ static volatile u32 proc_cache_admission_paused;
 static volatile u64 proc_cache_limit_last_warn_ns;
 /* Serializes admission against a concurrent limit update; never used by readers. */
 static pthread_mutex_t proc_cache_limit_update_lock = PTHREAD_MUTEX_INITIALIZER;
-#define PROC_CACHE_LIMIT_WARN_INTERVAL_NS (2ULL * 60 * 60 * NS_IN_SEC)
 static void *k_resolver;	// for kernel symbol cache
 static volatile u32 k_resolver_lock;
 static u64 sys_btime_msecs;	// system boot time(milliseconds)
@@ -232,53 +232,24 @@ static void update_proc_cache_admission_state(void)
 {
 	u64 total = __atomic_load_n(&proc_cache_total_count, __ATOMIC_ACQUIRE);
 	u64 limit = __atomic_load_n(&proc_cache_total_limit, __ATOMIC_ACQUIRE);
+	bool limit_reached = total >= limit;
+	u64 now_ns = limit_reached ?
+	    gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN) : 0;
+
+	if (!proc_cache_admission_update(&proc_cache_admission_paused,
+					 &proc_cache_limit_last_warn_ns,
+					 limit_reached, now_ns))
+		return;
+
 	u64 rejected = __atomic_load_n(&proc_cache_rejected_total,
 				       __ATOMIC_RELAXED);
-
-	if (total >= limit) {
-		u64 now_ns = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
-		u32 was_paused = __atomic_exchange_n(&proc_cache_admission_paused,
-						      1, __ATOMIC_ACQ_REL);
-		u64 last_warn = __atomic_load_n(&proc_cache_limit_last_warn_ns,
-						 __ATOMIC_ACQUIRE);
-		bool should_warn = was_paused == 0;
-
-		if (should_warn) {
-			__atomic_store_n(&proc_cache_limit_last_warn_ns, now_ns,
-					 __ATOMIC_RELEASE);
-		} else if (last_warn != 0 && now_ns >= last_warn &&
-			   now_ns - last_warn >=
-			   PROC_CACHE_LIMIT_WARN_INTERVAL_NS) {
-			should_warn = __atomic_compare_exchange_n(
-			    &proc_cache_limit_last_warn_ns, &last_warn, now_ns,
-			    false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
-		}
-
-		if (should_warn)
-			ebpf_warning("Proc cache limit reached: total=%lu "
-				     "limit=%lu active=%lu retired=%lu "
-				     "rejected=%lu\n",
-				     (unsigned long)total, (unsigned long)limit,
-				     (unsigned long)proc_cache_active_count(),
-				     (unsigned long)__atomic_load_n(
-					 &proc_cache_retired_count,
-					 __ATOMIC_RELAXED),
-				     (unsigned long)rejected);
-		return;
-	}
-
-	u32 paused = __atomic_load_n(&proc_cache_admission_paused,
-				     __ATOMIC_ACQUIRE);
-	if (paused != 0 && __atomic_compare_exchange_n(
-		&proc_cache_admission_paused, &paused, 0, false,
-		__ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
-		__atomic_store_n(&proc_cache_limit_last_warn_ns, 0,
-				 __ATOMIC_RELEASE);
-		ebpf_info("Proc cache capacity recovered: total=%lu limit=%lu "
-			  "rejected=%lu\n",
-			  (unsigned long)total, (unsigned long)limit,
-			  (unsigned long)rejected);
-	}
+	ebpf_warning("Proc cache limit reached: total=%lu "
+		     "limit=%lu active=%lu retired=%lu rejected=%lu\n",
+		     (unsigned long)total, (unsigned long)limit,
+		     (unsigned long)proc_cache_active_count(),
+		     (unsigned long)__atomic_load_n(&proc_cache_retired_count,
+						 __ATOMIC_RELAXED),
+		     (unsigned long)rejected);
 }
 
 static bool try_reserve_proc_cache_slot(void)

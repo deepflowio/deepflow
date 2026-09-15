@@ -24,7 +24,7 @@ ARCH ?= $(shell uname -m)
 CC ?= gcc
 CFLAGS ?= -std=gnu99 --static -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 
-EXECS := test_symbol test_offset test_insns_cnt test_bihash test_vec test_fetch_container_id test_parse_range test_set_ports_bitmap test_match_pids test_safe_snprintf
+EXECS := test_symbol test_offset test_insns_cnt test_bihash test_vec test_fetch_container_id test_parse_range test_set_ports_bitmap test_match_pids test_safe_snprintf test_proc_cache_admission
 ifeq ($(ARCH), x86_64)
 #-lbcc -lstdc++
         LDLIBS += ../libtrace.a ./libtrace_utils.a -ljattach -lbcc_bpf -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread -lbcc -lstdc++ -ldl -lm
@@ -38,6 +38,11 @@ all: $(EXECS) libtrace_utils.a
 	$(call msg,TEST,$@)
 	echo "$(Q)$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)"
 	$(Q)$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+	$(Q)./$@
+
+test_proc_cache_admission: test_proc_cache_admission.c
+	$(call msg,TEST,$@)
+	$(Q)$(CC) $(CFLAGS) -o $@ $^ -lpthread
 	$(Q)./$@
 
 libtrace_utils.a:

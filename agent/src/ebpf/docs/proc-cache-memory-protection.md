@@ -546,10 +546,10 @@ unlock retired list
 建议行为：
 
 ```text
-第一次达到上限      立即打印 WARNING
-持续处于超限状态    每 2 小时最多重复一次 WARNING
-恢复到限制以下      立即打印一次 INFO
-恢复后再次达到上限  立即打印 WARNING
+第一次达到上限                立即打印 WARNING
+持续处于超限状态              每 2 小时最多重复一次 WARNING
+在容量上限附近反复进入和恢复  每 2 小时最多打印一次 WARNING
+恢复到限制以下                不打印日志
 ```
 
 时间间隔：
@@ -567,12 +567,6 @@ unlock retired list
 
 ```text
 Proc cache limit reached: total=65536 limit=65536 active=54120 retired=11320 rejected=1823
-```
-
-恢复：
-
-```text
-Proc cache capacity recovered: total=65480 limit=65536 rejected=1841
 ```
 
 ### 12.3 计数优先于日志
