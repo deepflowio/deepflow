@@ -70,8 +70,8 @@
 * feature: adds system alarm of recorder cleaner [#8588](https://github.com/deepflowio/deepflow/pull/8588) by [ZhengYa-0110](https://github.com/ZhengYa-0110)
 
 #### Documentation
+* docs: clarify Kubernetes agent resource limit updates [#11900](https://github.com/deepflowio/deepflow/pull/11900) by [kylewanginchina](https://github.com/kylewanginchina)
 * docs: update agent config doc [#8661](https://github.com/deepflowio/deepflow/pull/8661) by [sharang](https://github.com/sharang)
-
 
 #### Refactoring
 * refactor: add logs [#8786](https://github.com/deepflowio/deepflow/pull/8786) by [yuanchaoa](https://github.com/yuanchaoa)
