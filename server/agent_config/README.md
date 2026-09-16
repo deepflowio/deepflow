@@ -35,6 +35,14 @@ global:
 deepflow-agent uses cgroups to limit CPU usage.
 1 millicpu = 1 millicore = 0.001 core.
 
+Kubernetes deployments:
+- The agent updates the target DaemonSet's Pod template to apply resource limits.
+  With the RollingUpdate strategy, template changes trigger Pod recreation even
+  though this setting is marked as hot_update.
+- All agents updating the same target DaemonSet must have identical CPU and memory
+  limits, even if they belong to different agent groups. Conflicting limits may
+  cause repeated template updates and continuous rolling Pod recreation.
+
 ### Memory Limit {#global.limits.max_memory}
 
 **Tags**:
@@ -68,7 +76,13 @@ deepflow-agent uses cgroups to limit memory usage.
 Note:
 - Memory of the dedicated deepflow-agent is not limited
 - Memory limits for container deepflow-agent are enforced by container
-- Memory limits for container deepflow-agent in the same cluster need to be consistent
+
+Kubernetes deployments:
+- The agent updates the target DaemonSet's Pod template to apply resource limits.
+  With the RollingUpdate strategy, template changes trigger Pod recreation.
+- All agents updating the same target DaemonSet must have identical CPU and memory
+  limits, even if they belong to different agent groups. Conflicting limits may
+  cause repeated template updates and continuous rolling Pod recreation.
 
 ### Maximum Log Backhaul Rate {#global.limits.max_log_backhaul_rate}
 

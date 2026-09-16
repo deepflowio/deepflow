@@ -35,6 +35,13 @@ global:
 deepflow-agent 使用 cgroups 来限制自身的 CPU 用量，
 1 millicpu = 1 millicore = 0.001 core。
 
+Kubernetes 部署注意：
+- 采集器会修改目标 DaemonSet 的 Pod 模板以应用资源限制。
+  使用 RollingUpdate 策略时，模板变更会触发 Pod 重建，
+  即使该配置标记为 hot_update。
+- 所有修改同一目标 DaemonSet 的采集器，其 CPU 和内存限制必须保持一致，
+  即使它们属于不同采集器组。限制不一致可能导致反复修改模板并持续触发 Pod 滚动重建。
+
 ### 内存限制 {#global.limits.max_memory}
 
 **标签**:
@@ -68,7 +75,12 @@ deepflow-agent 使用 cgroups 限制自身的 memory 用量。
 注意：
 - 专属采集器内存不受限制
 - 容器采集器内存限制由容器管理工具来实现
-- 同集群的容器采集器内存限制需要一致
+
+Kubernetes 部署注意：
+- 采集器会修改目标 DaemonSet 的 Pod 模板以应用资源限制。
+  使用 RollingUpdate 策略时，模板变更会触发 Pod 重建。
+- 所有修改同一目标 DaemonSet 的采集器，其 CPU 和内存限制必须保持一致，
+  即使它们属于不同采集器组。限制不一致可能导致反复修改模板并持续触发 Pod 滚动重建。
 
 ### 日志每小时回传上限 {#global.limits.max_log_backhaul_rate}
 
