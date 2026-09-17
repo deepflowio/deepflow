@@ -21,8 +21,9 @@ use std::sync::{
 };
 
 use ahash::AHashMap;
+#[cfg(not(target_os = "windows"))]
+use log::warn;
 use log::{debug, info};
-use pnet::datalink;
 use public::enums::IpProtocol;
 
 use super::fast_path::EndpointTableType;
@@ -46,6 +47,7 @@ use crate::common::{FlowAclListener, FlowAclListenerId};
 use npb_pcap_policy::PolicyData;
 use public::proto::agent::{AgentType, RoleType};
 use public::queue::Sender;
+use public::utils::net::link_list_with_ips;
 
 pub struct PolicyMonitor {
     sender: Arc<Sender<String>>,
@@ -481,7 +483,19 @@ impl Policy {
         self.table.update_interfaces(ifaces);
 
         // TODO: 后续需要添加监控本地网卡，如果网卡配置有变化应该也需要出发表更新
-        let local_interfaces = datalink::interfaces();
+        let local_interfaces = match link_list_with_ips() {
+            #[cfg(target_os = "windows")]
+            Err(e) => {
+                info!("link_list failed: {:?}, Maybe the issue is with the WinPcap driver call at the system level, use an empty vec instead.", e);
+                vec![]
+            }
+            #[cfg(not(target_os = "windows"))]
+            Err(e) => {
+                warn!("link_list failed: {:?}, Use an empty vec instead", e);
+                vec![]
+            }
+            Ok(v) => v,
+        };
         self.forward
             .update_from_config(agent_type, ifaces, &local_interfaces);
     }
