@@ -15,6 +15,7 @@
  */
 
 use std::{
+    collections::HashMap,
     ffi::{CStr, CString},
     fs,
     mem::MaybeUninit,
@@ -24,7 +25,7 @@ use std::{
 };
 
 use ipnet::IpNet;
-use log::warn;
+use log::{debug, warn};
 use neli::{
     consts::{nl::*, rtnl::*, socket::*},
     err::NlError::Nlmsgerr,
@@ -36,6 +37,7 @@ use neli::{
 use nix::libc::IFLA_INFO_KIND;
 use pnet::{
     datalink::{self, NetworkInterface},
+    ipnetwork::IpNetwork,
     packet::icmpv6::{
         ndp::{MutableNeighborSolicitPacket, NdpOption, NdpOptionTypes, NeighborAdvertPacket},
         Icmpv6Code, Icmpv6Types,
@@ -349,6 +351,7 @@ fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
                     peer_index,
                     link_netnsid,
                     stats: link_stats.unwrap_or_default(),
+                    ips: vec![],
                 });
             }
         }
@@ -431,6 +434,31 @@ pub fn link_list() -> Result<Vec<Link>> {
     request_link_info(None)
 }
 
+pub fn link_list_with_ips() -> Result<Vec<Link>> {
+    let mut links = link_list()?;
+    match addr_list() {
+        Ok(addrs) => {
+            let mut ip_map = HashMap::new();
+            for addr in addrs {
+                let Ok(ip) = IpNetwork::new(addr.ip_addr, addr.prefix_len) else {
+                    continue;
+                };
+                ip_map
+                    .entry(addr.if_index)
+                    .or_insert_with(Vec::new)
+                    .push(ip);
+            }
+            for link in &mut links {
+                if let Some(ips) = ip_map.remove(&link.if_index) {
+                    link.ips = ips;
+                }
+            }
+        }
+        Err(e) => debug!("failed to get address list for link ips: {}", e),
+    }
+    Ok(links)
+}
+
 pub fn addr_list() -> Result<Vec<Addr>> {
     let msg = Ifaddrmsg {
         ifa_family: RtAddrFamily::Unspecified,
@@ -460,14 +488,7 @@ pub fn addr_list() -> Result<Vec<Addr>> {
 
         let payload = m.get_payload()?;
 
-        let mut ip_addr = None;
-        for attr in payload.rtattrs.iter() {
-            match attr.rta_type {
-                Ifa::Address => ip_addr = parse_ip_slice(attr.rta_payload.as_ref()),
-                _ => (),
-            }
-        }
-        if let Some(ip_addr) = ip_addr {
+        if let Some(ip_addr) = parse_addr_ip(&payload.rtattrs) {
             addrs.push(Addr {
                 if_index: payload.ifa_index as u32,
                 ip_addr,
@@ -477,6 +498,27 @@ pub fn addr_list() -> Result<Vec<Addr>> {
         }
     }
     Ok(addrs)
+}
+
+/// 从 rtnetlink 地址属性里解析本地地址。
+///
+/// Linux 对普通地址和对点对点地址的语义不同：
+/// - 普通地址：`IFA_ADDRESS` 就是本机地址。
+/// - 点对点地址：`IFA_LOCAL` 是本机地址，`IFA_ADDRESS` 是对端地址。
+///
+/// 因此优先使用 `IFA_LOCAL`，不存在时再回退到 `IFA_ADDRESS`，
+/// 避免把对端地址错误绑定到本地网卡。
+fn parse_addr_ip(attrs: &RtBuffer<Ifa, Buffer>) -> Option<IpAddr> {
+    let mut local = None;
+    let mut address = None;
+    for attr in attrs.iter() {
+        match attr.rta_type {
+            Ifa::Local => local = parse_ip_slice(attr.rta_payload.as_ref()),
+            Ifa::Address => address = parse_ip_slice(attr.rta_payload.as_ref()),
+            _ => {}
+        }
+    }
+    local.or(address)
 }
 
 fn route_send_req(req: Nlmsghdr<Rtm, Rtmsg>) -> Result<Vec<Route>> {
