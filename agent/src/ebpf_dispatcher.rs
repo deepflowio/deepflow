@@ -1538,6 +1538,16 @@ impl EbpfCollector {
         process_listener: &Arc<ProcessListener>,
     ) -> Result<Box<Self>> {
         let ebpf_config = config.load();
+
+        #[cfg(feature = "extended_observability")]
+        unsafe {
+            // Older Agents could leave a persistent root-cgroup attachment.
+            // Run its compatibility cleanup before all current eBPF switches.
+            if ebpf::cleanup_legacy_tcp_option_tracing() != 0 {
+                warn!("failed to clean up legacy TCP Option Tracing attachment");
+            }
+        }
+
         let is_ebpf_meltdown = crate::utils::guard::is_kernel_ebpf_meltdown();
         let is_uprobe_meltdown = crate::utils::guard::is_kernel_ebpf_uprobe_meltdown();
 
