@@ -656,6 +656,38 @@ pub unsafe fn string_from_null_terminated_c_str(ptr: *const u8) -> String {
 }
 
 impl EbpfCollector {
+    #[cfg(feature = "extended_observability")]
+    unsafe fn apply_tcp_option_tracing_config(config: &EbpfConfig) {
+        let tcp_option_trace = &config.ebpf.socket.sock_ops.tcp_option_trace;
+
+        // Close the cgroup link before updating disabled-state config.
+        if !tcp_option_trace.enabled && ebpf::set_tcp_option_tracing_enabled(false) != 0 {
+            warn!("failed to disable TCP Option Tracing");
+        }
+
+        let config_applied = ebpf::set_tcp_option_tracing_config(
+            tcp_option_trace.sampling_window_bytes as u32,
+            tcp_option_trace.version as u32,
+            config.agent_id as u32,
+        ) == 0;
+        if !config_applied {
+            warn!(
+                "failed to set tcp option tracing config: sampling window {}, version {:?}, agent ID {}",
+                tcp_option_trace.sampling_window_bytes,
+                tcp_option_trace.version,
+                config.agent_id
+            );
+        }
+
+        // Prepare a valid config before loading and attaching the programs.
+        if tcp_option_trace.enabled
+            && config_applied
+            && ebpf::set_tcp_option_tracing_enabled(true) != 0
+        {
+            warn!("TCP Option Tracing enable failed");
+        }
+    }
+
     extern "C" fn ebpf_l7_callback(
         _: *mut c_void,
         #[allow(unused)] queue_id: c_int,
@@ -1129,30 +1161,7 @@ impl EbpfCollector {
         ebpf::set_dpdk_trace_enabled(config.dpdk_enabled);
 
         #[cfg(feature = "extended_observability")]
-        {
-            let tcp_option_trace = &config.ebpf.socket.sock_ops.tcp_option_trace;
-
-            if ebpf::set_tcp_option_tracing_config(
-                tcp_option_trace.sampling_window_bytes as u32,
-                tcp_option_trace.version as u32,
-                config.agent_id as u32,
-            ) != 0
-            {
-                warn!(
-                    "failed to set tcp option tracing config: sampling window {}, version {:?}, agent ID {}",
-                    tcp_option_trace.sampling_window_bytes,
-                    tcp_option_trace.version,
-                    config.agent_id
-                );
-            }
-
-            if ebpf::set_tcp_option_tracing_enabled(tcp_option_trace.enabled) != 0 {
-                warn!(
-                    "tcp option tracing enable failed (set enabled = {})",
-                    tcp_option_trace.enabled
-                );
-            }
-        }
+        Self::apply_tcp_option_tracing_config(config);
 
         if ebpf::set_proc_cache_max_entries(config.ebpf.tunning.proc_cache_max_entries) != 0 {
             warn!(
@@ -1609,30 +1618,7 @@ impl EbpfCollector {
             Self::ebpf_on_config_change(config.l7_log_packet_size);
 
             #[cfg(feature = "extended_observability")]
-            {
-                let tcp_option_trace = &config.ebpf.socket.sock_ops.tcp_option_trace;
-
-                if ebpf::set_tcp_option_tracing_config(
-                    tcp_option_trace.sampling_window_bytes as u32,
-                    tcp_option_trace.version as u32,
-                    config.agent_id as u32,
-                ) != 0
-                {
-                    warn!(
-                        "failed to set tcp option tracing config: sampling window {}, version {:?}, agent ID {}",
-                        tcp_option_trace.sampling_window_bytes,
-                        tcp_option_trace.version,
-                        config.agent_id
-                    );
-                }
-
-                if ebpf::set_tcp_option_tracing_enabled(tcp_option_trace.enabled) != 0 {
-                    warn!(
-                        "tcp option tracing enable failed (set enabled = {})",
-                        tcp_option_trace.enabled
-                    );
-                }
-            }
+            Self::apply_tcp_option_tracing_config(config);
         }
         if config.l7_log_enabled() || config.dpdk_enabled {
             self.start();
