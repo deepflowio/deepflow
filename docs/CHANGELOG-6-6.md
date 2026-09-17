@@ -9,6 +9,7 @@
 #### New Feature
 
 #### Bug Fix
+* fix(agent): 完善 TCP Option Tracing 生命周期和可观测性 [#11903](https://github.com/deepflowio/deepflow/pull/11903) by [rvql](https://github.com/rvql)
 * fix: agnet - eBPF Fix the kernel kick on CPU0 was not triggered [#8818](https://github.com/deepflowio/deepflow/pull/8818) by [yinjiping](https://github.com/yinjiping)
 * fix: agent - eBPF Fix Crashes Caused by Packet Count Statistics [#8815](https://github.com/deepflowio/deepflow/pull/8815) by [yinjiping](https://github.com/yinjiping)
 * fix: wan type cidr may not be tagged [#8811](https://github.com/deepflowio/deepflow/pull/8811) by [lzf575](https://github.com/lzf575)
