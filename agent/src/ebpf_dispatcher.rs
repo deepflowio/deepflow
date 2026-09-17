@@ -45,6 +45,8 @@ use std::ptr::{self, null_mut};
 use std::slice;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
+#[cfg(feature = "extended_observability")]
+use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -159,6 +161,83 @@ pub struct EbpfCounter {
 
 pub struct SyncEbpfCounter {
     counter: Arc<EbpfCounter>,
+}
+
+#[cfg(feature = "extended_observability")]
+struct TcpOptionTracingCounter {
+    // Keep the complete snapshot coherent. Stats collection is currently
+    // serialized, so this lock is uncontended and held only for the delta.
+    previous: Mutex<Option<ebpf::tcp_option_tracing::TcpOptionTracingStats>>,
+}
+
+#[cfg(feature = "extended_observability")]
+impl TcpOptionTracingCounter {
+    fn new() -> Self {
+        Self {
+            // Do not report errors accumulated between eBPF initialization and
+            // counter registration as a spike in the first collection period.
+            previous: Mutex::new(ebpf::tcp_option_tracing::stats().ok()),
+        }
+    }
+}
+
+#[cfg(feature = "extended_observability")]
+impl OwnedCountable for TcpOptionTracingCounter {
+    fn get_counters(&self) -> Vec<Counter> {
+        let stats = match ebpf::tcp_option_tracing::stats() {
+            Ok(current) => {
+                let mut previous = self.previous.lock().unwrap();
+                let delta = if let Some(previous) = *previous {
+                    current.delta_since(previous)
+                } else {
+                    ebpf::tcp_option_tracing::TcpOptionTracingStats::default()
+                };
+                *previous = Some(current);
+                delta
+            }
+            Err(error) => {
+                debug!("failed to read TCP Option Tracing stats: {error}");
+                ebpf::tcp_option_tracing::TcpOptionTracingStats::default()
+            }
+        };
+
+        vec![
+            (
+                "map_update_failed",
+                CounterType::Counted,
+                CounterValue::Unsigned(stats.map_update_failed),
+            ),
+            (
+                "map_delete_failed",
+                CounterType::Counted,
+                CounterValue::Unsigned(stats.map_delete_failed),
+            ),
+            (
+                "map_lookup_missed",
+                CounterType::Counted,
+                CounterValue::Unsigned(stats.map_lookup_missed),
+            ),
+            (
+                "task_tgid_read_failed",
+                CounterType::Counted,
+                CounterValue::Unsigned(stats.task_tgid_read_failed),
+            ),
+            (
+                "reserve_failed",
+                CounterType::Counted,
+                CounterValue::Unsigned(stats.reserve_failed),
+            ),
+            (
+                "store_failed",
+                CounterType::Counted,
+                CounterValue::Unsigned(stats.store_failed),
+            ),
+        ]
+    }
+
+    fn closed(&self) -> bool {
+        false
+    }
 }
 
 impl OwnedCountable for SyncEbpfCounter {
@@ -1512,6 +1591,12 @@ impl EbpfCollector {
             #[cfg(feature = "extended_observability")]
             memory_profiler.context(),
         )?;
+
+        #[cfg(feature = "extended_observability")]
+        stats_collector.register_countable(
+            &stats::NoTagModule("tcp_option_tracing"),
+            Countable::Owned(Box::new(TcpOptionTracingCounter::new())),
+        );
 
         info!("ebpf collector initialized.");
         Ok(Box::new(EbpfCollector {
