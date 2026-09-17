@@ -15,12 +15,14 @@
  */
 
 use std::{
+    collections::HashMap,
     ffi::CStr,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     ptr,
 };
 
 use log::{debug, trace, warn};
+use pnet::ipnetwork::IpNetwork;
 use regex::Regex;
 use windows::Win32::{
     Foundation::{CHAR, ERROR_BUFFER_OVERFLOW, NO_ERROR},
@@ -228,6 +230,32 @@ pub fn link_by_name<S: AsRef<str>>(name: S) -> Result<Link> {
 
 pub fn link_list() -> Result<Vec<Link>> {
     get_pcap_interfaces()
+}
+
+pub fn link_list_with_ips() -> Result<Vec<Link>> {
+    let mut links = link_list()?;
+    match addr_list() {
+        Ok(addrs) => {
+            let mut ip_map = HashMap::new();
+            for addr in addrs {
+                let Ok(ip) = IpNetwork::new(addr.ip_addr, addr.prefix_len) else {
+                    continue;
+                };
+
+                ip_map
+                    .entry(addr.if_index)
+                    .or_insert_with(Vec::new)
+                    .push(ip);
+            }
+            for link in &mut links {
+                if let Some(ips) = ip_map.remove(&link.if_index) {
+                    link.ips = ips;
+                }
+            }
+        }
+        Err(e) => debug!("failed to get address list for link ips: {}", e),
+    }
+    Ok(links)
 }
 
 pub fn links_by_name_regex<S: AsRef<str>>(regex: S) -> Result<Vec<Link>> {

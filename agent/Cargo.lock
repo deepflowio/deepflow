@@ -1037,7 +1037,6 @@ dependencies = [
  "integration_skywalking",
  "integration_vector",
  "ipnet",
- "ipnetwork",
  "k8s-openapi 0.24.0",
  "kube",
  "kube-derive",
