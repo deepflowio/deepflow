@@ -17,6 +17,9 @@
 extern crate libc;
 extern crate trace_utils;
 
+#[cfg(feature = "extended_observability")]
+pub mod tcp_option_tracing;
+
 pub use libc::c_char;
 pub use libc::c_int;
 pub use libc::c_uchar; // u8
