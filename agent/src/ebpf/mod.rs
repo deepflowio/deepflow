@@ -918,6 +918,11 @@ extern "C" {
                pub fn envoy_trace_start() -> c_int;
 
                /**
+                * Remove root-cgroup SockOps attachments left by older Agents.
+                */
+               pub fn cleanup_legacy_tcp_option_tracing() -> c_int;
+
+               /**
                 * @brief Enable or disable the TCP option tracing feature.
                 *
                 * When enabled, the tcp_option_tracing eBPF program is loaded and attached
