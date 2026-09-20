@@ -235,7 +235,8 @@ pub struct MetaPacket<'a> {
     pub protocol_data: ProtocolData,
     pub tap_port: TapPort, // packet与xflow复用
     pub signal_source: SignalSource,
-    pub payload_len: u16,
+    pub payload_len: u16,     // eBPF和cBPF聚合时会修改该字段来解析应用协议
+    pub raw_payload_len: u16, // 原始数据包的 payload 长度，用来判断重传
     pub vlan: u16,
     pub is_active_service: bool,
     pub queue_hash: u8,
@@ -359,7 +360,8 @@ impl<'a> MetaPacket<'a> {
     #[inline]
     pub fn is_psh_ack(&self) -> bool {
         if let ProtocolData::TcpHeader(tcp_data) = &self.protocol_data {
-            return tcp_data.flags & TcpFlags::MASK == TcpFlags::PSH_ACK && self.payload_len > 1;
+            return tcp_data.flags & TcpFlags::MASK == TcpFlags::PSH_ACK
+                && self.has_valid_payload();
         }
         false
     }
@@ -374,7 +376,7 @@ impl<'a> MetaPacket<'a> {
 
     #[inline]
     pub fn has_valid_payload(&self) -> bool {
-        self.payload_len > 1
+        self.raw_payload_len > 1
     }
 
     #[inline]
@@ -883,6 +885,7 @@ impl<'a> MetaPacket<'a> {
                 self.protocol_data = ProtocolData::IcmpData(icmp_data);
                 self.payload_len =
                     (self.packet_len as usize - (packet.len() - size_checker as usize)) as u16;
+                self.raw_payload_len = self.payload_len;
                 self.header_type = HeaderType::Ipv4Icmp;
                 return Ok(());
             }
@@ -914,6 +917,7 @@ impl<'a> MetaPacket<'a> {
                 self.l4_payload_len =
                     (self.packet_len as usize - (packet.len() - size_checker as usize)) as u16;
                 self.payload_len = self.l4_payload_len as u16;
+                self.raw_payload_len = self.payload_len;
                 self.header_type = header_type;
             }
             IpProtocol::TCP => {
@@ -976,6 +980,7 @@ impl<'a> MetaPacket<'a> {
                 self.l4_payload_len =
                     (self.packet_len - (packet.len() - size_checker as usize) as u32) as u16;
                 self.payload_len = self.l4_payload_len as u16;
+                self.raw_payload_len = self.payload_len;
                 self.header_type = header_type;
                 if let ProtocolData::TcpHeader(tcp_data) = &mut self.protocol_data {
                     tcp_data.data_offset = data_offset;
@@ -1020,6 +1025,7 @@ impl<'a> MetaPacket<'a> {
                 }
                 self.payload_len =
                     (self.packet_len - (packet.len() - size_checker as usize) as u32) as u16;
+                self.raw_payload_len = self.payload_len;
                 self.protocol_data = ProtocolData::IcmpData(icmp_data);
                 self.header_type = HeaderType::Ipv6Icmp;
                 return Ok(());
@@ -1027,6 +1033,7 @@ impl<'a> MetaPacket<'a> {
             _ => {
                 self.payload_len =
                     (self.packet_len - (packet.len() - size_checker as usize) as u32) as u16;
+                self.raw_payload_len = self.payload_len;
                 return Ok(());
             }
         }
@@ -1179,6 +1186,7 @@ impl<'a> MetaPacket<'a> {
         );
         packet.packet_len = data.syscall_len as u32 + 54; // 目前仅支持TCP
         packet.payload_len = data.cap_len as u16;
+        packet.raw_payload_len = packet.payload_len;
         packet.l4_payload_len = data.cap_len as u16;
         packet.tap_port = TapPort::from_ebpf(data.process_id, data.source);
         packet.signal_source = SignalSource::EBPF;
@@ -1321,6 +1329,7 @@ impl<'a> MetaPacket<'a> {
             tap_port: self.tap_port,
             signal_source: self.signal_source,
             payload_len: self.payload_len,
+            raw_payload_len: self.payload_len,
             sub_packets: self.sub_packets.clone(),
             header_type: self.header_type,
             l2_l3_opt_size: self.l2_l3_opt_size,
