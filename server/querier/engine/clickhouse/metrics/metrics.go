@@ -378,6 +378,8 @@ func GetMetricsByDBTableStatic(db string, table string, customMetrics map[string
 			return PROC_PERM_EVENT_METRICS
 		case ckcommon.TABLE_NAME_PROC_OPS_EVENT:
 			return PROC_OPS_EVENT_METRICS
+		case ckcommon.TABLE_NAME_PROC_BLOCK_EVENT:
+			return PROC_BLOCK_EVENT_METRICS
 		case ckcommon.TABLE_NAME_ALERT_EVENT, ckcommon.TABLE_NAME_ALERT_RECORD:
 			return GetAlarmEventMetrics()
 		case ckcommon.TABLE_NAME_FILE_EVENT_METRICS:
@@ -754,6 +756,9 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case ckcommon.TABLE_NAME_PROC_OPS_EVENT:
 			metrics = PROC_OPS_EVENT_METRICS
 			replaceMetrics = PROC_OPS_EVENT_METRICS_REPLACE
+		case ckcommon.TABLE_NAME_PROC_BLOCK_EVENT:
+			metrics = PROC_BLOCK_EVENT_METRICS
+			replaceMetrics = PROC_BLOCK_EVENT_METRICS_REPLACE
 		case ckcommon.TABLE_NAME_ALERT_EVENT, ckcommon.TABLE_NAME_ALERT_RECORD:
 			metrics = ALARM_EVENT_METRICS
 			replaceMetrics = ALARM_EVENT_METRICS_REPLACE

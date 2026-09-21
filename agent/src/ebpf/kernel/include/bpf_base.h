@@ -41,6 +41,10 @@ struct task_struct;
 // Helper ID for bpf_get_current_task_btf (introduced in Linux 5.11).
 #define BPF_FUNC_get_current_task_btf 158
 #endif
+#ifndef BPF_FUNC_override_return
+// Helper ID for bpf_override_return (kprobe override / error injection).
+#define BPF_FUNC_override_return 58
+#endif
 
 /*
  * bpf helpers
@@ -148,6 +152,11 @@ static int
 static int
     __attribute__ ((__unused__)) (*bpf_get_stack) (void *ctx, void *buf, __u32 size,
 						     int flags) = (void *)67;
+static long
+    __attribute__ ((__unused__)) (*bpf_override_return) (struct pt_regs *regs,
+							 __u64 rc) =
+    (void *)BPF_FUNC_override_return;
+#define DF_BPF_OVERRIDE_RETURN_HELPER_DECLARED 1
 
 
 // Linux 4.14: Added support for BPF_MAP_TYPE_CPUMAP, allowing packets to be redirected to specific CPUs.

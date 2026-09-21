@@ -37,6 +37,8 @@
 int extended_reader_create(struct bpf_tracer *tracer);
 int extended_maps_set(struct bpf_tracer *tracer);
 void extended_prog_jump_tables(struct bpf_tracer *tracer);
+int extended_socket_tracer_ready(struct bpf_tracer *tracer);
+int extended_map_reuse_fd(const char *obj_name, const char *map_name);
 
 /**
  * @brief **collect_extended_uprobe_syms_from_procfs()** extend the handling of uprobe

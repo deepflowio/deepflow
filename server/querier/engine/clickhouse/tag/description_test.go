@@ -70,6 +70,7 @@ func TestGProcessBizTypeTagDescriptions(t *testing.T) {
 		{"event", "file_mgmt_event", "gprocess.biz_type", "int_enum", "biz_type"},
 		{"event", "proc_perm_event", "gprocess.biz_type", "int_enum", "biz_type"},
 		{"event", "proc_ops_event", "gprocess.biz_type", "int_enum", "biz_type"},
+		{"event", "proc_block_event", "gprocess.biz_type", "int_enum", "biz_type"},
 	}
 
 	for _, tc := range tests {

@@ -30,12 +30,15 @@ use std::{
     time::Duration,
 };
 
+#[cfg(feature = "enterprise")]
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use log::{debug, error, info, trace};
 use nix::sys::utsname::uname;
 use procfs::process::all_processes_with_root;
 
 use crate::common::flow::BIZ_TYPE_AI_AGENT;
-use crate::config::ProcessMatcher;
+use crate::config::{config::OS_PROC_ENABLED_FEATURE_AI_AGENT, ProcessMatcher};
 use crate::platform::{get_os_app_tag_by_exec, ProcessData, ProcessDataOp};
 
 //返回当前进程占用内存RSS单位（字节）
@@ -369,7 +372,7 @@ impl ProcessListener {
         }
 
         for (feature, mut node) in current.features.drain() {
-            if node.callback.is_some() {
+            if node.callback.is_some() || feature == OS_PROC_ENABLED_FEATURE_AI_AGENT {
                 node.process_matcher.clear();
                 features.insert(feature, node);
             }
@@ -477,6 +480,7 @@ impl ProcessListener {
         process_data_cache.retain(|pid, _| alive_pids.contains(pid));
 
         for (key, value) in features.iter_mut() {
+            let is_ai_agent_matcher_feature = key.as_str() == OS_PROC_ENABLED_FEATURE_AI_AGENT;
             let ai_agent_pids =
                 if should_fetch_ai_agent_pids(key.as_str(), value.callback.is_none()) {
                     fetch_ai_agent_pids(key.as_str())
@@ -484,12 +488,14 @@ impl ProcessListener {
                     Vec::new()
                 };
 
-            if should_skip_feature(
-                value.process_matcher.is_empty(),
-                value.pids.is_empty(),
-                ai_agent_pids.is_empty(),
-                value.callback.is_none(),
-            ) {
+            if !is_ai_agent_matcher_feature
+                && should_skip_feature(
+                    value.process_matcher.is_empty(),
+                    value.pids.is_empty(),
+                    ai_agent_pids.is_empty(),
+                    value.callback.is_none(),
+                )
+            {
                 continue;
             }
 
@@ -526,6 +532,21 @@ impl ProcessListener {
             pids.dedup();
             process_datas.sort_by_key(|x| x.pid);
             process_datas.merge_and_dedup();
+
+            if is_ai_agent_matcher_feature {
+                #[cfg(feature = "enterprise")]
+                if let Some(registry) = enterprise_utils::ai_agent::global_registry() {
+                    sync_ai_agent_process_matcher_registry(
+                        registry.as_ref(),
+                        &value.pids,
+                        &process_datas,
+                        ai_agent_registry_now(),
+                    );
+                }
+                value.pids = pids;
+                value.process_datas = process_datas;
+                continue;
+            }
 
             if pids != value.pids || process_datas != value.process_datas {
                 debug!("Feature {} update {} pids {:?}.", key, pids.len(), pids);
@@ -604,6 +625,50 @@ fn should_fetch_ai_agent_pids(feature: &str, callback_missing: bool) -> bool {
 }
 
 #[cfg(feature = "enterprise")]
+trait AiAgentProcessMatcherRegistry {
+    fn register_process_matcher(&self, pid: u32, process_name: &str, now: Duration) -> bool;
+    fn remove_process_matcher_root(&self, root_pid: u32) -> Vec<u32>;
+}
+
+#[cfg(feature = "enterprise")]
+impl AiAgentProcessMatcherRegistry for enterprise_utils::ai_agent::AiAgentRegistry {
+    fn register_process_matcher(&self, pid: u32, process_name: &str, now: Duration) -> bool {
+        self.register_process_matcher(pid, process_name, now)
+    }
+
+    fn remove_process_matcher_root(&self, root_pid: u32) -> Vec<u32> {
+        self.remove_process_matcher_root(root_pid)
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn ai_agent_registry_now() -> Duration {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+}
+
+#[cfg(feature = "enterprise")]
+fn sync_ai_agent_process_matcher_registry<R: AiAgentProcessMatcherRegistry>(
+    registry: &R,
+    previous_pids: &[u32],
+    process_datas: &[ProcessData],
+    now: Duration,
+) {
+    let current_pids: HashSet<u32> = process_datas.iter().map(|pd| pd.pid as u32).collect();
+
+    for process_data in process_datas {
+        registry.register_process_matcher(process_data.pid as u32, &process_data.process_name, now);
+    }
+
+    for pid in previous_pids {
+        if !current_pids.contains(pid) {
+            registry.remove_process_matcher_root(*pid);
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
 fn fetch_ai_agent_pids(feature: &str) -> Vec<u32> {
     // AI Agent processes must participate in both gprocess_info and socket_list.
     // - gprocess_info ensures process metadata sync (MySQL process table, biz_type tagging)
@@ -661,6 +726,9 @@ fn merge_ai_agent_processes(
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[cfg(feature = "enterprise")]
+    use std::sync::Mutex;
 
     fn make_process_data(pid: u64) -> ProcessData {
         ProcessData {
@@ -740,5 +808,126 @@ mod tests {
         assert!(should_fetch_ai_agent_pids("proc.socket_list", false));
         assert!(!should_fetch_ai_agent_pids("proc.process_info", false));
         assert!(!should_fetch_ai_agent_pids("proc.socket_list", true));
+    }
+
+    #[test]
+    fn set_preserves_ai_agent_node_for_reconcile_after_matcher_removal() {
+        let matcher = ProcessMatcher {
+            enabled_features: vec![OS_PROC_ENABLED_FEATURE_AI_AGENT.to_string()],
+            ..Default::default()
+        };
+        let listener = ProcessListener::new(
+            &Vec::new(),
+            &vec![matcher],
+            "/proc".to_string(),
+            String::new(),
+            Vec::new(),
+        );
+
+        {
+            let mut features = listener.features.write().unwrap();
+            let node = features
+                .features
+                .get_mut(OS_PROC_ENABLED_FEATURE_AI_AGENT)
+                .expect("ai agent feature node missing");
+            node.pids = vec![4001];
+            node.process_datas = vec![make_process_data(4001)];
+        }
+
+        listener.set(&Vec::new(), &Vec::new());
+
+        let features = listener.features.read().unwrap();
+        let node = features
+            .features
+            .get(OS_PROC_ENABLED_FEATURE_AI_AGENT)
+            .expect("ai agent feature node should be preserved for reconcile");
+        assert!(node.process_matcher.is_empty());
+        assert_eq!(node.pids, vec![4001]);
+        assert_eq!(node.process_datas, vec![make_process_data(4001)]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[derive(Default)]
+    struct FakeAiAgentRegistry {
+        endpoint_pids: Mutex<HashSet<u32>>,
+        process_matcher_pids: Mutex<HashSet<u32>>,
+    }
+
+    #[cfg(feature = "enterprise")]
+    impl FakeAiAgentRegistry {
+        fn register_endpoint(&self, pid: u32) -> bool {
+            self.endpoint_pids.lock().unwrap().insert(pid)
+        }
+
+        fn is_ai_agent(&self, pid: u32) -> bool {
+            self.endpoint_pids.lock().unwrap().contains(&pid)
+                || self.process_matcher_pids.lock().unwrap().contains(&pid)
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    impl AiAgentProcessMatcherRegistry for FakeAiAgentRegistry {
+        fn register_process_matcher(&self, pid: u32, _process_name: &str, _now: Duration) -> bool {
+            self.process_matcher_pids.lock().unwrap().insert(pid)
+        }
+
+        fn remove_process_matcher_root(&self, root_pid: u32) -> Vec<u32> {
+            let removed = self.process_matcher_pids.lock().unwrap().remove(&root_pid);
+            if removed && !self.endpoint_pids.lock().unwrap().contains(&root_pid) {
+                return vec![root_pid];
+            }
+            Vec::new()
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn sync_ai_agent_process_matcher_registry_registers_matches() {
+        let registry = FakeAiAgentRegistry::default();
+        let process_datas = vec![make_process_data(3001)];
+
+        sync_ai_agent_process_matcher_registry(
+            &registry,
+            &[],
+            &process_datas,
+            Duration::from_secs(1),
+        );
+
+        assert!(registry.is_ai_agent(3001));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn sync_ai_agent_process_matcher_registry_removes_missing_matches() {
+        let registry = FakeAiAgentRegistry::default();
+        let process_datas = vec![make_process_data(3002)];
+
+        sync_ai_agent_process_matcher_registry(
+            &registry,
+            &[],
+            &process_datas,
+            Duration::from_secs(1),
+        );
+        sync_ai_agent_process_matcher_registry(&registry, &[3002], &[], Duration::from_secs(2));
+
+        assert!(!registry.is_ai_agent(3002));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn sync_ai_agent_process_matcher_registry_preserves_endpoint_sources() {
+        let registry = FakeAiAgentRegistry::default();
+        let process_datas = vec![make_process_data(3003)];
+
+        assert!(registry.register_endpoint(3003));
+        sync_ai_agent_process_matcher_registry(
+            &registry,
+            &[],
+            &process_datas,
+            Duration::from_secs(2),
+        );
+        sync_ai_agent_process_matcher_registry(&registry, &[3003], &[], Duration::from_secs(3));
+
+        assert!(registry.is_ai_agent(3003));
     }
 }

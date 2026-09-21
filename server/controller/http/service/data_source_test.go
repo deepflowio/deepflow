@@ -101,6 +101,13 @@ func Test_getTableName(t *testing.T) {
 			},
 			want: "event.proc_ops_event",
 		},
+		{
+			name: "event.proc_block_event",
+			args: args{
+				collection: "event.proc_block_event",
+			},
+			want: "event.proc_block_event",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -214,6 +221,7 @@ func TestLinkedRetentionCollections(t *testing.T) {
 				"event.file_mgmt_event",
 				"event.proc_perm_event",
 				"event.proc_ops_event",
+				"event.proc_block_event",
 			},
 		},
 		{
@@ -224,6 +232,7 @@ func TestLinkedRetentionCollections(t *testing.T) {
 				"event.file_mgmt_event",
 				"event.proc_perm_event",
 				"event.proc_ops_event",
+				"event.proc_block_event",
 			},
 		},
 		{
@@ -234,6 +243,7 @@ func TestLinkedRetentionCollections(t *testing.T) {
 				"event.file_mgmt_event",
 				"event.proc_perm_event",
 				"event.proc_ops_event",
+				"event.proc_block_event",
 			},
 		},
 		{
@@ -244,6 +254,18 @@ func TestLinkedRetentionCollections(t *testing.T) {
 				"event.file_mgmt_event",
 				"event.proc_perm_event",
 				"event.proc_ops_event",
+				"event.proc_block_event",
+			},
+		},
+		{
+			name:       "proc block event",
+			collection: "event.proc_block_event",
+			want: []string{
+				"event.file_agg_event",
+				"event.file_mgmt_event",
+				"event.proc_perm_event",
+				"event.proc_ops_event",
+				"event.proc_block_event",
 			},
 		},
 		{
@@ -269,13 +291,14 @@ func TestResolveRetentionTargets(t *testing.T) {
 		{Lcuuid: "b", DataTableCollection: "event.file_mgmt_event", RetentionTime: 24},
 		{Lcuuid: "c", DataTableCollection: "event.proc_perm_event", RetentionTime: 24},
 		{Lcuuid: "d", DataTableCollection: "event.proc_ops_event", RetentionTime: 24},
-		{Lcuuid: "e", DataTableCollection: "event.event", RetentionTime: 24},
+		{Lcuuid: "e", DataTableCollection: "event.proc_block_event", RetentionTime: 24},
+		{Lcuuid: "f", DataTableCollection: "event.event", RetentionTime: 24},
 	}
 
 	t.Run("ai agent event resolves to linked group", func(t *testing.T) {
 		got := resolveRetentionTargets(all[0], all)
 		want := []metadbmodel.DataSource{
-			all[0], all[1], all[2], all[3],
+			all[0], all[1], all[2], all[3], all[4],
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("resolveRetentionTargets(ai-agent) = %v, want %v", got, want)
@@ -283,8 +306,8 @@ func TestResolveRetentionTargets(t *testing.T) {
 	})
 
 	t.Run("non linked collection resolves to self only", func(t *testing.T) {
-		got := resolveRetentionTargets(all[4], all)
-		want := []metadbmodel.DataSource{all[4]}
+		got := resolveRetentionTargets(all[5], all)
+		want := []metadbmodel.DataSource{all[5]}
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("resolveRetentionTargets(non-linked) = %v, want %v", got, want)
 		}
@@ -315,7 +338,8 @@ func TestUpdateDataSourceLinksAIAgentRetentionGroup(t *testing.T) {
 		{ID: 28, DisplayName: "事件-文件管理事件", DataTableCollection: "event.file_mgmt_event", RetentionTime: retention, Lcuuid: "b", UpdatedAt: time.Now()},
 		{ID: 29, DisplayName: "事件-进程权限事件", DataTableCollection: "event.proc_perm_event", RetentionTime: retention, Lcuuid: "c", UpdatedAt: time.Now()},
 		{ID: 30, DisplayName: "事件-进程操作事件", DataTableCollection: "event.proc_ops_event", RetentionTime: retention, Lcuuid: "d", UpdatedAt: time.Now()},
-		{ID: 31, DisplayName: "事件-资源变更事件", DataTableCollection: "event.event", RetentionTime: retention, Lcuuid: "e", UpdatedAt: time.Now()},
+		{ID: 31, DisplayName: "事件-进程阻断事件", DataTableCollection: "event.proc_block_event", RetentionTime: retention, Lcuuid: "e", UpdatedAt: time.Now()},
+		{ID: 32, DisplayName: "事件-资源变更事件", DataTableCollection: "event.event", RetentionTime: retention, Lcuuid: "f", UpdatedAt: time.Now()},
 	}
 	if err := gormDB.Create(&dataSources).Error; err != nil {
 		t.Fatalf("insert data sources failed: %v", err)
@@ -374,13 +398,13 @@ func TestUpdateDataSourceLinksAIAgentRetentionGroup(t *testing.T) {
 		t.Fatalf("query updated data sources failed: %v", err)
 	}
 
-	for _, item := range updated[:4] {
+	for _, item := range updated[:5] {
 		if item.RetentionTime != newRetention {
 			t.Fatalf("collection %s retention = %d, want %d", item.DataTableCollection, item.RetentionTime, newRetention)
 		}
 	}
-	if updated[4].RetentionTime != retention {
-		t.Fatalf("non-linked collection retention = %d, want %d", updated[4].RetentionTime, retention)
+	if updated[5].RetentionTime != retention {
+		t.Fatalf("non-linked collection retention = %d, want %d", updated[5].RetentionTime, retention)
 	}
 
 	wantCollections := []string{
@@ -388,6 +412,7 @@ func TestUpdateDataSourceLinksAIAgentRetentionGroup(t *testing.T) {
 		"event.file_mgmt_event",
 		"event.proc_perm_event",
 		"event.proc_ops_event",
+		"event.proc_block_event",
 	}
 	if !reflect.DeepEqual(modifiedCollections, wantCollections) {
 		t.Fatalf("CallIngesterAPIModRP collections = %v, want %v", modifiedCollections, wantCollections)
@@ -418,7 +443,8 @@ func TestUpdateDataSourceMarksWholeAIAgentRetentionGroupExceptionOnFailure(t *te
 		{ID: 28, DisplayName: "事件-文件管理事件", DataTableCollection: "event.file_mgmt_event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "b", UpdatedAt: time.Now()},
 		{ID: 29, DisplayName: "事件-进程权限事件", DataTableCollection: "event.proc_perm_event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "c", UpdatedAt: time.Now()},
 		{ID: 30, DisplayName: "事件-进程操作事件", DataTableCollection: "event.proc_ops_event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "d", UpdatedAt: time.Now()},
-		{ID: 31, DisplayName: "事件-资源变更事件", DataTableCollection: "event.event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "e", UpdatedAt: time.Now()},
+		{ID: 31, DisplayName: "事件-进程阻断事件", DataTableCollection: "event.proc_block_event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "e", UpdatedAt: time.Now()},
+		{ID: 32, DisplayName: "事件-资源变更事件", DataTableCollection: "event.event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "f", UpdatedAt: time.Now()},
 	}
 	if err := gormDB.Create(&dataSources).Error; err != nil {
 		t.Fatalf("insert data sources failed: %v", err)
@@ -474,7 +500,7 @@ func TestUpdateDataSourceMarksWholeAIAgentRetentionGroupExceptionOnFailure(t *te
 		t.Fatalf("query updated data sources failed: %v", err)
 	}
 
-	for _, item := range updated[:4] {
+	for _, item := range updated[:5] {
 		if item.State != common.DATA_SOURCE_STATE_EXCEPTION {
 			t.Fatalf("collection %s state = %d, want %d", item.DataTableCollection, item.State, common.DATA_SOURCE_STATE_EXCEPTION)
 		}
@@ -483,8 +509,8 @@ func TestUpdateDataSourceMarksWholeAIAgentRetentionGroupExceptionOnFailure(t *te
 		}
 	}
 
-	if updated[4].State != common.DATA_SOURCE_STATE_NORMAL {
-		t.Fatalf("non-linked collection state = %d, want %d", updated[4].State, common.DATA_SOURCE_STATE_NORMAL)
+	if updated[5].State != common.DATA_SOURCE_STATE_NORMAL {
+		t.Fatalf("non-linked collection state = %d, want %d", updated[5].State, common.DATA_SOURCE_STATE_NORMAL)
 	}
 }
 
@@ -512,6 +538,7 @@ func TestUpdateDataSourceRollsBackLinkedRetentionGroupOnMetadbFailure(t *testing
 		{ID: 28, DisplayName: "事件-文件管理事件", DataTableCollection: "event.file_mgmt_event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "b", UpdatedAt: time.Now()},
 		{ID: 29, DisplayName: "事件-进程权限事件", DataTableCollection: "event.proc_perm_event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "c", UpdatedAt: time.Now()},
 		{ID: 30, DisplayName: "事件-进程操作事件", DataTableCollection: "event.proc_ops_event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "d", UpdatedAt: time.Now()},
+		{ID: 31, DisplayName: "事件-进程阻断事件", DataTableCollection: "event.proc_block_event", RetentionTime: retention, State: common.DATA_SOURCE_STATE_NORMAL, Lcuuid: "e", UpdatedAt: time.Now()},
 	}
 	if err := gormDB.Create(&dataSources).Error; err != nil {
 		t.Fatalf("insert data sources failed: %v", err)
