@@ -157,7 +157,7 @@ impl Default for RecvEngine {
     }
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 impl Default for RecvEngine {
     fn default() -> Self {
         Self::Libpcap(None)
