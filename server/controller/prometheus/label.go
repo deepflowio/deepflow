@@ -329,10 +329,10 @@ func (s *LabelSynchronizer) assembleMetricLabel(mls []*trident.MetricLabelReques
 		log.Errorf("metric name id not found, name to request count: %+v", nonMetricNameToCount, s.org.LogPrefix)
 	}
 	if nonLabelNames.Cardinality() > 0 {
-		log.Errorf("label name id not found, names: %v", nonLabelNames.ToSlice(), s.org.LogPrefix)
+		log.Errorf("label name id not found, %s", logNotFoundDetail(nonLabelNames.ToSlice()), s.org.LogPrefix)
 	}
 	if nonLabelValues.Cardinality() > 0 {
-		log.Errorf("label value id not found, values: %v", nonLabelValues.ToSlice(), s.org.LogPrefix)
+		log.Errorf("label value id not found, %s", logNotFoundDetail(nonLabelValues.ToSlice()), s.org.LogPrefix)
 	}
 	return respMLs, nil
 }
