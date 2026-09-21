@@ -165,6 +165,11 @@ const (
 	L7_PROTOCOL_POSTGRE     L7Protocol = 61
 	L7_PROTOCOL_ORACLE      L7Protocol = 62
 	L7_PROTOCOL_DAMENG      L7Protocol = 63
+	L7_PROTOCOL_DB2         L7Protocol = 64
+	L7_PROTOCOL_TDSQL       L7Protocol = 65
+	L7_PROTOCOL_OCEANBASE   L7Protocol = 66
+	L7_PROTOCOL_GOLDENDB    L7Protocol = 67
+	L7_PROTOCOL_KINGBASE    L7Protocol = 68
 	L7_PROTOCOL_REDIS       L7Protocol = 80
 	L7_PROTOCOL_MONGODB     L7Protocol = 81
 	L7_PROTOCOL_MEMCACHED   L7Protocol = 82
@@ -700,6 +705,36 @@ func (p L7Protocol) String(isTLS bool) string {
 		} else {
 			return "Dameng"
 		}
+	case L7_PROTOCOL_DB2:
+		if isTLS {
+			return "DB2_TLS"
+		} else {
+			return "DB2"
+		}
+	case L7_PROTOCOL_TDSQL:
+		if isTLS {
+			return "TDSQL_TLS"
+		} else {
+			return "TDSQL"
+		}
+	case L7_PROTOCOL_OCEANBASE:
+		if isTLS {
+			return "OceanBase_TLS"
+		} else {
+			return "OceanBase"
+		}
+	case L7_PROTOCOL_GOLDENDB:
+		if isTLS {
+			return "GoldenDB_TLS"
+		} else {
+			return "GoldenDB"
+		}
+	case L7_PROTOCOL_KINGBASE:
+		if isTLS {
+			return "Kingbase_TLS"
+		} else {
+			return "Kingbase"
+		}
 	case L7_PROTOCOL_ISO8583:
 		if isTLS {
 			return "ISO-8583_TLS"
@@ -823,6 +858,11 @@ var L7ProtocolStringMap = map[string]L7Protocol{
 	strings.ToLower(L7_PROTOCOL_POSTGRE.String(false)):     L7_PROTOCOL_POSTGRE,
 	strings.ToLower(L7_PROTOCOL_ORACLE.String(false)):      L7_PROTOCOL_ORACLE,
 	strings.ToLower(L7_PROTOCOL_DAMENG.String(false)):      L7_PROTOCOL_DAMENG,
+	strings.ToLower(L7_PROTOCOL_DB2.String(false)):         L7_PROTOCOL_DB2,
+	strings.ToLower(L7_PROTOCOL_TDSQL.String(false)):       L7_PROTOCOL_TDSQL,
+	strings.ToLower(L7_PROTOCOL_OCEANBASE.String(false)):   L7_PROTOCOL_OCEANBASE,
+	strings.ToLower(L7_PROTOCOL_GOLDENDB.String(false)):    L7_PROTOCOL_GOLDENDB,
+	strings.ToLower(L7_PROTOCOL_KINGBASE.String(false)):    L7_PROTOCOL_KINGBASE,
 	strings.ToLower(L7_PROTOCOL_ISO8583.String(false)):     L7_PROTOCOL_ISO8583,
 	strings.ToLower(L7_PROTOCOL_NET_SIGN.String(false)):    L7_PROTOCOL_NET_SIGN,
 	strings.ToLower(L7_PROTOCOL_TRIPLE.String(false)):      L7_PROTOCOL_TRIPLE,
