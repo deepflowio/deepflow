@@ -392,7 +392,13 @@ func ReleaseEventStore(e *EventStore) {
 	if e == nil || e.SubReferenceCount() {
 		return
 	}
+	for i := range e.AttributeNames {
+		e.AttributeNames[i] = ""
+	}
 	attributeNames := e.AttributeNames[:0]
+	for i := range e.AttributeValues {
+		e.AttributeValues[i] = ""
+	}
 	attributeValues := e.AttributeValues[:0]
 	*e = EventStore{}
 	e.AttributeNames = attributeNames
