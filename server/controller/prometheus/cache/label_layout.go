@@ -94,7 +94,15 @@ func (mll *metricAndAPPLabelLayout) GetLayoutKeyToIndex() map[LayoutKey]uint8 {
 	return snapshot
 }
 
-func (mll *metricAndAPPLabelLayout) Add(batch []*controller.PrometheusMetricAPPLabelLayout) {
+func (mll *metricAndAPPLabelLayout) Add(batch []*metadbmodel.PrometheusMetricAPPLabelLayout) {
+	mll.mu.Lock()
+	defer mll.mu.Unlock()
+	for _, m := range batch {
+		mll.pending[NewLayoutKey(m.MetricName, m.APPLabelName)] = uint8(m.APPLabelColumnIndex)
+	}
+}
+
+func (mll *metricAndAPPLabelLayout) AddFromGrpc(batch []*controller.PrometheusMetricAPPLabelLayout) {
 	mll.mu.Lock()
 	defer mll.mu.Unlock()
 	for _, m := range batch {
@@ -103,18 +111,31 @@ func (mll *metricAndAPPLabelLayout) Add(batch []*controller.PrometheusMetricAPPL
 }
 
 func (mll *metricAndAPPLabelLayout) refresh(args ...interface{}) error {
-	items, err := mll.load()
+	var count int64
+	if err := mll.org.DB.Model(&metadbmodel.PrometheusMetricAPPLabelLayout{}).Count(&count).Error; err != nil {
+		return err
+	}
+
+	rows, err := mll.org.DB.Model(&metadbmodel.PrometheusMetricAPPLabelLayout{}).Select("metric_name", "app_label_name", "app_label_column_index").Rows()
 	if err != nil {
 		return err
 	}
-	mll.processLoadedData(items)
-	return nil
-}
+	defer rows.Close()
 
-func (mll *metricAndAPPLabelLayout) processLoadedData(items []*metadbmodel.PrometheusMetricAPPLabelLayout) {
-	newActive := make(map[LayoutKey]uint8, len(items))
-	for _, item := range items {
-		newActive[NewLayoutKey(item.MetricName, item.APPLabelName)] = uint8(item.APPLabelColumnIndex)
+	newActive := make(map[LayoutKey]uint8, count)
+	for rows.Next() {
+		var metricName string
+		var appLabelName string
+		var appLabelColumnIndex int
+		if scanErr := rows.Scan(&metricName, &appLabelName, &appLabelColumnIndex); scanErr != nil {
+			log.Errorf("stream scan prometheus_metric_app_label_layout interrupted: %v", scanErr, mll.org.LogPrefix)
+			return scanErr
+		}
+		newActive[NewLayoutKey(metricName, appLabelName)] = uint8(appLabelColumnIndex)
+	}
+	if err := rows.Err(); err != nil {
+		log.Errorf("stream read prometheus_metric_app_label_layout error: %v", err, mll.org.LogPrefix)
+		return err
 	}
 
 	mll.mu.Lock()
@@ -126,10 +147,5 @@ func (mll *metricAndAPPLabelLayout) processLoadedData(items []*metadbmodel.Prome
 		newActive[k] = v
 	}
 	mll.replaceActive(newActive)
-}
-
-func (mml *metricAndAPPLabelLayout) load() ([]*metadbmodel.PrometheusMetricAPPLabelLayout, error) {
-	var metricAPPLabelLayouts []*metadbmodel.PrometheusMetricAPPLabelLayout
-	err := mml.org.DB.Select("metric_name", "app_label_name", "app_label_column_index").Find(&metricAPPLabelLayouts).Error
-	return metricAPPLabelLayouts, err
+	return nil
 }

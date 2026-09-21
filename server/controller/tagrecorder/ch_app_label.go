@@ -21,6 +21,7 @@ import (
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	promcache "github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 )
 
 type ChAPPLabel struct {
@@ -42,13 +43,18 @@ func (l *ChAPPLabel) generateNewData(db *metadb.DB) (map[PrometheusAPPLabelKey]m
 	log.Infof("generate data for %s", l.resourceTypeName, db.LogPrefixORGID)
 
 	appLabelSlice, ok := l.generateAPPLabelData(db)
-
-	labelNameIDMap, valueNameIDMap, ok := l.generateNameIDData(db)
 	if !ok {
 		return nil, false
 	}
 
-	labelRows, err := db.Unscoped().Model(&metadbmodel.PrometheusLabel{}).Select("id", "name", "value").Rows()
+	promCache, err := promcache.GetCache(db.ORGID)
+	if err != nil {
+		log.Errorf("get prometheus cache failed: %v", err)
+		return nil, false
+	}
+	promCache.Refresh(true)
+
+	labelRows, err := db.Unscoped().Model(&metadbmodel.PrometheusLabel{}).Select("name", "value").Rows()
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
 		return nil, false
@@ -57,17 +63,16 @@ func (l *ChAPPLabel) generateNewData(db *metadb.DB) (map[PrometheusAPPLabelKey]m
 
 	keyToItem := make(map[PrometheusAPPLabelKey]metadbmodel.ChAPPLabel)
 	for labelRows.Next() {
-		var id int
 		var labelName, labelValue string
-		if scanErr := labelRows.Scan(&id, &labelName, &labelValue); scanErr != nil {
+		if scanErr := labelRows.Scan(&labelName, &labelValue); scanErr != nil {
 			log.Errorf("stream scan %s prometheus_label interrupted: %v", l.resourceTypeName, scanErr, db.LogPrefixORGID)
 			return nil, false
 		}
 		if slices.Contains(appLabelSlice, labelName) {
-			labelNameID, nameOK := labelNameIDMap[labelName]
-			labelValueID, valueOK := valueNameIDMap[labelValue]
+			labelNameID, nameOK := promCache.GetLabelNameID(labelName)
+			labelValueID, valueOK := promCache.GetLabelValueID(labelValue)
 			if !nameOK || !valueOK {
-				log.Warningf("label name or value not found in db, labelName: %s, labelValue: %s", labelName, labelValue)
+				log.Warningf("label name or value not found in cache, labelName: %s, labelValue: %s", labelName, labelValue)
 				continue
 			}
 			keyToItem[PrometheusAPPLabelKey{LabelNameID: labelNameID, LabelValueID: labelValueID}] = metadbmodel.ChAPPLabel{
@@ -113,50 +118,4 @@ func (l *ChAPPLabel) generateAPPLabelData(db *metadb.DB) ([]string, bool) {
 		appLabelSlice = append(appLabelSlice, prometheusAPPMetricAPPLabelLayout.APPLabelName)
 	}
 	return appLabelSlice, true
-}
-
-func (l *ChAPPLabel) generateNameIDData(db *metadb.DB) (map[string]int, map[string]int, bool) {
-	labelNameIDMap := make(map[string]int)
-	valueNameIDMap := make(map[string]int)
-
-	nameRows, err := db.Unscoped().Model(&metadbmodel.PrometheusLabelName{}).Select("id", "name").Rows()
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
-		return nil, nil, false
-	}
-	defer nameRows.Close()
-	for nameRows.Next() {
-		var id int
-		var name string
-		if scanErr := nameRows.Scan(&id, &name); scanErr != nil {
-			log.Errorf("stream scan %s prometheus_label_name interrupted: %v", l.resourceTypeName, scanErr, db.LogPrefixORGID)
-			return nil, nil, false
-		}
-		labelNameIDMap[name] = id
-	}
-	if err := nameRows.Err(); err != nil {
-		log.Errorf("stream read %s prometheus_label_name error: %v", l.resourceTypeName, err, db.LogPrefixORGID)
-		return nil, nil, false
-	}
-
-	valueRows, err := db.Unscoped().Model(&metadbmodel.PrometheusLabelValue{}).Select("id", "value").Rows()
-	if err != nil {
-		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err), db.LogPrefixORGID)
-		return nil, nil, false
-	}
-	defer valueRows.Close()
-	for valueRows.Next() {
-		var id int
-		var value string
-		if scanErr := valueRows.Scan(&id, &value); scanErr != nil {
-			log.Errorf("stream scan %s prometheus_label_value interrupted: %v", l.resourceTypeName, scanErr, db.LogPrefixORGID)
-			return nil, nil, false
-		}
-		valueNameIDMap[value] = id
-	}
-	if err := valueRows.Err(); err != nil {
-		log.Errorf("stream read %s prometheus_label_value error: %v", l.resourceTypeName, err, db.LogPrefixORGID)
-		return nil, nil, false
-	}
-	return labelNameIDMap, valueNameIDMap, true
 }

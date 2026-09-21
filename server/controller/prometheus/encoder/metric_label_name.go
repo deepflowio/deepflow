@@ -24,6 +24,7 @@ import (
 
 	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -43,25 +44,23 @@ type metricLabelName struct {
 	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
-
-	metricNameEncoder *metricName
-	labelNameEncoder  *labelName
+	cache        cache.PrometheusCache
 
 	keys mapset.Set[metricLabelNameKey]
 }
 
-func newMetricLabelName(org *common.ORG, mn *metricName, l *labelName) *metricLabelName {
+func newMetricLabelName(org *common.ORG) *metricLabelName {
+	c, _ := cache.GetCache(org.ID)
 	return &metricLabelName{
-		org:               org,
-		resourceType:      "metric_label",
-		metricNameEncoder: mn,
-		labelNameEncoder:  l,
-		keys:              mapset.NewSet[metricLabelNameKey](),
+		org:          org,
+		resourceType: "metric_label",
+		cache:        c,
+		keys:         mapset.NewSet[metricLabelNameKey](),
 	}
 }
 
 func (ml *metricLabelName) store(item *metadbmodel.PrometheusMetricLabelName) {
-	if mni, ok := ml.metricNameEncoder.getID(item.MetricName); ok {
+	if mni, ok := ml.cache.GetMetricNameID(item.MetricName); ok {
 		ml.keys.Add(newMetricLabelNameKey(mni, item.LabelNameID))
 	}
 }
@@ -87,7 +86,7 @@ func (ml *metricLabelName) encode(rMLs []*controller.PrometheusMetricLabelNameRe
 	respToAdd := make([]*controller.PrometheusMetricLabelName, 0)
 	for _, rML := range rMLs {
 		mn := rML.GetMetricName()
-		mni, ok := ml.metricNameEncoder.getID(mn)
+		mni, ok := ml.cache.GetMetricNameID(mn)
 		if !ok {
 			log.Warningf("%s metric_name: %s id not found", ml.resourceType, mn, ml.org.LogPrefix)
 			continue
@@ -95,7 +94,7 @@ func (ml *metricLabelName) encode(rMLs []*controller.PrometheusMetricLabelNameRe
 		lis := make([]uint32, 0)
 		lisToAdd := make([]uint32, 0)
 		for _, ln := range rML.GetLabelNames() {
-			lni, ok := ml.labelNameEncoder.getID(ln)
+			lni, ok := ml.cache.GetLabelNameID(ln)
 			if !ok {
 				log.Warningf("%s label (name: %s) id not found", ml.resourceType, ln, ml.org.LogPrefix)
 				continue

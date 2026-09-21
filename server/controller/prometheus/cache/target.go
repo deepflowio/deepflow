@@ -177,28 +177,64 @@ func (t *target) GetTargetIDToLabelNames() map[int]mapset.Set[string] {
 }
 
 func (t *target) refresh(args ...interface{}) error {
-	recorderTargets, selfTargets, err := t.load()
+	keyToTargetID := make(map[TargetKey]int)
+	targetIDToLabelNames := make(map[int]mapset.Set[string])
+
+	// Load recorder targets
+	rows1, err := t.org.DB.Model(&metadbmodel.PrometheusTarget{}).
+		Where("create_method = ?", ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER).
+		Select("id, instance, job, vpc_id, pod_cluster_id, other_labels").Rows()
 	if err != nil {
 		return err
 	}
+	defer rows1.Close()
 
-	keyToTargetID := make(map[TargetKey]int)
-	targetIDToLabelNames := make(map[int]mapset.Set[string])
-	for _, item := range recorderTargets {
-		keyToTargetID[NewTargetKey(item.Instance, item.Job, item.VPCID, item.PodClusterID)] = item.ID
-		targetIDToLabelNames[item.ID] = mapset.NewSet(t.getTargetLabelNames(item)...)
+	for rows1.Next() {
+		var id, vpcID, podClusterID int
+		var instance, job, otherLabels string
+		if scanErr := rows1.Scan(&id, &instance, &job, &vpcID, &podClusterID, &otherLabels); scanErr != nil {
+			log.Errorf("stream scan prometheus_target (recorder) interrupted: %v", scanErr, t.org.LogPrefix)
+			return scanErr
+		}
+		tk := NewTargetKey(instance, job, vpcID, podClusterID)
+		keyToTargetID[tk] = id
+		targetIDToLabelNames[id] = mapset.NewSet(t.parseTargetLabelNames(otherLabels)...)
+	}
+	if err := rows1.Err(); err != nil {
+		log.Errorf("stream read prometheus_target (recorder) error: %v", err, t.org.LogPrefix)
+		return err
 	}
 
+	// Load self targets and handle duplicates
 	dupKeyIDs := make([]int, 0)
-	for _, item := range selfTargets {
-		tk := NewTargetKey(item.Instance, item.Job, item.VPCID, item.PodClusterID)
+	rows2, err := t.org.DB.Model(&metadbmodel.PrometheusTarget{}).
+		Where("create_method = ?", ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS).
+		Select("id, instance, job, vpc_id, pod_cluster_id, other_labels").Rows()
+	if err != nil {
+		return err
+	}
+	defer rows2.Close()
+
+	for rows2.Next() {
+		var id, vpcID, podClusterID int
+		var instance, job, otherLabels string
+		if scanErr := rows2.Scan(&id, &instance, &job, &vpcID, &podClusterID, &otherLabels); scanErr != nil {
+			log.Errorf("stream scan prometheus_target (self) interrupted: %v", scanErr, t.org.LogPrefix)
+			return scanErr
+		}
+		tk := NewTargetKey(instance, job, vpcID, podClusterID)
 		if _, ok := keyToTargetID[tk]; ok {
-			dupKeyIDs = append(dupKeyIDs, item.ID)
+			dupKeyIDs = append(dupKeyIDs, id)
 			continue
 		}
-		keyToTargetID[tk] = item.ID
-		targetIDToLabelNames[item.ID] = mapset.NewSet(t.getTargetLabelNames(item)...)
+		keyToTargetID[tk] = id
+		targetIDToLabelNames[id] = mapset.NewSet(t.parseTargetLabelNames(otherLabels)...)
 	}
+	if err := rows2.Err(); err != nil {
+		log.Errorf("stream read prometheus_target (self) error: %v", err, t.org.LogPrefix)
+		return err
+	}
+
 	if len(dupKeyIDs) != 0 {
 		t.dedup(dupKeyIDs)
 	}
@@ -208,9 +244,9 @@ func (t *target) refresh(args ...interface{}) error {
 	return nil
 }
 
-func (t *target) getTargetLabelNames(tg *metadbmodel.PrometheusTarget) []string {
+func (t *target) parseTargetLabelNames(otherLabels string) []string {
 	lns := []string{common.TargetLabelInstance, common.TargetLabelJob}
-	for _, l := range strings.Split(tg.OtherLabels, labelJoiner) {
+	for _, l := range strings.Split(otherLabels, labelJoiner) {
 		if l == "" {
 			continue
 		}
@@ -222,15 +258,6 @@ func (t *target) getTargetLabelNames(tg *metadbmodel.PrometheusTarget) []string 
 		lns = append(lns, parts[0])
 	}
 	return lns
-}
-
-func (t *target) load() (recorderTargets, selfTargets []*metadbmodel.PrometheusTarget, err error) {
-	err = t.org.DB.Where(&metadbmodel.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_RECORDER}).Find(&recorderTargets).Error
-	if err != nil {
-		return
-	}
-	err = t.org.DB.Where(&metadbmodel.PrometheusTarget{CreateMethod: ctrlrcommon.PROMETHEUS_TARGET_CREATE_METHOD_PROMETHEUS}).Find(&selfTargets).Error
-	return
 }
 
 func (t *target) dedup(ids []int) error {

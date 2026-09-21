@@ -21,7 +21,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
@@ -111,10 +110,10 @@ func (mt *metricTarget) GetMetricIDsByTargetID(id int) []uint32 {
 	return mt.targetIDToMetricIDs[id]
 }
 
-func (mt *metricTarget) Add(batch []*controller.PrometheusMetricTarget) {
+func (mt *metricTarget) Add(batch []*metadbmodel.PrometheusMetricTarget) {
 	for _, item := range batch {
-		mt.metricTargetKeys.Add(NewMetricTargetKey(item.GetMetricName(), int(item.GetTargetId())))
-		mt.metricNameToTargetIDs.Append(item.GetMetricName(), int(item.GetTargetId()))
+		mt.metricTargetKeys.Add(NewMetricTargetKey(item.MetricName, item.TargetID))
+		mt.metricNameToTargetIDs.Append(item.MetricName, item.TargetID)
 	}
 }
 
@@ -134,24 +133,34 @@ func (mt *metricTarget) GetMetricNameToTargetIDs() map[string]mapset.Set[int] {
 }
 
 func (mt *metricTarget) refresh(args ...interface{}) error {
-	mts, err := mt.load()
+	rows, err := mt.org.DB.Model(&metadbmodel.PrometheusMetricTarget{}).Select("metric_name", "target_id").Rows()
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
+
+	// Clear existing data
+	mt.metricTargetKeys = mapset.NewSet[MetricTargetKey]()
+	mt.metricNameToTargetIDs = newMetricNameToTargetIDs()
 	targetIDToMetricIDs := make(map[int][]uint32)
-	for _, item := range mts {
-		mt.metricTargetKeys.Add(NewMetricTargetKey(item.MetricName, item.TargetID))
-		mt.metricNameToTargetIDs.Append(item.MetricName, item.TargetID)
-		if mni, ok := mt.metricNameCache.GetIDByName(item.MetricName); ok {
-			targetIDToMetricIDs[item.TargetID] = append(targetIDToMetricIDs[item.TargetID], uint32(mni))
+
+	for rows.Next() {
+		var metricName string
+		var targetID int
+		if scanErr := rows.Scan(&metricName, &targetID); scanErr != nil {
+			log.Errorf("stream scan prometheus_metric_target interrupted: %v", scanErr, mt.org.LogPrefix)
+			return scanErr
 		}
+		mt.metricTargetKeys.Add(NewMetricTargetKey(metricName, targetID))
+		mt.metricNameToTargetIDs.Append(metricName, targetID)
+		if mni, ok := mt.metricNameCache.GetIDByName(metricName); ok {
+			targetIDToMetricIDs[targetID] = append(targetIDToMetricIDs[targetID], uint32(mni))
+		}
+	}
+	if err := rows.Err(); err != nil {
+		log.Errorf("stream read prometheus_metric_target error: %v", err, mt.org.LogPrefix)
+		return err
 	}
 	mt.targetIDToMetricIDs = targetIDToMetricIDs
 	return nil
-}
-
-func (mt *metricTarget) load() ([]*metadbmodel.PrometheusMetricTarget, error) {
-	var metricTargets []*metadbmodel.PrometheusMetricTarget
-	err := mt.org.DB.Find(&metricTargets).Error
-	return metricTargets, err
 }
