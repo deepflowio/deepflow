@@ -122,10 +122,14 @@ func (k *KubernetesGatherTask) run(rSignal *queue.OverwriteQueue) {
 	kResource, err := k.kubernetesGather.GetKubernetesGatherData()
 	// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
 	if err != nil {
-		kResource.ErrorMessage = fmt.Sprintf("%s %s", time.Now().Format(common.GO_BIRTHDAY), err.Error())
+		if kResource.ErrorState == common.RESOURCE_STATE_CODE_EXIT {
+			log.Infof("kubernetes gather (%s) assemble failed: %s", k.kubernetesGather.Name, err.Error(), logger.NewORGPrefix(k.orgID))
+			return
+		}
 		if kResource.ErrorState == 0 {
 			kResource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
 		}
+		kResource.ErrorMessage = fmt.Sprintf("%s %s", time.Now().Format(common.GO_BIRTHDAY), err.Error())
 	} else {
 		kResource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
 	}

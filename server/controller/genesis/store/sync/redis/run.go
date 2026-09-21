@@ -30,6 +30,10 @@ func NewGenesisSync(ctx context.Context, isMaster bool, queue queue.QueueReader,
 	return nil
 }
 
+func (g *GenesisSync) GetVtapUpdatedVersion(key string) (uint64, bool) {
+	return 0, false
+}
+
 func (g *GenesisSync) GetGenesisSyncData(orgID int) common.GenesisSyncDataResponse {
 	return common.GenesisSyncDataResponse{}
 }
