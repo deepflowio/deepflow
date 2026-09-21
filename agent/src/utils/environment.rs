@@ -378,7 +378,7 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
     }
 
     // FIXME: Getting ctrl_ip and ctrl_mac sometimes fails, increase three retry opportunities to ensure access to ctrl_ip and ctrl_mac
-    for _ in 0..3 {
+    for i in 0..3 {
         let tuple = get_route_src_ip_and_mac(dest);
         if tuple.is_err() {
             warn!(
@@ -389,6 +389,7 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
             continue;
         }
         let (ip, mac) = tuple.unwrap();
+        println!("xxxxxxxxxxxxxxxxxxxxxxxxx {:?} {:?} {:?}", i, ip, mac);
         let links = link_list();
         if links.is_err() {
             warn!(
@@ -402,6 +403,7 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
         // use the public IP to check again to find the outgoing
         // interface of the default route.
         for link in links.unwrap().iter() {
+            println!("xxxxxxxxxxxxxx {:?}", link);
             if link.mac_addr == mac {
                 if !link.flags.contains(LinkFlags::UP) {
                     let dest = if dest.is_ipv4() {
