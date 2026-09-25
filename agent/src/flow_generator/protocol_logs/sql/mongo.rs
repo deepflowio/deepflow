@@ -341,11 +341,11 @@ impl MongoDBLog {
 
         if header.is_request() {
             info.msg_type = LogMessageType::Request;
-            self.info.req_len = header.length;
+            info.req_len = header.length;
             info.request_id = header.request_id;
         } else {
             info.msg_type = LogMessageType::Response;
-            self.info.resp_len = header.length;
+            info.resp_len = header.length;
             info.request_id = header.response_to;
             info.response_id = header.request_id;
         }
@@ -691,6 +691,42 @@ mod tests {
     };
 
     const FILE_DIR: &str = "resources/test/flow_generator/mongo";
+
+    #[test]
+    fn reports_wire_length_for_truncated_messages() {
+        let mut parser = MongoDBLog::default();
+        let mut payload = [0u8; 16];
+        payload[..4].copy_from_slice(&32u32.to_le_bytes());
+        payload[12..].copy_from_slice(&_OP_QUERY.to_le_bytes());
+
+        let mut request = MongoDBInfo::default();
+        parser
+            .parse(
+                &payload,
+                IpProtocol::TCP,
+                PacketDirection::ClientToServer,
+                &mut request,
+            )
+            .unwrap();
+        assert_eq!(request.req_len, 32);
+        assert_eq!(request.resp_len, 0);
+
+        payload[..4].copy_from_slice(&40u32.to_le_bytes());
+        payload[8..12].copy_from_slice(&1u32.to_le_bytes());
+        payload[12..].copy_from_slice(&_OP_REPLY.to_le_bytes());
+
+        let mut response = MongoDBInfo::default();
+        parser
+            .parse(
+                &payload,
+                IpProtocol::TCP,
+                PacketDirection::ServerToClient,
+                &mut response,
+            )
+            .unwrap();
+        assert_eq!(response.req_len, 0);
+        assert_eq!(response.resp_len, 40);
+    }
 
     fn run(name: &str) -> String {
         let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name));
