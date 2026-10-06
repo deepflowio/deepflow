@@ -949,6 +949,10 @@ impl QuadrupleGenerator {
 
         if minute_inject {
             for i in 0..2 {
+                // 与 flow_aggr::send_flow 保持一致：无包方向跳过，避免残留已删除 pcap 策略的 gid
+                if tagged_flow.flow.flow_metrics_peers[i].packet_count == 0 {
+                    continue;
+                }
                 // policy_ids are only used for the calculation of vtap_acl metrics
                 if let Some(policy_data) = tagged_flow.tag.policy_data[i].as_ref() {
                     for action in policy_data.npb_actions.iter() {

@@ -20,10 +20,9 @@ use std::num::NonZeroUsize;
 use std::sync::{Arc, RwLock};
 
 use ahash::AHashMap;
-use ipnetwork::IpNetwork;
 use log::{debug, error};
 use lru::LruCache;
-use pnet::datalink::NetworkInterface;
+use pnet::ipnetwork::IpNetwork;
 
 use crate::{
     common::{
@@ -33,7 +32,7 @@ use crate::{
     utils::environment::is_tt_workload,
 };
 use public::proto::agent::AgentType;
-use public::utils::net::MacAddr;
+use public::utils::net::{Link, LinkFlags, MacAddr};
 
 pub const FROM_CONTROLLER: u16 = 1;
 pub const FROM_CONFIG: u16 = 2;
@@ -192,17 +191,16 @@ impl Forward {
         }
     }
 
-    fn get_ip_from_lookback(
-        agent_type: AgentType,
-        interfaces: &Vec<NetworkInterface>,
-    ) -> Vec<IpNetwork> {
+    fn get_ip_from_lookback(agent_type: AgentType, interfaces: &Vec<Link>) -> Vec<IpNetwork> {
         let mut ips = Vec::new();
         if !is_tt_workload(agent_type) {
             return ips;
         }
 
         for interface in interfaces {
-            if !interface.is_loopback() || !interface.is_up() {
+            if !interface.flags.contains(LinkFlags::LOOPBACK)
+                || !interface.flags.contains(LinkFlags::UP)
+            {
                 continue;
             }
 
@@ -222,20 +220,25 @@ impl Forward {
         &self,
         agent_type: AgentType,
         table: &mut TableLruCache,
-        interfaces: &Vec<NetworkInterface>,
+        interfaces: &Vec<Link>,
     ) {
         let ips = Self::get_ip_from_lookback(agent_type, interfaces);
         debug!("Interface L3:");
         for interface in interfaces {
-            if interface.is_loopback() || !interface.is_up() || interface.mac.is_none() {
+            if interface.flags.contains(LinkFlags::LOOPBACK)
+                || !interface.flags.contains(LinkFlags::UP)
+                || interface.mac_addr == MacAddr::ZERO
+            {
                 continue;
             }
 
-            let mac = MacAddr::from(interface.mac.unwrap().octets());
             let mut ips = ips.clone();
             interface.ips.iter().for_each(|v| ips.push(v.clone()));
             for ip in &ips {
-                let key = L3Key { ip: ip.ip(), mac };
+                let key = L3Key {
+                    ip: ip.ip(),
+                    mac: interface.mac_addr,
+                };
                 if let Some(value) = table.get_mut(&key) {
                     value.from |= FROM_CONFIG;
                     continue;
@@ -251,7 +254,7 @@ impl Forward {
                     last: Timestamp::ZERO,
                     from: FROM_CONFIG,
                     ip: ip.ip(),
-                    mac,
+                    mac: interface.mac_addr,
                 };
                 debug!("\t{} {}", key.mac, key.ip);
                 table.push(key, value);
@@ -263,7 +266,7 @@ impl Forward {
         &mut self,
         agent_type: AgentType,
         platforms: &Vec<Arc<PlatformData>>,
-        interfaces: &Vec<NetworkInterface>,
+        interfaces: &Vec<Link>,
     ) {
         if platforms.len() + interfaces.len() > self.capacity {
             error!("The capacity({}) of the Forward table will be exceeded, where platforms is {} and interfaces is {}. ",
@@ -326,7 +329,7 @@ impl Forward {
 mod tests {
     use std::net::Ipv4Addr;
 
-    use pnet::datalink;
+    use public::utils::net::{link_list_with_ips, LinkFlags, MacAddr};
 
     use crate::common::decapsulate::TunnelType;
     use crate::common::platform_data::IpSubnet;
@@ -336,7 +339,7 @@ mod tests {
     #[test]
     fn test_forward() {
         let mut forward = Forward::new(3, 1024);
-        let interfaces = datalink::interfaces();
+        let interfaces = link_list_with_ips().unwrap();
         let mut platforms = Vec::new();
         platforms.push(Arc::new(PlatformData {
             mac: 0x112233445566,
@@ -391,17 +394,16 @@ mod tests {
         );
         // 本地接口查询
         for i in interfaces {
-            if i.is_loopback() || !i.is_up() || i.mac.is_none() || i.ips.len() == 0 {
+            if i.flags.contains(LinkFlags::LOOPBACK)
+                || !i.flags.contains(LinkFlags::UP)
+                || i.mac_addr == MacAddr::ZERO
+                || i.ips.len() == 0
+            {
                 continue;
             }
             assert_eq!(
                 true,
-                forward.query(
-                    0,
-                    MacAddr::from(i.mac.unwrap().octets()),
-                    i.ips.first().unwrap().ip(),
-                    false
-                )
+                forward.query(0, i.mac_addr, i.ips.first().unwrap().ip(), false)
             );
         }
         // 流量添加查询

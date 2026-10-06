@@ -362,7 +362,7 @@ impl SessionPeer {
             unreachable!();
         };
         self.timestamp = p.lookup_key.timestamp.into();
-        self.payload_len = p.payload_len as u32;
+        self.payload_len = p.raw_payload_len as u32;
         if tcp_data.flags.contains(TcpFlags::SYN) {
             self.payload_len = 1;
         }
@@ -721,7 +721,7 @@ impl TcpPerf {
         }
 
         // 连接建立后，即ESTABLISHED阶段，用SeqArray判断包重传
-        match same_dir.assert_seq_number(tcp_data, p.payload_len) {
+        match same_dir.assert_seq_number(tcp_data, p.raw_payload_len) {
             PacketSeqType::Retrans => {
                 // established retrans
                 self.perf_data.calc_retrans(packet_direction);
@@ -950,7 +950,7 @@ impl TcpPerf {
         // The client sends the packet payload > 1 (cannot be equal to 1, because it may be heartbeat)
         // - the previous packet of the client is syn-ack-ack, then idle_time = current_time - max(previouse_client_packet_time, previouse_server_packet_time)
         // - idel_time = current_time - previouse_server_packet_time
-        if fpd && p.is_psh_ack() && p.payload_len > 1 {
+        if fpd && p.is_psh_ack() {
             if same_dir.is_handshake_ack_packet {
                 same_dir.is_handshake_ack_packet = false;
                 let d = p.lookup_key.timestamp - same_dir.timestamp.max(oppo_dir.timestamp);
@@ -1222,6 +1222,7 @@ impl<'a> From<MiniMetaPacket> for MetaPacket<'_> {
             ..Default::default()
         };
         packet.payload_len = m.payload_len;
+        packet.raw_payload_len = m.payload_len;
         packet.packet_len = m.packet_len;
         packet
     }

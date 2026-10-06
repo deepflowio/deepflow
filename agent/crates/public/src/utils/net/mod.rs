@@ -23,6 +23,7 @@ use std::{
 
 use bitflags::bitflags;
 use ipnet::IpNet;
+use pnet::ipnetwork::IpNetwork;
 use serde::Serialize;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -111,6 +112,7 @@ pub struct Link {
     pub peer_index: Option<u32>,
     pub link_netnsid: Option<u32>,
     pub stats: LinkStats,
+    pub ips: Vec<IpNetwork>,
 }
 
 impl PartialEq for Link {
