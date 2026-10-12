@@ -201,21 +201,71 @@ static __inline bool is_socket_info_valid(struct socket_info_s *sk_info)
 }
 
 
-static __inline void extract_network_address_info(struct data_args_t *args, void *ptr)
+/*
+ * Linux accepts the RFC 2133 sockaddr_in6 layout without sin6_scope_id when
+ * the destination does not need a scope ID. The family, port, flowinfo and
+ * complete IPv6 address occupy the bytes before sin6_scope_id.
+ */
+#define SOCKADDR_IN6_ADDR_PORT_LEN \
+	offsetof(struct sockaddr_in6, sin6_scope_id)
+
+/*
+ * 将用户态 sockaddr 缓冲区的容量压缩为本功能关心的两个有效值。
+ *
+ * recvfrom()/recvmsg()/recvmmsg() 返回时会覆盖调用者提供的地址长度；返回值
+ * 表示完整地址所需长度，不代表内核实际向用户缓冲区复制了多少字节。因此
+ * 接收入口必须保存调用前的容量。IPv6 只需保留“能够容纳地址和端口”的
+ * 24 字节状态，不能要求包含非必需的 sin6_scope_id。这里只保留“足够容纳
+ * IPv4”或“足够容纳 IPv6 地址和端口”两种状态，避免扩大 packed 的
+ * data_args_t。
+ */
+static __inline __u16 normalize_sockaddr_capacity(int addr_len)
 {
-	if (args == NULL || ptr == NULL)
+	if (addr_len >= (int)SOCKADDR_IN6_ADDR_PORT_LEN)
+		return SOCKADDR_IN6_ADDR_PORT_LEN;
+	if (addr_len >= (int)sizeof(struct sockaddr_in))
+		return sizeof(struct sockaddr_in);
+	return 0;
+}
+
+static __inline void extract_network_address_info(struct data_args_t *args,
+						  void *ptr, int addr_len)
+{
+	if (args == NULL)
+		return;
+
+	/*
+	 * 接收路径会暂借 port 保存入口时的地址缓冲区容量。无论地址是否有效，
+	 * 提取前都必须清零，防止容量值被后续逻辑误认为远端端口。
+	 */
+	args->port = 0;
+	if (ptr == NULL || addr_len < (int)sizeof(struct sockaddr_in))
 		return;
 
 	struct sockaddr_in addr = { 0 };
 	bpf_probe_read_user(&addr, sizeof(addr), ptr);
-	args->port = __bpf_ntohs(addr.sin_port);
-	if (args->port > 0 && addr.sin_family == AF_INET) {
-		*(__u32 *) args->addr =  addr.sin_addr.s_addr;
-	} else if (args->port > 0 && addr.sin_family == AF_INET6) {
-		struct sockaddr_in6 addr = { 0 };
-		bpf_probe_read_user(&addr, sizeof(addr), ptr);
+	if (addr.sin_family == AF_INET && addr.sin_port != 0) {
+		args->port = __bpf_ntohs(addr.sin_port);
+		/*
+		 * Linux 允许关闭 IPV6_V6ONLY 的 AF_INET6 UDP socket 使用
+		 * sockaddr_in 发送 IPv4 报文。后续不能根据 socket 的地址族
+		 * 判断这里提取的是 IPv4 还是 IPv6，否则这 4 字节会被误当作
+		 * IPv6 地址。统一保存为 IPv4-mapped 格式，使地址自身携带类型，
+		 * 同时不扩大 data_args_t。
+		 */
+		*(__u64 *) &args->addr[0] = 0;
+		*(__u32 *) &args->addr[8] = 0xffff0000;
+		*(__u32 *) &args->addr[12] = addr.sin_addr.s_addr;
+	} else if (addr.sin_family == AF_INET6 &&
+		   addr_len >= (int)SOCKADDR_IN6_ADDR_PORT_LEN) {
+		struct sockaddr_in6 addr6 = { 0 };
+		/* 只读取地址和端口，避免访问调用者未提供的 sin6_scope_id。 */
+		bpf_probe_read_user(&addr6, SOCKADDR_IN6_ADDR_PORT_LEN, ptr);
+		if (addr6.sin6_port == 0)
+			return;
+		args->port = __bpf_ntohs(addr6.sin6_port);
 		bpf_probe_read_kernel(&args->addr[0], 16,
-				      &addr.sin6_addr.s6_addr[0]);
+				      &addr6.sin6_addr.s6_addr[0]);
 	}
 }
 
@@ -1451,14 +1501,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		sk_info->need_reconfirm = conn_info->need_reconfirm;
 		sk_info->correlation_id = conn_info->correlation_id;
 		if (conn_info->tuple.l4_protocol == IPPROTO_UDP) {
-			if (args->port > 0) {
-				bpf_probe_read_kernel(sk_info->ipaddr,
-						      sizeof(sk_info->ipaddr),
-						      args->addr);
-				sk_info->udp_pre_set_addr = 1;
-				sk_info->port = args->port;
-			}
-
 			/*
 			 * If a request involves two push events, the 'seq' must be
 			 * increased to ensure that it remains strictly incremental.
@@ -1609,20 +1651,28 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	v->tuple.num = conn_info->tuple.num;
 	v->data_type = conn_info->protocol;
 	if (conn_info->tuple.l4_protocol == IPPROTO_UDP && args->port > 0) {
-		if (conn_info->skc_family == PF_INET) {
-			bpf_probe_read_kernel(v->tuple.daddr, 4, args->addr);
+		/*
+		 * msg_name 的地址族可能与 socket 地址族不同。例如双栈
+		 * AF_INET6 UDP socket 可以使用 sockaddr_in 指定 IPv4 目标。
+		 * 因此先根据提取地址自身的 IPv4-mapped 编码判断地址类型，
+		 * 不能优先依赖 skc_family，否则 IPv4 会被解释成 IPv6。
+		 *
+		 * data_args_t 是 packed 结构，而且旧内核 verifier 不允许在
+		 * 这里直接解引用 args->addr。先通过 helper 复制到已校验的
+		 * trace map value，既避免增加栈占用，也兼容 4.14 verifier。
+		 */
+		bpf_probe_read_kernel(v->tuple.daddr, sizeof(args->addr),
+				      args->addr);
+		if (*(__u64 *) & v->tuple.daddr[0] == 0 &&
+		    *(__u32 *) & v->tuple.daddr[8] == 0xffff0000) {
+			*(__u32 *) v->tuple.daddr =
+			    *(__u32 *) & v->tuple.daddr[12];
+			v->tuple.addr_len = 4;
+		} else if (conn_info->skc_family == PF_INET) {
+			/* 兼容旧的、未归一化的 IPv4 地址表示。 */
 			v->tuple.addr_len = 4;
 		} else if (conn_info->skc_family == PF_INET6) {
-			if (*(__u64 *) & args->addr[0] == 0 &&
-			    *(__u32 *) & args->addr[8] == 0xffff0000) {
-				*(__u32 *) v->tuple.daddr =
-				    *(__u32 *) & args->addr[12];
-				v->tuple.addr_len = 4;
-			} else {
-				bpf_probe_read_kernel(v->tuple.daddr, 16,
-						      args->addr);
-				v->tuple.addr_len = 16;
-			}
+			v->tuple.addr_len = 16;
 		}
 	}
 
@@ -1644,6 +1694,8 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 	v->cap_timestamp = bpf_ktime_get_ns();
 	v->direction = conn_info->direction;
 	v->syscall_len = syscall_len;
+	v->source_fn = (__u8)args->source_fn;
+	v->mmsg_count = args->mmsg_count;
 	v->msg_type = MSG_COMMON;
 
 	// Reassembly modification type
@@ -1784,19 +1836,14 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 
 	init_conn_info(id >> 32, args->fd, conn_info, sk, direction,
 		       bytes_count, offset);
-	if (conn_info->tuple.l4_protocol == IPPROTO_UDP
-	    && conn_info->tuple.dport == 0) {
+	if (conn_info->tuple.l4_protocol == IPPROTO_UDP && args->port > 0) {
+		/*
+		 * 本次 syscall 携带的地址比 socket 中的地址更准确。
+		 * IP 和端口必须使用相同来源，避免生成“当前目标 IP + socket
+		 * 旧端口”的混合 tuple。未 connect UDP 的远端地址属于单个
+		 * 报文，不能从 socket_info_map 回填历史值；无法取得时保留为 0。
+		 */
 		conn_info->tuple.dport = args->port;
-		if (conn_info->tuple.dport == 0 &&
-		    is_socket_info_valid(conn_info->socket_info_ptr) &&
-		    conn_info->socket_info_ptr->udp_pre_set_addr) {
-			conn_info->tuple.dport =
-			    conn_info->socket_info_ptr->port;
-			args->port = conn_info->tuple.dport;
-			bpf_probe_read_kernel(args->addr, sizeof(args->addr),
-					      conn_info->socket_info_ptr->
-					      ipaddr);
-		}
 	}
 
 	conn_info->direction = direction;
@@ -2153,7 +2200,8 @@ KRETFUNC_PROG(ksys_read, unsigned int fd, const char __user * buf, size_t count,
  */
 // System call sendto() entry point
 static __inline int do_sys_enter_sendto(void *ctx, int sockfd, char *buf,
-					struct sockaddr __user *u_addr)
+					struct sockaddr __user *u_addr,
+					int addr_len)
 {
 	__u64 id = bpf_get_current_pid_tgid();
 
@@ -2172,15 +2220,22 @@ static __inline int do_sys_enter_sendto(void *ctx, int sockfd, char *buf,
 	    get_tcp_write_seq(sockfd, &write_args.sk, socket_info_ptr);
 
 	void *ptr = NULL;
-#ifndef LINUX_VER_KFUNC
+#if defined(SUPPORTS_KPROBE_ONLY) || defined(LINUX_VER_ANDROID) || \
+    defined(LINUX_VER_KFUNC)
+	ptr = u_addr;
+#else
 	struct syscall_sendto_enter_ctx *sendto_ctx =
 	    (struct syscall_sendto_enter_ctx *)ctx;
 	ptr = sendto_ctx->addr;
-#else
-	ptr = u_addr;
+	addr_len = sendto_ctx->addr_len;
 #endif
+	/*
+	 * addr 非空而 addr_len 为零或过小时，内核不会把该缓冲区作为
+	 * 有效目的地址。这里必须使用本次 sendto() 的真实长度校验，
+	 * 不能把缓冲区中的残留 sockaddr 当成本次远端地址。
+	 */
 	if (ptr)
-		extract_network_address_info(&write_args, ptr);
+		extract_network_address_info(&write_args, ptr, addr_len);
 
 	active_write_args_map__update(&id, &write_args);
 	return 0;
@@ -2190,13 +2245,17 @@ static __inline int do_sys_enter_sendto(void *ctx, int sockfd, char *buf,
 KPROG(__sys_sendto) (struct pt_regs *ctx) {
 	int sockfd = (int)PT_REGS_PARM1(ctx);
 	char *buf = (char *)PT_REGS_PARM2(ctx);
-	return do_sys_enter_sendto((void *)ctx, sockfd, buf, NULL);
+	struct sockaddr *u_addr = (struct sockaddr *)PT_REGS_PARM5(ctx);
+	int addr_len = (int)PT_REGS_PARM6(ctx);
+	return do_sys_enter_sendto((void *)ctx, sockfd, buf, u_addr, addr_len);
 }
 
 KPROG(sys_sendto) (struct pt_regs *ctx) {
 	int sockfd = (int)PT_REGS_PARM1(ctx);
 	char *buf = (char *)PT_REGS_PARM2(ctx);
-	return do_sys_enter_sendto((void *)ctx, sockfd, buf, NULL);
+	struct sockaddr *u_addr = (struct sockaddr *)PT_REGS_PARM5(ctx);
+	int addr_len = (int)PT_REGS_PARM6(ctx);
+	return do_sys_enter_sendto((void *)ctx, sockfd, buf, u_addr, addr_len);
 }
 #else
 #ifndef LINUX_VER_KFUNC
@@ -2204,6 +2263,7 @@ TP_SYSCALL_PROG(enter_sendto) (struct syscall_comm_enter_ctx *ctx) {
 	int sockfd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
 	struct sockaddr *u_addr = NULL;
+	int addr_len = 0;
 #else
 //int __sys_sendto(int fd, void __user *buff, size_t len, unsigned int flags,
 //                 struct sockaddr __user *addr,  int addr_len)
@@ -2213,7 +2273,7 @@ KFUNC_PROG(__sys_sendto, int fd, void __user * buff, size_t len,
 	int sockfd = fd;
 	char *buf = (char *)buff;
 #endif /* LINUX_VER_KFUNC */
-	return do_sys_enter_sendto((void *)ctx, sockfd, buf, u_addr);
+	return do_sys_enter_sendto((void *)ctx, sockfd, buf, u_addr, addr_len);
 }
 #endif /* SUPPORTS_KPROBE_ONLY */
 
@@ -2258,7 +2318,9 @@ KRETFUNC_PROG(__sys_sendto, int fd, void __user * buff, size_t len,
 #endif /* SUPPORTS_KPROBE_ONLY */
 
 // System call recvfrom() entry point
-static __inline int do_sys_enter_recvfrom(int sockfd, const char *buf, struct sockaddr __user *u_addr)
+static __inline int do_sys_enter_recvfrom(int sockfd, const char *buf,
+					  struct sockaddr __user *u_addr,
+					  int __user *u_addr_len)
 {
 	__u64 id = bpf_get_current_pid_tgid();
 	// Stash arguments.
@@ -2272,8 +2334,16 @@ static __inline int do_sys_enter_recvfrom(int sockfd, const char *buf, struct so
 	    socket_info_map__lookup(&conn_key);
 	read_args.tcp_seq =
 	    get_tcp_read_seq(sockfd, &read_args.sk, socket_info_ptr);
-	if (u_addr) {
+	if (u_addr && u_addr_len) {
+		int addr_len = 0;
+		/*
+		 * recvfrom() 的 addrlen 是 value-result 参数。必须在入口读取
+		 * 用户提供的缓冲区容量；退出时该值可能已被内核改写为完整
+		 * sockaddr 所需长度，不能再用来判断实际复制了多少字节。
+		 */
+		bpf_probe_read_user(&addr_len, sizeof(addr_len), u_addr_len);
 		read_args.ipaddr_ptr = (void *)u_addr;
+		read_args.port = normalize_sockaddr_capacity(addr_len);
 	}
 	active_read_args_map__update(&id, &read_args);
 	return 0;
@@ -2286,7 +2356,8 @@ KPROG(__sys_recvfrom) (struct pt_regs *ctx) {
 	int sockfd = (int)PT_REGS_PARM1(ctx);
 	char *buf = (char *)PT_REGS_PARM2(ctx);
 	struct sockaddr *src_addr = (struct sockaddr *)PT_REGS_PARM5(ctx);
-	return do_sys_enter_recvfrom(sockfd, buf, src_addr);
+	int *src_addr_len = (int *)PT_REGS_PARM6(ctx);
+	return do_sys_enter_recvfrom(sockfd, buf, src_addr, src_addr_len);
 }
 
 KPROG(sys_recvfrom) (struct pt_regs *ctx) {
@@ -2295,7 +2366,8 @@ KPROG(sys_recvfrom) (struct pt_regs *ctx) {
 	int sockfd = (int)PT_REGS_PARM1(ctx);
 	char *buf = (char *)PT_REGS_PARM2(ctx);
 	struct sockaddr *src_addr = (struct sockaddr *)PT_REGS_PARM5(ctx);
-	return do_sys_enter_recvfrom(sockfd, buf, src_addr);
+	int *src_addr_len = (int *)PT_REGS_PARM6(ctx);
+	return do_sys_enter_recvfrom(sockfd, buf, src_addr, src_addr_len);
 }
 #else
 // ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
@@ -2308,10 +2380,10 @@ TP_SYSCALL_PROG(enter_recvfrom) (struct syscall_comm_enter_ctx *ctx) {
 	int sockfd = (int)ctx->fd;
 	char *buf = (char *)ctx->buf;
 
-	struct sockaddr *u_addr = NULL;
-	struct syscall_sendto_enter_ctx *sendto_ctx = (struct syscall_sendto_enter_ctx *)ctx;
-	u_addr = sendto_ctx->addr;
-	return do_sys_enter_recvfrom(sockfd, buf, u_addr);
+	struct syscall_recvfrom_enter_ctx *recvfrom_ctx =
+	    (struct syscall_recvfrom_enter_ctx *)ctx;
+	return do_sys_enter_recvfrom(sockfd, buf, recvfrom_ctx->addr,
+				     recvfrom_ctx->addr_len);
 }
 #endif /* SUPPORTS_KPROBE_ONLY */
 
@@ -2323,9 +2395,10 @@ static __inline int do_sys_exit_recvfrom(void *ctx, ssize_t bytes_count) {
 	if (read_args != NULL) {
 		read_args->bytes_count = bytes_count;
 		if (read_args->ipaddr_ptr) {
+			__u16 addr_len = read_args->port;
 			void *ptr = read_args->ipaddr_ptr;
 			read_args->ipaddr_ptr = NULL;
-			extract_network_address_info(read_args, ptr);
+			extract_network_address_info(read_args, ptr, addr_len);
 		}
 		process_syscall_data((struct pt_regs *)ctx, id, T_INGRESS,
 				     read_args, bytes_count);
@@ -2379,6 +2452,14 @@ KFUNC_PROG(__sys_sendmsg, int fd, struct user_msghdr __user * msg,
 		write_args.fd = sockfd;
 		write_args.iov = msghdr->msg_iov;
 		write_args.iovlen = msghdr->msg_iovlen;
+		/*
+		 * 发送目标是输入参数，应在入口按 msg_namelen 校验并提取。
+		 * msg_name 非空但长度为零时，内核会忽略该缓冲区并使用已
+		 * connect 的目标地址，不能让缓冲区中的旧值覆盖 socket 地址。
+		 */
+		extract_network_address_info(
+		    &write_args, (void *)msghdr->msg_name,
+		    msghdr->msg_namelen);
 		write_args.enter_ts = bpf_ktime_get_ns();
 		__u64 conn_key =
 		    gen_conn_key_id((__u64) (id >> 32), (__u64) sockfd);
@@ -2386,7 +2467,6 @@ KFUNC_PROG(__sys_sendmsg, int fd, struct user_msghdr __user * msg,
 		    socket_info_map__lookup(&conn_key);
 		write_args.tcp_seq =
 		    get_tcp_write_seq(sockfd, &write_args.sk, socket_info_ptr);
-		write_args.ipaddr_ptr = (void *)msghdr->msg_name;
 		active_write_args_map__update(&id, &write_args);
 	}
 
@@ -2413,19 +2493,6 @@ KRETFUNC_PROG(__sys_sendmsg, int sockfd, const struct msghdr * msg, int flags,
 	struct data_args_t *write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL) {
 		write_args->bytes_count = bytes_count;
-		/*
-		 * For the `sendmsg()/recvmsg()` system interfaces, the remote
-		 * IP address and port may be specified through the parameter
-		 * `struct user_msghdr __user *msg` and may not be recorded in
-		 * the kernel `sock` structure (as is common in the UDP protocol).
-		 * We extract the values from the system call parameters to obtain
-		 * this data and populate the network tuple.
-		 */
-		if (write_args->ipaddr_ptr) {
-			void *ptr = write_args->ipaddr_ptr;
-			write_args->ipaddr_ptr = NULL;
-			extract_network_address_info(write_args, ptr);
-		}
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS,
 					  write_args, bytes_count);
 		active_write_args_map__delete(&id);
@@ -2461,6 +2528,16 @@ KFUNC_PROG(__sys_sendmmsg, int fd, struct mmsghdr __user * mmsg,
 		write_args.fd = sockfd;
 		write_args.iov = msgvec[0].msg_hdr.msg_iov;
 		write_args.iovlen = msgvec[0].msg_hdr.msg_iovlen;
+		/*
+		 * 当前只用 sendmmsg() 的第一条消息确定五元组，并约定同一批
+		 * 消息使用相同的五元组。msg_name 中的目标地址不会写入未 connect 的
+		 * UDP socket，因此直接从输入参数提取远端 IP 和端口，避免
+		 * 回退到 socket_info_map 的历史地址。发送目标是输入值，无需
+		 * 等待系统调用返回。
+		 */
+		extract_network_address_info(
+		    &write_args, (void *)msgvec[0].msg_hdr.msg_name,
+		    msgvec[0].msg_hdr.msg_namelen);
 		write_args.msg_len = (void *)msgvec_ptr + offsetof(typeof(struct mmsghdr), msg_len);	//&msgvec[0].msg_len;
 		write_args.enter_ts = bpf_ktime_get_ns();
 		__u64 conn_key =
@@ -2507,8 +2584,22 @@ KRETFUNC_PROG(__sys_sendmmsg, int fd, struct mmsghdr __user * mmsg,
 	// Unstash arguments, and process syscall.
 	struct data_args_t *write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL && num_msgs > 0) {
-		ssize_t bytes_count;
-		bpf_probe_read_user(&bytes_count, sizeof(write_args->msg_len),
+		/* sendmmsg() returns the number of successfully sent messages. */
+		write_args->mmsg_count = (__u16)num_msgs;
+		/*
+		 * mmsghdr.msg_len 是 unsigned int，而 data_args_t.msg_len 是
+		 * 指向该字段的用户态指针。必须按字段本身的 4 字节读取，不能使用
+		 * 指针大小，否则 64 位系统会把尾部 padding 读入 bytes_count。
+		 */
+		unsigned int bytes_count = 0;
+		/*
+		 * sendmmsg() 返回实际成功发送的消息数量。extra_iov 保存的是
+		 * 第二条消息；返回值小于 2 时第二条并未发送，必须在进入后续
+		 * tail call 前关闭 extra 输出，避免上报不存在的 UDP DNS 事件。
+		 */
+		if (num_msgs < 2)
+			write_args->extra_iovlen = 0;
+		bpf_probe_read_user(&bytes_count, sizeof(bytes_count),
 				    write_args->msg_len);
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS,
 					  write_args, bytes_count);
@@ -2558,6 +2649,9 @@ KFUNC_PROG(__sys_recvmsg, int fd, struct user_msghdr __user * msg,
 		read_args.tcp_seq =
 		    get_tcp_read_seq(sockfd, &read_args.sk, socket_info_ptr);
 		read_args.ipaddr_ptr = (void *)msghdr->msg_name;
+		/* 保存入口容量；返回后的 msg_namelen 不能代表实际复制长度。 */
+		read_args.port =
+		    normalize_sockaddr_capacity(msghdr->msg_namelen);
 		active_read_args_map__update(&id, &read_args);
 	}
 
@@ -2584,12 +2678,15 @@ KRETFUNC_PROG(__sys_recvmsg, int fd, struct user_msghdr __user * msg,
 	struct data_args_t *read_args = active_read_args_map__lookup(&id);
 	if (read_args != NULL) {
 		read_args->bytes_count = bytes_count;
-		// Extract the remote address carried by `recvmsg()`.
-		if (read_args->ipaddr_ptr) {
-			void *ptr = read_args->ipaddr_ptr;
-			read_args->ipaddr_ptr = NULL;
-			extract_network_address_info(read_args, ptr);
-		}
+		/* Extract the remote address carried by `recvmsg()`. */
+		__u16 addr_len = read_args->port;
+		void *ptr = read_args->ipaddr_ptr;
+		/*
+		 * addr 与 ipaddr_ptr 共用 union。先保存用户态指针并清空 union，
+		 * 再由提取函数写入完整的归一化地址，避免残留旧指针内容。
+		 */
+		read_args->ipaddr_ptr = NULL;
+		extract_network_address_info(read_args, ptr, addr_len);
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_INGRESS,
 					  read_args, bytes_count);
 		active_read_args_map__delete(&id);
@@ -2621,7 +2718,7 @@ TP_SYSCALL_PROG(enter_recvmmsg) (struct syscall_comm_enter_ctx * ctx) {
 #endif
 	__u64 id = bpf_get_current_pid_tgid();
 	if (msgvec != NULL && vlen >= 1) {
-		int offset;
+		int offset, msg_namelen = 0;
 		// Stash arguments.
 		struct data_args_t read_args = {};
 		read_args.source_fn = SYSCALL_FUNC_RECVMMSG;
@@ -2639,6 +2736,23 @@ TP_SYSCALL_PROG(enter_recvmmsg) (struct syscall_comm_enter_ctx * ctx) {
 
 		bpf_probe_read_user(&read_args.iovlen, sizeof(read_args.iovlen),
 				    (void *)msgvec + offset);
+
+		/*
+		 * recvmmsg() 返回时，内核把第一条消息的远端地址写入
+		 * msgvec[0].msg_hdr.msg_name 指向的缓冲区。这里只保存缓冲区
+		 * 指针，等系统调用成功退出后再读取实际的远端 IP 和端口。
+		 */
+		offset = offsetof(typeof(struct mmsghdr), msg_hdr) +
+		    offsetof(typeof(struct user_msghdr), msg_name);
+		bpf_probe_read_user(&read_args.ipaddr_ptr,
+				    sizeof(read_args.ipaddr_ptr),
+				    (void *)msgvec + offset);
+
+		offset = offsetof(typeof(struct mmsghdr), msg_hdr) +
+		    offsetof(typeof(struct user_msghdr), msg_namelen);
+		bpf_probe_read_user(&msg_namelen, sizeof(msg_namelen),
+				    (void *)msgvec + offset);
+		read_args.port = normalize_sockaddr_capacity(msg_namelen);
 
 		read_args.msg_len =
 		    (void *)msgvec + offsetof(typeof(struct mmsghdr), msg_len);
@@ -2666,9 +2780,27 @@ TP_SYSCALL_PROG(exit_recvmmsg) (struct syscall_comm_exit_ctx *ctx) {
 	// Unstash arguments, and process syscall.
 	struct data_args_t *read_args = active_read_args_map__lookup(&id);
 	if (read_args != NULL && num_msgs > 0) {
-		ssize_t bytes_count;
-		bpf_probe_read_user(&bytes_count, sizeof(read_args->msg_len),
+		/* recvmmsg() returns the number of successfully received messages. */
+		read_args->mmsg_count = (__u16)num_msgs;
+		/*
+		 * mmsghdr.msg_len 是 unsigned int，而 data_args_t.msg_len 是
+		 * 指向该字段的用户态指针。必须按字段本身的 4 字节读取，不能使用
+		 * 指针大小，否则 64 位系统会把尾部 padding 读入 bytes_count。
+		 */
+		unsigned int bytes_count = 0;
+		void *ipaddr_ptr = NULL;
+		__u16 addr_len = read_args->port;
+		bpf_probe_read_user(&bytes_count, sizeof(bytes_count),
 				    read_args->msg_len);
+		/* data_args_t 是 packed 结构，通过 helper 读取可避免展开为逐字节指令。 */
+		bpf_probe_read_kernel(&ipaddr_ptr, sizeof(ipaddr_ptr),
+				      &read_args->ipaddr_ptr);
+		/*
+		 * addr 与 ipaddr_ptr 共用 union。先保存用户态指针并清空 union，
+		 * 再由提取函数写入完整的归一化地址，避免残留旧指针内容。
+		 */
+		read_args->ipaddr_ptr = NULL;
+		extract_network_address_info(read_args, ipaddr_ptr, addr_len);
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_INGRESS,
 					  read_args, bytes_count);
 	}
@@ -3202,6 +3334,14 @@ static __inline int output_extra_data_common(struct data_args_t *args, struct __
 
 	args->iov = args->extra_iov;
 	args->iovlen = args->extra_iovlen;
+	/*
+	 * args->msg_len 指向 msgvec[0].msg_len。mmsghdr 数组连续存放，
+	 * 因此加上一个 struct mmsghdr 的大小即可定位 msgvec[1].msg_len。
+	 * 第二条消息必须使用自身的长度；继续沿用第一条的 syscall_len，
+	 * 会导致长度字段错误，并在第二条较长时提前截断采集数据。
+	 */
+	void *msg_len = (char *)args->msg_len + sizeof(struct mmsghdr);
+
 	struct __socket_data *extra_v =
 	    (struct __socket_data *)(v_buff->data + v_buff->len);
 	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*extra_v)))
@@ -3211,6 +3351,9 @@ static __inline int output_extra_data_common(struct data_args_t *args, struct __
 			      offsetof(typeof(struct __socket_data),
 				       data), head);
 	extra_v->data_seq += 1;
+	if (bpf_probe_read_user(&extra_v->syscall_len,
+				sizeof(extra_v->syscall_len), msg_len) != 0)
+		return -1;
 	int copy_bytes = output_iov_data_copy(args, v_buff, extra_v, max_size,
 					      reassembly_bytes);
 	if (copy_bytes < 0)
