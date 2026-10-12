@@ -413,7 +413,13 @@ prefetch_and_process_data(struct bpf_tracer *t, int id, int nb_rx, void **datas_
 			if (t->datadump)
 				t->datadump((void *)sd, boot_time);
 			/*
-			 * Modify socket data time to real time, 
+			 * reader_raw_cb() temporarily carries datadump-only syscall
+			 * metadata in the high 32 bits. Restore the public field before
+			 * invoking the external callback.
+			 */
+			sd->syscall_len = (uint32_t)sd->syscall_len;
+			/*
+			 * Modify socket data time to real time,
 			 * time precision is in nanosecond.
 			 */
 			sd->timestamp = sd->timestamp + boot_time;

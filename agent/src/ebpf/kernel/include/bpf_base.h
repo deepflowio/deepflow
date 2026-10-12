@@ -164,6 +164,7 @@ unsigned long long load_word(void *skb,
 #define PT_REGS_PARM3(x) ((x)->dx)
 #define PT_REGS_PARM4(x) ((x)->cx)
 #define PT_REGS_PARM5(x) ((x)->r8)
+#define PT_REGS_PARM6(x) ((x)->r9)
 #define PT_REGS_RET(x) ((x)->sp)
 #define PT_REGS_FP(x) ((x)->bp)
 #define PT_REGS_RC(x) ((x)->ax)
@@ -177,6 +178,7 @@ unsigned long long load_word(void *skb,
 #define PT_REGS_PARM3(x) ((x)->ecx)
 #define PT_REGS_PARM4(x) 0
 #define PT_REGS_PARM5(x) 0
+#define PT_REGS_PARM6(x) 0
 #define PT_REGS_RET(x) ((x)->esp)
 #define PT_REGS_FP(x) ((x)->ebp)
 #define PT_REGS_RC(x) ((x)->eax)
@@ -188,6 +190,7 @@ unsigned long long load_word(void *skb,
 #define PT_REGS_PARM3(x) ((x)->rdx)
 #define PT_REGS_PARM4(x) ((x)->rcx)
 #define PT_REGS_PARM5(x) ((x)->r8)
+#define PT_REGS_PARM6(x) ((x)->r9)
 #define PT_REGS_RET(x) ((x)->rsp)
 #define PT_REGS_FP(x) ((x)->rbp)
 #define PT_REGS_RC(x) ((x)->rax)
@@ -225,6 +228,7 @@ struct pt_regs {
 #define PT_REGS_PARM3(x) ((x)->regs[2])
 #define PT_REGS_PARM4(x) ((x)->regs[3])
 #define PT_REGS_PARM5(x) ((x)->regs[4])
+#define PT_REGS_PARM6(x) ((x)->regs[5])
 #define PT_REGS_RET(x) ((x)->regs[30])
 #define PT_REGS_FP(x) ((x)->regs[29])	/* Works only with CONFIG_FRAME_POINTER */
 #define PT_REGS_RC(x) ((x)->regs[0])
