@@ -2588,10 +2588,11 @@ KRETFUNC_PROG(__sys_sendmmsg, int fd, struct mmsghdr __user * mmsg,
 		write_args->mmsg_count = (__u16)num_msgs;
 		/*
 		 * mmsghdr.msg_len 是 unsigned int，而 data_args_t.msg_len 是
-		 * 指向该字段的用户态指针。必须按字段本身的 4 字节读取，不能使用
-		 * 指针大小，否则 64 位系统会把尾部 padding 读入 bytes_count。
+		 * 指向该字段的用户态指针。bytes_count 有意使用 8 字节栈槽，以保持
+		 * 大型内联处理路径的寄存器分配稳定；helper 仍必须只读取字段本身的
+		 * 4 字节，避免将 64 位系统上的尾部 padding 当作长度高位。
 		 */
-		unsigned int bytes_count = 0;
+		ssize_t bytes_count = 0;
 		/*
 		 * sendmmsg() 返回实际成功发送的消息数量。extra_iov 保存的是
 		 * 第二条消息；返回值小于 2 时第二条并未发送，必须在进入后续
@@ -2599,7 +2600,7 @@ KRETFUNC_PROG(__sys_sendmmsg, int fd, struct mmsghdr __user * mmsg,
 		 */
 		if (num_msgs < 2)
 			write_args->extra_iovlen = 0;
-		bpf_probe_read_user(&bytes_count, sizeof(bytes_count),
+		bpf_probe_read_user(&bytes_count, sizeof(unsigned int),
 				    write_args->msg_len);
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS,
 					  write_args, bytes_count);
@@ -2784,13 +2785,13 @@ TP_SYSCALL_PROG(exit_recvmmsg) (struct syscall_comm_exit_ctx *ctx) {
 		read_args->mmsg_count = (__u16)num_msgs;
 		/*
 		 * mmsghdr.msg_len 是 unsigned int，而 data_args_t.msg_len 是
-		 * 指向该字段的用户态指针。必须按字段本身的 4 字节读取，不能使用
-		 * 指针大小，否则 64 位系统会把尾部 padding 读入 bytes_count。
+		 * 指向该字段的用户态指针。与 sendmmsg 路径相同，使用 8 字节栈槽
+		 * 保持 verifier 处理稳定，但 helper 只读取字段本身的 4 字节。
 		 */
-		unsigned int bytes_count = 0;
+		ssize_t bytes_count = 0;
 		void *ipaddr_ptr = NULL;
 		__u16 addr_len = read_args->port;
-		bpf_probe_read_user(&bytes_count, sizeof(bytes_count),
+		bpf_probe_read_user(&bytes_count, sizeof(unsigned int),
 				    read_args->msg_len);
 		/* data_args_t 是 packed 结构，通过 helper 读取可避免展开为逐字节指令。 */
 		bpf_probe_read_kernel(&ipaddr_ptr, sizeof(ipaddr_ptr),
