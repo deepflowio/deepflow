@@ -340,7 +340,7 @@ impl AnalyzerModeDispatcher {
                             let tunnel_type_bitmap = tunnel_type_bitmap.read().unwrap().clone();
                             let mut tunnel_info = TunnelInfo::default();
 
-                            let (decap_length, tap_type) = match Self::decap_tunnel(
+                            let (decap_length, _, tap_type) = match Self::decap_tunnel(
                                 &mut packet.raw[..raw_length],
                                 &tap_type_handler,
                                 &mut tunnel_info,
@@ -655,7 +655,7 @@ impl AnalyzerModeDispatcher {
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
         trim_bitmap: TunnelTypeBitmap,
-    ) -> Result<(usize, CaptureNetworkType)> {
+    ) -> Result<(usize, bool, CaptureNetworkType)> {
         let packet = packet.as_mut();
         if packet[BILD_FLAGS_OFFSET] == BILD_FLAGS as u8 && packet.len() > ETH_HEADER_SIZE {
             // bild will mark ERSPAN traffic and reduce the Trident process
@@ -668,7 +668,7 @@ impl AnalyzerModeDispatcher {
                 }
             };
             *tunnel_info = TunnelInfo::default();
-            return Ok((overlay_offset, tap_type));
+            return Ok((overlay_offset, false, tap_type));
         }
 
         BaseDispatcher::decap_tunnel(packet, tap_type_handler, tunnel_info, bitmap, trim_bitmap)
