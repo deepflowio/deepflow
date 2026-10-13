@@ -362,9 +362,10 @@ impl BaseDispatcher {
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
         trim_bitmap: &TunnelTypeBitmap,
-    ) -> Result<(usize, CaptureNetworkType)> {
+    ) -> Result<(usize, bool, CaptureNetworkType)> {
         let mut decap_len = 0;
         let mut tap_type = CaptureNetworkType::Any;
+        let mut has_trim = false;
         // 仅解析两层隧道
         for i in 0..2 {
             let (offset, t) = Self::decapsulate(
@@ -385,13 +386,14 @@ impl BaseDispatcher {
                 // erspan-vxlan；隧道信息为vxlan，隧道层数为1
                 // erspan-vxlan-erspan；隧道信息为空
                 *tunnel_info = Default::default();
+                has_trim = true;
             }
             if decap_len + offset > packet.len() {
                 break;
             }
             decap_len += offset;
         }
-        Ok((decap_len, tap_type))
+        Ok((decap_len, has_trim, tap_type))
     }
 
     pub(super) fn decap_tunnel(
@@ -400,7 +402,7 @@ impl BaseDispatcher {
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
         trim_bitmap: TunnelTypeBitmap,
-    ) -> Result<(usize, CaptureNetworkType)> {
+    ) -> Result<(usize, bool, CaptureNetworkType)> {
         *tunnel_info = Default::default();
         Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap, &trim_bitmap)
     }
@@ -510,9 +512,10 @@ impl BaseDispatcher {
         tunnel_info: &mut TunnelInfo,
         bitmap: &TunnelTypeBitmap,
         trim_bitmap: &TunnelTypeBitmap,
-    ) -> Result<(usize, CaptureNetworkType)> {
+    ) -> Result<(usize, bool, CaptureNetworkType)> {
         let mut decap_len = 0;
         let mut tap_type = CaptureNetworkType::Any;
+        let mut has_trim = false;
         // 仅解析两层隧道
         for i in 0..2 {
             let (offset, t) = Self::decapsulate(
@@ -533,10 +536,11 @@ impl BaseDispatcher {
                 // erspan-vxlan；隧道信息为vxlan，隧道层数为1
                 // erspan-vxlan-erspan；隧道信息为空
                 tunnel_info.reset_and_retain_erspan_from();
+                has_trim = true;
             }
             decap_len += offset;
         }
-        Ok((decap_len, tap_type))
+        Ok((decap_len, has_trim, tap_type))
     }
 
     pub(super) fn decap_tunnel(
@@ -545,7 +549,7 @@ impl BaseDispatcher {
         tunnel_info: &mut TunnelInfo,
         bitmap: TunnelTypeBitmap,
         trim_bitmap: TunnelTypeBitmap,
-    ) -> Result<(usize, CaptureNetworkType)> {
+    ) -> Result<(usize, bool, CaptureNetworkType)> {
         *tunnel_info = Default::default();
         Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap, &trim_bitmap)
     }
