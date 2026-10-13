@@ -48,11 +48,12 @@ for function_name, mmsg_exit in (
     ("recvmmsg", recvmmsg_exit),
 ):
     require(
-        "unsigned int bytes_count = 0;" in mmsg_exit
-        and "sizeof(bytes_count)" in mmsg_exit
+        "ssize_t bytes_count = 0;" in mmsg_exit
+        and "bpf_probe_read_user(&bytes_count, sizeof(unsigned int)," in mmsg_exit
+        and "sizeof(bytes_count)" not in mmsg_exit
         and "sizeof(write_args->msg_len)" not in mmsg_exit
         and "sizeof(read_args->msg_len)" not in mmsg_exit,
-        f"{function_name} must read the 32-bit mmsghdr.msg_len value, not pointer width",
+        f"{function_name} must keep a zeroed ssize_t slot but read only the 32-bit mmsghdr.msg_len value",
     )
 
 sendmmsg_entry = block(
