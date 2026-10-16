@@ -584,7 +584,7 @@ impl MirrorPlusModeDispatcher {
         tunnel_type_trim_bitmap: TunnelTypeBitmap,
         counter: &Arc<PacketCounter>,
     ) -> usize {
-        let (decap_length, _) = match BaseDispatcher::decap_tunnel(
+        let (decap_length, _, _) = match BaseDispatcher::decap_tunnel(
             &mut packet.raw,
             tap_type_handler,
             tunnel_info,
