@@ -57,6 +57,7 @@ use crate::{
 };
 use public::{
     buffer::Allocator,
+    consts::ETH_HEADER_SIZE,
     debug::QueueDebugger,
     proto::agent::{AgentType, IfMacSource},
     queue::{self, bounded_with_debug, DebugSender, Receiver},
@@ -194,27 +195,15 @@ impl LocalPlusModeDispatcher {
                                 timestamp = pipeline.timestamp;
                             }
 
-                            // compare 3 low bytes
-                            let mac_low = &pipeline.vm_mac.octets()[Self::VALID_MAC_INDEX..];
-                            // src mac
-                            let src_local = mac_low
-                                == &packet.raw[MAC_ADDR_LEN + Self::VALID_MAC_INDEX
-                                    ..MAC_ADDR_LEN + MAC_ADDR_LEN];
-                            // dst mac
-                            let dst_local = !src_local
-                                && (mac_low == &packet.raw[Self::VALID_MAC_INDEX..MAC_ADDR_LEN]
-                                    || MacAddr::is_multicast(&packet.raw));
-
-                            // LOCAL模式L2END使用underlay网络的MAC地址，实际流量解析使用overlay
                             let cur_tunnel_type_bitmap = tunnel_type_bitmap.read().unwrap().clone();
-                            let decap_length = match BaseDispatcher::decap_tunnel(
+                            let (decap_length, has_trim) = match BaseDispatcher::decap_tunnel(
                                 &mut packet.raw,
                                 &tap_type_handler,
                                 &mut tunnel_info,
                                 cur_tunnel_type_bitmap,
                                 tunnel_type_trim_bitmap,
                             ) {
-                                Ok((l, _)) => l,
+                                Ok((l, has_trim, _)) => (l, has_trim),
                                 Err(e) => {
                                     counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
                                     warn!("decap_tunnel failed: {:?}", e);
@@ -226,7 +215,56 @@ impl LocalPlusModeDispatcher {
                                 .min(packet.raw.len())
                                 .min(pool_raw_size);
                             let mut overlay_packet = packet.raw;
-                            overlay_packet.truncate(decap_length..raw_length);
+                            // compare 3 low bytes
+                            let mac_low = &pipeline.vm_mac.octets()[Self::VALID_MAC_INDEX..];
+                            let (src_local, dst_local) = if !has_trim {
+                                if overlay_packet.len() < ETH_HEADER_SIZE {
+                                    counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+                                    continue;
+                                }
+                                // src mac
+                                let src_local = mac_low
+                                    == &overlay_packet[MAC_ADDR_LEN + Self::VALID_MAC_INDEX
+                                        ..MAC_ADDR_LEN + MAC_ADDR_LEN];
+                                // dst mac
+                                let dst_local = !src_local
+                                    && (mac_low
+                                        == &overlay_packet[Self::VALID_MAC_INDEX..MAC_ADDR_LEN]
+                                        || MacAddr::is_multicast(&overlay_packet[..]));
+                                overlay_packet.truncate(decap_length..raw_length);
+
+                                (src_local, dst_local)
+                            } else {
+                                overlay_packet.truncate(decap_length..raw_length);
+
+                                if overlay_packet.len() < ETH_HEADER_SIZE {
+                                    counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+                                    continue;
+                                }
+                                if tunnel_info.tier != 0 {
+                                    // src mac
+                                    let src_local =
+                                        mac_low == &tunnel_info.mac_src.to_be_bytes()[1..];
+                                    // dst mac
+                                    let dst_local = !src_local
+                                        && mac_low == &tunnel_info.mac_dst.to_be_bytes()[1..];
+
+                                    (src_local, dst_local)
+                                } else {
+                                    // src mac
+                                    let src_local = mac_low
+                                        == &overlay_packet[MAC_ADDR_LEN + Self::VALID_MAC_INDEX
+                                            ..MAC_ADDR_LEN + MAC_ADDR_LEN];
+                                    // dst mac
+                                    let dst_local = !src_local
+                                        && (mac_low
+                                            == &overlay_packet
+                                                [Self::VALID_MAC_INDEX..MAC_ADDR_LEN]
+                                            || MacAddr::is_multicast(&overlay_packet[..]));
+                                    (src_local, dst_local)
+                                }
+                            };
+
                             let mut meta_packet = MetaPacket::empty();
                             let offset = Duration::ZERO;
                             if let Err(e) = meta_packet.update(
