@@ -57,6 +57,27 @@ func (lv *labelValue) getActive() map[string]int {
 	return map[string]int{}
 }
 
+func (lv *labelValue) getActiveR() map[int]string {
+	if activeR := lv.activeR.Load(); activeR != nil {
+		return activeR.(map[int]string)
+	}
+	return map[int]string{}
+}
+
+func (lv *labelValue) GetValueByID(id int) (string, bool) {
+	if activeR := lv.getActiveR(); activeR != nil {
+		value, ok := activeR[id]
+		if ok {
+			return value, ok
+		}
+	}
+
+	lv.mu.RLock()
+	defer lv.mu.RUnlock()
+	value, ok := lv.pendingIDToValue[id]
+	return value, ok
+}
+
 func cloneValueMap(src map[string]int, extra int) map[string]int {
 	dst := make(map[string]int, len(src)+extra)
 	for key, value := range src {
@@ -78,17 +99,34 @@ func (lv *labelValue) GetIDByValue(v string) (int, bool) {
 	return 0, false
 }
 
-// GetValueByID returns the label value string for a given ID.
-func (lv *labelValue) GetValueByID(id int) (string, bool) {
-	if r := lv.activeR.Load(); r != nil {
-		if value, ok := r.(map[int]string)[id]; ok {
-			return value, true
-		}
+func (lv *labelValue) GetID(str string) (int, bool) {
+	return lv.GetIDByValue(str)
+}
+
+func (lv *labelValue) setID(str string, id int) {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
+	lv.pending[str] = id
+}
+
+func (lv *labelValue) Add(batch []*metadbmodel.PrometheusLabelValue) {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
+	for _, item := range batch {
+		lv.pending[item.Value] = item.ID
+		lv.pendingIDToValue[item.ID] = item.Value
 	}
-	lv.mu.RLock()
-	defer lv.mu.RUnlock()
-	value, ok := lv.pendingIDToValue[id]
-	return value, ok
+}
+
+func (lv *labelValue) AddFromGrpc(batch []*controller.PrometheusLabelValue) {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
+	for _, item := range batch {
+		value := item.GetValue()
+		id := int(item.GetId())
+		lv.pending[value] = id
+		lv.pendingIDToValue[id] = value
+	}
 }
 
 func (lv *labelValue) GetValueToID() map[string]int {
@@ -103,15 +141,6 @@ func (lv *labelValue) GetValueToID() map[string]int {
 	lv.mu.RUnlock()
 
 	return snapshot
-}
-
-func (lv *labelValue) Add(batch []*controller.PrometheusLabelValue) {
-	lv.mu.Lock()
-	defer lv.mu.Unlock()
-	for _, item := range batch {
-		lv.pending[item.GetValue()] = int(item.GetId())
-		lv.pendingIDToValue[int(item.GetId())] = item.GetValue()
-	}
 }
 
 func (lv *labelValue) refresh(args ...interface{}) error {

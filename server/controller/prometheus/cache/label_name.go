@@ -52,6 +52,13 @@ func (ln *labelName) getActive() map[string]int {
 	return map[string]int{}
 }
 
+func (ln *labelName) getActiveR() map[int]string {
+	if activeR := ln.activeR.Load(); activeR != nil {
+		return activeR.(map[int]string)
+	}
+	return map[int]string{}
+}
+
 func (ln *labelName) replaceActive(newActive map[string]int) {
 	ln.active.Store(newActive)
 }
@@ -66,17 +73,34 @@ func (ln *labelName) GetIDByName(n string) (int, bool) {
 	return id, ok
 }
 
-// GetNameByID returns the label name string for a given ID.
-func (ln *labelName) GetNameByID(id int) (string, bool) {
-	if r := ln.activeR.Load(); r != nil {
-		if name, ok := r.(map[int]string)[id]; ok {
-			return name, true
-		}
+func (ln *labelName) GetID(str string) (int, bool) {
+	return ln.GetIDByName(str)
+}
+
+func (ln *labelName) setID(str string, id int) {
+	ln.mu.Lock()
+	defer ln.mu.Unlock()
+	ln.pendingNameToID[str] = id
+}
+
+func (ln *labelName) Add(batch []*metadbmodel.PrometheusLabelName) {
+	ln.mu.Lock()
+	defer ln.mu.Unlock()
+	for _, item := range batch {
+		ln.pendingNameToID[item.Name] = item.ID
+		ln.pendingIDToName[item.ID] = item.Name
 	}
-	ln.mu.RLock()
-	defer ln.mu.RUnlock()
-	name, ok := ln.pendingIDToName[id]
-	return name, ok
+}
+
+func (ln *labelName) AddFromGrpc(batch []*controller.PrometheusLabelName) {
+	ln.mu.Lock()
+	defer ln.mu.Unlock()
+	for _, item := range batch {
+		name := item.GetName()
+		id := int(item.GetId())
+		ln.pendingNameToID[name] = id
+		ln.pendingIDToName[id] = name
+	}
 }
 
 func (ln *labelName) GetNameToID() map[string]int {
@@ -93,30 +117,47 @@ func (ln *labelName) GetNameToID() map[string]int {
 	return snapshot
 }
 
-func (ln *labelName) Add(batch []*controller.PrometheusLabelName) {
-	ln.mu.Lock()
-	defer ln.mu.Unlock()
-	for _, item := range batch {
-		ln.pendingNameToID[item.GetName()] = int(item.GetId())
-		ln.pendingIDToName[int(item.GetId())] = item.GetName()
+func (ln *labelName) GetNameByID(id int) (string, bool) {
+	if activeR := ln.getActiveR(); activeR != nil {
+		name, ok := activeR[id]
+		if ok {
+			return name, ok
+		}
 	}
+
+	ln.mu.RLock()
+	defer ln.mu.RUnlock()
+	name, ok := ln.pendingIDToName[id]
+	return name, ok
 }
 
 func (ln *labelName) refresh(args ...interface{}) error {
-	items, err := ln.load()
+	var count int64
+	if err := ln.org.DB.Model(&metadbmodel.PrometheusLabelName{}).Count(&count).Error; err != nil {
+		return err
+	}
+
+	rows, err := ln.org.DB.Model(&metadbmodel.PrometheusLabelName{}).Select("id", "name").Rows()
 	if err != nil {
 		return err
 	}
-	ln.processLoadedData(items)
-	return nil
-}
+	defer rows.Close()
 
-func (ln *labelName) processLoadedData(items []*metadbmodel.PrometheusLabelName) {
-	newActive := make(map[string]int, len(items))
-	newActiveR := make(map[int]string, len(items))
-	for _, item := range items {
-		newActive[item.Name] = item.ID
-		newActiveR[item.ID] = item.Name
+	newActive := make(map[string]int, count)
+	newActiveR := make(map[int]string, count)
+	for rows.Next() {
+		var id int
+		var name string
+		if scanErr := rows.Scan(&id, &name); scanErr != nil {
+			log.Errorf("stream scan prometheus_label_name interrupted: %v", scanErr, ln.org.LogPrefix)
+			return scanErr
+		}
+		newActive[name] = id
+		newActiveR[id] = name
+	}
+	if err := rows.Err(); err != nil {
+		log.Errorf("stream read prometheus_label_name error: %v", err, ln.org.LogPrefix)
+		return err
 	}
 
 	ln.mu.Lock()
@@ -134,10 +175,5 @@ func (ln *labelName) processLoadedData(items []*metadbmodel.PrometheusLabelName)
 	}
 	ln.activeR.Store(newActiveR)
 	ln.replaceActive(newActive)
-}
-
-func (ln *labelName) load() ([]*metadbmodel.PrometheusLabelName, error) {
-	var labelNames []*metadbmodel.PrometheusLabelName
-	err := ln.org.DB.Select("id", "name").Find(&labelNames).Error
-	return labelNames, err
+	return nil
 }
