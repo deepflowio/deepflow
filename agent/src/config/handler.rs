@@ -3736,6 +3736,11 @@ impl ConfigHandler {
                     "inputs.ebpf.socket.tunning.hooked_socket_syscalls"
                 ),
                 (
+                    tunning.udp_peer_id_enabled,
+                    new_tunning.udp_peer_id_enabled,
+                    "inputs.ebpf.socket.tunning.udp_peer_id_enabled"
+                ),
+                (
                     tunning.map_prealloc_disabled,
                     new_tunning.map_prealloc_disabled,
                     "inputs.ebpf.socket.tunning.map_prealloc_disabled"

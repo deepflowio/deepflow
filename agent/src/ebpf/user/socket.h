@@ -460,6 +460,7 @@ enum tracer_state get_socket_tracer_state(void);
 int set_protocol_ports_bitmap(int proto_type, const char *ports);
 int disable_syscall_trace_id(void);
 void set_hooked_socket_syscalls(uint64_t bitmap);
+void set_udp_peer_id_enabled(bool enabled);
 
 /**
  * eBPF Probe Point Configuration

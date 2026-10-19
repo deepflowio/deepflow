@@ -3269,6 +3269,31 @@ inputs:
           - writev
         # type: bool
         # name:
+        #   en: Enable UDP Peer Socket ID Isolation
+        #   ch: 开启 UDP Peer Socket ID 隔离
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     When enabled, Socket Tracer assigns an independent socket ID and capture sequence
+        #     to each UDP peer identified by the physical socket and its complete local and remote
+        #     endpoints. This prevents different peers sharing one UDP file descriptor from being
+        #     aggregated into the same flow. Events with incomplete endpoint information fall back
+        #     to the physical socket ID. This branch cannot compensate for missing local IPs on
+        #     wildcard-bound UDP sockets; bind a concrete local address for isolation. Restart the
+        #     agent after changing this option.
+        #   ch: |-
+        #     开启后，Socket Tracer 会按“物理 socket + 完整本地/远端端点”为每个 UDP peer
+        #     分配独立的 socket ID 和采集序号，避免共用同一 UDP FD 的不同 peer 被聚合到
+        #     同一 Flow。端点信息不完整的事件会回退到物理 socket ID。本分支无法补偿 bind
+        #     到通配地址时缺失的本地 IP，建议绑定具体本地地址。修改后需重启 Agent。
+        # upgrade_from:
+        udp_peer_id_enabled: false
+        # type: bool
+        # name:
         #   en: Enable the fentry/fexit feature
         #   ch: 启用fentry/fexit特性
         # unit:
