@@ -75,7 +75,7 @@ require(
 
 extra_output = block(
     KERNEL,
-    "static __inline int output_extra_data_common",
+    "static_always_inline int output_extra_data_common",
     "#if defined(LINUX_VER_KFUNC)",
 )
 require(

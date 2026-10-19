@@ -39,6 +39,21 @@
 
 #define __user
 
+struct udp_peer_key_t {
+	__u64 physical_socket_id;
+	__u8 local_addr[16];
+	__u8 remote_addr[16];
+	__u16 local_port;
+	__u16 remote_port;
+	__u8 addr_len;
+	__u8 reserved[3];
+};
+
+struct udp_peer_state_t {
+	__u64 socket_id;
+	volatile __u64 seq;
+};
+
 /* *INDENT-OFF* */
 /***********************************************************
  * map definitions
@@ -102,6 +117,24 @@ MAP_PERARRAY(tracer_ctx_map, __u32, struct tracer_ctx_s, 1, FEATURE_FLAG_SOCKET_
  * 对各类map进行统计
  */
 MAP_ARRAY(trace_stats_map, __u32, struct trace_stats, 1, FEATURE_FLAG_SOCKET_TRACER)
+
+MAP_ARRAY(udp_peer_id_enabled_map, __u32, __u32, 1,
+	  FEATURE_FLAG_SOCKET_TRACER)
+
+struct bpf_map_def SEC("maps") __udp_peer_map = {
+	.type = BPF_MAP_TYPE_LRU_HASH,
+	.key_size = sizeof(struct udp_peer_key_t),
+	.value_size = sizeof(struct udp_peer_state_t),
+	.max_entries = MAP_MAX_ENTRIES_DEF,
+	.feat_flags = FEATURE_FLAG_SOCKET_TRACER,
+};
+
+static_always_inline __attribute__((unused)) struct udp_peer_state_t *
+udp_peer_map__lookup(struct udp_peer_key_t *key)
+{
+	return (struct udp_peer_state_t *)bpf_map_lookup_elem(&__udp_peer_map,
+							      (const void *)key);
+}
 
 // key: protocol id, value: is protocol enabled, size: PROTO_NUM
 MAP_ARRAY(protocol_filter, int, int, PROTO_NUM, FEATURE_FLAG_SOCKET_TRACER)
@@ -419,13 +452,20 @@ static __u32 __inline get_tcp_read_seq(int fd, void **sk, struct socket_info_s
 static __inline int iovecs_copy(struct __socket_data *v,
 				struct __socket_data_buffer *v_buff,
 				const struct data_args_t *args,
-				size_t real_len, __u32 send_len)
+				size_t real_len, __u32 send_len,
+				unsigned int loop_limit)
 {
 /*
  * When `LOOP_LIMIT` is set too high, the 'fentry/fexit' bytecode fails
  * to load. Testing shows that the appropriate maximum value is 18.
  */
 #define LOOP_LIMIT 18
+/*
+ * The extra output path only handles the second DNS A/AAAA message. Keeping
+ * that dedicated path to one iovec prevents the post-copy UDP peer
+ * lookup from exceeding the Linux 4.14 verifier complexity limit.
+ */
+#define EXTRA_LOOP_LIMIT 1
 
 	struct copy_data_s {
 		char data[sizeof(v->data)];
@@ -444,7 +484,8 @@ static __inline int iovecs_copy(struct __socket_data *v,
 
 #pragma unroll
 	for (unsigned int i = 0;
-	     i < LOOP_LIMIT && i < args->iovlen && bytes_copy < total_size;
+	     i < LOOP_LIMIT && i < loop_limit && i < args->iovlen &&
+	     bytes_copy < total_size;
 	     ++i) {
 		COPY_IOV(v_buff->data,
 			 v_buff->len + offsetof(typeof(struct __socket_data),
@@ -3177,6 +3218,86 @@ KFUNC_PROG(__sys_connect, int fd, struct sockaddr __user * uservaddr,
 	return 0;
 }
 
+static_always_inline bool udp_peer_addr_is_zero(const __u8 *addr,
+						 __u8 addr_len)
+{
+	if (addr_len == 4)
+		return *(__u32 *)addr == 0;
+
+	return *(__u64 *)addr == 0 && *(__u64 *)(addr + 8) == 0;
+}
+
+static_always_inline bool
+build_udp_peer_key(struct __socket_data *event, __u64 physical_socket_id,
+		   struct udp_peer_key_t *key)
+{
+	__u8 addr_len = event->tuple.addr_len;
+	if (physical_socket_id == 0 || (addr_len != 4 && addr_len != 16) ||
+	    event->tuple.num == 0 || event->tuple.dport == 0)
+		return false;
+
+	key->physical_socket_id = physical_socket_id;
+	key->local_port = event->tuple.num;
+	key->remote_port = event->tuple.dport;
+	key->addr_len = addr_len;
+	if (addr_len == 4) {
+		bpf_probe_read_kernel(key->local_addr, 4,
+				      event->tuple.rcv_saddr);
+		bpf_probe_read_kernel(key->remote_addr, 4,
+				      event->tuple.daddr);
+	} else {
+		bpf_probe_read_kernel(key->local_addr, sizeof(key->local_addr),
+				      event->tuple.rcv_saddr);
+		bpf_probe_read_kernel(key->remote_addr, sizeof(key->remote_addr),
+				      event->tuple.daddr);
+	}
+
+	return !udp_peer_addr_is_zero(key->local_addr, addr_len) &&
+	    !udp_peer_addr_is_zero(key->remote_addr, addr_len);
+}
+
+static_always_inline __u64
+rewrite_udp_peer_metadata(struct __socket_data *event,
+			  struct tracer_ctx_s *tracer_ctx,
+			  struct udp_peer_key_t *key)
+{
+	if (event->tuple.l4_protocol != IPPROTO_UDP)
+		return 0;
+
+	__u32 k0 = 0;
+	__u32 *enabled = udp_peer_id_enabled_map__lookup(&k0);
+	if (!enabled || !*enabled || event->socket_id == 0)
+		return 0;
+
+	if (!build_udp_peer_key(event, event->socket_id, key))
+		return 0;
+
+	struct udp_peer_state_t *state = udp_peer_map__lookup(key);
+	if (!state) {
+		struct udp_peer_state_t new_state = {
+			.socket_id = tracer_ctx->socket_id + 1,
+			.seq = (__u64)-1,
+		};
+		tracer_ctx->socket_id++;
+		bpf_map_update_elem(&__udp_peer_map, key, &new_state,
+				    BPF_NOEXIST);
+		state = udp_peer_map__lookup(key);
+		if (!state)
+			return 0;
+	}
+
+	/*
+	 * LLVM 11 cannot consume the return value of BPF XADD. Keep the same
+	 * increment-then-read sequence used by socket_info_s.seq so the object
+	 * remains loadable on the 3.10 and 4.14 kernel variants.
+	 */
+	__sync_fetch_and_add(&state->seq, 1);
+	__u64 peer_socket_id = state->socket_id;
+	event->socket_id = peer_socket_id;
+	event->data_seq = state->seq;
+	return peer_socket_id;
+}
+
 static __inline int finalize_data_output(void *ctx,
 					 struct tracer_ctx_s *tracer_ctx,
 					 __u64 curr_time, __u64 diff,
@@ -3235,7 +3356,7 @@ static __inline int output_iov_data_copy(const struct data_args_t *args,
 	 */
 	__u32 len = __len & (sizeof(v->data) - 1);
 
-	len = iovecs_copy(v, v_buff, args, __len, len);
+	len = iovecs_copy(v, v_buff, args, __len, len, EXTRA_LOOP_LIMIT);
 	return len;
 }
 
@@ -3261,7 +3382,7 @@ static __inline int output_data_copy(const struct data_args_t *args,
 	__u32 len = __len & (sizeof(v->data) - 1);
 
 	if (vecs) {
-		len = iovecs_copy(v, v_buff, args, __len, len);
+		len = iovecs_copy(v, v_buff, args, __len, len, LOOP_LIMIT);
 		return len;
 	}
 
@@ -3319,11 +3440,13 @@ static __inline int output_data_copy(const struct data_args_t *args,
  * This function reads and outputs such extra data segments using the extra_iov
  * buffer.
  */
-static __inline int output_extra_data_common(struct data_args_t *args, struct __socket_data_buffer
-					     *v_buff,
-					     struct __socket_data *head,
-					     int max_size,
-					     __u32 reassembly_bytes)
+static_always_inline int output_extra_data_common(struct data_args_t *args,
+					  struct __socket_data_buffer *v_buff,
+					  struct __socket_data *head,
+					  struct udp_peer_key_t *peer_key,
+					  __u64 peer_socket_id,
+					  int max_size,
+					  __u32 reassembly_bytes)
 {
 	if (!(args && args->extra_iovlen))
 		return -1;
@@ -3351,7 +3474,6 @@ static __inline int output_extra_data_common(struct data_args_t *args, struct __
 	bpf_probe_read_kernel(extra_v,
 			      offsetof(typeof(struct __socket_data),
 				       data), head);
-	extra_v->data_seq += 1;
 	if (bpf_probe_read_user(&extra_v->syscall_len,
 				sizeof(extra_v->syscall_len), msg_len) != 0)
 		return -1;
@@ -3359,6 +3481,25 @@ static __inline int output_extra_data_common(struct data_args_t *args, struct __
 					      reassembly_bytes);
 	if (copy_bytes < 0)
 		return -1;
+
+	if (peer_socket_id) {
+		/*
+		 * Linux 4.14 cannot keep a map-value pointer valid across the
+		 * helpers used above to copy the second message. Look the state up
+		 * only after the copy succeeds, using the stack-resident key built
+		 * for the main event. Verify that LRU eviction did not replace the
+		 * peer instance, then consume the next sequence without another
+		 * helper call in between.
+		 */
+		struct udp_peer_state_t *state = udp_peer_map__lookup(peer_key);
+		if (!state || state->socket_id != peer_socket_id)
+			return -1;
+		__sync_fetch_and_add(&state->seq, 1);
+		extra_v->socket_id = peer_socket_id;
+		extra_v->data_seq = state->seq;
+	} else {
+		extra_v->data_seq += 1;
+	}
 
 	extra_v->data_len = copy_bytes;
 	v_buff->len +=
@@ -3438,7 +3579,7 @@ skip_copy:
 		finalize_data_output(ctx, tracer_ctx, curr_time, diff, v_buff);
 	}
 
-	output_extra_data_common((struct data_args_t *)args, v_buff, v,
+	output_extra_data_common((struct data_args_t *)args, v_buff, v, NULL, 0,
 				 max_size, reassembly_bytes);
 
 exit:
@@ -3461,6 +3602,10 @@ static __inline int output_data_common(void *ctx)
 	__u32 k0 = 0;
 	char *buffer = NULL;
 	__u32 reassembly_bytes = 0;
+	__u64 peer_socket_id = 0;
+	struct udp_peer_key_t peer_key = {
+		0,
+	};
 
 	struct tracer_ctx_s *tracer_ctx = tracer_ctx_map__lookup(&k0);
 	if (tracer_ctx == NULL)
@@ -3527,6 +3672,10 @@ skip_copy:
 	v_buff->len +=
 	    offsetof(typeof(struct __socket_data), data) + v->data_len;
 	v_buff->events_num++;
+	if (!is_close) {
+		peer_socket_id =
+		    rewrite_udp_peer_metadata(v, tracer_ctx, &peer_key);
+	}
 
 	/*
 	 * If the delay of the periodic push event exceeds the threshold, it
@@ -3541,7 +3690,8 @@ skip_copy:
 		finalize_data_output(ctx, tracer_ctx, curr_time, diff, v_buff);
 	}
 
-	output_extra_data_common(args, v_buff, v, max_size, reassembly_bytes);
+	output_extra_data_common(args, v_buff, v, &peer_key, peer_socket_id,
+				 max_size, reassembly_bytes);
 
 clear_args_map_1:
 	__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1);
