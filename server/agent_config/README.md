@@ -4406,6 +4406,40 @@ behavior plus the tracepoint fallback for `recvfrom` and `recvmmsg`.
 Supported values: `read`, `readv`, `recvfrom`, `recvmsg`, `recvmmsg`, `sendmsg`,
 `sendmmsg`, `sendto`, `write`, `writev`.
 
+##### Enable UDP Peer Socket ID Isolation {#inputs.ebpf.socket.tunning.udp_peer_id_enabled}
+
+**Tags**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.udp_peer_id_enabled`
+
+**Default value**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        udp_peer_id_enabled: false
+```
+
+**Schema**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**Description**:
+
+When enabled, Socket Tracer assigns an independent socket ID and capture sequence
+to each UDP peer identified by the physical socket and its complete local and remote
+endpoints. This prevents different peers sharing one UDP file descriptor from being
+aggregated into the same flow. Events with incomplete endpoint information fall back
+to the physical socket ID. This branch cannot compensate for missing local IPs on
+wildcard-bound UDP sockets; bind a concrete local address for isolation. Restart the
+agent after changing this option.
+
 ##### Enable the fentry/fexit feature {#inputs.ebpf.socket.tunning.fentry_enabled}
 
 **Tags**:
@@ -11783,4 +11817,3 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
-

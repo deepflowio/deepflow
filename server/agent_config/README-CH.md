@@ -4309,6 +4309,37 @@ syscall 仍然遵循当前运行模式下既有的 backend 选择逻辑。例如
 支持的配置值：`read`、`readv`、`recvfrom`、`recvmsg`、`recvmmsg`、`sendmsg`、
 `sendmmsg`、`sendto`、`write`、`writev`。
 
+##### 开启 UDP Peer Socket ID 隔离 {#inputs.ebpf.socket.tunning.udp_peer_id_enabled}
+
+**标签**:
+
+<mark>agent_restart</mark>
+
+**FQCN**:
+
+`inputs.ebpf.socket.tunning.udp_peer_id_enabled`
+
+**默认值**:
+```yaml
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        udp_peer_id_enabled: false
+```
+
+**模式**:
+| Key  | Value                        |
+| ---- | ---------------------------- |
+| Type | bool |
+
+**详细描述**:
+
+开启后，Socket Tracer 会按“物理 socket + 完整本地/远端端点”为每个 UDP peer
+分配独立的 socket ID 和采集序号，避免共用同一 UDP FD 的不同 peer 被聚合到
+同一 Flow。端点信息不完整的事件会回退到物理 socket ID。本分支无法补偿 bind
+到通配地址时缺失的本地 IP，建议绑定具体本地地址。修改后需重启 Agent。
+
 ##### 启用fentry/fexit特性 {#inputs.ebpf.socket.tunning.fentry_enabled}
 
 **标签**:
@@ -11523,4 +11554,3 @@ dev:
 **详细描述**:
 
 未发布的采集器特性可以通过该选项开启。
-

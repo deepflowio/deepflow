@@ -123,6 +123,7 @@ static uint32_t go_tracing_timeout = GO_TRACING_TIMEOUT_DEFAULT;
 static uint32_t io_event_collect_mode = 1;
 static uint64_t io_event_minimal_duration = 1000000;
 static uint64_t hooked_socket_syscalls_bitmap = HOOKED_SOCKET_SYSCALL_ALL;
+static bool udp_peer_id_enabled = false;
 
 /*
  * The maximum threshold for socket map reclamation, with map
@@ -3040,6 +3041,15 @@ int running_socket_tracer(tracer_callback_t handle,
 
 	conf_max_trace_entries = max_trace_entries;
 
+	/*
+	 * Keep the map in every Socket Tracer object so ELF relocation remains
+	 * identical. When the feature is disabled, the BPF path returns before
+	 * accessing it and one entry avoids reserving the full LRU capacity.
+	 */
+	if (!udp_peer_id_enabled &&
+	    (ret = maps_config(tracer, MAP_UDP_PEER_NAME, 1)))
+		return ret;
+
 	bool has_attempted = false;
 	while (true) {
 		if (tracer_bpf_load(tracer) == 0) {
@@ -3073,6 +3083,13 @@ int running_socket_tracer(tracer_callback_t handle,
 			}
 		}
 
+		return -EINVAL;
+	}
+
+	uint32_t udp_peer_id_enabled_value = udp_peer_id_enabled ? 1 : 0;
+	if (!bpf_table_set_value(tracer, MAP_UDP_PEER_ENABLED_NAME, 0,
+				 &udp_peer_id_enabled_value)) {
+		ebpf_error("Failed to update UDP peer ID enabled map.\n");
 		return -EINVAL;
 	}
 
@@ -4178,6 +4195,13 @@ void set_hooked_socket_syscalls(uint64_t bitmap)
 	hooked_socket_syscalls_bitmap = bitmap & HOOKED_SOCKET_SYSCALL_ALL;
 	ebpf_info("Set hooked_socket_syscalls bitmap 0x%llx\n",
 		  hooked_socket_syscalls_bitmap);
+}
+
+void set_udp_peer_id_enabled(bool enabled)
+{
+	udp_peer_id_enabled = enabled;
+	ebpf_info("UDP peer socket ID isolation is %s.\n",
+		  enabled ? "enabled" : "disabled");
 }
 
 void disable_fentry(void)
