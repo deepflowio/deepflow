@@ -153,7 +153,7 @@ func (d *SimpleDecoder) DecodeVarint() uint64 {
 	b = uint64(buf[i])
 	i++
 	x += b << 63
-	if b&0x80 == 0 {
+	if b <= 1 {
 		goto done
 	}
 	// x -= 0x80 << 63 // Always zero.
@@ -178,6 +178,9 @@ func (d *SimpleDecoder) decodeVarintSlow() (x uint64, err error) {
 		}
 		b := d.buf[i]
 		i++
+		if shift == 63 && b > 1 {
+			break
+		}
 		x |= (uint64(b) & 0x7F) << shift
 		if b < 0x80 {
 			d.offset = i
