@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -156,6 +157,16 @@ func NewTagEnum(value, displayNameZH, displayNameEN, descriptionZH, descriptionE
 	}
 }
 
+func enumFileBaseAndPriority(file string) (string, int) {
+	if strings.HasSuffix(file, ".ch") {
+		return strings.TrimSuffix(file, ".ch"), 1
+	}
+	if strings.HasSuffix(file, ".en") {
+		return strings.TrimSuffix(file, ".en"), 2
+	}
+	return file, 0
+}
+
 func LoadTagDescriptions(tagData map[string]interface{}) error {
 	// 生成tag description
 	enumFileToTagType := make(map[string]string)
@@ -241,7 +252,20 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	tagEnumData, ok := tagData["enum"]
 	if ok {
 		tagMap := map[string][][6]interface{}{}
-		for tagEnumFile, enumData := range tagEnumData.(map[string]interface{}) {
+		tagEnumFiles := make([]string, 0, len(tagEnumData.(map[string]interface{})))
+		for tagEnumFile := range tagEnumData.(map[string]interface{}) {
+			tagEnumFiles = append(tagEnumFiles, tagEnumFile)
+		}
+		sort.SliceStable(tagEnumFiles, func(i, j int) bool {
+			baseI, priorityI := enumFileBaseAndPriority(tagEnumFiles[i])
+			baseJ, priorityJ := enumFileBaseAndPriority(tagEnumFiles[j])
+			if baseI == baseJ {
+				return priorityI < priorityJ
+			}
+			return baseI < baseJ
+		})
+		for _, tagEnumFile := range tagEnumFiles {
+			enumData := tagEnumData.(map[string]interface{})[tagEnumFile]
 			tagName := strings.TrimSuffix(tagEnumFile, ".ch")
 			tagName = strings.TrimSuffix(tagName, ".en")
 			values, ok := tagMap[tagName]

@@ -1003,7 +1003,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 		columns = append(columns, ckdb.NewColumnWithGroupBy("l3_epc_id_1", ckdb.Int32).SetComment("ip4/6_1对应的EPC ID"))
 	}
 	if code&L7Protocol != 0 {
-		columns = append(columns, ckdb.NewColumnWithGroupBy("l7_protocol", ckdb.UInt8).SetComment("应用协议0: unknown, 1: http, 2: dns, 3: mysql, 4: redis, 5: dubbo, 6: kafka"))
+		columns = append(columns, ckdb.NewColumnWithGroupBy("l7_protocol", ckdb.UInt8).SetComment("应用协议0: unknown, 20: http1, 21: http2, 40: dubbo, 60: mysql, 61: postgresql, 62: oracle, 63: dameng, 64: db2, 65: tdsql, 66: oceanbase, 67: goldendb, 68: kingbase, 80: redis, 100: kafka"))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("app_service", ckdb.LowCardinalityString))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("app_instance", ckdb.LowCardinalityString))
 		columns = append(columns, ckdb.NewColumnWithGroupBy("endpoint", ckdb.String))

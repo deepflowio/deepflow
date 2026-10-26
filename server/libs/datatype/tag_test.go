@@ -45,3 +45,25 @@ func TestTagEncodeAndDecode(t *testing.T) {
 		t.Errorf("编解码函数实现错误")
 	}
 }
+
+func TestCommercialDatabaseL7ProtocolMappings(t *testing.T) {
+	expected := map[string]L7Protocol{
+		"mysql":      L7_PROTOCOL_MYSQL,
+		"postgresql": L7_PROTOCOL_POSTGRE,
+		"oracle":     L7_PROTOCOL_ORACLE,
+		"dameng":     L7_PROTOCOL_DAMENG,
+		"db2":        L7_PROTOCOL_DB2,
+		"tdsql":      L7_PROTOCOL_TDSQL,
+		"oceanbase":  L7_PROTOCOL_OCEANBASE,
+		"goldendb":   L7_PROTOCOL_GOLDENDB,
+		"kingbase":   L7_PROTOCOL_KINGBASE,
+	}
+	for name, protocol := range expected {
+		if got := L7ProtocolStringMap[name]; got != protocol {
+			t.Errorf("L7ProtocolStringMap[%q] = %v, want %v", name, got, protocol)
+		}
+		if got := protocol.String(false); got == "N/A" {
+			t.Errorf("L7Protocol(%d).String(false) = %q", protocol, got)
+		}
+	}
+}
