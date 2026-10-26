@@ -499,7 +499,15 @@ impl Trident {
             }
         };
 
-        let controller_ip: IpAddr = config.controller_ips[0].parse()?;
+        let controller_ip: IpAddr = config
+            .controller_ips
+            .first()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "controller_ips is empty, please configure controller-ips in standalone mode"
+                )
+            })?
+            .parse()?;
         let (ctrl_ip, ctrl_mac) = match get_ctrl_ip_and_mac(&controller_ip) {
             Ok(tuple) => tuple,
             Err(e) => return Err(anyhow!("get ctrl ip and mac failed: {}", e)),
