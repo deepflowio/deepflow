@@ -74,13 +74,15 @@ func (s *SyncStorage) Renew(orgID int, vtapID uint32, vtapKey string, refresh, w
 	}
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
-		log.Errorf("get metadb session failed", logger.NewORGPrefix(orgID))
+		log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 		return
 	}
-	err = db.Model(&model.GenesisStorage{}).Where("vtap_id = ? AND node_ip <> ?", vtapID, s.nodeIP).Update("node_ip", s.nodeIP).Error
-	if err != nil {
-		log.Warningf("vtap id (%d) refresh storage to node (%s) failed: %s", vtapID, s.nodeIP, err, logger.NewORGPrefix(orgID))
+	tx := db.Model(&model.GenesisStorage{}).Where("vtap_id = ?", vtapID).Update("node_ip", s.nodeIP)
+	if tx.Error != nil || tx.RowsAffected == 0 {
+		log.Warningf("update storage vtap=%d to node (%s) failed: %s", vtapID, s.nodeIP, tx.Error, logger.NewORGPrefix(orgID))
+		return
 	}
+	log.Infof("update storage vtap=%d, set node=%s", vtapID, s.nodeIP, logger.NewORGPrefix(orgID))
 }
 
 func (s *SyncStorage) Update(orgID int, vtapID uint32, vtapKey string, items common.GenesisSyncDataResponse) {
@@ -92,8 +94,8 @@ func (s *SyncStorage) Update(orgID int, vtapID uint32, vtapKey string, items com
 	s.data.Ports.Update(orgID, vtapID, vtapKey, items.Ports)
 	s.data.Networks.Update(orgID, vtapID, vtapKey, items.Networks)
 	s.data.IPlastseens.Update(orgID, vtapID, vtapKey, items.IPLastSeens)
-	s.data.Vinterfaces.Update(orgID, vtapID, vtapKey, items.Vinterfaces)
 	s.data.Processes.Update(orgID, vtapID, vtapKey, items.Processes)
+	s.data.Vinterfaces.Update(orgID, vtapID, vtapKey, items.Vinterfaces)
 
 	// push immediately after update
 	s.fetch()
@@ -114,9 +116,10 @@ func (s *SyncStorage) Update(orgID int, vtapID uint32, vtapKey string, items com
 		NodeIP: s.nodeIP,
 	}).Error
 	if err != nil {
-		log.Errorf("update storage (vtap_id:%d/node_ip:%s) failed: %s", vtapID, s.nodeIP, err.Error(), logger.NewORGPrefix(orgID))
+		log.Errorf("update storage create vtap=%d and node=%s failed: %s", vtapID, s.nodeIP, err.Error(), logger.NewORGPrefix(orgID))
 		return
 	}
+	log.Infof("update storage vtap=%d and node=%s", vtapID, s.nodeIP, logger.NewORGPrefix(orgID))
 }
 
 func (s *SyncStorage) fetch() {
@@ -137,35 +140,37 @@ func (s *SyncStorage) fetch() {
 func (s *SyncStorage) loadFromDatabase() {
 	expired := int(s.cfg.AgingTime)
 	interval := int(s.cfg.DataPersistenceInterval)
-	s.data.VIPs = NewVIPPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.VIPs = NewVIPPlatformDataOperation(s.nodeIP, expired, interval, s.cfg)
 	s.data.VIPs.Load()
 
-	s.data.VMs = NewVMPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.VMs = NewVMPlatformDataOperation(s.nodeIP, expired, interval, s.cfg)
 	s.data.VMs.Load()
 
-	s.data.VPCs = NewVpcPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.VPCs = NewVpcPlatformDataOperation(s.nodeIP, expired, interval, s.cfg)
 	s.data.VPCs.Load()
 
-	s.data.Hosts = NewHostPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.Hosts = NewHostPlatformDataOperation(s.nodeIP, expired, interval, s.cfg)
 	s.data.Hosts.Load()
 
-	s.data.Ports = NewPortPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.Ports = NewPortPlatformDataOperation(s.nodeIP, expired, interval, s.cfg)
 	s.data.Ports.Load()
 
-	s.data.Lldps = NewLldpInfoPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.Lldps = NewLldpInfoPlatformDataOperation(s.nodeIP, expired, interval, s.cfg)
 	s.data.Lldps.Load()
 
-	s.data.IPlastseens = NewIPLastSeenPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.IPlastseens = NewIPLastSeenPlatformDataOperation(s.nodeIP, expired, interval, s.cfg)
 	s.data.IPlastseens.Load()
 
-	s.data.Networks = NewNetworkPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.Networks = NewNetworkPlatformDataOperation(s.nodeIP, expired, interval, s.cfg)
 	s.data.Networks.Load()
 
-	s.data.Vinterfaces = NewVinterfacePlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.Vinterfaces = NewVinterfacePlatformDataOperation(s.nodeIP, int(s.cfg.VinterfaceAgingTime), interval, s.cfg)
 	s.data.Vinterfaces.Load()
 
-	s.data.Processes = NewProcessPlatformDataOperation(s.nodeIP, expired, interval)
+	s.data.Processes = NewProcessPlatformDataOperation(s.nodeIP, expired, interval, s.cfg)
 	s.data.Processes.Load()
+
+	log.Info("genesis load from db complete")
 
 	s.fetch()
 }
@@ -174,52 +179,73 @@ func (s *SyncStorage) refreshDatabase() {
 	ticker := time.NewTicker(time.Duration(s.cfg.AgingTime) * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		// clean genesis storage invalid data
-		orgIDs, err := metadb.GetORGIDs()
-		if err != nil {
-			log.Error("get org ids failed")
+	for {
+		select {
+		case <-s.sCtx.Done():
 			return
-		}
-		for _, orgID := range orgIDs {
-			db, err := metadb.GetDB(orgID)
+		case <-ticker.C:
+			// clean genesis storage invalid data
+			orgIDs, err := metadb.GetORGIDs()
 			if err != nil {
-				log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
+				log.Errorf("get org ids failed: %s", err.Error())
 				continue
 			}
-			vTaps := []metadbmodel.VTap{}
-			vTapIDs := map[int]bool{}
-			storages := []model.GenesisStorage{}
-			invalidStorages := []model.GenesisStorage{}
-			db.Select("id").Find(&vTaps)
-			db.Where("node_ip = ?", s.nodeIP).Find(&storages)
-			for _, v := range vTaps {
-				vTapIDs[v.ID] = false
-			}
-			for _, s := range storages {
-				if _, ok := vTapIDs[int(s.VtapID)]; !ok {
-					invalidStorages = append(invalidStorages, s)
-				}
-			}
-			if len(invalidStorages) > 0 {
-				err := db.Delete(&invalidStorages).Error
+			for _, orgID := range orgIDs {
+				db, err := metadb.GetDB(orgID)
 				if err != nil {
-					log.Errorf("node (%s) clean genesis storage invalid data failed: %s", s.nodeIP, err, logger.NewORGPrefix(orgID))
-				} else {
-					log.Infof("node (%s) clean genesis storage invalid data success", s.nodeIP, logger.NewORGPrefix(orgID))
+					log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
+					continue
+				}
+				vTaps := []metadbmodel.VTap{}
+				vTapIDs := map[int]bool{}
+				storages := []model.GenesisStorage{}
+				invalidStorages := []model.GenesisStorage{}
+				db.Select("id").Find(&vTaps)
+				db.Where("node_ip = ?", s.nodeIP).Find(&storages)
+				for _, v := range vTaps {
+					vTapIDs[v.ID] = false
+				}
+				for _, s := range storages {
+					if _, ok := vTapIDs[int(s.VtapID)]; !ok {
+						invalidStorages = append(invalidStorages, s)
+					}
+				}
+				if len(invalidStorages) > 0 {
+					err := db.Delete(&invalidStorages).Error
+					if err != nil {
+						log.Errorf("node (%s) clean genesis storage invalid data failed: %s", s.nodeIP, err.Error(), logger.NewORGPrefix(orgID))
+					} else {
+						log.Infof("node (%s) clean genesis storage invalid data success", s.nodeIP, logger.NewORGPrefix(orgID))
+					}
 				}
 			}
 		}
 	}
 }
 
-func (s *SyncStorage) onEvicted(k string, v interface{}) {
+func parseEvictedOrgID(k string) (int, error) {
+	orgIDAndRest := strings.SplitN(k, "-", 2)
+	if len(orgIDAndRest) != 2 {
+		return 0, strconv.ErrSyntax
+	}
+	return strconv.Atoi(orgIDAndRest[0])
+}
+
+func handleEvicted[T common.GenesisSyncType](s *SyncStorage, k string, v interface{}) {
 	s.fetch()
 
-	keys := strings.Split(k, "-")
-	orgID, err := strconv.Atoi(keys[0])
+	items, ok := v.([]T)
+	if !ok {
+		log.Errorf("unexpected evicted data type for key (%s): %T", k, v)
+		return
+	}
+	if len(items) == 0 {
+		return
+	}
+
+	orgID, err := parseEvictedOrgID(k)
 	if err != nil {
-		log.Error(err.Error())
+		log.Errorf("parse evicted org ID failed: %s", err.Error())
 		return
 	}
 	db, err := metadb.GetDB(orgID)
@@ -227,25 +253,25 @@ func (s *SyncStorage) onEvicted(k string, v interface{}) {
 		log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
 		return
 	}
-	err = db.Delete(&v).Error
+	err = db.Delete(&items).Error
 	if err != nil {
-		log.Errorf("delete vtap (%s) stale data (%#v) failed: %s", k, v, err.Error(), logger.NewORGPrefix(orgID))
+		log.Errorf("delete vtap (%s) stale data (%#v) failed: %s", k, items, err.Error(), logger.NewORGPrefix(orgID))
 	}
 }
 
 func (s *SyncStorage) run() {
 	s.loadFromDatabase()
 
-	s.data.VMs.SetOnEvicted(s.onEvicted)
-	s.data.VIPs.SetOnEvicted(s.onEvicted)
-	s.data.VPCs.SetOnEvicted(s.onEvicted)
-	s.data.Hosts.SetOnEvicted(s.onEvicted)
-	s.data.Lldps.SetOnEvicted(s.onEvicted)
-	s.data.Ports.SetOnEvicted(s.onEvicted)
-	s.data.Networks.SetOnEvicted(s.onEvicted)
-	s.data.Processes.SetOnEvicted(s.onEvicted)
-	s.data.Vinterfaces.SetOnEvicted(s.onEvicted)
-	s.data.IPlastseens.SetOnEvicted(s.onEvicted)
+	s.data.VMs.SetOnEvicted(func(k string, v interface{}) { handleEvicted[model.GenesisVM](s, k, v) })
+	s.data.VIPs.SetOnEvicted(func(k string, v interface{}) { handleEvicted[model.GenesisVIP](s, k, v) })
+	s.data.VPCs.SetOnEvicted(func(k string, v interface{}) { handleEvicted[model.GenesisVPC](s, k, v) })
+	s.data.Hosts.SetOnEvicted(func(k string, v interface{}) { handleEvicted[model.GenesisHost](s, k, v) })
+	s.data.Lldps.SetOnEvicted(func(k string, v interface{}) { handleEvicted[model.GenesisLldp](s, k, v) })
+	s.data.Ports.SetOnEvicted(func(k string, v interface{}) { handleEvicted[model.GenesisPort](s, k, v) })
+	s.data.Networks.SetOnEvicted(func(k string, v interface{}) { handleEvicted[model.GenesisNetwork](s, k, v) })
+	s.data.Processes.SetOnEvicted(func(k string, v interface{}) { handleEvicted[model.GenesisProcess](s, k, v) })
+	s.data.Vinterfaces.SetOnEvicted(func(k string, v interface{}) { handleEvicted[model.GenesisVinterface](s, k, v) })
+	s.data.IPlastseens.SetOnEvicted(func(k string, v interface{}) { handleEvicted[model.GenesisIP](s, k, v) })
 }
 
 func (s *SyncStorage) Start() {
