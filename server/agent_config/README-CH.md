@@ -1194,6 +1194,13 @@ deepflow-server 地址设置一个额外的 NAT IP，并将本参数设置为 `t
 
 配置 deepflow-agent 自身诊断相关的参数。
 
+升级已有采集器组配置时，请先从 YAML 中删除已废弃的
+`global.self_monitoring.profile.enabled` 和
+`global.self_monitoring.debug.debug_metrics_enabled` 字段后再保存。
+如果 `profile` 配置段因此变为空，也请一并删除。
+Server 会将这些废弃字段视为未知配置项并拒绝保存。
+请保留仍有效的 `debug.enabled` 和 `debug.local_udp_port` 配置。
+
 ### 日志 {#global.self_monitoring.log}
 
 deepflow-agent 自身日志的相关配置参数。
@@ -1309,41 +1316,6 @@ global:
 
 开启后，deepflow-agent 将向 deepflow-server 回传运行日志。
 
-### 持续剖析 {#global.self_monitoring.profile}
-
-deepflow-agent 自身持续剖析数据配置参数
-
-#### Enabled {#global.self_monitoring.profile.enabled}
-
-**标签**:
-
-<mark>agent_restart</mark>
-<mark>deprecated</mark>
-
-**FQCN**:
-
-`global.self_monitoring.profile.enabled`
-
-Upgrade from old version: `static_config.profiler`
-
-**默认值**:
-```yaml
-global:
-  self_monitoring:
-    profile:
-      enabled: false
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | bool |
-
-**详细描述**:
-
-该参数仅对 deepflow-trident 有效，对 deepflow-agent 无效。
-开启后，支持对 Trident 持续剖析。
-
 ### 诊断 {#global.self_monitoring.debug}
 
 deepflow-agent 的诊断功能配置参数
@@ -1405,38 +1377,7 @@ global:
 
 **详细描述**:
 
-该参数仅对 deepflow-trident 有效，对 deepflow-agent 无效。用于配置
-trident 用于诊断的 UDP 监听端口，默认值为 `0` ，表示使用随机的端口。
-
-#### 启用调试指标 {#global.self_monitoring.debug.debug_metrics_enabled}
-
-**标签**:
-
-<mark>agent_restart</mark>
-<mark>deprecated</mark>
-
-**FQCN**:
-
-`global.self_monitoring.debug.debug_metrics_enabled`
-
-Upgrade from old version: `static_config.enable-debug-stats`
-
-**默认值**:
-```yaml
-global:
-  self_monitoring:
-    debug:
-      debug_metrics_enabled: false
-```
-
-**模式**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | bool |
-
-**详细描述**:
-
-该参数仅对 deepflow-trident 有效，对 deepflow-agent 无效。
+deepflow-agent 用于接收诊断请求的 UDP 监听端口，默认值为 `0`，表示使用随机端口。
 
 ### Interval {#global.self_monitoring.interval}
 
@@ -8929,4 +8870,3 @@ dev:
 **详细描述**:
 
 未发布的采集器特性可以通过该选项开启。
-

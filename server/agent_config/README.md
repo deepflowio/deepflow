@@ -1222,6 +1222,13 @@ value to `true`.
 
 Configuration of deepflow-agent's own diagnosis.
 
+When upgrading existing agent group configurations, remove the retired
+`global.self_monitoring.profile.enabled` and
+`global.self_monitoring.debug.debug_metrics_enabled` fields from the YAML
+before saving. Also remove the `profile` section if it becomes empty.
+The server rejects these retired fields as unknown configuration keys.
+Keep the supported `debug.enabled` and `debug.local_udp_port` settings.
+
 ### Log {#global.self_monitoring.log}
 
 Configuration of deepflow-agent's own logs.
@@ -1338,38 +1345,6 @@ global:
 
 When enabled, deepflow-agent will send its own logs to deepflow-server.
 
-### Profile {#global.self_monitoring.profile}
-
-#### Enabled {#global.self_monitoring.profile.enabled}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-<mark>deprecated</mark>
-
-**FQCN**:
-
-`global.self_monitoring.profile.enabled`
-
-Upgrade from old version: `static_config.profiler`
-
-**Default value**:
-```yaml
-global:
-  self_monitoring:
-    profile:
-      enabled: false
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | bool |
-
-**Description**:
-
-Only available for Trident (Golang version of Agent).
-
 ### Debug {#global.self_monitoring.debug}
 
 #### Enabled {#global.self_monitoring.debug.enabled}
@@ -1429,38 +1404,8 @@ global:
 
 **Description**:
 
+UDP port on which deepflow-agent listens for diagnostic requests.
 Default value `0` means use a random listen port number.
-Only available for Trident (Golang version of Agent).
-
-#### Debug Metrics Enabled {#global.self_monitoring.debug.debug_metrics_enabled}
-
-**Tags**:
-
-<mark>agent_restart</mark>
-<mark>deprecated</mark>
-
-**FQCN**:
-
-`global.self_monitoring.debug.debug_metrics_enabled`
-
-Upgrade from old version: `static_config.enable-debug-stats`
-
-**Default value**:
-```yaml
-global:
-  self_monitoring:
-    debug:
-      debug_metrics_enabled: false
-```
-
-**Schema**:
-| Key  | Value                        |
-| ---- | ---------------------------- |
-| Type | bool |
-
-**Description**:
-
-Only available for Trident (Golang version of Agent).
 
 ### Interval {#global.self_monitoring.interval}
 
@@ -9142,4 +9087,3 @@ dev:
 **Description**:
 
 Unreleased deepflow-agent features can be turned on by setting this switch.
-

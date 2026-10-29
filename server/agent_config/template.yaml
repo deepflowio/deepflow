@@ -836,8 +836,24 @@ global:
   #   en: Self Monitoring
   #   ch: 自监控
   # description:
-  #   en: Configuration of deepflow-agent's own diagnosis.
-  #   ch: 配置 deepflow-agent 自身诊断相关的参数。
+  #   en: |-
+  #     Configuration of deepflow-agent's own diagnosis.
+  #
+  #     When upgrading existing agent group configurations, remove the retired
+  #     `global.self_monitoring.profile.enabled` and
+  #     `global.self_monitoring.debug.debug_metrics_enabled` fields from the YAML
+  #     before saving. Also remove the `profile` section if it becomes empty.
+  #     The server rejects these retired fields as unknown configuration keys.
+  #     Keep the supported `debug.enabled` and `debug.local_udp_port` settings.
+  #   ch: |-
+  #     配置 deepflow-agent 自身诊断相关的参数。
+  #
+  #     升级已有采集器组配置时，请先从 YAML 中删除已废弃的
+  #     `global.self_monitoring.profile.enabled` 和
+  #     `global.self_monitoring.debug.debug_metrics_enabled` 字段后再保存。
+  #     如果 `profile` 配置段因此变为空，也请一并删除。
+  #     Server 会将这些废弃字段视为未知配置项并拒绝保存。
+  #     请保留仍有效的 `debug.enabled` 和 `debug.local_udp_port` 配置。
   self_monitoring:
     # type: section
     # name:
@@ -932,30 +948,6 @@ global:
       log_backhaul_enabled: true
     # type: section
     # name:
-    #   en: Profile
-    #   ch: 持续剖析
-    # description:
-    #   en:
-    #   ch: deepflow-agent 自身持续剖析数据配置参数
-    profile:
-      # type: bool
-      # name: Enabled
-      # unit:
-      # range: []
-      # enum_options: []
-      # modification: agent_restart
-      # ee_feature: false
-      # description:
-      #   en: |-
-      #     Only available for Trident (Golang version of Agent).
-      #   ch: |-
-      #     该参数仅对 deepflow-trident 有效，对 deepflow-agent 无效。
-      #     开启后，支持对 Trident 持续剖析。
-      # upgrade_from: static_config.profiler
-      # deprecated: true
-      enabled: false
-    # type: section
-    # name:
     #   en: Debug
     #   ch: 诊断
     # description:
@@ -985,30 +977,12 @@ global:
       # ee_feature: false
       # description:
       #   en: |-
+      #     UDP port on which deepflow-agent listens for diagnostic requests.
       #     Default value `0` means use a random listen port number.
-      #     Only available for Trident (Golang version of Agent).
       #   ch: |-
-      #     该参数仅对 deepflow-trident 有效，对 deepflow-agent 无效。用于配置
-      #     trident 用于诊断的 UDP 监听端口，默认值为 `0` ，表示使用随机的端口。
+      #     deepflow-agent 用于接收诊断请求的 UDP 监听端口，默认值为 `0`，表示使用随机端口。
       # upgrade_from: static_config.debug-listen-port
       local_udp_port: 0
-      # type: bool
-      # name:
-      #   en: Debug Metrics Enabled
-      #   ch: 启用调试指标
-      # unit:
-      # range: []
-      # enum_options: []
-      # modification: agent_restart
-      # ee_feature: false
-      # description:
-      #   en: |-
-      #     Only available for Trident (Golang version of Agent).
-      #   ch: |-
-      #     该参数仅对 deepflow-trident 有效，对 deepflow-agent 无效。
-      # upgrade_from: static_config.enable-debug-stats
-      # deprecated: true
-      debug_metrics_enabled: false
     # type: duration
     # name: Interval
     # unit:
