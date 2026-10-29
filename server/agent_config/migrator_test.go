@@ -294,6 +294,100 @@ static_config:
 	}
 }
 
+func TestUpgradeIgnoresRetiredTridentConfig(t *testing.T) {
+	toolData, err := NewMigrationToolData(nil)
+	if err != nil {
+		t.Fatalf("Failed to create toolData: %v", err)
+	}
+	tests := []struct {
+		name   string
+		config string
+		want   string
+	}{
+		{
+			name: "only_retired_fields",
+			config: `static_config:
+  profiler: true
+  enable-debug-stats: true
+`,
+			want: "{}\n",
+		},
+		{
+			name: "preserve_agent_settings",
+			config: `debug_enabled: true
+log_level: DEBUG
+static_config:
+  profiler: false
+  enable-debug-stats: false
+  debug-listen-port: 30036
+`,
+			want: `global:
+  self_monitoring:
+    debug:
+      enabled: true
+      local_udp_port: 30036
+    log:
+      log_level: DEBUG
+`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := newUpgrader(toolData).Upgrade([]byte(tt.config))
+			if err != nil {
+				t.Fatalf("Upgrade() error = %v", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("Upgrade() = %q, want %q", got, tt.want)
+			}
+			if err := ValidateYAML(got); err != nil {
+				t.Errorf("upgraded config is invalid: %v", err)
+			}
+		})
+	}
+}
+
+func TestRetiredTridentConfigRequiresManualCleanup(t *testing.T) {
+	const logConfig = "global:\n  self_monitoring:\n    log: {log_level: DEBUG}\n"
+	for _, retired := range []string{
+		"    profile: {enabled: false}\n",
+		"    debug: {debug_metrics_enabled: false}\n",
+		"    profile: {}\n",
+	} {
+		storedConfig := []byte(logConfig + retired)
+		readback, err := ConvertYAMLToJSON(storedConfig)
+		if err != nil {
+			t.Fatalf("read stored config: %v", err)
+		}
+		if err := ValidateYAML(storedConfig); err == nil || !strings.Contains(err.Error(), "unexpected key in configuration") {
+			t.Fatalf("expected retired key rejection, got %v", err)
+		}
+		var input map[string]interface{}
+		if err := json.Unmarshal(readback, &input); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ConvertJSONToYAMLAndValidate(input); err == nil {
+			t.Fatal("JSON save should reject retired fields until they are removed")
+		}
+	}
+
+	cleanConfig := []byte(logConfig + "    debug: {enabled: true, local_udp_port: 30036}\n")
+	if err := ValidateYAML(cleanConfig); err != nil {
+		t.Fatalf("manually cleaned config is invalid: %v", err)
+	}
+	readback, err := ConvertYAMLToJSON(cleanConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var input map[string]interface{}
+	if err := json.Unmarshal(readback, &input); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ConvertJSONToYAMLAndValidate(input); err != nil {
+		t.Fatalf("manually cleaned JSON config is invalid: %v", err)
+	}
+}
+
 func TestFmtLowerVersionValue(t *testing.T) {
 	type args struct {
 		longKey    string
