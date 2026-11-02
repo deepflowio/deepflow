@@ -375,6 +375,10 @@ func (d *SimpleDecoder) ReadBytes() []byte {
 }
 
 func (d *SimpleDecoder) ReadBytesN(n int) []byte {
+	if n < 0 || d.offset < 0 || d.offset > len(d.buf) || n > len(d.buf)-d.offset {
+		d.err++
+		return nil
+	}
 	d.offset += n
 	if d.offset > len(d.buf) {
 		d.err++
