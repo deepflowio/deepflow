@@ -70,7 +70,15 @@ func bytesToUint64(b []byte) uint64 {
 }
 
 func (d *SimpleDecoder) ReadPrefixU64() uint64 {
+	if d.offset < 0 || d.offset >= len(d.buf) {
+		d.err++
+		return 0
+	}
 	length := 1 + count_trailing_zeros_32(uint32(d.buf[d.offset])|0x100)
+	if length > len(d.buf)-d.offset {
+		d.err++
+		return 0
+	}
 	if length < 9 {
 		unused := uint(64 - 8*length)
 		d.offset += length
