@@ -100,6 +100,8 @@ def update_changelog(changelog_file, categorized_prs, branch):
             if section:
                 existing_prs = section.split('\n')
                 new_prs = [pr for pr in pr_list if pr not in existing_prs]
+                if not new_prs:
+                    continue
                 pr_list_str = "\n".join(new_prs) + "\n" + section
             new_content = new_content[:start_idx] + pr_list_str + "\n" + new_content[end_idx:]
         else:
