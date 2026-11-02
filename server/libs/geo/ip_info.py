@@ -39,7 +39,7 @@ class Encoder(object):
 
     def __init__(self):
         self.items = ['未知']  # index starts from 1
-        self.item_map = {}
+        self.item_map = {'未知': 0}
 
     def encode(self, item):
         item = item.encode('utf-8').decode('utf-8')
