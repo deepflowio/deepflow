@@ -717,7 +717,16 @@ impl Trident {
             if let Err(e) = netns::NsFile::Root.open_and_setns() {
                 return Err(anyhow!("agent must have CAP_SYS_ADMIN to run without 'hostNetwork: true'. setns error: {}", e));
             }
-            let controller_ip: IpAddr = config_handler.static_config.controller_ips[0].parse()?;
+            let controller_ip: IpAddr = config_handler
+                .static_config
+                .controller_ips
+                .first()
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "controller_ips is empty, please configure controller-ips in standalone mode"
+                    )
+                })?
+                .parse()?;
             let (ip, mac) = match get_ctrl_ip_and_mac(&controller_ip) {
                 Ok(tuple) => tuple,
                 Err(e) => return Err(anyhow!("get ctrl ip and mac failed with error: {}", e)),
@@ -836,7 +845,16 @@ impl Trident {
             state.clone(),
             version_info,
             agent_id,
-            config_handler.static_config.controller_ips[0].clone(),
+            config_handler
+                .static_config
+                .controller_ips
+                .first()
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "controller_ips is empty, please configure controller-ips in standalone mode"
+                    )
+                })?
+                .clone(),
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
             config_handler.static_config.kubernetes_cluster_name.clone(),
@@ -950,7 +968,16 @@ impl Trident {
             ext.start();
             let poller = if sidecar_mode {
                 let p = match SidecarPoller::new(
-                    config_handler.static_config.controller_ips[0].parse()?,
+                    config_handler
+                        .static_config
+                        .controller_ips
+                        .first()
+                        .ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "controller_ips is empty, please configure controller-ips in standalone mode"
+                            )
+                        })?
+                        .parse()?,
                 ) {
                     Ok(p) => p,
                     Err(e) => return Err(anyhow!(e)),
