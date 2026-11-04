@@ -249,7 +249,7 @@ func SplitPort2Int(src string) []PortRange {
 			continue
 		}
 		// 合并连续的端口号
-		if ports[i].Max()+1 >= ports[i+1].Min() {
+		if uint32(ports[i].Max())+1 >= uint32(ports[i+1].Min()) {
 			max := ports[i+1].Max()
 			if ports[i].Max() > max {
 				max = ports[i].Max()
