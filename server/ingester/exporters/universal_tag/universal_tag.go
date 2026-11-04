@@ -149,8 +149,22 @@ const (
 	TYPE_NAT_GATEWAY    DeviceType = 16
 	TYPE_POD_GROUP      DeviceType = 101
 	TYPE_SERVICE        DeviceType = 102
+	TYPE_POD_CLUSTER    DeviceType = 103
+	TYPE_CUSTOM_SERVICE DeviceType = 104
 	TYPE_GPROCESS       DeviceType = 120
-	TYPE_IP             DeviceType = 255
+
+	// common.GetAutoService returns a workload controller's own subtype, not
+	// TYPE_POD_GROUP, whenever auto_service resolves to a pod_group — so these
+	// have to resolve here too. flow_tag.node_type_map maps all six to
+	// "pod_group" (see tagrecorder's RESOURCE_TYPE_TO_NODE_TYPE).
+	TYPE_POD_GROUP_DEPLOYMENT            DeviceType = 130
+	TYPE_POD_GROUP_STATEFULSET           DeviceType = 131
+	TYPE_POD_GROUP_RC                    DeviceType = 132
+	TYPE_POD_GROUP_DAEMON_SET            DeviceType = 133
+	TYPE_POD_GROUP_REPLICASET_CONTROLLER DeviceType = 134
+	TYPE_POD_GROUP_CLONESET              DeviceType = 135
+
+	TYPE_IP DeviceType = 255
 )
 
 // from clickhouse flow_tag.node_type_map
@@ -169,8 +183,22 @@ var deviceTypeStrings = []string{
 	TYPE_NAT_GATEWAY:    "natgw",
 	TYPE_POD_GROUP:      "pod_group",
 	TYPE_SERVICE:        "service",
+	TYPE_POD_CLUSTER:    "pod_cluster",
+	TYPE_CUSTOM_SERVICE: "custom_service",
 	TYPE_GPROCESS:       "gprocess",
-	TYPE_IP:             "ip",
+
+	// Every pod_group subtype resolves to "pod_group", matching the dictionary.
+	// Leaving these unset made auto_service_type serialize empty — and drop out
+	// of the exported JSON entirely — for every pod endpoint without a
+	// pod_service, which is the majority of them.
+	TYPE_POD_GROUP_DEPLOYMENT:            "pod_group",
+	TYPE_POD_GROUP_STATEFULSET:           "pod_group",
+	TYPE_POD_GROUP_RC:                    "pod_group",
+	TYPE_POD_GROUP_DAEMON_SET:            "pod_group",
+	TYPE_POD_GROUP_REPLICASET_CONTROLLER: "pod_group",
+	TYPE_POD_GROUP_CLONESET:              "pod_group",
+
+	TYPE_IP: "ip",
 }
 
 func (t DeviceType) String() string {
