@@ -268,7 +268,7 @@ func GetTraceIdIndex(traceId string, indexTypeIsIncremetalId, formatIsHex bool, 
 		return DJBHash(17, traceId), nil
 	}
 
-	if len(traceId) < incremetalIdLength || incremetalIdLength == 0 {
+	if len(traceId) < incremetalIdLength || incremetalIdLength <= 0 {
 		return 0, fmt.Errorf("traceId(%s) or incremetalIdLength(%d) is invalid", traceId, incremetalIdLength)
 	}
 
@@ -280,10 +280,10 @@ func GetTraceIdIndex(traceId string, indexTypeIsIncremetalId, formatIsHex bool, 
 			return 0, fmt.Errorf("traceId(%s) or incremetalIdStart(%d) is invalid", traceId, incremetalIdStart)
 		}
 	}
-	end := start + incremetalIdLength
-	if end > traceIdLen {
-		return 0, fmt.Errorf("traceId(%s) incremetalIdLocation(%d-%d) is beyond traceId length", traceId, start, end)
+	if start > traceIdLen || incremetalIdLength > traceIdLen-start {
+		return 0, fmt.Errorf("traceId(%s) incremetalIdStart(%d) or incremetalIdLength(%d) is beyond traceId length", traceId, start, incremetalIdLength)
 	}
+	end := start + incremetalIdLength
 
 	traceIdIndex := traceId[start:end]
 	var num uint64
