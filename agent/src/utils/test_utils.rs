@@ -16,6 +16,7 @@
 
 use std::{
     fmt,
+    net::Ipv4Addr,
     path::Path,
     sync::{atomic::AtomicI64, Arc},
     time::Duration,
@@ -441,7 +442,11 @@ impl FlowMapTesterBuilder {
             Arc::new(AtomicI64::new(0)),
             &self.config,
             Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
-            Arc::new(stats::Collector::new("", Arc::new(AtomicI64::new(0)))),
+            Arc::new(stats::Collector::new(
+                "",
+                Ipv4Addr::UNSPECIFIED.into(),
+                Arc::new(AtomicI64::new(0)),
+            )),
             false,
         );
 

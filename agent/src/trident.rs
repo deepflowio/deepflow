@@ -514,7 +514,7 @@ impl Trident {
         };
 
         let ntp_diff = Arc::new(AtomicI64::new(0));
-        let stats_collector = Arc::new(stats::Collector::new(&hostname, ntp_diff.clone()));
+        let stats_collector = Arc::new(stats::Collector::new(&hostname, ctrl_ip, ntp_diff.clone()));
         let exception_handler = ExceptionHandler::default();
         let sender_leaky_bucket = Arc::new(LeakyBucket::new(Some(0)));
 

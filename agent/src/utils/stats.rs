@@ -16,7 +16,7 @@
 
 use std::fmt;
 use std::io;
-use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::{
     atomic::{AtomicI64, AtomicU32, AtomicU64, Ordering},
     Arc, Condvar, Mutex,
@@ -68,6 +68,7 @@ impl fmt::Display for Source {
 pub struct Batch {
     module: &'static str,
     hostname: String,
+    ip: IpAddr,
     tags: Vec<(&'static str, String)>,
     points: Vec<Counter>,
     timestamp: u32,
@@ -92,6 +93,8 @@ impl Batch {
             tag_names.push("host".to_string());
             tag_values.push(self.hostname.clone());
         }
+        tag_names.push("ip".to_string());
+        tag_values.push(self.ip.to_string());
 
         for p in self.points.iter() {
             metrics_float_names.push(p.0.to_string());
@@ -170,6 +173,7 @@ impl Module for QueueStats {
 
 pub struct Collector {
     hostname: Arc<Mutex<String>>,
+    ip: IpAddr,
 
     sources: Arc<Mutex<Vec<Source>>>,
     pre_hooks: Arc<Mutex<Vec<Box<dyn FnMut() + Send>>>>,
@@ -185,12 +189,13 @@ pub struct Collector {
 }
 
 impl Collector {
-    pub fn new<S: AsRef<str>>(hostname: S, ntp_diff: Arc<AtomicI64>) -> Self {
-        Self::with_min_interval(hostname, STATS_MIN_INTERVAL, ntp_diff)
+    pub fn new<S: AsRef<str>>(hostname: S, ip: IpAddr, ntp_diff: Arc<AtomicI64>) -> Self {
+        Self::with_min_interval(hostname, ip, STATS_MIN_INTERVAL, ntp_diff)
     }
 
     pub fn with_min_interval<S: AsRef<str>>(
         hostname: S,
+        ip: IpAddr,
         interval: Duration,
         ntp_diff: Arc<AtomicI64>,
     ) -> Self {
@@ -205,6 +210,7 @@ impl Collector {
         };
         let s = Self {
             hostname: Arc::new(Mutex::new(hostname.as_ref().to_owned())),
+            ip,
             sources: Arc::new(Mutex::new(vec![])),
             pre_hooks: Arc::new(Mutex::new(vec![])),
             min_interval: Arc::new(AtomicU64::new(min_interval.as_secs())),
@@ -377,6 +383,7 @@ impl Collector {
         let sources = self.sources.clone();
         let pre_hooks = self.pre_hooks.clone();
         let hostname = self.hostname.clone();
+        let ip = self.ip;
         let min_interval = self.min_interval.clone();
         let sender = self.sender.clone();
         let ntp_diff = self.ntp_diff.clone();
@@ -425,6 +432,7 @@ impl Collector {
                                     let batch = Arc::new(Batch {
                                         module: source.module,
                                         hostname: host.clone(),
+                                        ip,
                                         tags: source.tags.clone(),
                                         points,
                                         timestamp: now as u32,
