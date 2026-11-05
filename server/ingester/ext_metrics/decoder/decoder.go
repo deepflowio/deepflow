@@ -19,6 +19,7 @@ package decoder
 import (
 	"fmt"
 	"net"
+	"slices"
 	"strconv"
 
 	"github.com/influxdata/influxdb/models"
@@ -238,6 +239,13 @@ func (d *Decoder) StatsToExtMetrics(vtapID uint16, s *pb.Stats) (*dbwriter.ExtMe
 		} else { // from deepflow_agent, OrgId Get from header first, then from vtapID
 			m.OrgId, m.TeamID = d.orgId, d.teamId
 			writerDBID = dbwriter.DEEPFLOW_TENANT_DB_ID
+		}
+	}
+	// Enrich agent stats with the control IP from the organization-scoped platform data.
+	if m.MsgType == datatype.MESSAGE_TYPE_DFSTATS && vtapID != 0 && !slices.Contains(m.TagNames, "ip") {
+		if vtapInfo := d.platformData.QueryVtapInfo(m.OrgId, vtapID); vtapInfo != nil && vtapInfo.Ip != "" {
+			m.TagNames = append(m.TagNames, "ip")
+			m.TagValues = append(m.TagValues, vtapInfo.Ip)
 		}
 	}
 	// adapt to the name of the metric sent by Trident
