@@ -62,11 +62,11 @@ func NewExtMetrics(config *config.Config, recv *receiver.Receiver, platformDataM
 	if err != nil {
 		return nil, err
 	}
-	deepflowAgentStats, err := NewMetricsor(datatype.MESSAGE_TYPE_DFSTATS, []dbwriter.WriterDBID{dbwriter.DEEPFLOW_ADMIN_DB_ID, dbwriter.DEEPFLOW_TENANT_DB_ID}, config, platformDataManager, manager, recv, false)
+	deepflowAgentStats, err := NewMetricsor(datatype.MESSAGE_TYPE_DFSTATS, []dbwriter.WriterDBID{dbwriter.DEEPFLOW_ADMIN_DB_ID, dbwriter.DEEPFLOW_TENANT_DB_ID}, config, platformDataManager, manager, recv, true)
 	if err != nil {
 		return nil, err
 	}
-	deepflowStats, err := NewMetricsor(datatype.MESSAGE_TYPE_SERVER_DFSTATS, []dbwriter.WriterDBID{dbwriter.DEEPFLOW_ADMIN_DB_ID, dbwriter.DEEPFLOW_TENANT_DB_ID}, config, platformDataManager, manager, recv, false)
+	deepflowStats, err := NewMetricsor(datatype.MESSAGE_TYPE_SERVER_DFSTATS, []dbwriter.WriterDBID{dbwriter.DEEPFLOW_ADMIN_DB_ID, dbwriter.DEEPFLOW_TENANT_DB_ID}, config, platformDataManager, manager, recv, true)
 	if err != nil {
 		return nil, err
 	}
