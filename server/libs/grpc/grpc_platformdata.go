@@ -116,6 +116,7 @@ type VtapInfo struct {
 	VtapId       uint16
 	EpcId        int32
 	Ip           string
+	CtrlIp       string
 	IsIPv4       bool
 	IP4          uint32
 	IP6          net.IP
@@ -1767,6 +1768,7 @@ func (t *PlatformInfoTable) updateVtapIps(orgId uint16, vtapIps []*trident.VtapI
 			VtapId:       uint16(vtapIp.GetVtapId()),
 			EpcId:        epcId,
 			Ip:           vtapIp.GetIp(),
+			CtrlIp:       vtapIp.GetCtrlIp(),
 			PodClusterId: vtapIp.GetPodClusterId(),
 			OrgId:        uint16(vtapIp.GetOrgId()),
 			TeamId:       uint16(vtapIp.GetTeamId()),

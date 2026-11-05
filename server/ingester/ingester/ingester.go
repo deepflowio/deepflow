@@ -63,7 +63,7 @@ var log = logging.MustGetLogger("ingester")
 
 const (
 	PROFILER_PORT                = 9526
-	MAX_SLAVE_PLATFORMDATA_COUNT = 128
+	MAX_SLAVE_PLATFORMDATA_COUNT = 256
 )
 
 func Start(configPath string, shared *servercommon.ControllerIngesterShared) []io.Closer {
