@@ -27,6 +27,7 @@ import (
 	mysql "github.com/deepflowio/deepflow/server/controller/db/metadb"
 	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris"
+	"github.com/deepflowio/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowio/deepflow/server/controller/trisolaris/dbmgr"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -66,7 +67,8 @@ func (p *PluginEvent) GetPluginData(r *api.PluginRequest, orgID int) (*PluginDat
 	}
 	content := plugin.Image
 	totalLen := uint64(len(content))
-	step := uint64(1024 * 1024)
+	// max upgrade data packet size is 1024KB, so use half mega byte step
+	step := uint64(common.HALF_MEGA_BYTE)
 	pktCount := uint32(math.Ceil(float64(totalLen) / float64(step)))
 	md5Sum := fmt.Sprintf("%x", md5.Sum(content))
 	return &PluginData{
