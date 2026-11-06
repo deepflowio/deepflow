@@ -164,21 +164,22 @@ impl L7ProtocolInfoInterface for FastCGIInfo {
 
 impl FastCGIInfo {
     // reference https://www.mit.edu/~yandros/doc/specs/fcgi-spec.html#S3.4
+    // Returns false when the record ends with an incomplete name/value pair.
     fn fill_from_param(
         &mut self,
         param_payload: &[u8],
         direction: PacketDirection,
         config: Option<&L7LogDynamicConfig>,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let mut p = param_payload;
-        while p.len() > 2 {
+        while !p.is_empty() {
             let Ok((off, key_len, val_len)) = read_param_kv_len(p) else {
-                break;
+                return Ok(false);
             };
             p = &p[off..];
 
             if p.len() < key_len + val_len {
-                break;
+                return Ok(false);
             }
 
             let (key, val) = (&p[..key_len], &p[key_len..key_len + val_len]);
@@ -187,7 +188,7 @@ impl FastCGIInfo {
             p = &p[(key_len + val_len)..]
         }
 
-        Ok(())
+        Ok(true)
     }
 
     fn on_param(
@@ -448,14 +449,24 @@ impl<'a> Iterator for RecordIter<'a> {
 
 impl L7ProtocolParserInterface for FastCGILog {
     fn check_payload(&mut self, payload: &[u8], _: &ParseParam) -> Option<LogMessageType> {
-        for (r, p, _) in RecordIter::new(payload) {
+        let mut request_id = None;
+        for (r, p, off) in RecordIter::new(payload) {
+            if matches!(request_id, Some(id) if id != r.request_id)
+                || (off > 0 && r.record_type == FCGI_BEGIN_REQUEST)
+            {
+                return None;
+            }
+            request_id = Some(r.request_id);
             match r.record_type {
-                FCGI_END_REQUEST | FCGI_STDOUT => return None,
-                _ => {}
+                FCGI_BEGIN_REQUEST | FCGI_PARAMS => {}
+                _ => return None,
             }
 
             if r.record_type == FCGI_PARAMS {
-                if let Ok(val) = get_param_val(p, "REQUEST_METHOD") {
+                if r.content_len == 0 {
+                    return None;
+                }
+                if let Some(val) = get_param_val(p, "REQUEST_METHOD").ok()? {
                     if check_http_method(
                         std::str::from_utf8(val)
                             .map_err(|_| Error::L7ProtocolUnknown)
@@ -465,8 +476,8 @@ impl L7ProtocolParserInterface for FastCGILog {
                     {
                         return Some(LogMessageType::Request);
                     }
+                    return None;
                 }
-                return None;
             }
         }
 
@@ -481,13 +492,31 @@ impl L7ProtocolParserInterface for FastCGILog {
         match param.direction {
             PacketDirection::ClientToServer => {
                 info.msg_type = LogMessageType::Request;
+                let mut request_id = None;
+                let mut first_params = true;
                 for (record, record_payload, off) in RecordIter::new(payload) {
+                    if matches!(request_id, Some(id) if id != record.request_id)
+                        || (off > 0 && record.record_type == FCGI_BEGIN_REQUEST)
+                    {
+                        break;
+                    }
+                    request_id = Some(record.request_id);
+                    match record.record_type {
+                        FCGI_BEGIN_REQUEST | FCGI_PARAMS => {}
+                        _ => break,
+                    }
+
                     if record.record_type == FCGI_PARAMS {
-                        info.request_id = record.request_id as u32;
-                        info.version = record.version;
-                        if record.content_len > 0 {
-                            info.fill_from_param(record_payload, param.direction, config)?;
+                        if record.content_len == 0 {
+                            break;
+                        }
+                        if first_params {
+                            info.request_id = record.request_id as u32;
+                            info.version = record.version;
                             info.seq_off = off as u32;
+                            first_params = false;
+                        }
+                        if !info.fill_from_param(record_payload, param.direction, config)? {
                             break;
                         }
                     }
@@ -638,12 +667,10 @@ fn read_param_kv_len(param_payload: &[u8]) -> Result<(usize, usize, usize)> {
     return Ok((off, key_len, val_len));
 }
 
-fn get_param_val<'a>(param_payload: &'a [u8], key: &str) -> Result<&'a [u8]> {
+fn get_param_val<'a>(param_payload: &'a [u8], key: &str) -> Result<Option<&'a [u8]>> {
     let mut p = param_payload;
-    while p.len() > 2 {
-        let Ok((off, key_len, val_len)) = read_param_kv_len(p) else {
-            break;
-        };
+    while !p.is_empty() {
+        let (off, key_len, val_len) = read_param_kv_len(p)?;
         p = &p[off..];
 
         if p.len() < key_len + val_len {
@@ -652,12 +679,12 @@ fn get_param_val<'a>(param_payload: &'a [u8], key: &str) -> Result<&'a [u8]> {
 
         let (k, val) = (&p[..key_len], &p[key_len..key_len + val_len]);
         if k == key.as_bytes() {
-            return Ok(val);
+            return Ok(Some(val));
         }
 
         p = &p[(key_len + val_len)..];
     }
-    return Err(Error::L7ProtocolUnknown);
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -669,11 +696,16 @@ mod test {
     use crate::common::flow::{L7PerfStats, PacketDirection};
     use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
     use crate::common::l7_protocol_log::{L7PerfCache, L7ProtocolParserInterface, ParseParam};
+    use crate::common::meta_packet::MetaPacket;
     use crate::flow_generator::protocol_logs::fastcgi::FastCGILog;
     use crate::flow_generator::protocol_logs::L7ResponseStatus;
+    use crate::flow_generator::{Error, Result};
     use crate::{flow_generator::L7_RRT_CACHE_CAPACITY, utils::test::Capture};
 
-    use super::FastCGIInfo;
+    use super::{
+        FastCGIInfo, FCGI_ABORT_REQUEST, FCGI_BEGIN_REQUEST, FCGI_END_REQUEST, FCGI_PARAMS,
+        FCGI_STDIN, FCGI_STDOUT,
+    };
 
     const FILE_DIR: &str = "resources/test/flow_generator/fastcgi";
 
@@ -715,6 +747,222 @@ mod test {
                 ..Default::default()
             }
         );
+    }
+
+    #[test]
+    fn test_fastcgi_split_params() {
+        let file_name = "fastcgi-params-split-method-late.pcap";
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(file_name), None);
+        let packets = capture.as_meta_packets();
+        let payload = packets[0].get_l4_payload().unwrap();
+        assert!(payload.len() < 1024);
+        // Direct parsing must work without protocol detection priming the parser.
+        let info = check_and_parse_request(payload, Some(LogMessageType::Request)).unwrap();
+        assert_eq!(info.method, "POST");
+        assert_eq!(info.path, "/fcgi-bin/fixture.cgi?case=ticket-7341");
+        assert_eq!(info.host, "example.test:8091");
+        assert_eq!(info.req_content_length, Some(9));
+        assert_eq!(info.seq_off, 16);
+
+        let (info, perf) = check_and_parse(file_name);
+        assert_eq!(info.version, 1);
+        assert_eq!(info.request_id, 1);
+        assert_eq!(info.user_agent.as_deref(), Some("ticket-7341-fixture/1.0"));
+        assert_eq!(info.endpoint.as_deref(), Some("/fcgi-bin/fixture.cgi"));
+        assert_eq!(info.status_code, Some(200));
+        assert_eq!(info.status, L7ResponseStatus::Ok);
+        assert_eq!(info.captured_request_byte, 544);
+        assert_eq!(info.captured_response_byte, 104);
+        assert_eq!(perf.request_count, 1);
+        assert_eq!(perf.response_count, 1);
+        assert_eq!(perf.rrt_count, 1);
+        assert_eq!(perf.rrt_sum, 174);
+        assert_eq!(perf.rrt_max, 174);
+    }
+
+    #[test]
+    fn test_fastcgi_no_method() {
+        let mut payload = param_record(1, "HTTP_HOST", "first.test");
+        payload.extend(param_record(1, "REQUEST_URI", "/test"));
+        payload.extend(record(FCGI_PARAMS, 1, &[]));
+        assert!(matches!(
+            check_and_parse_request(&payload, None),
+            Err(Error::L7ProtocolUnknown)
+        ));
+    }
+
+    #[test]
+    fn test_fastcgi_method_first() {
+        let mut payload = param_record(1, "REQUEST_METHOD", "POST");
+        payload.extend(param_record(1, "HTTP_HOST", "first.test"));
+        payload.extend(param_record(1, "SCRIPT_NAME", "/index.php"));
+        payload.extend(param_record(1, "REQUEST_URI", "/test"));
+        payload.extend(param_record(1, "SCRIPT_NAME", "/fallback.php"));
+        payload.extend(param_record(1, "CONTENT_LENGTH", "9"));
+        let info = check_and_parse_request(&payload, Some(LogMessageType::Request)).unwrap();
+        assert_eq!(info.host, "first.test");
+        assert_eq!(info.path, "/test");
+        assert_eq!(info.req_content_length, Some(9));
+        assert_eq!(info.seq_off, 0);
+    }
+
+    #[test]
+    fn test_fastcgi_long_prefix() {
+        let mut payload = param_record(1, "HTTP_HOST", "first.test");
+        // A complete PARAMS record larger than 1024, with a four-byte value length.
+        let mut content = vec![1, 0x80, 0, 4, 0, b'X'];
+        content.extend(vec![b'x'; 1024]);
+        payload.extend(record(FCGI_PARAMS, 1, &content));
+        payload.extend(param_record(1, "REQUEST_METHOD", "POST"));
+        payload.extend(param_record(1, "REQUEST_URI", "/test"));
+        assert!(payload.len() < 16384);
+        assert!(matches!(
+            check_and_parse_request(&payload[..1024], None),
+            Err(Error::L7ProtocolUnknown)
+        ));
+        let info = check_and_parse_request(&payload, Some(LogMessageType::Request)).unwrap();
+        assert_eq!(info.method, "POST");
+        assert_eq!(info.path, "/test");
+        assert_eq!(info.seq_off, 0);
+    }
+
+    fn record(record_type: u8, request_id: u16, content: &[u8]) -> Vec<u8> {
+        let mut data = vec![1, record_type];
+        data.extend_from_slice(&request_id.to_be_bytes());
+        data.extend_from_slice(&(content.len() as u16).to_be_bytes());
+        data.extend_from_slice(&[0, 0]);
+        data.extend_from_slice(content);
+        data
+    }
+
+    fn param_record(request_id: u16, key: &str, value: &str) -> Vec<u8> {
+        assert!(key.len() < 128 && value.len() < 128);
+        let mut content = vec![key.len() as u8, value.len() as u8];
+        content.extend_from_slice(key.as_bytes());
+        content.extend_from_slice(value.as_bytes());
+        record(FCGI_PARAMS, request_id, &content)
+    }
+
+    #[test]
+    fn test_fastcgi_request_boundaries() {
+        for boundary in [
+            record(FCGI_PARAMS, 1, &[]),
+            param_record(2, "HTTP_HOST", "other.test"),
+            record(FCGI_BEGIN_REQUEST, 1, &[0, 1, 0, 0, 0, 0, 0, 0]),
+            record(FCGI_STDIN, 1, &[]),
+            record(FCGI_ABORT_REQUEST, 1, &[]),
+            record(FCGI_END_REQUEST, 1, &[0; 8]),
+            record(FCGI_STDOUT, 1, &[]),
+        ] {
+            let mut payload = param_record(1, "HTTP_HOST", "first.test");
+            payload.extend_from_slice(&boundary);
+            payload.extend(param_record(1, "REQUEST_METHOD", "POST"));
+            assert!(matches!(
+                check_and_parse_request(&payload, None),
+                Err(Error::L7ProtocolUnknown)
+            ));
+
+            let mut payload = param_record(1, "REQUEST_METHOD", "POST");
+            payload.extend(param_record(1, "HTTP_HOST", "first.test"));
+            payload.extend_from_slice(&boundary);
+            payload.extend(param_record(1, "HTTP_HOST", "other.test"));
+            let info = check_and_parse_request(&payload, Some(LogMessageType::Request)).unwrap();
+            assert_eq!(info.host, "first.test");
+            assert_eq!(info.request_id, 1);
+            assert_eq!(info.seq_off, 0);
+        }
+
+        let mut payload = record(FCGI_BEGIN_REQUEST, 1, &[0, 1, 0, 0, 0, 0, 0, 0]);
+        payload.extend(param_record(2, "REQUEST_METHOD", "POST"));
+        assert!(matches!(
+            check_and_parse_request(&payload, None),
+            Err(Error::L7ProtocolUnknown)
+        ));
+    }
+
+    #[test]
+    fn test_fastcgi_invalid_method() {
+        for method in ["INVALID", "", "post"] {
+            let mut payload = param_record(1, "HTTP_HOST", "first.test");
+            payload.extend(param_record(1, "REQUEST_METHOD", method));
+            payload.extend(param_record(1, "REQUEST_METHOD", "POST"));
+            let _ = check_and_parse_request(&payload, None);
+        }
+    }
+
+    #[test]
+    fn test_fastcgi_truncated_params() {
+        let mut payload = param_record(1, "HTTP_HOST", "first.test");
+        let method = param_record(1, "REQUEST_METHOD", "POST");
+        let method_offset = payload.len();
+        payload.extend_from_slice(&method);
+        for end in 0..payload.len() {
+            assert!(matches!(
+                check_and_parse_request(&payload[..end], None),
+                Err(Error::L7ProtocolUnknown)
+            ));
+        }
+        assert_eq!(
+            check_and_parse_request(&payload, Some(LogMessageType::Request))
+                .unwrap()
+                .seq_off,
+            0
+        );
+
+        // A truncated trailing record must retain the already captured method.
+        let path = param_record(1, "REQUEST_URI", "/test");
+        for end in 0..path.len() {
+            let mut partial = payload.clone();
+            partial.extend_from_slice(&path[..end]);
+            let info = check_and_parse_request(&partial, Some(LogMessageType::Request)).unwrap();
+            assert_eq!(info.method, "POST");
+            assert!(info.path.is_empty());
+        }
+
+        // Malformed name/value lengths must not be skipped to find a later method.
+        for malformed in [vec![0x80], vec![1, 0x80], vec![127, 127], vec![0xff; 8]] {
+            let mut data = record(FCGI_PARAMS, 1, &malformed);
+            data.extend_from_slice(&payload[method_offset..]);
+            assert!(matches!(
+                check_and_parse_request(&data, None),
+                Err(Error::L7ProtocolUnknown)
+            ));
+        }
+    }
+
+    #[test]
+    fn test_fastcgi_invalid_content_length() {
+        let mut payload = param_record(1, "REQUEST_METHOD", "POST");
+        payload.extend(param_record(1, "CONTENT_LENGTH", "invalid"));
+        assert!(matches!(
+            check_and_parse_request(&payload, Some(LogMessageType::Request)),
+            Err(Error::L7ProtocolUnknown)
+        ));
+    }
+
+    fn check_and_parse_request(
+        payload: &[u8],
+        expected: Option<LogMessageType>,
+    ) -> Result<FastCGIInfo> {
+        let packet = MetaPacket::default();
+        let param = ParseParam::new(
+            &packet,
+            Rc::new(RefCell::new(L7PerfCache::new(L7_RRT_CACHE_CAPACITY))),
+            Default::default(),
+            #[cfg(any(target_os = "linux", target_os = "android"))]
+            Default::default(),
+            false,
+            true,
+        );
+        assert_eq!(
+            FastCGILog::default().check_payload(payload, &param),
+            expected
+        );
+        let result = FastCGILog::default().parse_payload(payload, &param)?;
+        let L7ProtocolInfo::FastCGIInfo(info) = result.unwrap_single() else {
+            unreachable!();
+        };
+        Ok(info)
     }
 
     fn check_and_parse(file_name: &str) -> (FastCGIInfo, L7PerfStats) {
