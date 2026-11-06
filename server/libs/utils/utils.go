@@ -93,7 +93,8 @@ func Abs(n time.Duration) time.Duration {
 }
 
 func IpToUint32(ip net.IP) uint32 {
-	if len(ip) != net.IPv4len {
+	ip = ip.To4()
+	if ip == nil {
 		return 0
 	}
 	return BigEndian.Uint32(ip)
