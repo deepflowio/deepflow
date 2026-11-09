@@ -45,14 +45,10 @@ def categorize_prs(prs):
         if "update changelog for" in pr['title'].lower():
             continue  # Exclude 'Update changelog for xx' PRs
 
-        matched = False
-        for key, value in PR_TYPE_MAPPING.items():
-            if key in pr['title'].lower():
-                categorized[value].append(pr)
-                matched = True
-                break
-        if not matched:
-            categorized[PR_TYPE_MAPPING['other']].append(pr)
+        match = re.match(r"^([a-z]+)(?:\([^()]+\))?!?:", pr['title'], re.IGNORECASE)
+        pr_type = match.group(1).lower() if match else 'other'
+        category = PR_TYPE_MAPPING.get(pr_type, PR_TYPE_MAPPING['other'])
+        categorized[category].append(pr)
     return categorized
 
 def format_pr_list(prs):
