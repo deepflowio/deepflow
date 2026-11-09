@@ -19,12 +19,12 @@ package encoder
 import (
 	"sync"
 
-	"github.com/cornelk/hashmap"
 	mapset "github.com/deckarep/golang-set/v2"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
@@ -33,23 +33,24 @@ type labelName struct {
 	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
-	strToID      *hashmap.Map[string, int]
+	cache        cache.PrometheusCache
 	ascIDAllocator
 }
 
 func newLabelName(org *common.ORG, max int) *labelName {
+	c, _ := cache.GetCache(org.ID)
 	ln := &labelName{
 		org:          org,
 		resourceType: "label_name",
-		strToID:      hashmap.New[string, int](),
+		cache:        c,
 	}
 	ln.ascIDAllocator = newAscIDAllocator(org, ln.resourceType, 1, max)
 	ln.rawDataProvider = ln
 	return ln
 }
 
-func (mn *labelName) getID(str string) (int, bool) {
-	return mn.strToID.Get(str)
+func (ln *labelName) getID(str string) (int, bool) {
+	return ln.cache.GetLabelNameID(str)
 }
 
 func (ln *labelName) refresh(args ...interface{}) error {
@@ -67,7 +68,7 @@ func (ln *labelName) encode(strs []string) ([]*controller.PrometheusLabelName, e
 	var dbToAdd []*metadbmodel.PrometheusLabelName
 	for i := range strs {
 		str := strs[i]
-		if id, ok := ln.strToID.Get(str); ok {
+		if id, ok := ln.cache.GetLabelNameID(str); ok {
 			resp = append(resp, &controller.PrometheusLabelName{Name: &str, Id: proto.Uint32(uint32(id))})
 			continue
 		}
@@ -88,10 +89,10 @@ func (ln *labelName) encode(strs []string) ([]*controller.PrometheusLabelName, e
 		log.Errorf("add %s error: %s", ln.resourceType, err.Error(), ln.org.LogPrefix)
 		return nil, err
 	}
+	ln.cache.AddLabelNames(dbToAdd)
 	for i := range dbToAdd {
 		id := dbToAdd[i].ID
 		str := dbToAdd[i].Name
-		ln.strToID.Set(str, id)
 		resp = append(resp, &controller.PrometheusLabelName{Name: &str, Id: proto.Uint32(uint32(id))})
 	}
 	return resp, nil
@@ -107,7 +108,6 @@ func (ln *labelName) load() (ids mapset.Set[int], err error) {
 	inUseIDsSet := mapset.NewSet[int]()
 	for _, item := range items {
 		inUseIDsSet.Add(item.ID)
-		ln.strToID.Set(item.Name, item.ID)
 	}
 	return inUseIDsSet, nil
 }

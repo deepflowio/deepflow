@@ -112,7 +112,8 @@ func (c *ORGCaches) NewCacheAndInitIfNotExist(orgID int) (*Cache, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = cache.Refresh()
+	cache.refreshInterval = c.refreshInterval
+	err = cache.Refresh(true)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +142,7 @@ func (c *ORGCaches) refresh() error {
 		return err
 	}
 	for iter := range c.orgIDToCache.IterBuffered() {
-		iter.Val.Refresh()
+		iter.Val.Refresh(false)
 	}
 	return nil
 }

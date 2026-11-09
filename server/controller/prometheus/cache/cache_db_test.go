@@ -158,6 +158,7 @@ func generateDBLabels(n int) []metadbmodel.PrometheusLabel {
 	now := time.Now()
 	for i := 0; i < n; i++ {
 		items[i] = metadbmodel.PrometheusLabel{
+			PrometheusAutoIncID:    metadbmodel.PrometheusAutoIncID{ID: i + 1},
 			PrometheusOperatedTime: metadbmodel.PrometheusOperatedTime{CreatedAt: now, SyncedAt: now},
 			Name:                   fmt.Sprintf("n_%d", i),
 			Value:                  fmt.Sprintf("v_%d", i),
@@ -252,11 +253,33 @@ func TestSelect_Label_LoadOnlyIDNameValue(t *testing.T) {
 	db := setupTestDB(t)
 	defer cleanupTestDB(t)
 
+	nameItems := make([]metadbmodel.PrometheusLabelName, 5000)
+	valueItems := make([]metadbmodel.PrometheusLabelValue, 5000)
+	now := time.Now()
+	for i := 0; i < 5000; i++ {
+		nameItems[i] = metadbmodel.PrometheusLabelName{
+			PrometheusID:           metadbmodel.PrometheusID{ID: i + 1},
+			PrometheusOperatedTime: metadbmodel.PrometheusOperatedTime{CreatedAt: now, SyncedAt: now},
+			Name:                   fmt.Sprintf("n_%d", i),
+		}
+		valueItems[i] = metadbmodel.PrometheusLabelValue{
+			PrometheusID:           metadbmodel.PrometheusID{ID: i + 1},
+			PrometheusOperatedTime: metadbmodel.PrometheusOperatedTime{CreatedAt: now, SyncedAt: now},
+			Value:                  fmt.Sprintf("v_%d", i),
+		}
+	}
+	require.NoError(t, batchInsert(db, nameItems, 1000))
+	require.NoError(t, batchInsert(db, valueItems, 1000))
+
 	items := generateDBLabels(5000)
 	require.NoError(t, batchInsert(db, items, 1000))
 
 	l := newTestLabel()
 	l.org = newTestORG(db)
+	l.labelName.org = l.org
+	l.labelValue.org = l.org
+	require.NoError(t, l.labelName.refresh())
+	require.NoError(t, l.labelValue.refresh())
 
 	err := l.refresh()
 	require.NoError(t, err)
@@ -298,12 +321,34 @@ func TestSelect_Label_RefreshDiscardsDeletedRows(t *testing.T) {
 	db := setupTestDB(t)
 	defer cleanupTestDB(t)
 
+	nameItems := make([]metadbmodel.PrometheusLabelName, 200)
+	valueItems := make([]metadbmodel.PrometheusLabelValue, 200)
+	now := time.Now()
+	for i := 0; i < 200; i++ {
+		nameItems[i] = metadbmodel.PrometheusLabelName{
+			PrometheusID:           metadbmodel.PrometheusID{ID: i + 1},
+			PrometheusOperatedTime: metadbmodel.PrometheusOperatedTime{CreatedAt: now, SyncedAt: now},
+			Name:                   fmt.Sprintf("n_%d", i),
+		}
+		valueItems[i] = metadbmodel.PrometheusLabelValue{
+			PrometheusID:           metadbmodel.PrometheusID{ID: i + 1},
+			PrometheusOperatedTime: metadbmodel.PrometheusOperatedTime{CreatedAt: now, SyncedAt: now},
+			Value:                  fmt.Sprintf("v_%d", i),
+		}
+	}
+	require.NoError(t, batchInsert(db, nameItems, 100))
+	require.NoError(t, batchInsert(db, valueItems, 100))
+
 	// 第一轮：插入 200 条并 refresh
 	items := generateDBLabels(200)
 	require.NoError(t, batchInsert(db, items, 100))
 
 	l := newTestLabel()
 	l.org = newTestORG(db)
+	l.labelName.org = l.org
+	l.labelValue.org = l.org
+	require.NoError(t, l.labelName.refresh())
+	require.NoError(t, l.labelValue.refresh())
 	require.NoError(t, l.refresh())
 	assert.Equal(t, 200, countLabelConcurrentMap(l.GetKeyToID()))
 
@@ -439,10 +484,34 @@ func TestSelect_Label_500K_Refresh(t *testing.T) {
 	insertStart := time.Now()
 	items := generateDBLabels(N)
 	require.NoError(t, batchInsert(db, items, 5000))
+	
+	// Insert unique label names and values
+	labelNames := make([]metadbmodel.PrometheusLabelName, N)
+	labelValues := make([]metadbmodel.PrometheusLabelValue, N)
+	now := time.Now()
+	for i := 0; i < N; i++ {
+		labelNames[i] = metadbmodel.PrometheusLabelName{
+			PrometheusID:           metadbmodel.PrometheusID{ID: i + 1},
+			PrometheusOperatedTime: metadbmodel.PrometheusOperatedTime{CreatedAt: now, SyncedAt: now},
+			Name:                   fmt.Sprintf("n_%d", i),
+		}
+		labelValues[i] = metadbmodel.PrometheusLabelValue{
+			PrometheusID:           metadbmodel.PrometheusID{ID: i + 1},
+			PrometheusOperatedTime: metadbmodel.PrometheusOperatedTime{CreatedAt: now, SyncedAt: now},
+			Value:                  fmt.Sprintf("v_%d", i),
+		}
+	}
+	require.NoError(t, batchInsert(db, labelNames, 5000))
+	require.NoError(t, batchInsert(db, labelValues, 5000))
+	
 	t.Logf("insert completed in %v", time.Since(insertStart))
 
 	l := newTestLabel()
 	l.org = newTestORG(db)
+	l.labelName.org = l.org
+	l.labelValue.org = l.org
+	require.NoError(t, l.labelName.refresh())
+	require.NoError(t, l.labelValue.refresh())
 
 	refreshStart := time.Now()
 	err := l.refresh()
