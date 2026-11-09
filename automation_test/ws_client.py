@@ -8,6 +8,7 @@ import getopt
 import os
 
 public_support_test_case = {
+    "all": "all",
     "basic": "basic",
     "querier": "interface/querier_sql/",
     "cloud_k8s": "cloud/k8s",
