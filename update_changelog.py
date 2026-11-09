@@ -61,7 +61,10 @@ def format_pr_list(prs):
     """
     formatted_prs = []
     for pr in prs:
-        author_name = pr['author']['login']
+        author_name = (pr.get('author') or {}).get('login')
+        if not author_name:
+            formatted_prs.append(f"* {pr['title']} [#{pr['number']}]({pr['url']})")
+            continue
         author_url = f"https://github.com/{author_name}"
         author_link = f"[{author_name}]({author_url})"
         formatted_prs.append(f"* {pr['title']} [#{pr['number']}]({pr['url']}) by {author_link}")
