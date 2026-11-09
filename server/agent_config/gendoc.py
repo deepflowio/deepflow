@@ -162,6 +162,7 @@ def replace_template_syntax(m):
 
 
 def load_comment_as_yaml(key, comment):
+    parsed_comment = []
     try:
         parsed_comment = list(yaml.load_all(comment, Loader=yaml.SafeLoader))
     except yaml.YAMLError as e:
