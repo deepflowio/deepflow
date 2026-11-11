@@ -74,7 +74,7 @@ def gen_code(file):
                 encoded['ip_start'] = data['ip_start']
                 encoded['ip_end'] = data['ip_end']
                 encoded['country'] = country_encoder.encode(data['country']) if 'country' in data else 0
-                encoded['region'] = region_encoder.encode(data['region']) if 'region' in data else 0
+                encoded['region'] = region_encoder.encode(fixed_name(data['region'])) if 'region' in data else 0
                 encoded['isp'] = isp_encoder.encode(data['isp']) if 'isp' in data else 0
                 wf.write(ITEM_STR.format(**encoded))
         wf.write('}\n')
