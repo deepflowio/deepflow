@@ -18,6 +18,7 @@ public_supoort_worker_number_max = 6
 public_supoort_df_env_number_max = 3
 UUID = ""
 execed = False
+runner_failed = False
 sio = socketio.Client()
 keys = [
     "worker_number", "df_env_number", "test_case", "df_server_image_tag",
@@ -81,9 +82,10 @@ def logs(data):
 
 @sio.on('runner-logs-error')
 def error(data):
+    global runner_failed
+    runner_failed = True
     print(data)
     sio.disconnect()
-    assert False
 
 
 @sio.on('runner-logs-finished')
@@ -143,3 +145,5 @@ if __name__ == '__main__':
     check_variables(params)
     sio.connect(f'ws://{url}', wait_timeout=10)
     sio.wait()
+    if runner_failed:
+        sys.exit(1)
