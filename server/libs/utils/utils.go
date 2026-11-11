@@ -388,6 +388,8 @@ func GetValueByOffsetAndKind(ptr, offset uintptr, kind reflect.Kind, dataType Da
 		return *(*float64)(fieldAddr)
 	case reflect.Pointer:
 		switch dataType {
+		case DATATYPE_IntPtr:
+			return *(**int)(fieldAddr)
 		case DATATYPE_Int8Ptr:
 			return *(**int8)(fieldAddr)
 		case DATATYPE_Int16Ptr:
@@ -396,6 +398,8 @@ func GetValueByOffsetAndKind(ptr, offset uintptr, kind reflect.Kind, dataType Da
 			return *(**int32)(fieldAddr)
 		case DATATYPE_Int64Ptr:
 			return *(**int64)(fieldAddr)
+		case DATATYPE_UintPtr:
+			return *(**uint)(fieldAddr)
 		case DATATYPE_Uint8Ptr:
 			return *(**uint8)(fieldAddr)
 		case DATATYPE_Uint16Ptr:
