@@ -33,7 +33,7 @@ def get_recent_prs(branch):
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
         logging.error(f"Failed to fetch PRs: {result.stderr}")
-        return []
+        raise RuntimeError("Failed to fetch recent pull requests")
     return json.loads(result.stdout)
 
 def categorize_prs(prs):
