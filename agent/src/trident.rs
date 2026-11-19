@@ -2587,6 +2587,7 @@ impl AgentComponents {
             dispatcher_components.push(dispatcher_component);
         }
         tap_interfaces.sort();
+        tap_interfaces.dedup();
         let proc_event_queue_name = "1-proc-event-to-sender";
         #[allow(unused)]
         let (proc_event_sender, proc_event_receiver, counter) = queue::bounded_with_debug(
