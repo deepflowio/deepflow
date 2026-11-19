@@ -74,7 +74,7 @@ def update_changelog(changelog_file, categorized_prs, branch):
     if not os.path.exists(changelog_file):
         logging.info(f"{changelog_file} does not exist. Creating a new file.")
         with open(changelog_file, 'w', encoding='utf-8') as f:
-            f.write(f"### Table of Contents\n\n**[DeepFlow release {branch}](#{branch})**<br/>\n\n# Changelog\n\n### <a id=\"{branch}\"></a>DeepFlow release {branch}\n\n#### New Feature\n\n#### Bug Fix\n\n")
+            f.write(f"### Table of Contents\n\n**[DeepFlow release {branch}](#{branch})**<br/>\n\n# Changelog\n\n### <a id=\"{branch}\"></a>DeepFlow release {branch}\n\n#### {PR_TYPE_MAPPING['feat']}\n\n#### {PR_TYPE_MAPPING['fix']}\n\n")
 
     with open(changelog_file, 'r', encoding='utf-8') as f:
         content = f.read()
