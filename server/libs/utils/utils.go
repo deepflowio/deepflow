@@ -51,6 +51,10 @@ func Uint64ToMac(v uint64) net.HardwareAddr {
 }
 
 func FindInterfaceByIp(ip string) *net.Interface {
+	target := net.ParseIP(ip)
+	if target == nil {
+		return nil
+	}
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return nil
@@ -61,7 +65,8 @@ func FindInterfaceByIp(ip string) *net.Interface {
 			continue
 		}
 		for _, addr := range addrs {
-			if strings.Contains(addr.String(), ip) {
+			address, _, err := net.ParseCIDR(addr.String())
+			if err == nil && address.Equal(target) {
 				return &iface
 			}
 		}
