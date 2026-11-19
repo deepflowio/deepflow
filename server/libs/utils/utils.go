@@ -342,7 +342,7 @@ func ToDataType(str string) DataType {
 	case "*int32":
 		return DATATYPE_Int32Ptr
 	case "*int64":
-		return DATATYPE_Int32Ptr
+		return DATATYPE_Int64Ptr
 	case "[]string":
 		return DATATYPE_StringSlice
 	case "[]float64":
