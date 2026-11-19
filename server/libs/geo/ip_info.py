@@ -20,7 +20,7 @@ import os
 import struct
 import sys
 
-import ujson as json
+import json
 
 
 FILE_NAME = 'ip_info.go'
@@ -80,22 +80,22 @@ def gen_code(file):
         wf.write('}\n')
 
         wf.write('\n')
-        wf.write('var COUNTRY_NAMES = [...]string{%s}\n' % ', '.join(['"%s"' % name for name in country_encoder.items]))
+        wf.write('var COUNTRY_NAMES = [...]string{%s}\n' % ', '.join(json.dumps(name, ensure_ascii=False) for name in country_encoder.items))
         wf.write('\n')
         wf.write('var COUNTRY_NAMES_MAP map[string]uint8 = map[string]uint8{%s}\n' %
-                 ', '.join(['"%s":%d' % (name, idx) for idx, name in enumerate(country_encoder.items)]))
+                 ', '.join('%s:%d' % (json.dumps(name, ensure_ascii=False), idx) for idx, name in enumerate(country_encoder.items)))
 
         wf.write('\n')
-        wf.write('var REGION_NAMES = [...]string{%s}\n' % ', '.join(['"%s"' % fixed_name(name) for name in region_encoder.items]))
+        wf.write('var REGION_NAMES = [...]string{%s}\n' % ', '.join(json.dumps(fixed_name(name), ensure_ascii=False) for name in region_encoder.items))
         wf.write('\n')
         wf.write('var REGION_NAMES_MAP map[string]uint8 = map[string]uint8{%s}\n' %
-                 ', '.join(['"%s":%d' % (fixed_name(name), idx) for idx, name in enumerate(region_encoder.items)]))
+                 ', '.join('%s:%d' % (json.dumps(fixed_name(name), ensure_ascii=False), idx) for idx, name in enumerate(region_encoder.items)))
 
         wf.write('\n')
-        wf.write('var ISP_NAMES = [...]string{%s}\n' % ', '.join(['"%s"' % name for name in isp_encoder.items]))
+        wf.write('var ISP_NAMES = [...]string{%s}\n' % ', '.join(json.dumps(name, ensure_ascii=False) for name in isp_encoder.items))
         wf.write('\n')
         wf.write('var ISP_NAMES_MAP map[string]uint8 = map[string]uint8{%s}\n' %
-                 ', '.join(['"%s":%d' % (name, idx) for idx, name in enumerate(isp_encoder.items)]))
+                 ', '.join('%s:%d' % (json.dumps(name, ensure_ascii=False), idx) for idx, name in enumerate(isp_encoder.items)))
 
 
 if __name__ == '__main__':
