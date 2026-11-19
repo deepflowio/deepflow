@@ -151,21 +151,21 @@ func (e *SimpleEncoder) WriteBytesWithVarintLen(v []byte) {
 }
 
 func (e *SimpleEncoder) ReplaceU16At(offset int, v uint16) {
-	if offset+2 >= len(e.buf) {
+	if offset < 0 || offset > len(e.buf)-2 {
 		return
 	}
 	binary.LittleEndian.PutUint16(e.buf[offset:], v)
 }
 
 func (e *SimpleEncoder) ReplaceU32At(offset int, v uint32) {
-	if offset+4 >= len(e.buf) {
+	if offset < 0 || offset > len(e.buf)-4 {
 		return
 	}
 	binary.LittleEndian.PutUint32(e.buf[offset:], v)
 }
 
 func (e *SimpleEncoder) ReplaceU64At(offset int, v uint64) {
-	if offset+8 >= len(e.buf) {
+	if offset < 0 || offset > len(e.buf)-8 {
 		return
 	}
 	binary.LittleEndian.PutUint64(e.buf[offset:], v)
