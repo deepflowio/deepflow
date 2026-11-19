@@ -89,6 +89,57 @@ require(
     "the main rewrite helper must return a scalar instead of a map-value pointer",
 )
 
+submit = block(
+    KERNEL,
+    "\n__data_submit(",
+    "static __inline int trace_io_event_common(",
+)
+require(
+    "__output_data_common(" not in submit
+    and "\n#endif\n\n\tstruct tail_calls_context *context =" in submit,
+    "all normal socket submissions must prepare tail-call context instead of inlining output",
+)
+for field in (
+    "max_size_limit = data_max_sz",
+    "push_reassembly_bytes = send_reasm_bytes",
+    "vecs = (bool) vecs",
+    "is_close = false",
+    "dir = conn_info->direction",
+):
+    require(
+        "context->" + field in submit,
+        "normal output tail calls must preserve {}".format(field),
+    )
+
+process = block(
+    KERNEL,
+    "static __inline int process_data(",
+    "static __inline void process_syscall_data(",
+)
+require(
+    "int ret = __data_submit(" in process,
+    "5.2+/KFUNC paths must check submission before tail-calling output",
+)
+output_routing = block(process, "if (ret == SUBMIT_OK) {", "\n\t\t}\n#endif")
+syscall_routing = block(
+    output_routing,
+    "if (extra->source == DATA_SOURCE_SYSCALL) {",
+    "\n\t\t\t} else {",
+)
+kprobe_routing = block(syscall_routing, "#ifdef SUPPORTS_KPROBE_ONLY", "#else")
+tracepoint_routing = block(syscall_routing, "#else", "#endif")
+uprobe_routing = output_routing[output_routing.find("\n\t\t\t} else {") :]
+for routing, map_name, index in (
+    (kprobe_routing, "progs_jmp_kp_map", "PROG_OUTPUT_DATA_KP_IDX"),
+    (tracepoint_routing, "progs_jmp_tp_map", "PROG_OUTPUT_DATA_TP_IDX"),
+    (uprobe_routing, "progs_jmp_kp_map", "PROG_OUTPUT_DATA_KP_IDX"),
+):
+    require(
+        "bpf_tail_call(ctx, &NAME({}),".format(map_name) in routing
+        and index in routing,
+        "normal output must select {} with {}".format(map_name, index),
+    )
+
 extra = block(
     KERNEL,
     "output_extra_data_common(",
@@ -137,6 +188,12 @@ require(
     and "struct udp_peer_key_t peer_key" in output
     and "v, &peer_key, peer_socket_id" in output,
     "the normal output program must pass its stack key and scalar peer identity to extra output",
+)
+require(
+    "active_read_args_map__delete(&id)" in output
+    and "active_write_args_map__delete(&id)" in output
+    and "__sync_fetch_and_add(&tracer_ctx->push_buffer_refcnt, -1)" in output,
+    "the output tail-call program must release its buffer reference and syscall arguments",
 )
 
 require(
