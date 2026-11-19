@@ -176,10 +176,10 @@ def load_comment_as_yaml(key, comment):
 # Generate doc
 def generate_doc(yaml_data, lang):
     if lang == 'en':
-        wf = open("README.md", 'w')
+        wf = open("README.md", 'w', encoding='utf-8')
     else:
         lang_upper = lang.upper()
-        wf = open(f"README-{lang_upper}.md", 'w')
+        wf = open(f"README-{lang_upper}.md", 'w', encoding='utf-8')
 
     for key, comment in comments.items():
         segments = key.split('.')
