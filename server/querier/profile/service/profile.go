@@ -26,7 +26,6 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	controller_common "github.com/deepflowio/deepflow/server/controller/common"
 	ingester_common "github.com/deepflowio/deepflow/server/ingester/profile/common"
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	querier_common "github.com/deepflowio/deepflow/server/querier/common"
@@ -171,7 +170,7 @@ func GenerateProfile(args model.Profile, cfg *config.QuerierConfig, where string
 	locations = append(locations, args.AppService)
 	locationToID := map[string]int{args.AppService: 0}
 
-	nodeUUIDToID := make(map[string]int)
+	trieChildMap := make(map[uint64]int, initNodeCapacity)
 	stackToNodeID := make(map[string]int)
 	nodes := make([]model.ProfileTreeNode, 0, initNodeCapacity)
 	nodes = append(nodes, model.ProfileTreeNode{ParentNodeID: -1})
@@ -214,61 +213,41 @@ func GenerateProfile(args model.Profile, cfg *config.QuerierConfig, where string
 			}
 		}
 
-		// 4. merge to profile tree
-		preSemicolonIndex := len(profileLocationStrByte)
-		curSemicolonIndex := -2
-		preNodeID := -1
-		nodeProfileValue := profileValue
-		for runeIndex := len(profileLocationStrByte) - 1; runeIndex >= 0; runeIndex -= 1 {
-			if runeIndex == 0 {
-				curSemicolonIndex = -1
-			} else if profileLocationStrByte[runeIndex] == byte(';') {
-				curSemicolonIndex = runeIndex
-			} else {
-				continue
-			}
-			if preNodeID >= 0 { // Only leaf node has the selfValue
-				nodeProfileValue = 0
-			}
+		// 4. merge to profile tree via Trie (top-down from root to leaf)
+		currNodeID := 0
+		start := 0
+		for i := 0; i <= len(profileLocationStrByte); i++ {
+			if i == len(profileLocationStrByte) || profileLocationStrByte[i] == ';' {
+				if i > start {
+					frameBytes := profileLocationStrByte[start:i]
+					frameStr := utils.String(frameBytes)
+					locationID, ok := locationToID[frameStr]
+					if !ok {
+						locationID = len(locations)
+						frameName := string(frameBytes)
+						locationToID[frameName] = locationID
+						locations = append(locations, frameName)
+					}
 
-			// Achieve the hash effect with uuid
-			nodeUUID := controller_common.GenerateUUID(utils.String(profileLocationStrByte[:preSemicolonIndex]))
-			nodeID, ok := nodeUUIDToID[nodeUUID]
-			if ok {
-				// son node
-				if preNodeID >= 0 {
-					nodes[preNodeID].ParentNodeID = nodeID
+					key := (uint64(currNodeID) << 32) | uint64(locationID)
+					childNodeID, exists := trieChildMap[key]
+					if !exists {
+						childNodeID = len(nodes)
+						nodes = append(nodes, model.ProfileTreeNode{
+							LocationID:   locationID,
+							ParentNodeID: currNodeID,
+						})
+						trieChildMap[key] = childNodeID
+					}
+					currNodeID = childNodeID
 				}
-				updateAllParentNodes(nodes, nodeID, nodeProfileValue, profileValue)
-				break
-			} else {
-				// Location to id
-				nodeProfileLocationStrRef := utils.String(profileLocationStrByte[curSemicolonIndex+1 : preSemicolonIndex])
-				locationID, ok := locationToID[nodeProfileLocationStrRef]
-				if !ok {
-					locationID = len(locations)
-					nodeProfileLocationStr := string(profileLocationStrByte[curSemicolonIndex+1 : preSemicolonIndex])
-					locationToID[nodeProfileLocationStr] = locationID
-					locations = append(locations, nodeProfileLocationStr)
-				}
-
-				// new node
-				nodeID = len(nodes)
-				nodeUUIDToID[nodeUUID] = nodeID
-				nodes = append(nodes, newProfileTreeNode(locationID, nodeProfileValue, profileValue))
-				if runeIndex == 0 {
-					nodes[0].TotalValue += profileValue // update root
-				}
-
-				if preNodeID >= 0 {
-					nodes[preNodeID].ParentNodeID = nodeID
-				} else {
-					// remember the entier stack
-					stackToNodeID[profileLocationCompress] = nodeID // compressed stack
-				}
+				start = i + 1
 			}
-			preSemicolonIndex = curSemicolonIndex
-			preNodeID = nodeID
+		}
+
+		if currNodeID > 0 {
+			updateAllParentNodes(nodes, currNodeID, profileValue, profileValue)
+			stackToNodeID[profileLocationCompress] = currNodeID
 		}
 	}
 
@@ -303,14 +282,6 @@ func GenerateProfile(args model.Profile, cfg *config.QuerierConfig, where string
 	debugs.FormatTime = formatTime
 	debug = debugs
 	return
-}
-
-func newProfileTreeNode(locationID, selfValue, totalValue int) model.ProfileTreeNode {
-	node := model.ProfileTreeNode{}
-	node.LocationID = locationID
-	node.SelfValue = selfValue
-	node.TotalValue = totalValue
-	return node
 }
 
 func updateAllParentNodes(nodes []model.ProfileTreeNode, thisNodeID, selfValue, totalValue int) {
