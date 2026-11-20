@@ -1451,14 +1451,6 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 		sk_info->need_reconfirm = conn_info->need_reconfirm;
 		sk_info->correlation_id = conn_info->correlation_id;
 		if (conn_info->tuple.l4_protocol == IPPROTO_UDP) {
-			if (args->port > 0) {
-				bpf_probe_read_kernel(sk_info->ipaddr,
-						      sizeof(sk_info->ipaddr),
-						      args->addr);
-				sk_info->udp_pre_set_addr = 1;
-				sk_info->port = args->port;
-			}
-
 			/*
 			 * If a request involves two push events, the 'seq' must be
 			 * increased to ensure that it remains strictly incremental.
@@ -1787,16 +1779,6 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	if (conn_info->tuple.l4_protocol == IPPROTO_UDP
 	    && conn_info->tuple.dport == 0) {
 		conn_info->tuple.dport = args->port;
-		if (conn_info->tuple.dport == 0 &&
-		    is_socket_info_valid(conn_info->socket_info_ptr) &&
-		    conn_info->socket_info_ptr->udp_pre_set_addr) {
-			conn_info->tuple.dport =
-			    conn_info->socket_info_ptr->port;
-			args->port = conn_info->tuple.dport;
-			bpf_probe_read_kernel(args->addr, sizeof(args->addr),
-					      conn_info->socket_info_ptr->
-					      ipaddr);
-		}
 	}
 
 	conn_info->direction = direction;
