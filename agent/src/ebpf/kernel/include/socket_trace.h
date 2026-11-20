@@ -228,32 +228,14 @@ struct ctx_info_s {
 	};
 };
 
-enum syscall_src_func {
-	SYSCALL_FUNC_UNKNOWN,
-	SYSCALL_FUNC_WRITE,
-	SYSCALL_FUNC_READ,
-	SYSCALL_FUNC_SEND,
-	SYSCALL_FUNC_RECV,
-	SYSCALL_FUNC_SENDTO,
-	SYSCALL_FUNC_RECVFROM,
-	SYSCALL_FUNC_SENDMSG,
-	SYSCALL_FUNC_RECVMSG,
-	SYSCALL_FUNC_SENDMMSG,
-	SYSCALL_FUNC_RECVMMSG,
-	SYSCALL_FUNC_WRITEV,
-	SYSCALL_FUNC_READV,
-	SYSCALL_FUNC_SENDFILE,
-	SYSCALL_FUNC_PWRITE64,
-	SYSCALL_FUNC_PWRITEV,
-	SYSCALL_FUNC_PWRITEV2,
-	SYSCALL_FUNC_PREAD64,
-	SYSCALL_FUNC_PREADV,
-	SYSCALL_FUNC_PREADV2,
-};
-
 struct data_args_t {
-	// Represents the function from which this argument group originates.
-	enum syscall_src_func source_fn;
+	/*
+	 * source_fn used to occupy four bytes as an enum. Splitting those same
+	 * four bytes keeps the map value layout unchanged while carrying the
+	 * successful message count returned by sendmmsg()/recvmmsg().
+	 */
+	__u16 source_fn;	// enum syscall_src_func
+	__u16 mmsg_count;
 	__u32 fd;
 	// For send()/recv()/write()/read().
 	const char *buf;
@@ -287,7 +269,11 @@ struct data_args_t {
 		ssize_t bytes_count;	// io event
 		ssize_t data_seq;	// Use for socket close
 	};
-	// Scenario for using sendto() with a specified address
+	/*
+	 * 远端端口。recvfrom()/recvmsg()/recvmmsg() 从 enter 到 exit 之间暂借
+	 * 该字段保存地址缓冲区的入口容量，地址提取前会将其清零并写回实际端口。
+	 * 复用现有字段可以避免扩大 packed 结构及增加旧内核 eBPF 栈压力。
+	 */
 	__u16 port;
 	union {
 		__u8 addr[16];
@@ -385,6 +371,39 @@ struct syscall_sendto_enter_ctx {
 	unsigned int flags;	//offset:40;      size:8; signed:0;
 	struct sockaddr *addr;	//offset:48;      size:8; signed:0;
 	int addr_len;		//offset:56;      size:8; signed:0;
+#endif
+};
+
+/*
+ * recvfrom() 的前五个参数与 sendto() 布局相同，但第六个参数是用户态
+ * socklen_t 指针，而不是长度值。单独定义上下文，避免在 64 位内核上
+ * 将该指针截断为 int。
+ */
+struct syscall_recvfrom_enter_ctx {
+#ifdef LINUX_VER_RT
+	__u64 __pad_0;		/*     0     8 */
+	unsigned char common_migrate_disable;	/*     8     1 */
+	unsigned char common_preempt_lazy_count;	/*     9     1 */
+
+	int __syscall_nr;	/*    12     4 */
+	int fd;			/*    16     4 */
+
+	void *buff;		/*    24     8 */
+	size_t len;		/*    32     8 */
+	unsigned int flags;	/*    40     4 */
+
+	struct sockaddr *addr;	/*    48     8 */
+	int *addr_len;		/*    56     8 */
+#else
+	__u64 __pad_0;
+	int __syscall_nr;	// offset:8     size:4
+	__u32 __pad_1;		// offset:12    size:4
+	int fd;			// offset:16;   size:8; signed:0;
+	void *buff;		// offset:24;   size:8; signed:0;
+	size_t len;		// offset:32;   size:8; signed:0;
+	unsigned int flags;	// offset:40;   size:8; signed:0;
+	struct sockaddr *addr;	// offset:48;   size:8; signed:0;
+	int *addr_len;		// offset:56;   size:8; signed:0;
 #endif
 };
 

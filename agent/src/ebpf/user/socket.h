@@ -422,7 +422,13 @@ prefetch_and_process_data(struct bpf_tracer *t, int id, int nb_rx, void **datas_
 			if (t->datadump)
 				t->datadump((void *)sd, boot_time);
 			/*
-			 * Modify socket data time to real time, 
+			 * reader_raw_cb() temporarily carries datadump-only syscall
+			 * metadata in the high 32 bits. Restore the public field before
+			 * invoking the external callback.
+			 */
+			sd->syscall_len = (uint32_t)sd->syscall_len;
+			/*
+			 * Modify socket data time to real time,
 			 * time precision is in nanosecond.
 			 */
 			sd->timestamp = sd->timestamp + boot_time;
@@ -454,6 +460,7 @@ enum tracer_state get_socket_tracer_state(void);
 int set_protocol_ports_bitmap(int proto_type, const char *ports);
 int disable_syscall_trace_id(void);
 void set_hooked_socket_syscalls(uint64_t bitmap);
+void set_udp_peer_id_enabled(bool enabled);
 
 /**
  * eBPF Probe Point Configuration

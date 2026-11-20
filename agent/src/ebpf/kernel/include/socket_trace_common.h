@@ -42,6 +42,33 @@ enum endpoint_role {
 	ROLE_SERVER
 };
 
+/*
+ * The concrete syscall that produced socket data. Keep the values stable:
+ * they are transferred from eBPF to userspace and printed by datadump.
+ */
+enum syscall_src_func {
+	SYSCALL_FUNC_UNKNOWN,
+	SYSCALL_FUNC_WRITE,
+	SYSCALL_FUNC_READ,
+	SYSCALL_FUNC_SEND,
+	SYSCALL_FUNC_RECV,
+	SYSCALL_FUNC_SENDTO,
+	SYSCALL_FUNC_RECVFROM,
+	SYSCALL_FUNC_SENDMSG,
+	SYSCALL_FUNC_RECVMSG,
+	SYSCALL_FUNC_SENDMMSG,
+	SYSCALL_FUNC_RECVMMSG,
+	SYSCALL_FUNC_WRITEV,
+	SYSCALL_FUNC_READV,
+	SYSCALL_FUNC_SENDFILE,
+	SYSCALL_FUNC_PWRITE64,
+	SYSCALL_FUNC_PWRITEV,
+	SYSCALL_FUNC_PWRITEV2,
+	SYSCALL_FUNC_PREAD64,
+	SYSCALL_FUNC_PREADV,
+	SYSCALL_FUNC_PREADV2,
+};
+
 struct __tuple_t {
 	__u8 daddr[16];
 	__u8 rcv_saddr[16];
@@ -123,7 +150,15 @@ struct __socket_data {
 	__u8 msg_type:6;	// bits[1-6]: 信息类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
 	__u8 is_tls:1;
 
-	__u64 syscall_len;	// 本次系统调用读、写数据的总长度
+	/*
+	 * __data_submit() already limits syscall_len to 32 bits. Reuse the
+	 * previously unused upper half of the old 64-bit field for syscall
+	 * metadata, keeping this event header and all following offsets stable.
+	 */
+	__u32 syscall_len;	// 本次系统调用读、写数据的总长度
+	__u8 source_fn;		// enum syscall_src_func
+	__u8 reserved_syscall_meta;
+	__u16 mmsg_count;	// sendmmsg/recvmmsg 实际成功处理的消息数
 	__u64 data_seq;		// cap_data在Socket中的相对顺序号
 	__u32 fd;
 	__u16 data_type;	// HTTP, DNS, MySQL ...
@@ -167,7 +202,12 @@ struct socket_info_s {
 	 */
 	__u16 allow_reassembly:1;
 	__u16 finish_reasm:1;	// Has the reassembly been completed?
-	__u16 udp_pre_set_addr:1;	// Is the socket address pre-set during the system call phase in the UDP protocol?
+	/*
+	 * 该位曾用于标记 socket_info_map 中缓存的 UDP 远端地址。
+	 * 未 connect UDP 的远端地址属于单个报文，不能作为 socket 状态缓存。
+	 * 保留此位仅用于维持 map value 布局以及后续 bit 字段的位置不变。
+	 */
+	__u16 reserved_udp_addr_cache:1;
 	/*
 	 * Indicate that the current and next data must be pushed in
 	 * the form of data reorganization.
@@ -200,7 +240,8 @@ struct socket_info_s {
 	 */
 	union {
 		__u8 prev_data[EBPF_CACHE_SIZE];
-		__u8 ipaddr[EBPF_CACHE_SIZE];	// IP address for UDP sendto()
+		/* 保留旧存储别名以维持 socket_info_s 的 map value ABI。 */
+		__u8 reserved_udp_addr[EBPF_CACHE_SIZE];
 	};
 	__u8 direction:1;
 	__u8 pre_direction:1;
@@ -212,7 +253,8 @@ struct socket_info_s {
 	union {
 		__u8 encoding_type;	// Currently used for OpenWire encoding inference.
 		__s32 correlation_id;	// Currently used for Kafka protocol inference.
-		__u16 port;	// Port for UDP sendto()
+		/* 保留旧存储别名以维持 socket_info_s 的 map value ABI。 */
+		__u16 reserved_udp_port;
 	};
 
 	__u32 peer_fd;		// Used to record the peer fd for data transfer between sockets.

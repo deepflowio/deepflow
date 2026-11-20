@@ -244,7 +244,8 @@ fn sk_l4proto_safe(sd: *mut SK_BPF_DATA) -> &'static str {
 fn process_name_safe(sd: *mut SK_BPF_DATA) -> String {
     unsafe {
         let v = &(*sd).process_kname;
-        String::from_utf8_lossy(v).to_string()
+        let len = v.iter().position(|&byte| byte == 0).unwrap_or(v.len());
+        String::from_utf8_lossy(&v[..len]).into_owned()
     }
 }
 
@@ -288,7 +289,35 @@ extern "C" fn socket_trace_callback(
     queue_id: c_int,
     sd: *mut SK_BPF_DATA,
 ) -> c_int {
+    if sd.is_null() {
+        return 0;
+    }
+
     unsafe {
+        let event = &*sd;
+        if event.tuple.protocol == 17 {
+            let direction = if event.direction == SOCK_DIR_SND {
+                "out"
+            } else {
+                "in"
+            };
+            println!(
+                "UDP_PEER queue={} process={} pid={} fd={} direction={} socket_id={} cap_seq={} local={}:{} remote={}:{} cap_len={}",
+                queue_id,
+                process_name_safe(sd),
+                event.process_id,
+                event.fd,
+                direction,
+                event.socket_id,
+                event.cap_seq,
+                sk_laddr_str_safe(sd),
+                event.tuple.lport,
+                sk_raddr_str_safe(sd),
+                event.tuple.rport,
+                event.cap_len,
+            );
+        }
+
         let mut proto_tag = String::from("");
         if sk_proto_safe(sd) == SOCK_DATA_OTHER {
             proto_tag.push_str("ORTHER");
@@ -704,7 +733,10 @@ fn main() {
         );
         set_protocol_ports_bitmap(
             SOCK_DATA_DNS as c_int,
-            CString::new("53".as_bytes()).unwrap().as_c_str().as_ptr(),
+            CString::new("53,53053".as_bytes())
+                .unwrap()
+                .as_c_str()
+                .as_ptr(),
         );
         set_protocol_ports_bitmap(
             SOCK_DATA_MONGO as c_int,
@@ -745,6 +777,8 @@ fn main() {
         // set_dpdk_trace_enabled(true);
         // disable_kprobe_feature();
         // set_virtual_file_collect(true);
+        set_udp_peer_id_enabled(true);
+        info!("UDP peer socket ID isolation enabled for sample testing");
         if running_socket_tracer(
             socket_trace_callback, /* Callback interface rust -> C */
             1, /* Number of worker threads, indicating how many user-space threads participate in data processing */

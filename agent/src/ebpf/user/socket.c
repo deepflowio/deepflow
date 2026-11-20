@@ -123,6 +123,7 @@ static uint32_t go_tracing_timeout = GO_TRACING_TIMEOUT_DEFAULT;
 static uint32_t io_event_collect_mode = 1;
 static uint64_t io_event_minimal_duration = 1000000;
 static uint64_t hooked_socket_syscalls_bitmap = HOOKED_SOCKET_SYSCALL_ALL;
+static bool udp_peer_id_enabled = false;
 
 /*
  * The maximum threshold for socket map reclamation, with map
@@ -1477,6 +1478,18 @@ static void reader_raw_cb(void *cookie, void *raw, int raw_size)
 			submit_data->cap_data[len + offset] = '\0';
 		}
 		submit_data->syscall_len += offset;
+		/*
+		 * socket_bpf_data is a public callback ABI and must not gain fields.
+		 * Its syscall_len is 64 bits while the kernel event length is 32
+		 * bits, so carry datadump-only metadata in the unused high half.
+		 * prefetch_and_process_data() restores the original length before
+		 * invoking the external callback.
+		 */
+		if (sd->source == DATA_SOURCE_SYSCALL) {
+			submit_data->syscall_len |=
+			    (uint64_t)sd->mmsg_count << 32 |
+			    (uint64_t)sd->source_fn << 48;
+		}
 		submit_data->cap_len = len + offset;
 		burst_data[i] = submit_data;
 
@@ -3056,6 +3069,15 @@ int running_socket_tracer(tracer_callback_t handle,
 
 	conf_max_trace_entries = max_trace_entries;
 
+	/*
+	 * Keep the map in every Socket Tracer object so ELF relocation remains
+	 * identical. When the feature is disabled, the BPF path returns before
+	 * accessing it and one entry avoids reserving the full LRU capacity.
+	 */
+	if (!udp_peer_id_enabled &&
+	    (ret = maps_config(tracer, MAP_UDP_PEER_NAME, 1)))
+		return ret;
+
 	bool has_attempted = false;
 	while (true) {
 		if (tracer_bpf_load(tracer) == 0) {
@@ -3089,6 +3111,13 @@ int running_socket_tracer(tracer_callback_t handle,
 			}
 		}
 
+		return -EINVAL;
+	}
+
+	uint32_t udp_peer_id_enabled_value = udp_peer_id_enabled ? 1 : 0;
+	if (!bpf_table_set_value(tracer, MAP_UDP_PEER_ENABLED_NAME, 0,
+				 &udp_peer_id_enabled_value)) {
+		ebpf_error("Failed to update UDP peer ID enabled map.\n");
 		return -EINVAL;
 	}
 
@@ -3895,16 +3924,63 @@ static int __unused get_fd_path(pid_t pid, u32 fd, char *buf, size_t bufsize)
 	return 0;
 }
 
+static const char *syscall_source_name(uint8_t source_fn)
+{
+	switch (source_fn) {
+	case SYSCALL_FUNC_WRITE:
+		return "write";
+	case SYSCALL_FUNC_READ:
+		return "read";
+	case SYSCALL_FUNC_SEND:
+		return "send";
+	case SYSCALL_FUNC_RECV:
+		return "recv";
+	case SYSCALL_FUNC_SENDTO:
+		return "sendto";
+	case SYSCALL_FUNC_RECVFROM:
+		return "recvfrom";
+	case SYSCALL_FUNC_SENDMSG:
+		return "sendmsg";
+	case SYSCALL_FUNC_RECVMSG:
+		return "recvmsg";
+	case SYSCALL_FUNC_SENDMMSG:
+		return "sendmmsg";
+	case SYSCALL_FUNC_RECVMMSG:
+		return "recvmmsg";
+	case SYSCALL_FUNC_WRITEV:
+		return "writev";
+	case SYSCALL_FUNC_READV:
+		return "readv";
+	case SYSCALL_FUNC_SENDFILE:
+		return "sendfile";
+	case SYSCALL_FUNC_PWRITE64:
+		return "pwrite64";
+	case SYSCALL_FUNC_PWRITEV:
+		return "pwritev";
+	case SYSCALL_FUNC_PWRITEV2:
+		return "pwritev2";
+	case SYSCALL_FUNC_PREAD64:
+		return "pread64";
+	case SYSCALL_FUNC_PREADV:
+		return "preadv";
+	case SYSCALL_FUNC_PREADV2:
+		return "preadv2";
+	default:
+		return "unknown";
+	}
+}
+
 #define DATADUMP_FORMAT							\
 	"%s [datadump] SEQ %" PRIu64 " <%s> DIR %s TYPE %s(%d) PID %u "	\
 	"THREAD_ID %u COROUTINE_ID %" PRIu64 " FD %d ROLE %s"		\
-	" CONTAINER_ID %s SOURCE %d COMM %s "				\
+	" CONTAINER_ID %s SOURCE %d SOURCE_FN %s(%u) MSG_NUM %u COMM %s " \
 	"%s LEN %d SYSCALL_LEN %" PRIu64 " SOCKET_ID %" PRIu64		\
 	" " "TRACE_ID %" PRIu64 " TCP_SEQ %" PRIu64			\
 	" DATA_SEQ %" PRIu64 " TLS %s SyscallTime %s "			\
 	"SyscallMonoTime %llu us CapTime %s CapMonoTime %llu us\n"
 
-static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
+static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time,
+			      uint8_t source_fn, uint16_t msg_num)
 {
 	if (!allow_datadump(sd))
 		return;
@@ -3966,8 +4042,9 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 			  sd->coroutine_id, sd->fd, role_str,
 			  strlen((char *)sd->container_id) ==
 			  0 ? "null" : (char *)sd->container_id, sd->source,
+			  syscall_source_name(source_fn), source_fn, msg_num,
 			  sd->process_kname, flow_str, sd->cap_len,
-			  sd->syscall_len, sd->socket_id,
+			  (uint64_t)(uint32_t)sd->syscall_len, sd->socket_id,
 			  sd->syscall_trace_id_call, sd->tcp_seq,
 			  sd->cap_seq, sd->is_tls ? "true" : "false",
 			  kern_syscall_time, sd->timestamp / NS_IN_USEC,
@@ -4047,9 +4124,11 @@ static void print_socket_data(struct socket_bpf_data *sd, int64_t boot_time)
 static void datadump_process(void *data, int64_t boot_time)
 {
 	struct socket_bpf_data *sd = data;
+	uint8_t source_fn = (uint8_t)(sd->syscall_len >> 48);
+	uint16_t msg_num = (uint16_t)(sd->syscall_len >> 32);
 	pthread_mutex_lock(&datadump_mutex);
 	if (unlikely(datadump_enable))
-		print_socket_data(sd, boot_time);
+		print_socket_data(sd, boot_time, source_fn, msg_num);
 	pthread_mutex_unlock(&datadump_mutex);
 }
 
@@ -4157,6 +4236,13 @@ void set_hooked_socket_syscalls(uint64_t bitmap)
 	hooked_socket_syscalls_bitmap = bitmap & HOOKED_SOCKET_SYSCALL_ALL;
 	ebpf_info("Set hooked_socket_syscalls bitmap 0x%llx\n",
 		  hooked_socket_syscalls_bitmap);
+}
+
+void set_udp_peer_id_enabled(bool enabled)
+{
+	udp_peer_id_enabled = enabled;
+	ebpf_info("UDP peer socket ID isolation is %s.\n",
+		  enabled ? "enabled" : "disabled");
 }
 
 void disable_fentry(void)

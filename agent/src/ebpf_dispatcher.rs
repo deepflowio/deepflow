@@ -1226,6 +1226,15 @@ impl EbpfCollector {
             )
             .0,
         );
+        let udp_peer_id_enabled = config.ebpf.socket.tunning.udp_peer_id_enabled;
+        if udp_peer_id_enabled {
+            info!(
+                "UDP peer socket ID isolation requires complete local and remote endpoints; \
+                 wildcard UDP sockets may fall back to physical socket IDs because \
+                 the local IP is unavailable on this branch."
+            );
+        }
+        ebpf::set_udp_peer_id_enabled(udp_peer_id_enabled);
 
         ebpf::set_bpf_map_prealloc(!config.ebpf.socket.tunning.map_prealloc_disabled);
 
