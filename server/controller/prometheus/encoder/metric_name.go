@@ -19,29 +19,29 @@ package encoder
 import (
 	"sync"
 
-	"github.com/cornelk/hashmap"
 	mapset "github.com/deckarep/golang-set/v2"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	"github.com/deepflowio/deepflow/server/controller/prometheus/cache"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
 
-// 缓存资源可用于分配的ID，提供ID的刷新、分配、回收接口
 type metricName struct {
 	org          *common.ORG
 	lock         sync.Mutex
 	resourceType string
-	strToID      *hashmap.Map[string, int]
+	cache        cache.PrometheusCache
 	ascIDAllocator
 }
 
 func newMetricName(org *common.ORG, max int) *metricName {
+	c, _ := cache.GetCache(org.ID)
 	mn := &metricName{
 		org:          org,
 		resourceType: "metric_name",
-		strToID:      hashmap.New[string, int](),
+		cache:        c,
 	}
 	mn.ascIDAllocator = newAscIDAllocator(org, mn.resourceType, 1, max)
 	mn.rawDataProvider = mn
@@ -49,7 +49,7 @@ func newMetricName(org *common.ORG, max int) *metricName {
 }
 
 func (mn *metricName) getID(str string) (int, bool) {
-	return mn.strToID.Get(str)
+	return mn.cache.GetMetricNameID(str)
 }
 
 func (mn *metricName) refresh(args ...interface{}) error {
@@ -67,7 +67,7 @@ func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName,
 	dbToAdd := make([]*metadbmodel.PrometheusMetricName, 0)
 	for i := range strs {
 		str := strs[i]
-		if id, ok := mn.strToID.Get(str); ok {
+		if id, ok := mn.cache.GetMetricNameID(str); ok {
 			resp = append(resp, &controller.PrometheusMetricName{Name: &str, Id: proto.Uint32(uint32(id))})
 			continue
 		}
@@ -88,12 +88,14 @@ func (mn *metricName) encode(strs []string) ([]*controller.PrometheusMetricName,
 		log.Errorf("add %s error: %s", mn.resourceType, err.Error(), mn.org.LogPrefix)
 		return nil, err
 	}
+
+	// Update cache using model structs directly to avoid redundant protobuf construction
 	for i := range dbToAdd {
 		id := dbToAdd[i].ID
 		str := dbToAdd[i].Name
-		mn.strToID.Set(str, id)
 		resp = append(resp, &controller.PrometheusMetricName{Name: &str, Id: proto.Uint32(uint32(id))})
 	}
+	mn.cache.AddMetricNames(dbToAdd)
 	return resp, nil
 }
 
@@ -107,7 +109,7 @@ func (mn *metricName) load() (ids mapset.Set[int], err error) {
 	inUseIDsSet := mapset.NewSet[int]()
 	for _, item := range items {
 		inUseIDsSet.Add(item.ID)
-		mn.strToID.Set(item.Name, item.ID)
+		// Cache is refreshed separately, do not set here
 	}
 	return inUseIDsSet, nil
 }

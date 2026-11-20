@@ -23,7 +23,6 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	cmap "github.com/orcaman/concurrent-map/v2"
 
-	"github.com/deepflowio/deepflow/message/controller"
 	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/prometheus/common"
 )
@@ -94,24 +93,8 @@ func (ml *metricLabelName) GetIDByKey(key metricLabelNameKey) (int, bool) {
 	return 0, false
 }
 
-func (ml *metricLabelName) Add(batch []*controller.PrometheusMetricLabelName) {
+func (ml *metricLabelName) Add(batch []*metadbmodel.PrometheusMetricLabelName) {
 	for _, item := range batch {
-		for _, li := range item.GetLabelNameIds() {
-			mni := int(item.GetMetricNameId())
-			ml.metricNameIDToLabelNameIDs.GetOrInsert(mni, mapset.NewSet[int]())
-			if lids, ok := ml.metricNameIDToLabelNameIDs.Get(mni); ok {
-				lids.Add(int(li))
-			}
-		}
-	}
-}
-
-func (ml *metricLabelName) refresh(args ...interface{}) error {
-	metricLabelNames, err := ml.load()
-	if err != nil {
-		return err
-	}
-	for _, item := range metricLabelNames {
 		if mni, ok := ml.metricNameCache.GetIDByName(item.MetricName); ok {
 			ml.metricNameIDToLabelNameIDs.GetOrInsert(mni, mapset.NewSet[int]())
 			if lids, ok := ml.metricNameIDToLabelNameIDs.Get(mni); ok {
@@ -120,11 +103,38 @@ func (ml *metricLabelName) refresh(args ...interface{}) error {
 			ml.keyToID.Set(NewMetricLabelNameKey(mni, item.LabelNameID), item.ID)
 		}
 	}
-	return nil
 }
 
-func (ml *metricLabelName) load() ([]*metadbmodel.PrometheusMetricLabelName, error) {
-	var items []*metadbmodel.PrometheusMetricLabelName
-	err := ml.org.DB.Select("metric_name", "label_name_id", "id").Find(&items).Error
-	return items, err
+func (ml *metricLabelName) refresh(args ...interface{}) error {
+	rows, err := ml.org.DB.Model(&metadbmodel.PrometheusMetricLabelName{}).Select("metric_name", "label_name_id", "id").Rows()
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	// Clear existing data
+	ml.metricNameIDToLabelNameIDs = hashmap.New[int, mapset.Set[int]]()
+	ml.keyToID = cmap.NewStringer[metricLabelNameKey, int]()
+
+	for rows.Next() {
+		var metricName string
+		var labelNameID int
+		var id int
+		if scanErr := rows.Scan(&metricName, &labelNameID, &id); scanErr != nil {
+			log.Errorf("stream scan prometheus_metric_label_name interrupted: %v", scanErr, ml.org.LogPrefix)
+			return scanErr
+		}
+		if mni, ok := ml.metricNameCache.GetIDByName(metricName); ok {
+			ml.metricNameIDToLabelNameIDs.GetOrInsert(mni, mapset.NewSet[int]())
+			if lids, ok := ml.metricNameIDToLabelNameIDs.Get(mni); ok {
+				lids.Add(labelNameID)
+			}
+			ml.keyToID.Set(NewMetricLabelNameKey(mni, labelNameID), id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		log.Errorf("stream read prometheus_metric_label_name error: %v", err, ml.org.LogPrefix)
+		return err
+	}
+	return nil
 }
