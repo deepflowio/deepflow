@@ -244,11 +244,7 @@ func ConvertL7TracingRespToProto(data map[string]interface{}, argTraceId string)
 			})
 		}
 		for k, v := range SPAN_KEY_MAP {
-			_, ok := trace[v]
-			value := ""
-			if ok {
-				value = trace[v].(string)
-			}
+			value, _ := trace[v].(string)
 			span.Attributes = append(span.Attributes, &v1.KeyValue{
 				Key:   k,
 				Value: &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: value}},
