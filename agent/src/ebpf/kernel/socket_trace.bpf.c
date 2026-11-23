@@ -39,6 +39,27 @@
 
 #define __user
 
+struct udp_peer_key_t {
+	__u64 physical_socket_id;
+	struct __tuple_t tuple;
+	__u16 reserved;
+};
+
+_Static_assert(offsetof(struct __socket_data, tuple) ==
+	       offsetof(struct __socket_data, socket_id) +
+	       offsetof(struct udp_peer_key_t, tuple),
+	       "UDP peer key requires contiguous socket ID and tuple");
+
+struct udp_peer_state_t {
+	__u64 socket_id;
+	volatile __u64 seq;
+};
+
+struct udp_peer_scratch_t {
+	struct udp_peer_key_t key;
+	struct udp_peer_state_t state;
+};
+
 /* *INDENT-OFF* */
 /***********************************************************
  * map definitions
@@ -102,6 +123,17 @@ MAP_PERARRAY(tracer_ctx_map, __u32, struct tracer_ctx_s, 1, FEATURE_FLAG_SOCKET_
  * 对各类map进行统计
  */
 MAP_ARRAY(trace_stats_map, __u32, struct trace_stats, 1, FEATURE_FLAG_SOCKET_TRACER)
+
+MAP_ARRAY(udp_peer_id_enabled_map, __u32, __u32, 1, FEATURE_FLAG_SOCKET_TRACER)
+MAP_PERARRAY(udp_peer_scratch, __u32, struct udp_peer_scratch_t, 1, FEATURE_FLAG_SOCKET_TRACER)
+
+struct bpf_map_def SEC("maps") __udp_peer_map = {
+	.type = BPF_MAP_TYPE_LRU_HASH,
+	.key_size = sizeof(struct udp_peer_key_t),
+	.value_size = sizeof(struct udp_peer_state_t),
+	.max_entries = MAP_MAX_ENTRIES_DEF,
+	.feat_flags = FEATURE_FLAG_SOCKET_TRACER,
+};
 
 // key: protocol id, value: is protocol enabled, size: PROTO_NUM
 MAP_ARRAY(protocol_filter, int, int, PROTO_NUM, FEATURE_FLAG_SOCKET_TRACER)
@@ -1787,6 +1819,11 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	if (!ctx_map)
 		return -1;
 
+#if defined(LINUX_VER_5_2_PLUS)
+	ctx_map->bytes_count = bytes_count;
+	bytes_count = ((volatile struct ctx_info_s *)ctx_map)->bytes_count;
+#endif
+
 	struct kprobe_port_bitmap *bypass = kprobe_port_bitmap__lookup(&k1);
 	if (bypass) {
 		if (is_set_bitmap(bypass->bitmap, conn_info->tuple.dport) ||
@@ -1803,6 +1840,11 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		}
 	}
 
+#if defined(LINUX_VER_5_2_PLUS)
+	if (bpf_probe_read_kernel(conn_info,
+				 offsetof(struct conn_info_s, socket_info_ptr), conn_info))
+		return -1;
+#endif
 	int act;
 	act = infer_l7_class_1(ctx_map, conn_info, direction, args,
 			       bytes_count, sock_state, extra);
@@ -1851,6 +1893,12 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		ctx_map->tail_call.offset = offset;
 		return 0;
 #else
+#if defined(LINUX_VER_5_2_PLUS)
+		struct socket_info_s *socket_info_ptr = conn_info->socket_info_ptr;
+		if (bpf_probe_read_kernel(conn_info, sizeof(*conn_info), conn_info))
+			return -1;
+		conn_info->socket_info_ptr = socket_info_ptr;
+#endif
 		return __data_submit(ctx, conn_info, args, extra->vecs,
 				     bytes_count, offset, args->enter_ts,
 				     extra);
@@ -2489,8 +2537,8 @@ KRETFUNC_PROG(__sys_sendmmsg, int fd, struct mmsghdr __user * mmsg,
 	// Unstash arguments, and process syscall.
 	struct data_args_t *write_args = active_write_args_map__lookup(&id);
 	if (write_args != NULL && num_msgs > 0) {
-		ssize_t bytes_count;
-		bpf_probe_read_user(&bytes_count, sizeof(write_args->msg_len),
+		__u32 bytes_count = 0;
+		bpf_probe_read_user(&bytes_count, sizeof(bytes_count),
 				    write_args->msg_len);
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_EGRESS,
 					  write_args, bytes_count);
@@ -2648,8 +2696,8 @@ TP_SYSCALL_PROG(exit_recvmmsg) (struct syscall_comm_exit_ctx *ctx) {
 	// Unstash arguments, and process syscall.
 	struct data_args_t *read_args = active_read_args_map__lookup(&id);
 	if (read_args != NULL && num_msgs > 0) {
-		ssize_t bytes_count;
-		bpf_probe_read_user(&bytes_count, sizeof(read_args->msg_len),
+		__u32 bytes_count = 0;
+		bpf_probe_read_user(&bytes_count, sizeof(bytes_count),
 				    read_args->msg_len);
 		process_syscall_data_vecs((struct pt_regs *)ctx, id, T_INGRESS,
 					  read_args, bytes_count);
@@ -3026,6 +3074,60 @@ KFUNC_PROG(__sys_connect, int fd, struct sockaddr __user * uservaddr,
 	return 0;
 }
 
+static_always_inline void
+rewrite_udp_peer_metadata(struct __socket_data *event,
+			  struct tracer_ctx_s *tracer_ctx,
+			  const struct data_args_t *args)
+{
+	if (event->tuple.l4_protocol != IPPROTO_UDP)
+		return;
+
+	__u32 k0 = 0;
+	__u32 *enabled = udp_peer_id_enabled_map__lookup(&k0);
+	if (!enabled || !*enabled)
+		return;
+
+	struct udp_peer_scratch_t *scratch = udp_peer_scratch__lookup(&k0);
+	if (!scratch)
+		return;
+	struct udp_peer_key_t *key = &scratch->key;
+	if (bpf_probe_read_kernel(key, offsetof(struct udp_peer_key_t, reserved),
+				  &event->socket_id))
+		return;
+	key->reserved = 0;
+	__u8 addr_len = key->tuple.addr_len;
+	if (key->physical_socket_id == 0 ||
+	    (addr_len != 4 && addr_len != 16) ||
+	    key->tuple.num == 0 || key->tuple.dport == 0)
+		return;
+	if (addr_len == 4) {
+		__builtin_memset(key->tuple.rcv_saddr + 4, 0, 12);
+		__builtin_memset(key->tuple.daddr + 4, 0, 12);
+		if (*(__u32 *)key->tuple.rcv_saddr == 0 || *(__u32 *)key->tuple.daddr == 0)
+			return;
+	} else {
+		if ((*(__u64 *)key->tuple.rcv_saddr == 0 && *(__u64 *)(key->tuple.rcv_saddr + 8) == 0) ||
+		    (*(__u64 *)key->tuple.daddr == 0 && *(__u64 *)(key->tuple.daddr + 8) == 0))
+			return;
+	}
+
+	struct udp_peer_state_t *state = bpf_map_lookup_elem(&__udp_peer_map, key);
+	if (!state) {
+		scratch->state.socket_id = tracer_ctx->socket_id + 1;
+		scratch->state.seq = (__u64)-1;
+		tracer_ctx->socket_id++;
+		bpf_map_update_elem(&__udp_peer_map, key, &scratch->state, BPF_NOEXIST);
+		state = bpf_map_lookup_elem(&__udp_peer_map, key);
+		if (!state)
+			return;
+	}
+
+	__u64 count = args && args->extra_iovlen && event->data_type == PROTO_DNS ? 2 : 1;
+	__sync_fetch_and_add(&state->seq, count);
+	event->socket_id = state->socket_id;
+	event->data_seq = state->seq - (count - 1);
+}
+
 static __inline int finalize_data_output(void *ctx,
 					 struct tracer_ctx_s *tracer_ctx,
 					 __u64 curr_time, __u64 diff,
@@ -3259,6 +3361,8 @@ skip_copy:
 	v_buff->len +=
 	    offsetof(typeof(struct __socket_data), data) + v->data_len;
 	v_buff->events_num++;
+	if (!is_close)
+		rewrite_udp_peer_metadata(v, tracer_ctx, args);
 
 	/*
 	 * Batch data will be sent immediately if any of the following conditions are met:
@@ -3365,6 +3469,8 @@ skip_copy:
 	v_buff->len +=
 	    offsetof(typeof(struct __socket_data), data) + v->data_len;
 	v_buff->events_num++;
+	if (!is_close)
+		rewrite_udp_peer_metadata(v, tracer_ctx, args);
 
 	/*
 	 * If the delay of the periodic push event exceeds the threshold, it

@@ -745,6 +745,10 @@ fn main() {
         // set_dpdk_trace_enabled(true);
         // disable_kprobe_feature();
         // set_virtual_file_collect(true);
+        set_udp_peer_id_enabled(matches!(
+            env::var("DF_UDP_PEER_ID_ENABLED").as_deref(),
+            Ok("1" | "true")
+        ));
         if running_socket_tracer(
             socket_trace_callback, /* Callback interface rust -> C */
             1, /* Number of worker threads, indicating how many user-space threads participate in data processing */

@@ -1228,6 +1228,7 @@ impl EbpfCollector {
         );
 
         ebpf::set_bpf_map_prealloc(!config.ebpf.socket.tunning.map_prealloc_disabled);
+        ebpf::set_udp_peer_id_enabled(config.ebpf.socket.tunning.udp_peer_id_enabled);
 
         if config.ebpf.socket.tunning.fentry_enabled {
             ebpf::enable_fentry();

@@ -38,6 +38,8 @@
 #define MAP_MEMBERS_OFFSET_NAME         "__members_offset"
 #define MAP_SOCKET_INFO_NAME            "__socket_info_map"
 #define MAP_TRACE_NAME                  "__trace_map"
+#define MAP_UDP_PEER_NAME               "__udp_peer_map"
+#define MAP_UDP_PEER_ENABLED_NAME       "__udp_peer_id_enabled_map"
 #define MAP_PERF_SOCKET_DATA_NAME       "__socket_data"
 #define MAP_TRACER_CTX_NAME             "__tracer_ctx_map"
 #define MAP_TRACE_STATS_NAME            "__trace_stats_map"

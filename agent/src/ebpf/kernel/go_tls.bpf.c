@@ -264,15 +264,17 @@ UPROG(go_tls_read_exit) (struct pt_regs *ctx)
 		return 0;
 	}
 
-	struct http2_tcp_seq_key tcp_seq_key = {
-		.tgid = key.tgid,
-		.fd = c->fd,
-		.tcp_seq_end = get_tcp_read_seq(c->fd, NULL, NULL),
-	};
-	// make linux 4.14 validator happy
-	__u32 tcp_seq = c->tcp_seq;
-	bpf_map_update_elem(&http2_tcp_seq_map, &tcp_seq_key, &tcp_seq,
-			    BPF_NOEXIST);
+	{
+		struct http2_tcp_seq_key tcp_seq_key = {
+			.tgid = key.tgid,
+			.fd = c->fd,
+			.tcp_seq_end = get_tcp_read_seq(c->fd, NULL, NULL),
+		};
+		// make linux 4.14 validator happy
+		__u32 tcp_seq = c->tcp_seq;
+		bpf_map_update_elem(&http2_tcp_seq_map, &tcp_seq_key, &tcp_seq,
+				    BPF_NOEXIST);
+	}
 
 	if (is_register_based_call(info)) {
 		bytes_count = PT_GO_REGS_PARM1(ctx);
