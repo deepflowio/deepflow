@@ -443,8 +443,11 @@ static __always_inline int output_extra_data_common(
 ```
 
 为控制旧内核 verifier 的状态空间，主 iovec 路径仍保留 18 次展开；当前只服务于第二条 DNS
-A/AAAA 消息的附加路径限定为单个 iovec。实际实现还需要避免栈膨胀，并按 4.14 verifier
-能接受的方式读取 packed event 字段；伪代码只表达语义，不规定最终局部变量形态。
+A/AAAA 消息的附加路径支持前 8 个 iovec，空项同样占用一个展开次数。该值已在 Linux 4.14
+和 4.19 上完成实际加载与分段报文验证，候选值对比及边界见
+[附加 iovec 上限测试报告](udp-extra-iov-limit-test-report-20261124.md)。实际实现还需要避免
+栈膨胀，并按 4.14 verifier 能接受的方式读取 packed event 字段；伪代码只表达语义，
+不规定最终局部变量形态。
 
 ## 10. 配置开关
 
