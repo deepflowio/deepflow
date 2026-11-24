@@ -3731,6 +3731,11 @@ impl ConfigHandler {
                     "inputs.ebpf.socket.tunning.fentry_enabled"
                 ),
                 (
+                    tunning.udp_peer_id_enabled,
+                    new_tunning.udp_peer_id_enabled,
+                    "inputs.ebpf.socket.tunning.udp_peer_id_enabled"
+                ),
+                (
                     tunning.hooked_socket_syscalls,
                     new_tunning.hooked_socket_syscalls,
                     "inputs.ebpf.socket.tunning.hooked_socket_syscalls"

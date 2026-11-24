@@ -223,7 +223,10 @@ struct tail_calls_context {
 
 struct ctx_info_s {
 	union {
-		struct infer_data_s infer_buf;
+		struct {
+			struct infer_data_s infer_buf;
+			__u64 bytes_count;
+		};
 		struct tail_calls_context tail_call;
 	};
 };

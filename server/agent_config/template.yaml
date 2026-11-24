@@ -3300,6 +3300,25 @@ inputs:
         #     - 内核建议：若要启用 fentry/fexit 特性，推荐使用 Linux kernel 5.10.28 及以上版本，以确保稳定性和性能。
         # upgrade_from:
         fentry_enabled: false
+        # type: bool
+        # name:
+        #   en: Enable UDP Peer Socket ID Isolation
+        #   ch: 开启 UDP Peer Socket ID 隔离
+        # unit:
+        # range: []
+        # enum_options: []
+        # modification: agent_restart
+        # ee_feature: false
+        # description:
+        #   en: |-
+        #     Assign independent socket IDs and capture sequences to UDP peers with complete
+        #     local and remote endpoints. Incomplete endpoints retain physical socket metadata.
+        #     Restart the agent after changing this option.
+        #   ch: |-
+        #     对完整本地、远端端点的 UDP peer 分配独立 socket ID 和采集序号。
+        #     端点不完整时保留物理 socket 元数据。修改后需重启 Agent。
+        # upgrade_from:
+        udp_peer_id_enabled: false
       # type: section
       # name:
       #   en: Preprocess

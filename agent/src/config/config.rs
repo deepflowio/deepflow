@@ -1018,6 +1018,7 @@ pub struct EbpfSocketTunning {
     pub syscall_trace_id_disabled: bool,
     pub map_prealloc_disabled: bool,
     pub fentry_enabled: bool,
+    pub udp_peer_id_enabled: bool,
     #[serde(
         default = "default_hooked_socket_syscalls",
         deserialize_with = "deser_hooked_socket_syscalls"
@@ -1032,6 +1033,7 @@ impl Default for EbpfSocketTunning {
             syscall_trace_id_disabled: false,
             map_prealloc_disabled: false,
             fentry_enabled: false,
+            udp_peer_id_enabled: false,
             hooked_socket_syscalls: default_hooked_socket_syscalls(),
         }
     }
@@ -4113,6 +4115,29 @@ inputs:
             cfg.inputs.ebpf.socket.tunning.hooked_socket_syscalls,
             vec!["read", "sendto", "write"]
         );
+    }
+
+    #[test]
+    fn parse_udp_peer_id_enabled() {
+        let default_config: UserConfig = serde_yaml::from_str("{}").unwrap();
+        assert!(
+            !default_config
+                .inputs
+                .ebpf
+                .socket
+                .tunning
+                .udp_peer_id_enabled
+        );
+
+        let yaml = r#"
+inputs:
+  ebpf:
+    socket:
+      tunning:
+        udp_peer_id_enabled: true
+"#;
+        let config: UserConfig = serde_yaml::from_str(yaml).unwrap();
+        assert!(config.inputs.ebpf.socket.tunning.udp_peer_id_enabled);
     }
 
     #[test]
