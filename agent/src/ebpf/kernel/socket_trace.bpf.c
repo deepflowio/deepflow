@@ -1894,10 +1894,12 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		return 0;
 #else
 #if defined(LINUX_VER_5_2_PLUS)
-		struct socket_info_s *socket_info_ptr = conn_info->socket_info_ptr;
-		if (bpf_probe_read_kernel(conn_info, sizeof(*conn_info), conn_info))
-			return -1;
-		conn_info->socket_info_ptr = socket_info_ptr;
+		if (extra->vecs) {
+			struct socket_info_s *socket_info_ptr = conn_info->socket_info_ptr;
+			if (bpf_probe_read_kernel(conn_info, sizeof(*conn_info), conn_info))
+				return -1;
+			conn_info->socket_info_ptr = socket_info_ptr;
+		}
 #endif
 		return __data_submit(ctx, conn_info, args, extra->vecs,
 				     bytes_count, offset, args->enter_ts,

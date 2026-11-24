@@ -476,3 +476,291 @@ KFUNC/fentry 实机或生产流量性能测试，不扩大已有功能验证结�
 - `final-elf-inspection.log`、`final-elf-results.json` 保存双架构指令数、栈偏移、Map 定义及逐函数字节码比较结果。
 - `final-target-command.log`、`final-runtime-results.json`、`final-tracer-on.log`、`final-tracer-off.log` 保存最终 5.10 实机测试和清理结果。
 - `source-changes.patch`、`changed-source-sha256.txt`、`final-source/` 保存本轮代码、回归测试及验证文档快照。
+
+## 2026-11-24：PR #11970 最新 HEAD 全范围复测
+
+### 提交范围与构建来源
+
+本轮按 PR 的完整提交范围测试，不只检查最后一次提交。开始和结束时均核对
+远端分支及 `refs/pull/11970/head`，两者都是
+`9dcf0f28c3da94bcdef59b2e08448f9766defad5`。GitHub PR API 当前返回两次提交：
+
+| 提交 | 本轮必须覆盖的内容 |
+| --- | --- |
+| `5a32767e225d2e7ad17c538d104aa2d8e467afa2` | 移除 UDP 历史远端地址读写，保留 `socket_info_s` ABI，当前 syscall / connected socket 端口选择不变 |
+| `9dcf0f28c3da94bcdef59b2e08448f9766defad5` | UDP peer 输出 ID / 序号隔离、默认关闭及配置重启、统一 LRU、5.2+ verifier E2BIG 修复、mmsg 长度读取及 Go TLS 栈修复 |
+
+第二次提交已合并原 `4f91668`、`5915501`、`942d4b6` 的修改。本轮没有因为
+提交合并而缩减验证范围；`9dcf0f2` 与 `942d4b6` 的 tree 都是
+`932810f1c2196623dab7f6f2472aebdb36d25444`。
+
+从精确 HEAD 执行 `git archive` 导出全新的独立源码目录，补齐仓库固定版本
+的 jattach 子模块及仓库自带静态库补丁，不对原工作区执行 `make clean`。
+构建后逐个核对归档中的 2952 个已跟踪文件与 HEAD 的 Git blob，全部一致。
+没有改动生产源码、主锁文件、ELF 列表或加载器来绕过测试。
+
+编译继续参考历史 `v6.6-udp-chat-recovery-20261119.md` 的容器及工具链：
+
+- 镜像：`hub.deepflow.yunshan.net/public/rust-build:1.31`，镜像 ID 为 `sha256:a62a990c528a9dad734da6e705940102540b26781422ee1ac8c27c1da9e6a85b`。
+- GCC 11.2.1、Clang/LLVM 11.0.0、Rust/Cargo 1.83.0。
+- 独立副本执行 `source /opt/rh/devtoolset-11/enable`、`make clean`、`make socket-tracer`、`make test`，随后执行样例 `cargo test --offline`。
+- Cargo 复用离线依赖下载缓存；原生测试需要的 `libtrace_utils.a` 从同份 HEAD 的 trace-utils 源码在独立 Cargo workspace 重新构建，没有直接复用旧静态库。
+
+本轮重新构建、上传和实测的文件：
+
+```text
+COMMIT=9dcf0f28c3da94bcdef59b2e08448f9766defad5
+SHA256=7ce00e1e6135a32103e61b9b70f7d0b2fa33a749e6f44d4a157f99446182bcd7
+HOST=192.168.10.12
+KERNEL=5.10.201-1.el7.x86_64
+```
+
+SHA256 与上一轮相同不代表复用了旧文件：源码 tree 相同，本轮保留了新的
+clean 构建日志、源文件核对结果以及本地 / 目标机 SHA256。另逐一确认新编译的
+七种 socket trace ELF 的完整字节均嵌入了本轮 `socket_tracer`。
+
+### 按提交内容对应的覆盖矩阵
+
+| 修改项 | 本轮检查 | 结果与边界 |
+| --- | --- | --- |
+| 移除 UDP 历史远端地址缓存 | 三项缓存契约重新执行；同一服务端先 `recvmsg` 收到客户端 A，再用不返回地址的 `recv` 收到客户端 B | 第二次输出远端为 `0.0.0.0:0`，没有沿用 A；配置开启、关闭及默认三种模式均通过 |
+| 端口选择与物理 Map ABI | 提取真实端口选择代码检查不同 syscall 端口、无地址、connected UDP 和 TCP；检查结构大小及偏移，实机读取物理 Map | 原生检查通过；`socket_info_s` 仍为 82 字节 |
+| 配置默认值、解析与重启 | 提取真实 `EbpfSocketTunning`、Default、反序列化辅助函数、重启宏及整个 socket tunning 更新块，编译运行三项 Rust 检查；解析完整配置模板并检查 Rust/C FFI 配置接线 | 默认关闭、显式开关、非法值拒绝、首次配置不重启、运行时切换才重启及重启原因均通过；不是完整 Agent 集成测试 |
+| 完整端点的 UDP peer 输出隔离 | IPv4 / IPv6 各两个客户端，共用一个服务端物理 socket，反向次序回复 | 开启时不同 peer 的输出 ID 不同，同一 peer 双向 ID 相同且序号为 0 / 1；关闭和默认模式保留一个物理 ID |
+| 不完整端点及 Map 失败降级 | 实机 wildcard 本地地址、缺失远端地址；原生契约覆盖关闭、端点不完整、读取失败、scratch / Map 操作失败和 key 清零 | 实机不完整端点保留物理元数据；失败注入契约通过，没有将故障注入到目标机正在运行的 Map |
+| 物理状态、TCP 及输出复制路径 | 对比实机物理 Map UID 与输出 peer ID；TCP HTTP1、HTTP2 第 8 帧 HEADERS、18-iovec 完整载荷；源代码契约检查两个输出入口跳过 close，并保留额外消息复制逻辑 | 实机用例通过；18-iovec 仍采集完整 72 字节；close / 重组边界的源码契约不扩大为完整实机覆盖 |
+| DNS mmsg 序号及 32 位长度读取 | 原生检查长度读取宽度、邻接高字节、`0xffffffff` 及读取失败；实机 `sendmmsg` 两条 DNS 后继续 `sendmsg`，以及 `recvmmsg` 后继续 `sendmsg` | 发送事件为序号 0 / 1 / 2，采集及 syscall 长度均为 31；接收保持既有首条 mmsg 加后续单条的采集边界，序号 0 / 1，不宣称完整采集接收批次 |
+| 3.10 不再降级普通 Hash、统一 LRU | 双架构七变体 ELF 检查 Map 定义；5.10 实机检查类型、容量及开关 | 各变体 peer Map 均为类型 9、key=48、value=16；实机为 `lru_hash`，开启 40960 项、关闭和默认 1 项；不算 3.10 实机验证 |
+| 5.2+ E2BIG 与状态归并 | 原生 verifier 状态契约；最终未改加载器的二进制在 5.10 上三次启动 | 开启、关闭及默认均实际加载 `socket-trace-bpf-linux-5.2_plus`；无 E2BIG、无 common 回退，不以新增 tail call 绕过 |
+| Go TLS 临时变量生命周期 | 原生 TCP 序号读取及 Map 更新语义检查；x86_64 / ARM64 各七变体重新编译及栈偏移检查 | 通过；5.2+ `df_U_go_tls_read_exit` 栈偏移分别为 480 / 488 字节，没有 LLVM 11 栈超限；未执行真实 Go TLS HTTPS 会话 |
+
+### 构建与自动测试结果
+
+| 项目 | 本轮结果 |
+| --- | --- |
+| x86_64 common / 3.10 / 5.2+ / KFUNC / Kylin / RT / KPROBE | 七变体 fresh clean 编译及二进制嵌入检查通过 |
+| ARM64 相同七变体 | 使用真实 `--target=aarch64-linux-gnu` 和独立 sysroot 重新交叉编译通过 |
+| ARM64 KFUNC sysroot 边界 | 仍需在本次交叉编译命令增加 `-include stdint.h`；未修改生产头文件 / Makefile，不宣称原封不动的 ARM64 构建环境通过 |
+| 旧内核受限变体指令数 | 双架构 common / 3.10 / Kylin / RT / KPROBE 最大均为 4083，未放宽 4096 限制 |
+| Map 布局 | 双架构七变体均通过；peer scratch=64 字节，`ctx_info` value=248 字节，物理 socket value=82 字节 |
+| `make test` | 11 个原生测试程序及 4 组、共 10 项 Python 2 契约检查全部通过 |
+| 宿主 Python 3 重新执行相同契约 | 10 / 10 通过 |
+| `socket_tracer` Rust 样例测试 | 2 / 2 通过 |
+| 源码提取的配置 Rust 检查 | 3 / 3 通过，另有 FFI 接线检查；明确不计为完整 Agent 测试 |
+
+曾尝试在原 Agent workspace 直接执行：
+
+```bash
+cargo test --locked --offline -p deepflow-agent --lib parse_udp_peer_id_enabled
+```
+
+离线缓存缺少 `https://github.com/deepflowio/hpack-rs/#d65b96c2`，在依赖解析阶段
+失败，未编译或执行该 Agent 单元测试。因此上表中的配置检查明确采用真实源码
+提取方法，不把它报告成完整 Agent 的原测试通过，也未修改依赖来绕过此限制。
+
+### 5.10 实机与并发检查
+
+目标机预检未发现其他 `socket_tracer` 或活跃的 tracer 控制 socket。
+使用本轮新二进制，分别设置 `DF_UDP_PEER_ID_ENABLED=1`、`=0` 及不设置该变量：
+
+```text
+READY on socket-trace-bpf-linux-5.2_plus
+PASS on
+READY off socket-trace-bpf-linux-5.2_plus
+PASS off
+READY default socket-trace-bpf-linux-5.2_plus
+PASS default
+```
+
+三轮均执行上表的实机功能用例，只有开启模式额外执行并发压力检查：同一个
+已连接 UDP socket、同一个远端，8 个发送线程分别绑定 CPU 0–7，一半线程使用
+`sendmsg`，另一半使用每批两条 DNS 的 `sendmmsg`。先串行预热创建同一 peer 状态，
+随后并发发送，共产生 6145 条预期发送事件。
+
+- 实际采集发送事件 6145 条，共用 1 个输出 ID，序号 0–6144，6145 个序号唯一，没有观察到重复或 mmsg 序号区间重叠。
+- UDP 服务端实际只收到 2939 条；该突发负载存在接收丢包，不能据此宣称 6145 次请求 / 响应端到端全部成功，也不是生产性能基准。
+- 上述仅是一次有限压力运行未复现竞态。生产代码仍然是原子递增后另读共享 `state->seq`；本轮没有修改该逻辑，不能以该结果证明同 key 读写串行或并发安全。
+
+脚本结束后核对：没有新增 Map / Program，kprobe 内容、sysctl、原控制 socket、
+控制程序及日志均恢复；独立后检的 `bpftool map show` / `prog show` 均为空，
+没有遗留运行中的 `socket_tracer`。测试目录与归档按追溯用途保留，不是残留挂载
+或运行中的 BPF 资源。
+
+### 验证边界与归档
+
+本轮没有完整 Agent Rust 集成构建、真实 Go TLS HTTPS、ARM64 实机、
+3.10 / 4.14 / 4.19 实机、KFUNC/fentry 实机、KPROBE_ONLY 实机或生产性能测试。
+因此结论是本节列出的构建、契约和 5.10 实机用例通过，不是所有受支持环境与
+所有业务场景已验证通过。
+
+- 本机归档：`/home/jiping/deepflow/deepflow-1/udp-peer-pr11970-retest-20261124.WrBaoT`。
+- 目标机测试目录：`/tmp/udp-peer-pr11970-retest-20261124.LUIOQH`。
+- `pr11970-current-commits.json`、`final-remote-heads.txt`、`source-provenance.txt`、`source-verification.json` 保存 PR 范围、HEAD / tree 及源码核对。
+- `build-and-test.sh`、`clean-build-and-test.log`、`python3-contracts.log`、`build-image.txt`、`toolchain.txt` 保存实际构建和原生 / Rust / Python 测试。
+- `build-arm64.sh`、`arm64-*-build.log`、`elf-results.json`、`binary-provenance.log` 保存交叉编译、指令数、栈、Map 及二进制嵌入核对。
+- `make-config-harness.py`、`config-harness/`、`config-contracts.log`、`agent-config-test-attempt.log` 区分配置源码检查与未执行成功的完整 Agent 测试。
+- `socket_tracer`、`binary-sha256.txt`、`run-target-validation.py`、`target-command.log`、`runtime-results.json`、`tracer-*.log`、`target-postcheck.log` 保存新二进制、实机用例、并发统计和清理结果。
+- 初次初始化子模块前的构建中止及旧版 bpftool JSON 字段名导致的测试脚本中止单独保留，后者也已完成清理；它们不计入最终三模式通过结果。
+
+## 2026-11-24：减少状态归并的消融实验
+
+本轮针对 `9dcf0f28c3da94bcdef59b2e08448f9766defad5` 的 5.2+ 状态归并开销，
+在独立源码副本进行删减实验，不增加 tail call，不降低 iovec 或 HTTP2 扫描上限，
+不修改 UDP peer 的 LRU、历史地址移除或序号分配逻辑。
+
+目标机仍为 `192.168.10.12`，实际内核 `5.10.201-1.el7.x86_64`。
+开始前无运行中的 `socket_tracer`，BPF Program 列表为空。源码副本的 2952 个
+tracked blob 与 HEAD 一致；后续实验宏和 verifier 诊断只存在于独立副本。
+构建沿用恢复文档指定的 `rust-build:1.31` 镜像、GCC 11.2.1、LLVM 11.0.0。
+
+### 整体删除任意归并点均不能通过
+
+定义三个归并点：
+
+- A：`bytes_count` 写入既有 per-CPU Map 并 volatile 读回。
+- B：协议推断前读回 `conn_info` 的标量区域，不覆盖有类型的 socket Map 指针。
+- C：提交前读回连接状态并恢复有类型的 socket Map 指针。
+
+组合中的 `1` 表示保留，`0` 表示删除。每个候选强制重新编译 5.2+ ELF、重新嵌入
+`socket_tracer`，并核对上传二进制 SHA256。独立实验加载器仅增加 verifier
+统计输出，逐个记录全部程序是否加载成功及累计检查指令数；不能把 common 回退
+判为 5.2+ 成功。这一阶段只验证加载，不作为完整采集功能通过的结论。
+
+| A/B/C | 实际 5.2+ 加载 | 最大累计检查指令 | 首个失败程序 |
+| --- | --- | ---: | --- |
+| 111，原方案 | 81 个程序全部通过 | 856093 | 无 |
+| 110 | 失败，回退 common | 1000001 | `df_T_exit_sendmsg` |
+| 101 | 失败，回退 common | 1000001 | `df_T_exit_sendmsg` |
+| 011 | 失败，回退 common | 1000001 | `df_T_exit_sendmmsg` |
+| 100 | 失败，回退 common | 1000001 | `df_T_exit_write` |
+| 010 | 失败，回退 common | 1000001 | `df_T_exit_sendmsg` |
+| 001 | 失败，回退 common | 1000001 | `df_T_exit_sendmsg` |
+| 000 | 失败，回退 common | 1000001 | `df_T_exit_write` |
+
+上述失败均为 `errno=7 / E2BIG`，触及 verifier 累计检查 100 万指令的限制，
+不是 common 静态 4096 条限制。原方案本轮重编译的 5.2+ ELF 与此前 HEAD clean
+构建产物逐字节一致，SHA256 为
+`3336ebe95add1ee027fddd9c3f627eeda3022332a3655fdbd37d8381cba11601`。
+
+另外独立重新编译 common ELF，与 HEAD 基线产物逐字节一致；真实
+`test_insns_cnt` 通过，所有 81 个程序最多 4083 条，输出程序各 4080 条。
+因此不能通过只删除若干行 C 代码，推断 verifier 的路径复杂度必然下降。
+
+### 按向量、普通路径分别处理可以减少开销
+
+整体删除失败后，保留向量路径所需的归并，仅删减 `extra->vecs == false`
+的普通 socket 数据路径，继续进行三组独立加载实验：
+
+| 候选 | 普通路径保留 | 向量路径保留 | 实际 5.2+ 加载 | 最大累计检查指令 |
+| --- | --- | --- | --- | ---: |
+| `submit-vector-only`，采用 | A、B | A、B、C | 81 个程序全部通过 | 856093 |
+| `infer-vector-only` | A、C | A、B、C | 81 个程序全部通过 | 869391 |
+| `scalar-infer-only` | 仅 B | A、B、C | 81 个程序全部通过 | 858091 |
+
+第三个候选完成了七变体 clean 构建、原生及契约测试，但进一步比较真实字节码
+发现：普通 `df_T_exit_write` 从 22780 条增长到 23215 条，Go TLS read 从
+20421 条增长到 20790 条。减少源代码中的 Map 读写、helper 并不保证 LLVM 生成的
+其他代码也减少；没有性能基准时，不能把该候选认定为净性能收益，故本次不采用。
+
+最终采用更保守的第一个方案：仅为 C 增加 `if (extra->vecs)`，A、B 保持不变。
+普通 `read/write/sendto/recvfrom` 等非向量 socket 数据路径仍进行长度 Map
+写入、读回，但不再执行提交前的连接状态复制；向量路径保留全部三处归并。
+
+对能够进入数据提交分支的对应路径，新增归并操作的变化如下：
+
+| 路径 | 修改前 | 修改后 |
+| --- | --- | --- |
+| 普通路径 | 一次长度 Map 写入和读取、两次状态复制 helper | 一次长度 Map 写入和读取、仅一次推断前状态复制 helper |
+| 向量路径 | 一次长度 Map 写入和读取、两次状态复制 helper | 不变 |
+| common、3.10、KFUNC 等非 5.2+ 变体 | 不执行新增状态归并 | 不变 |
+
+回归测试提取真实生产代码，覆盖普通、向量路径，空、非空 socket Map 指针，
+完整 64 位长度，推断缓冲及连接状态保持不变，以及读取失败处理。新增约束在旧版
+无条件归并代码上按预期失败，应用候选后通过。仅减少这些操作不代表已经量化了
+CPU 或吞吐收益，本轮不宣称零开销或生产性能提升比例。
+
+### 实验归档与清理
+
+- 本机归档：`/home/jiping/deepflow/deepflow-1/udp-verifier-reduction-20261124.prapiX`。
+- 目标机实验目录：`/tmp/udp-verifier-reduction-20261124.QOs7oM`。
+- `matrix-results.json`、`matrix-summary.md` 和 `candidates/*/` 保存全部 11 个候选的构建、真实 ELF、二进制、verifier 统计及加载结果。
+- 全部 11 个候选结束后均确认没有新增 Map、Program；kprobe、sysctl、控制 socket、原控制程序和日志均恢复。
+- 初次日志回传遇到旧版 scp 多远端源问题，改为逐文件回传；后续目标机磁盘空间不足时，在确认没有活跃 tracer 后，仅删除本轮已归档及上传未完成的测试二进制，保留日志和本机全部产物，再继续测试。中止与恢复日志单独保留，不计为加载通过。
+- `final/` 保存移除实验宏和诊断加载器后的最终候选、干净构建及后续功能回归；具体完成结果见本节后续记录。
+
+### 最终保守方案的干净构建与实机回归
+
+最终源码为 `9dcf0f28c3da94bcdef59b2e08448f9766defad5` 加本节未提交的 C 路径条件
+和回归测试修改，不把 HEAD 单独作为修改后产物的完整源码标识。生产代码仅在提交
+前的连接状态归并外增加 `if (extra->vecs)`；没有保留实验宏或诊断加载器。
+
+在独立副本重新执行以下命令，其中 `-j4` 仅用于并行构建，不改变 BPF 编译参数：
+
+```bash
+source /opt/rh/devtoolset-11/enable
+make clean
+make -j4 socket-tracer
+make test
+cd samples/rust/socket-tracer
+cargo test --offline
+```
+
+| 检查 | 最终结果 |
+| --- | --- |
+| x86_64 七种 Socket Tracer ELF | 全部 clean 编译，并逐个验证完整 ELF 已嵌入最终二进制 |
+| 原生测试 | `make test` 的 11 个测试程序通过，包含真实 `test_insns_cnt` |
+| Python 契约 | 容器 Python 2、宿主 Python 3 各 10 项通过，包含普通、向量两条归并路径 |
+| Rust 样例 | 2 项测试通过 |
+| 旧内核受限变体 | 最大静态指令仍为 4083，没有放宽 4096 门槛 |
+| 非 5.2+ 六变体 | 程序指令与 HEAD 基线逐字节一致，Map 定义一致 |
+| 5.2+ | 仅 8 个普通 syscall / TLS 退出程序指令变化；与采用的诊断候选全部程序指令一致，Map 定义不变 |
+| ARM64 5.2+ | 使用真实 AArch64 前端和独立 sysroot 重新交叉编译通过，Map 定义不变；不是 ARM64 实机验证 |
+
+静态指令并非在每个程序中都单调下降。例如 x86_64 的 `df_T_exit_write` /
+`df_T_exit_read` 从 22780 降到 22773，Go TLS read 从 20421 降到 20414，
+但 `df_T_exit_recvfrom` 从 22901 增至 22938。上述程序各少一个静态
+`bpf_probe_read_kernel` 调用点，5.2+ 全体程序的静态最大值仍为 25323。
+这里减少一次 helper 仅针对对应归并阶段，不代表整个 BPF 程序的 helper 数量或
+CPU 开销减半；不能由静态指令数直接推断实际执行成本。
+
+最终 `socket_tracer` SHA256：
+`dfc99c22199eb34853069e1b53bdda53e8a6a17425b69a49df34da06c5379876`。
+上传后再次核对 SHA256，使用该无诊断二进制完成三种模式的实机回归：
+
+```text
+READY on socket-trace-bpf-linux-5.2_plus
+PASS on
+READY off socket-trace-bpf-linux-5.2_plus
+PASS off
+READY default socket-trace-bpf-linux-5.2_plus
+PASS default
+```
+
+三种模式均实际加载 5.2+ ELF，没有 E2BIG 或 common 回退。覆盖范围：
+
+| 实机用例 | 结果 |
+| --- | --- |
+| 新增 IPv4 / IPv6 普通 `sendto/recvfrom` 双 peer，逆序回复 | 每种 4 条服务端事件，长度与 syscall 长度均为 31；开启时 2 个 ID、各序号 0/1，关闭及默认时 1 个物理 ID、序号 0–3 |
+| 原 IPv4 / IPv6 `sendmsg/recvmsg` 双 peer | 开启、关闭和默认行为均符合预期 |
+| wildcard 本地地址不完整 | 保留物理 ID |
+| 前一次 `recvmsg` 后再 `recv` 不返回远端地址 | 后一条为 `0.0.0.0:0`，不沿用前一客户端 |
+| `sendmmsg` 两条 DNS 后单条 `sendmsg` | 3 条事件，开启时同 peer ID、序号 0/1/2，长度均为 31 |
+| `recvmmsg` | 保持原有首条加后续单条的采集边界，2 条事件、序号 0/1；不代表完整采集接收批次 |
+| TCP HTTP1、HTTP2 第 8 帧 HEADERS | 识别、采集通过 |
+| 18-iovec `sendmsg` | 完整 72 字节 payload 及长度核对通过 |
+| 物理 socket 状态与 LRU | 物理 Map 的 82 字节布局和 ID 未被覆盖；peer Map 仍为 LRU，开启容量 40960、关闭及默认容量 1 |
+
+开启模式另执行同 peer、8 CPU 混合 `sendmsg/sendmmsg` 有限压力检查：6145 条发送
+事件全部采集，1 个 ID、6145 个唯一序号，未观察到重复。服务端实际仅收到 2349 条，
+存在突发 UDP 接收丢包；这不是性能基准，也不能证明共享序号分配并发安全。
+
+结束后没有新增 Map、Program 或 kprobe；sysctl、控制 socket、控制程序及日志
+恢复，独立后检没有运行中的 tracer。目标机仅删除本轮已归档测试二进制，没有
+清理其他目录；根分区仍约 96%，可用约 735 MiB。
+
+最终记录在 `final/clean-build-and-test.log`、`python3-contracts.log`、
+`elf-comparison.json`、`binary-provenance.log`、`binary-sha256.txt`、
+`runtime-results.json`、`tracer-*.log` 和 `target-postcheck.log`。
+未采用的进一步删减方案另存 `scalar-minimal-clean-stage/`，不与最终产物混用。
+本轮没有完整 Agent 集成构建、真实 Go TLS/OpenSSL HTTPS 会话、其他内核实机、
+KFUNC/fentry 实机或生产性能基准，不扩大为这些环境和场景全部通过。

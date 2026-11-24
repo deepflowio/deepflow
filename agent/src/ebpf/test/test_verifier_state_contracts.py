@@ -85,8 +85,11 @@ int main(void)
         blocks = re.findall(r"(?m)^\s*#if defined\(LINUX_VER_5_2_PLUS\)\n.*?^\s*#endif", process, re.S)
         self.assertEqual(len(blocks), 3)
         self.assertIn("ctx_map->bytes_count", blocks[0])
+        self.assertNotIn("extra->vecs", blocks[0])
         self.assertIn("offsetof(struct conn_info_s, socket_info_ptr)", blocks[1])
+        self.assertNotIn("extra->vecs", blocks[1])
         self.assertIn("conn_info->socket_info_ptr = socket_info_ptr;", blocks[2])
+        self.assertIn("if (extra->vecs) {", blocks[2])
         self.assertNotIn("bpf_tail_call", "".join(blocks))
         header = read_source("kernel/include/socket_trace.h")
         tuple_type = "struct __tuple_t {" + read_source("kernel/include/socket_trace_common.h").split(
@@ -136,7 +139,7 @@ static int normalize(struct ctx_info_s *ctx_map, struct conn_info_s *conn_info, 
     *value = bytes_count;
     return 0;
 }
-static int finish(struct conn_info_s *conn_info)
+static int finish(struct conn_info_s *conn_info, const struct process_data_extra *extra)
 {
 @POST@
     return 0;
@@ -148,8 +151,10 @@ int main(void)
     struct socket_info_s state = { 17 };
     const __u64 values[] = {0, 1, 31, 0x7fffffff, 0xffffffff, 1ULL << 40,
                             0x7fffffffffffffffULL, 1ULL << 63, UINT64_MAX};
-    for (unsigned int index = 0; index < sizeof(values) / sizeof(values[0]); index++) {
-        for (unsigned int present = 0; present < 2; present++) {
+    for (unsigned int variant = 0; variant < 4; variant++) {
+        struct process_data_extra extra = { .vecs = variant & 1 };
+        bool present = (variant & 2) != 0;
+        for (unsigned int index = 0; index < sizeof(values) / sizeof(values[0]); index++) {
             memset(&context, 0x33, sizeof(context));
             memset(&connection, 0xa5, sizeof(connection));
             connection.socket_info_ptr = present ? &state : NULL;
@@ -168,10 +173,11 @@ int main(void)
 #else
             assert(probes == 0);
 #endif
-            assert(finish(&connection) == 0);
+            assert(finish(&connection, &extra) == 0);
             assert(memcmp(&connection, &original, sizeof(connection)) == 0);
 #if defined(LINUX_VER_5_2_PLUS)
-            assert(probes == 2 && last_size == sizeof(connection));
+            assert(probes == (extra.vecs ? 2U : 1U));
+            assert(last_size == (extra.vecs ? sizeof(connection) : offsetof(struct conn_info_s, socket_info_ptr)));
 #else
             assert(probes == 0);
 #endif
@@ -179,10 +185,10 @@ int main(void)
 #if defined(LINUX_VER_5_2_PLUS)
             assert(normalize(&context, &connection, &value) == -1);
             memcpy(&connection, &original, sizeof(connection));
-            assert(finish(&connection) == -1);
+            assert(finish(&connection, &extra) == (extra.vecs ? -1 : 0));
 #else
             assert(normalize(&context, &connection, &value) == 0);
-            assert(finish(&connection) == 0);
+            assert(finish(&connection, &extra) == 0);
 #endif
             fail_probe = false;
         }

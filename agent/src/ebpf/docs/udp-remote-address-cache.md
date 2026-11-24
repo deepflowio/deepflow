@@ -61,3 +61,16 @@ make -C agent/src/ebpf/test test_udp_peer_cache_contracts
 ## 验证边界
 
 本轮未重新构建完整 Rust `socket_tracer`，未在 `192.168.10.12` 运行 `socket_tracer`；不能引用此前其他提交的 4.19/5.10 测试作为本改动的实机验证结果。
+
+## 2026-11-24 后续实机复测
+
+PR #11970 的 `9dcf0f28c3da94bcdef59b2e08448f9766defad5` 已包含本修改，
+该 HEAD 重新 clean 构建的 `socket_tracer` 已在 `192.168.10.12` 的
+`5.10.201-1.el7.x86_64` 上测试。除 IPv4 / IPv6 多客户端外，补充了同一服务端
+先通过 `recvmsg` 获取客户端 A 地址，再通过不返回地址的 `recv` 接收客户端 B
+的用例：第二次输出远端为 `0.0.0.0:0`，不复用 A 的历史地址。
+UDP peer 隔离开启、关闭和默认三种模式均通过。
+
+完整提交覆盖矩阵、编译来源、实测 SHA256、并发检查和验证边界见
+[`udp-peer-id-v6.6.md`](udp-peer-id-v6.6.md) 的“2026-11-24：PR #11970 最新 HEAD 全范围复测”。
+这里的后续结果不扩大为 3.10 / 4.14 / 4.19 或 KFUNC 实机验证通过。
