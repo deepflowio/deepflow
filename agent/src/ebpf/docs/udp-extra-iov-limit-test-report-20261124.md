@@ -4,6 +4,10 @@
 实际加载 common 字节码并完成开启、关闭 peer 隔离的分段 DNS 收发验证。
 第一条消息的 `LOOP_LIMIT` 保持 18。
 
+后续已执行 `make clean` 后重新构建，逐字节核对七种新字节码已嵌入最终 sample，
+并用同一个新二进制在 4.14、4.19、5.10 上复测通过，见
+[清理构建复测报告](udp-extra-iov-clean-build-test-report-20261124.md)。本报告保留此前定向重编译的结果。
+
 同日测试机切换到 Linux 5.10 后的大候选复测，见
 [Linux 5.10 取值测试报告](udp-extra-iov-limit-linux-5.10-test-report-20261124.md)。
 该报告区分独立输出程序与完整字节码加载；本报告的 4.14 / 4.19 结果继续保留。
