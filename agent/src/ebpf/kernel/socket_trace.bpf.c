@@ -461,11 +461,12 @@ static __inline int iovecs_copy(struct __socket_data *v,
  */
 #define LOOP_LIMIT 18
 /*
- * The extra output path only handles the second DNS A/AAAA message. Keeping
- * that dedicated path to one iovec prevents the post-copy UDP peer
- * lookup from exceeding the Linux 4.14 verifier complexity limit.
+ * The extra output path handles the second DNS A/AAAA message, including
+ * fragmented payloads and empty iovecs. Eight entries pass the Linux 4.14
+ * verifier with the post-copy UDP peer lookup; larger unrolled paths can
+ * exceed its verification complexity or instruction limit.
  */
-#define EXTRA_LOOP_LIMIT 1
+#define EXTRA_LOOP_LIMIT 8
 
 	struct copy_data_s {
 		char data[sizeof(v->data)];

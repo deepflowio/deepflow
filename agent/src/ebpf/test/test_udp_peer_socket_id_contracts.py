@@ -42,9 +42,9 @@ require(
 )
 require(
     "#define LOOP_LIMIT 18" in KERNEL
-    and "#define EXTRA_LOOP_LIMIT 1" in KERNEL
+    and "#define EXTRA_LOOP_LIMIT 8" in KERNEL
     and "len, EXTRA_LOOP_LIMIT" in KERNEL,
-    "the main iovec path must retain 18 entries while the extra DNS path uses one",
+    "the main iovec path must retain 18 entries while the extra DNS path supports eight",
 )
 require(
     "MAP_ARRAY(udp_peer_id_enabled_map, __u32, __u32, 1" in KERNEL,

@@ -103,3 +103,52 @@ wait "$server_pid"
 ```
 
 该步骤只能验证请求、响应通信成功，不能证明 peer `socket_id/cap_seq` 已隔离。
+
+## 6. 第二条 sendmmsg 消息的分段 iovec 回归
+
+`test_sendmmsg_iov.py` 需要 Linux 和 Python 3.6+，通过 libc `sendmmsg` 在同一 socket、
+同一目标上批量发送真实 DNS A + AAAA 请求。它验证单段、2/4/8 段、首项及中间项为空、
+第一条消息分段，以及第二条消息超过 8 项时只采集前 8 项的边界。
+本机需要能够绑定 `127.0.0.1:53053`，测试客户端绑定具体地址 `127.0.0.2`。
+
+先启动开启 DNS 端口 53053 的采集程序，等待 `TRACER_RUNNING`，再生成流量和预期记录：
+
+```bash
+python3 test_sendmmsg_iov.py /tmp/iov-expectations.json --limit 8
+```
+
+仅运行上述命令会核对接收端的完整报文。要核对 eBPF 实际采集内容，需在独立测试副本的
+Rust sample UDP callback 中输出以下记录；现有 `UDP_PEER` 日志不包含完整载荷，不能替代：
+
+```rust
+let event = &*sd; // 在现有 unsafe UDP callback 块内
+let payload = std::slice::from_raw_parts(event.cap_data as *const u8, event.cap_len as usize);
+let hex = payload.iter().map(|b| format!("{:02x}", b)).collect::<String>();
+println!("UDP_IOV pid={} fd={} direction={} socket_id={} cap_seq={} cap_len={} syscall_len={} hex={}",
+    event.process_id, event.fd,
+    if event.direction == SOCK_DIR_SND { "out" } else { "in" },
+    event.socket_id, event.cap_seq, event.cap_len, event.syscall_len, hex);
+```
+
+停止采集程序、确保日志落盘后，核对每条发送事件的完整载荷或预期截断前缀、采集长度、
+syscall 长度、同一 peer 的稳定 ID，以及每批两条消息的相邻序号：
+
+```bash
+python3 test_sendmmsg_iov.py /tmp/iov-expectations.json --tracer-log /tmp/iov-tracer.log
+```
+
+分别设置 `set_udp_peer_id_enabled(false)` 和 `true` 重跑，使用各自的预期文件和日志。
+开启隔离时，校验命令追加 `--peer-id-enabled`，还会检查全部发送事件的 peer 序号从 0 开始、
+无重复或缺失（默认 8 项时为 20 条事件、序号 0–19）。关闭隔离时仅检查每批内部的相邻序号，
+不要求跨批物理序号连续。
+
+验证更大的候选值时，将生成流量的 `--limit` 设置为实际编译值，例如 12 或 16。
+大于 8 时，脚本追加不超过候选值的 12/16/18 段测试，以及候选上限处的中间空项和
+第一条消息分为 4 段的测试；超限场景使用候选值加 1 项。
+12 项运行 14 个场景、28 条发送事件；16 项运行 16 个场景、32 条发送事件。
+必须确认 sample 成功加载预期字节码变体，避免将自动回退后的运行误判为候选值通过。
+
+本轮实际构建、测试日志和结果见
+[附加 iovec 上限测试报告](../../docs/udp-extra-iov-limit-test-report-20261124.md)。
+5.10 上的更大候选值、完整程序加载边界及 verifier 统计，见
+[Linux 5.10 取值测试报告](../../docs/udp-extra-iov-limit-linux-5.10-test-report-20261124.md)。
