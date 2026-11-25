@@ -209,7 +209,7 @@ func getPorts(src string) []PortRange {
 	ports := make([]PortRange, 0, 8)
 	if len(splitSrcPorts) < 2 {
 		portInt, err := strconv.Atoi(src)
-		if err == nil {
+		if err == nil && portInt >= 0 && portInt <= 65535 {
 			ports = append(ports, NewPortRange(uint16(portInt), uint16(portInt)))
 		}
 		return ports
@@ -222,6 +222,9 @@ func getPorts(src string) []PortRange {
 
 	max, err := strconv.Atoi(splitSrcPorts[1])
 	if err != nil {
+		return ports
+	}
+	if min < 0 || max > 65535 || min > max {
 		return ports
 	}
 
