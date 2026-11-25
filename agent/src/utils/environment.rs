@@ -17,7 +17,8 @@
 use std::{
     cell::OnceCell,
     env::{self, VarError},
-    fs, io,
+    fs,
+    io::{self, IsTerminal},
     iter::Iterator,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     path::Path,
@@ -378,9 +379,16 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
     }
 
     // FIXME: Getting ctrl_ip and ctrl_mac sometimes fails, increase three retry opportunities to ensure access to ctrl_ip and ctrl_mac
+    let print_to_terminal = io::stderr().is_terminal();
     for _ in 0..3 {
         let tuple = get_route_src_ip_and_mac(dest);
         if tuple.is_err() {
+            if print_to_terminal {
+                eprintln!(
+                    "{} {}: failed getting control ip and mac from {}, because: {:?}, wait 1 second",
+                    file!(), line!(), dest, tuple
+                );
+            }
             warn!(
                 "failed getting control ip and mac from {}, because: {:?}, wait 1 second",
                 dest, tuple,
@@ -391,6 +399,14 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
         let (ip, mac) = tuple.unwrap();
         let links = link_list();
         if links.is_err() {
+            if print_to_terminal {
+                eprintln!(
+                    "{} {}: failed getting local interfaces, because: {:?}, wait 1 second",
+                    file!(),
+                    line!(),
+                    links
+                );
+            }
             warn!(
                 "failed getting local interfaces, because: {:?}, wait 1 second",
                 links
@@ -411,6 +427,12 @@ pub fn get_ctrl_ip_and_mac(dest: &IpAddr) -> Result<(IpAddr, MacAddr)> {
                     };
                     let tuple = get_route_src_ip_and_mac(&dest);
                     if tuple.is_err() {
+                        if print_to_terminal {
+                            eprintln!(
+                                "{} {}: failed getting control ip and mac from {}, because: {:?}, wait 1 second",
+                                file!(), line!(), dest, tuple
+                            );
+                        }
                         warn!("failed getting control ip and mac from {}, because: {:?}, wait 1 second", dest, tuple);
                         thread::sleep(Duration::from_secs(1));
                         // There are scenarios where multiple network cards use the same MAC address, so it is necessary to
