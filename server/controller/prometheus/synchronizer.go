@@ -58,11 +58,11 @@ type counter struct {
 
 type Synchronizer struct {
 	org     *common.ORG
-	cache   *cache.Cache
+	cache   cache.PrometheusCache
 	counter *counter
 }
 
-func newSynchronizer(c *cache.Cache) Synchronizer {
+func newSynchronizer(c cache.PrometheusCache) Synchronizer {
 	return Synchronizer{
 		org:     c.GetORG(),
 		cache:   c,
@@ -73,8 +73,8 @@ func newSynchronizer(c *cache.Cache) Synchronizer {
 func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelResponse, error) {
 	nonLabelNames := mapset.NewSet[string]()
 	metricNameToAPPLabelNames := make(map[string][]*trident.LabelResponse, 0)
-	for k, v := range s.cache.MetricAndAPPLabelLayout.GetLayoutKeyToIndex() {
-		labelNameID, ok := s.cache.LabelName.GetIDByName(k.LabelName)
+	for k, v := range s.cache.GetMetricAndAPPLabelLayout() {
+		labelNameID, ok := s.cache.GetLabelNameID(k.LabelName)
 		if !ok {
 			nonLabelNames.Add(k.LabelName)
 			continue
@@ -89,7 +89,7 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 	}
 
 	mLabels := make([]*trident.MetricLabelResponse, 0)
-	for k, v := range s.cache.MetricName.GetNameToID() {
+	for k, v := range s.cache.GetMetricNameToID() {
 		metricName := k
 		metricID := v
 		mLabels = append(
@@ -110,32 +110,32 @@ func (s *Synchronizer) assembleMetricLabelFully() ([]*trident.MetricLabelRespons
 
 func (s *Synchronizer) assembleLabelFully() ([]*trident.LabelResponse, error) {
 	ls := make([]*trident.LabelResponse, 0)
-	nonLabelNames := mapset.NewSet[string]()
-	nonLabelValues := mapset.NewSet[string]()
-	for k := range s.cache.Label.GetKeyToID() {
-		ni, ok := s.cache.LabelName.GetIDByName(k.Name)
-		if !ok {
-			nonLabelNames.Add(k.Name)
+	nonNameIDs := mapset.NewSet[string]()
+	nonValueIDs := mapset.NewSet[string]()
+	for k := range s.cache.GetLabelKeyToID() {
+		nameID, okN := s.cache.GetLabelNameID(k.Name)
+		if !okN {
+			nonNameIDs.Add(k.Name)
 			continue
 		}
-		vi, ok := s.cache.LabelValue.GetIDByValue(k.Value)
-		if !ok {
-			nonLabelValues.Add(k.Value)
+		valueID, okV := s.cache.GetLabelValueID(k.Value)
+		if !okV {
+			nonValueIDs.Add(k.Value)
 			continue
 		}
 		ls = append(ls, &trident.LabelResponse{
 			Name:    &k.Name,
 			Value:   &k.Value,
-			NameId:  proto.Uint32(uint32(ni)),
-			ValueId: proto.Uint32(uint32(vi)),
+			NameId:  proto.Uint32(uint32(nameID)),
+			ValueId: proto.Uint32(uint32(valueID)),
 		})
 		s.counter.SendLabelCount++
 	}
-	if nonLabelNames.Cardinality() > 0 {
-		log.Warningf("ids of label names not found, %s", logNotFoundDetail(nonLabelNames.ToSlice()), s.org.LogPrefix)
+	if nonNameIDs.Cardinality() > 0 {
+		log.Warningf("ids of label names not found, %s", logNotFoundDetail(nonNameIDs.ToSlice()), s.org.LogPrefix)
 	}
-	if nonLabelValues.Cardinality() > 0 {
-		log.Warningf("ids of label values not found, %s", logNotFoundDetail(nonLabelValues.ToSlice()), s.org.LogPrefix)
+	if nonValueIDs.Cardinality() > 0 {
+		log.Warningf("ids of label values not found, %s", logNotFoundDetail(nonValueIDs.ToSlice()), s.org.LogPrefix)
 	}
 	return ls, nil
 }
