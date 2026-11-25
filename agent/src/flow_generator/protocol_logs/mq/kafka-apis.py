@@ -71,6 +71,15 @@ def merge_apis(apis):
             return merged
     return merged
 
+def find_header_version(header_versions, api_version):
+    if not header_versions:
+        return None
+
+    loc = bisect_left(header_versions, (api_version, ""))
+    if loc == len(header_versions):
+        return header_versions[-1][1]
+    return header_versions[loc][1]
+
 def main():
     if len(sys.argv) != 3:
         print("Usage: kafka-apis.py <api_key> <type>")
@@ -89,16 +98,12 @@ def main():
     result = fetch_apis(api_key, api_type)
     if result:
         for versions, info in merge_apis(result):
-            hvs = []
-            for v in versions:
-                loc = bisect_left(header_versions, (v, ""))
-                if loc == len(header_versions):
-                    hvs.append(header_versions[-1][1])
-                else:
-                    hvs.append(header_versions[loc][1])
-            assert len(set(hvs)) == 1
+            hvs = [find_header_version(header_versions, v) for v in versions]
+            known_hvs = [hv for hv in hvs if hv is not None]
+            assert len(set(known_hvs)) <= 1
+            header_version = known_hvs[0] if known_hvs else "unknown"
 
-            title = f"{api_key} {api_type} {versions} header version: {hvs[0]}"
+            title = f"{api_key} {api_type} {versions} header version: {header_version}"
             print(f"{title}\n{'=' * len(title)}\n{info}")
     else:
         print(f"No API found for key={api_key} type={api_type}")
