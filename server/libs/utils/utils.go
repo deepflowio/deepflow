@@ -449,6 +449,8 @@ func ConvertToFloat64(data interface{}) (float64, string, bool) {
 		return float64(v), strconv.FormatInt(int64(v), 10), true
 	case int64:
 		return float64(v), strconv.FormatInt(v, 10), true
+	case float32:
+		return float64(v), strconv.FormatFloat(float64(v), 'f', -1, 32), true
 	case float64:
 		return v, strconv.FormatFloat(v, 'f', -1, 64), true
 	case bool:
