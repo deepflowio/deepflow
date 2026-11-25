@@ -231,6 +231,8 @@ pub enum IfType {
     Ppp = 23,
     Loopback = 24,
     Atm = 37,
+    // 53: propVirtual，OpenVPN TAP-Windows6 等虚拟网卡会使用
+    PropVirtual = 53,
     Ieee80211 = 71,
     Tunnel = 131,
     Ieee1394 = 144,
