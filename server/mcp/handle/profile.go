@@ -413,6 +413,21 @@ func generateFunctionMermaidDiagram(profileData *model.ProfileData) string {
 	callRelations := make(map[model.FunctionCallRelation]bool)
 	allFunctions := make(map[string]bool)
 
+	// node_values 的行序就是节点 ID：parent_node_id 引用行序，function_id 引用
+	// functions 列表。一个函数对应多个节点时两者会分叉，所以先把节点 ID 映射成
+	// 函数名，父节点也走这张表，不能用节点 ID 直接索引 functions。
+	nodeIDToFunctionName := make(map[int]string, len(profileData.NodeValues.Values))
+	for nodeIndex, row := range profileData.NodeValues.Values {
+		if len(row) < 1 {
+			continue
+		}
+		functionID, err := convertToInt(row[0])
+		if err != nil || functionID < 0 || functionID >= len(profileData.FunctionNames) {
+			continue
+		}
+		nodeIDToFunctionName[nodeIndex] = profileData.FunctionNames[functionID]
+	}
+
 	// 遍历所有节点，提取函数间调用关系
 	for _, row := range profileData.NodeValues.Values {
 		if len(row) < 4 {
@@ -437,8 +452,7 @@ func generateFunctionMermaidDiagram(profileData *model.ProfileData) string {
 		}
 
 		// 如果有父节点，建立调用关系
-		if parentID != -1 && parentID < len(profileData.FunctionNames) {
-			parentFunction := profileData.FunctionNames[parentID]
+		if parentFunction, ok := nodeIDToFunctionName[parentID]; ok && parentID != -1 {
 			allFunctions[parentFunction] = true
 
 			// 记录调用关系：父函数调用子函数
@@ -534,7 +548,8 @@ func generateFunctionMermaidDiagram(profileData *model.ProfileData) string {
 	}
 
 	// 添加统计信息
-	builder.WriteString(fmt.Sprintf("\n    info[\"%s\"]\n", translation("显示了 %d 个函数，%d 条调用关系"), len(functionInfos), relationCount))
+	builder.WriteString(fmt.Sprintf("\n    info[\"%s\"]\n",
+		fmt.Sprintf(translation("显示了 %d 个函数，%d 条调用关系"), len(functionInfos), relationCount)))
 	builder.WriteString("    style info fill:#e1f5fe,stroke:#01579b\n")
 
 	builder.WriteString("```\n")
