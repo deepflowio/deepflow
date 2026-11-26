@@ -171,6 +171,10 @@ def load_comment_as_yaml(key, comment):
         print(f"{comment}", file=sys.stderr)
         print("----------", file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
+    if parsed_comment and (len(parsed_comment) % 2 == 0 or
+                           any(not isinstance(item, dict) for item in parsed_comment)):
+        print(f"ERROR: invalid YAML comment structure at {key}", file=sys.stderr)
+        return []
     return parsed_comment
 
 
