@@ -39,6 +39,12 @@ import (
 const _STATUS_FAIL = "fail"
 const _STATUS_SUCCESS = "success"
 
+// decodeReadLimit is the maximum size of a remote read request body in bytes.
+// It limits both the compressed body read from the client and the declared
+// snappy-decoded length, preventing a small request from triggering a huge
+// memory allocation (CVE-2026-42154).
+const decodeReadLimit = 32 * 1024 * 1024
+
 // PromQL Query API
 func promQuery(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
@@ -114,8 +120,7 @@ func promQueryRange(svc *service.PrometheusService) gin.HandlerFunc {
 // RemoteRead API
 func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		compressed, _ := io.ReadAll(c.Request.Body)
-		reqBuf, err := snappy.Decode(nil, compressed)
+		reqBuf, err := decodeRemoteReadRequest(c.Request.Body)
 		if err != nil {
 			c.JSON(500, err)
 			return
@@ -145,10 +150,28 @@ func promReader(svc *service.PrometheusService) gin.HandlerFunc {
 			c.JSON(500, err)
 			return
 		}
-		compressed = snappy.Encode(nil, data)
+		compressed := snappy.Encode(nil, data)
 		c.Header("Content-Type", binding.MIMEPROTOBUF)
-		c.Writer.Write([]byte(compressed))
+		c.Writer.Write(compressed)
 	})
+}
+
+// decodeRemoteReadRequest reads and decodes a snappy-compressed remote read
+// request. Both the compressed body and the declared decoded length are limited
+// to protect against memory exhaustion from a crafted payload.
+func decodeRemoteReadRequest(r io.Reader) ([]byte, error) {
+	compressed, err := io.ReadAll(io.LimitReader(r, decodeReadLimit))
+	if err != nil {
+		return nil, err
+	}
+	decodedLen, err := snappy.DecodedLen(compressed)
+	if err != nil {
+		return nil, err
+	}
+	if decodedLen > decodeReadLimit {
+		return nil, errors.Errorf("snappy: decoded length %d exceeds limit %d", decodedLen, decodeReadLimit)
+	}
+	return snappy.Decode(nil, compressed)
 }
 
 func promTagValuesReader(svc *service.PrometheusService) gin.HandlerFunc {

@@ -17,8 +17,6 @@
 use std::env;
 use std::fmt;
 use std::fs;
-#[cfg(windows)]
-use std::io::IsTerminal;
 use std::io::Write;
 use std::mem;
 use std::net::SocketAddr;
@@ -600,14 +598,6 @@ impl Trident {
         } else {
             logger
         };
-        // Windows 终端模式下同样把日志复制到 stderr，服务模式没有控制台则不复制
-        #[cfg(windows)]
-        let logger = if std::io::stderr().is_terminal() {
-            logger.duplicate_to_stderr(flexi_logger::Duplicate::All)
-        } else {
-            logger
-        };
-
         let logger_handle = logger.start()?;
         config_handler.set_logger_handle(logger_handle);
 
@@ -2811,7 +2801,6 @@ impl AgentComponents {
             dispatcher_components.push(dispatcher_component);
         }
         tap_interfaces.sort();
-        tap_interfaces.dedup();
         #[cfg(feature = "libtrace")]
         let (proc_event_sender, proc_event_uniform_sender) = {
             let proc_event_queue_name = "1-proc-event-to-sender";

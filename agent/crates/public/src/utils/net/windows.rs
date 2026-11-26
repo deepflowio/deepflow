@@ -125,25 +125,9 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
     })
 }
 
-// GetBestInterfaceEx 对 IPv4/IPv6 分别返回 IPv4 IfIndex 与 Ipv6IfIndex，必须按目的地址族匹配，
-// 否则不同网卡的跨地址族索引数值重叠时会选错网卡。
-fn adapter_index_matches(
-    dest: IpAddr,
-    if_index: u32,
-    ipv4_if_index: u32,
-    ipv6_if_index: u32,
-) -> bool {
-    if dest.is_ipv4() {
-        if_index == ipv4_if_index
-    } else {
-        if_index == ipv6_if_index
-    }
-}
-
-pub fn get_interface_by_index_from_win32(if_index: u32, dest: IpAddr) -> Result<Link> {
+pub fn get_interface_by_index_from_win32(if_index: u32) -> Result<Link> {
     let family = AF_UNSPEC as u32;
-    // 包含隐藏/无地址网卡，避免 NIC Teaming、Hyper-V 虚拟交换机场景下按 ifindex 查不到
-    let flags = GAA_FLAG_INCLUDE_ALL_INTERFACES | GAA_FLAG_INCLUDE_PREFIX;
+    let flags = GAA_FLAG_INCLUDE_PREFIX;
     let mut buffer_len: u32 = 0;
 
     unsafe {
@@ -155,16 +139,10 @@ pub fn get_interface_by_index_from_win32(if_index: u32, dest: IpAddr) -> Result<
             &mut buffer_len,
         );
 
-        // 部分系统首次调用会直接返回 NO_ERROR，不能只接受 ERROR_BUFFER_OVERFLOW
-        if result != NO_ERROR && result != ERROR_BUFFER_OVERFLOW {
+        if result != 111 {
             return Err(Error::Windows(format!(
                 "Get buffer len by GetAdaptersAddresses failed error code {}",
                 result
-            )));
-        }
-        if buffer_len == 0 {
-            return Err(Error::Windows(String::from(
-                "failed to get buffer len by GetAdaptersAddresses, size=0",
             )));
         }
     }
@@ -192,12 +170,7 @@ pub fn get_interface_by_index_from_win32(if_index: u32, dest: IpAddr) -> Result<
     while !current_adapter.is_null() {
         let mac_address = unsafe {
             let adapter_ref = &*current_adapter;
-            if !adapter_index_matches(
-                dest,
-                if_index,
-                adapter_ref.Anonymous1.Anonymous.IfIndex,
-                adapter_ref.Ipv6IfIndex,
-            ) {
+            if if_index != adapter_ref.Anonymous1.Anonymous.IfIndex {
                 current_adapter = adapter_ref.Next;
                 continue;
             }
@@ -315,7 +288,7 @@ pub fn links_by_name_regex<S: AsRef<str>>(regex: S) -> Result<Vec<Link>> {
 
 pub fn get_route_src_ip_and_mac(dest_addr: &IpAddr) -> Result<(IpAddr, MacAddr)> {
     route_get(*dest_addr).and_then(|r| {
-        get_interface_by_index_from_win32(r.oif_index, *dest_addr)
+        get_interface_by_index_from_win32(r.oif_index)
             .map(|link| (r.pref_src.unwrap(), link.mac_addr))
     })
 }
@@ -620,7 +593,12 @@ pub fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
                 flags |= LinkFlags::UP;
             }
 
-            match IfType::try_from(adapter.IfType).unwrap_or(IfType::Other) {
+            match IfType::try_from(adapter.IfType).map_err(|e| {
+                Error::Windows(format!(
+                    "adapter name={}, id={} info has invalid if_type, error: {}",
+                    friendly_name, adapter_id, e
+                ))
+            })? {
                 IfType::Ethernet | IfType::TokenRing | IfType::Ieee80211 | IfType::Ieee1394 => {
                     flags |= LinkFlags::BROADCAST | LinkFlags::MULTICAST
                 }
