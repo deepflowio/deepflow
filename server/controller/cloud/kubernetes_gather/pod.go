@@ -28,8 +28,9 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
+func (k *KubernetesGather) getPods() ([]model.Pod, error) {
 	log.Debug("get pods starting", logger.NewORGPrefix(k.orgID))
+	pods := []model.Pod{}
 	podTypesMap := map[string]bool{
 		"CloneSet":              false,
 		"DaemonSet":             false,
@@ -42,11 +43,10 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		"ReplicationController": false,
 	}
 	for _, p := range k.k8sInfo["*v1.Pod"] {
-		pData, pErr := simplejson.NewJson([]byte(p))
-		if pErr != nil {
-			err = pErr
-			log.Errorf("pod initialization simplejson error: (%s)", pErr.Error(), logger.NewORGPrefix(k.orgID))
-			return
+		pData, err := simplejson.NewJson([]byte(p))
+		if err != nil {
+			log.Errorf("pod initialization simplejson error: (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
+			return nil, err
 		}
 
 		envString := expand.GetPodENV(pData, k.envRegex, k.customTagLenMax)
@@ -206,5 +206,5 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 		}
 	}
 	log.Debug("get pods complete", logger.NewORGPrefix(k.orgID))
-	return
+	return pods, nil
 }

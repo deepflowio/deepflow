@@ -30,7 +30,7 @@ func (k *KubernetesGather) getPodNamespaces() ([]model.PodNamespace, error) {
 		nData, err := simplejson.NewJson([]byte(n))
 		if err != nil {
 			log.Errorf("pod namespace initialization simplejson error: (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
-			return podNamespaces, err
+			return nil, err
 		}
 		metaData, ok := nData.CheckGet("metadata")
 		if !ok {

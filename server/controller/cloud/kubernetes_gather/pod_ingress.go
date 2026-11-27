@@ -25,8 +25,12 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingressRules []model.PodIngressRule, ingressRuleBackends []model.PodIngressRuleBackend, err error) {
+func (k *KubernetesGather) getPodIngresses() ([]model.PodIngress, []model.PodIngressRule, []model.PodIngressRuleBackend, error) {
 	log.Debug("get ingresses starting", logger.NewORGPrefix(k.orgID))
+	ingresses := []model.PodIngress{}
+	ingressRules := []model.PodIngressRule{}
+	ingressRuleBackends := []model.PodIngressRuleBackend{}
+
 	var ingressInfo []string
 	switch {
 	case len(k.k8sInfo["*v1.Ingress"]) != 0:
@@ -37,11 +41,10 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 		ingressInfo = k.k8sInfo["*v1beta1.Ingress"]
 	}
 	for _, i := range ingressInfo {
-		iData, iErr := simplejson.NewJson([]byte(i))
-		if iErr != nil {
-			err = iErr
-			log.Errorf("ingress initialization simplejson error: (%s)", iErr.Error(), logger.NewORGPrefix(k.orgID))
-			return
+		iData, err := simplejson.NewJson([]byte(i))
+		if err != nil {
+			log.Errorf("ingress initialization simplejson error: (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
+			return nil, nil, nil, err
 		}
 		metaData, ok := iData.CheckGet("metadata")
 		if !ok {
@@ -249,5 +252,5 @@ func (k *KubernetesGather) getPodIngresses() (ingresses []model.PodIngress, ingr
 		}
 	}
 	log.Debug("get ingresses complete", logger.NewORGPrefix(k.orgID))
-	return
+	return ingresses, ingressRules, ingressRuleBackends, nil
 }

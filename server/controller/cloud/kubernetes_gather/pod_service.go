@@ -29,8 +29,14 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (k *KubernetesGather) getPodServices() (services []model.PodService, servicePorts []model.PodServicePort, podGroupPorts []model.PodGroupPort, network model.Network, subnets []model.Subnet, vinterfaces []model.VInterface, ips []model.IP, err error) {
+func (k *KubernetesGather) getPodServices() (model.Network, []model.PodService, []model.PodServicePort, []model.PodGroupPort, []model.Subnet, []model.VInterface, []model.IP, error) {
 	log.Debug("get services starting", logger.NewORGPrefix(k.orgID))
+	services := []model.PodService{}
+	servicePorts := []model.PodServicePort{}
+	podGroupPorts := []model.PodGroupPort{}
+	subnets := []model.Subnet{}
+	vinterfaces := []model.VInterface{}
+	ips := []model.IP{}
 	serviceLcuuidToClusterIP := map[string]string{}
 	serviceTypes := map[string]int{
 		"NodePort":     common.POD_SERVICE_TYPE_NODEPORT,
@@ -41,11 +47,10 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 	servicesArrays = append(servicesArrays, k.k8sInfo["*v1.ServiceRule"])
 	for i, servicesArray := range servicesArrays {
 		for _, s := range servicesArray {
-			sData, sErr := simplejson.NewJson([]byte(s))
-			if sErr != nil {
-				err = sErr
-				log.Errorf("service initialization simplejson error: (%s)", sErr.Error(), logger.NewORGPrefix(k.orgID))
-				return
+			sData, err := simplejson.NewJson([]byte(s))
+			if err != nil {
+				log.Errorf("service initialization simplejson error: (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
+				return model.Network{}, nil, nil, nil, nil, nil, nil, err
 			}
 			metaData, ok := sData.CheckGet("metadata")
 			if !ok {
@@ -129,11 +134,11 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 			var hasPodGroup bool
 			for i := range specPorts.MustArray() {
 				podGroupLcuuids := mapset.NewSet()
-				labels, fErr := metaData.Get("annotations").Get("field.cattle.io/targetWorkloadIds").String()
-				if fErr == nil && labels != "[]" && labels != "null" {
-					labelArray, lErr := simplejson.NewJson([]byte(labels))
-					if lErr != nil {
-						log.Infof("service annotation (%s) init json error: (%s)", labels, lErr.Error(), logger.NewORGPrefix(k.orgID))
+				labels, err := metaData.Get("annotations").Get("field.cattle.io/targetWorkloadIds").String()
+				if err == nil && labels != "[]" && labels != "null" {
+					labelArray, err := simplejson.NewJson([]byte(labels))
+					if err != nil {
+						log.Infof("service annotation (%s) init json error: (%s)", labels, err.Error(), logger.NewORGPrefix(k.orgID))
 						continue
 					}
 					for i := range labelArray.MustArray() {
@@ -286,11 +291,10 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 	clusterIPs := cloudcommon.StringStringMapValues(serviceLcuuidToClusterIP)
 	serviceCIDR := []string{}
 	if len(clusterIPs) != 0 {
-		v4Prefixs, v6Prefixs, tErr := cloudcommon.TidyIPString(clusterIPs)
-		if tErr != nil {
-			err = tErr
-			log.Error("service tidy cluster ip Error"+tErr.Error(), logger.NewORGPrefix(k.orgID))
-			return
+		v4Prefixs, v6Prefixs, err := cloudcommon.TidyIPString(clusterIPs)
+		if err != nil {
+			log.Error("service tidy cluster ip Error"+err.Error(), logger.NewORGPrefix(k.orgID))
+			return model.Network{}, nil, nil, nil, nil, nil, nil, err
 		}
 		if len(v4Prefixs) != 0 {
 			v4cidrs := cloudcommon.AggregateCIDR(v4Prefixs, 0)
@@ -317,7 +321,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		subnets = append(subnets, nodeSubnet)
 	}
 
-	network = model.Network{
+	network := model.Network{
 		Lcuuid:         serviceNetworkLcuuid,
 		Name:           serviceNetworkName,
 		SegmentationID: 1,
@@ -351,5 +355,5 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		ips = append(ips, ip)
 	}
 	log.Debug("get services complete", logger.NewORGPrefix(k.orgID))
-	return
+	return network, services, servicePorts, podGroupPorts, subnets, vinterfaces, ips, nil
 }
