@@ -154,6 +154,7 @@ func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error)
 	if c.Context == nil {
 		ctx = context.Background()
 	}
+	ctx = clickhouse.Context(ctx, clickhouse.WithQueryID(query_uuid))
 	rows, err := c.connection.Query(ctx, sqlstr)
 	c.Debug.Sql = sqlstr
 	if err != nil {
