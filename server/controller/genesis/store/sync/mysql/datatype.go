@@ -25,8 +25,9 @@ import (
 	"github.com/patrickmn/go-cache"
 
 	"github.com/deepflowio/deepflow/server/controller/db/metadb"
-	metadbmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	mmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/controller/genesis/common"
+	cfg "github.com/deepflowio/deepflow/server/controller/genesis/config"
 	"github.com/deepflowio/deepflow/server/controller/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
@@ -46,6 +47,7 @@ type GenesisSyncDataOperation struct {
 
 type GenesisSyncTypeOperation[T common.GenesisSyncType] struct {
 	nodeIP string
+	config cfg.GenesisConfig
 	store  *cache.Cache
 }
 
@@ -58,7 +60,7 @@ func (gs *GenesisSyncTypeOperation[T]) Fetch() map[int][]T {
 	for key, item := range gs.store.Items() {
 		orgID, err := strconv.Atoi(strings.Split(key, "-")[0])
 		if err != nil {
-			log.Error(err.Error())
+			log.Errorf("parse org ID failed: %s", err.Error())
 			continue
 		}
 		result[orgID] = append(result[orgID], item.Object.([]T)...)
@@ -80,6 +82,8 @@ func (gs *GenesisSyncTypeOperation[T]) Update(orgID int, vtapID uint32, vtapKey 
 		return
 	}
 
+	log.Infof("update %T vtap (%s) entries: %d", items, vtapKey, len(items), logger.NewORGPrefix(orgID))
+
 	db, err := metadb.GetDB(orgID)
 	if err != nil {
 		log.Errorf("get metadb session failed: %s", err.Error(), logger.NewORGPrefix(orgID))
@@ -87,7 +91,7 @@ func (gs *GenesisSyncTypeOperation[T]) Update(orgID int, vtapID uint32, vtapKey 
 	}
 
 	key := gs.formatKey(orgID, vtapID, vtapKey)
-	if vtapID != 0 {
+	if gs.config.LogDetailEnabled && vtapID != 0 {
 		newData := map[string]T{}
 		for _, item := range items {
 			newData[item.GetLcuuid()] = item
@@ -107,7 +111,7 @@ func (gs *GenesisSyncTypeOperation[T]) Update(orgID int, vtapID uint32, vtapKey 
 			if ok || data.GetVtapID() == 0 {
 				continue
 			}
-			log.Infof("sync (%s) add (%#+v)", vtapKey, data, logger.NewORGPrefix(orgID))
+			log.Infof("sync (%s) add (%s)", key, data.GetInfo(), logger.NewORGPrefix(orgID))
 		}
 
 		// delete
@@ -116,7 +120,7 @@ func (gs *GenesisSyncTypeOperation[T]) Update(orgID int, vtapID uint32, vtapKey 
 			if ok || data.GetVtapID() == 0 {
 				continue
 			}
-			log.Infof("sync (%s) delete (%#+v)", vtapKey, data, logger.NewORGPrefix(orgID))
+			log.Infof("sync (%s) delete (%s)", key, data.GetInfo(), logger.NewORGPrefix(orgID))
 		}
 	}
 
@@ -141,7 +145,7 @@ func (gs *GenesisSyncTypeOperation[T]) Update(orgID int, vtapID uint32, vtapKey 
 func (gs *GenesisSyncTypeOperation[T]) Load() {
 	orgIDs, err := metadb.GetORGIDs()
 	if err != nil {
-		log.Error("get org ids failed")
+		log.Errorf("get org ids failed: %s", err.Error())
 		return
 	}
 	for _, orgID := range orgIDs {
@@ -157,6 +161,17 @@ func (gs *GenesisSyncTypeOperation[T]) Load() {
 			continue
 		}
 
+		var vtaps []mmodel.VTap
+		err = db.Find(&vtaps).Error
+		if err != nil {
+			log.Warning("get vtaps failed: %s", err.Error(), logger.NewORGPrefix(db.ORGID))
+			continue
+		}
+		vtapIDs := map[int]mmodel.VTap{}
+		for _, vtap := range vtaps {
+			vtapIDs[vtap.ID] = vtap
+		}
+
 		activeVtapIDs := []uint32{}
 		for _, storage := range storages {
 			var items []T
@@ -165,17 +180,23 @@ func (gs *GenesisSyncTypeOperation[T]) Load() {
 				log.Errorf("get vtap (%d) data failed:%s", storage.VtapID, err.Error(), logger.NewORGPrefix(orgID))
 				continue
 			}
-			var vtap metadbmodel.VTap
-			err = db.Where("id = ?", storage.VtapID).First(&vtap).Error
-			if err != nil {
-				log.Warningf("get vtap (%d) failed:%s", storage.VtapID, err.Error(), logger.NewORGPrefix(orgID))
+			vtap, ok := vtapIDs[int(storage.VtapID)]
+			if !ok {
+				log.Debugf("vtap (%d) not found", storage.VtapID, logger.NewORGPrefix(db.ORGID))
 				continue
 			}
 			if len(items) == 0 {
 				continue
 			}
-			gs.store.SetDefault(gs.formatKey(orgID, storage.VtapID, vtap.CtrlIP+"-"+vtap.CtrlMac), items)
+			key := gs.formatKey(orgID, storage.VtapID, vtap.CtrlIP+"-"+vtap.CtrlMac)
+			if gs.config.LogDetailEnabled {
+				for _, item := range items {
+					log.Infof("genesis load %T vtap (%s) data (%s)", item, key, item.GetInfo(), logger.NewORGPrefix(db.ORGID))
+				}
+			}
+			gs.store.SetDefault(key, items)
 			activeVtapIDs = append(activeVtapIDs, storage.VtapID)
+			log.Infof("genesis load %T vtap (%s) entries: %d", items, key, len(items), logger.NewORGPrefix(db.ORGID))
 		}
 		var inactive T
 		err = db.Where("node_ip = ?", gs.nodeIP).Where("vtap_id NOT IN (?)", activeVtapIDs).Delete(&inactive).Error
@@ -189,9 +210,10 @@ func (gs *GenesisSyncTypeOperation[T]) SetOnEvicted(f func(k string, v interface
 	gs.store.OnEvicted(f)
 }
 
-func NewHostPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisHost] {
+func NewHostPlatformDataOperation(nodeIP string, expired, interval int, config cfg.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisHost] {
 	return &GenesisSyncTypeOperation[model.GenesisHost]{
 		nodeIP: nodeIP,
+		config: config,
 		store: cache.New(
 			time.Duration(expired)*time.Second,
 			time.Duration(interval)*time.Second,
@@ -199,9 +221,10 @@ func NewHostPlatformDataOperation(nodeIP string, expired, interval int) *Genesis
 	}
 }
 
-func NewVMPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisVM] {
+func NewVMPlatformDataOperation(nodeIP string, expired, interval int, config cfg.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisVM] {
 	return &GenesisSyncTypeOperation[model.GenesisVM]{
 		nodeIP: nodeIP,
+		config: config,
 		store: cache.New(
 			time.Duration(expired)*time.Second,
 			time.Duration(interval)*time.Second,
@@ -209,9 +232,10 @@ func NewVMPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSy
 	}
 }
 
-func NewVIPPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisVIP] {
+func NewVIPPlatformDataOperation(nodeIP string, expired, interval int, config cfg.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisVIP] {
 	return &GenesisSyncTypeOperation[model.GenesisVIP]{
 		nodeIP: nodeIP,
+		config: config,
 		store: cache.New(
 			time.Duration(expired)*time.Second,
 			time.Duration(interval)*time.Second,
@@ -219,9 +243,10 @@ func NewVIPPlatformDataOperation(nodeIP string, expired, interval int) *GenesisS
 	}
 }
 
-func NewVpcPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisVPC] {
+func NewVpcPlatformDataOperation(nodeIP string, expired, interval int, config cfg.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisVPC] {
 	return &GenesisSyncTypeOperation[model.GenesisVPC]{
 		nodeIP: nodeIP,
+		config: config,
 		store: cache.New(
 			time.Duration(expired)*time.Second,
 			time.Duration(interval)*time.Second,
@@ -229,9 +254,10 @@ func NewVpcPlatformDataOperation(nodeIP string, expired, interval int) *GenesisS
 	}
 }
 
-func NewPortPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisPort] {
+func NewPortPlatformDataOperation(nodeIP string, expired, interval int, config cfg.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisPort] {
 	return &GenesisSyncTypeOperation[model.GenesisPort]{
 		nodeIP: nodeIP,
+		config: config,
 		store: cache.New(
 			time.Duration(expired)*time.Second,
 			time.Duration(interval)*time.Second,
@@ -239,9 +265,10 @@ func NewPortPlatformDataOperation(nodeIP string, expired, interval int) *Genesis
 	}
 }
 
-func NewNetworkPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisNetwork] {
+func NewNetworkPlatformDataOperation(nodeIP string, expired, interval int, config cfg.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisNetwork] {
 	return &GenesisSyncTypeOperation[model.GenesisNetwork]{
 		nodeIP: nodeIP,
+		config: config,
 		store: cache.New(
 			time.Duration(expired)*time.Second,
 			time.Duration(interval)*time.Second,
@@ -249,9 +276,10 @@ func NewNetworkPlatformDataOperation(nodeIP string, expired, interval int) *Gene
 	}
 }
 
-func NewVinterfacePlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisVinterface] {
+func NewVinterfacePlatformDataOperation(nodeIP string, expired, interval int, config cfg.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisVinterface] {
 	return &GenesisSyncTypeOperation[model.GenesisVinterface]{
 		nodeIP: nodeIP,
+		config: config,
 		store: cache.New(
 			time.Duration(expired)*time.Second,
 			time.Duration(interval)*time.Second,
@@ -259,9 +287,10 @@ func NewVinterfacePlatformDataOperation(nodeIP string, expired, interval int) *G
 	}
 }
 
-func NewIPLastSeenPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisIP] {
+func NewIPLastSeenPlatformDataOperation(nodeIP string, expired, interval int, config cfg.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisIP] {
 	return &GenesisSyncTypeOperation[model.GenesisIP]{
 		nodeIP: nodeIP,
+		config: config,
 		store: cache.New(
 			time.Duration(expired)*time.Second,
 			time.Duration(interval)*time.Second,
@@ -269,9 +298,10 @@ func NewIPLastSeenPlatformDataOperation(nodeIP string, expired, interval int) *G
 	}
 }
 
-func NewLldpInfoPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisLldp] {
+func NewLldpInfoPlatformDataOperation(nodeIP string, expired, interval int, config cfg.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisLldp] {
 	return &GenesisSyncTypeOperation[model.GenesisLldp]{
 		nodeIP: nodeIP,
+		config: config,
 		store: cache.New(
 			time.Duration(expired)*time.Second,
 			time.Duration(interval)*time.Second,
@@ -279,9 +309,10 @@ func NewLldpInfoPlatformDataOperation(nodeIP string, expired, interval int) *Gen
 	}
 }
 
-func NewProcessPlatformDataOperation(nodeIP string, expired, interval int) *GenesisSyncTypeOperation[model.GenesisProcess] {
+func NewProcessPlatformDataOperation(nodeIP string, expired, interval int, config cfg.GenesisConfig) *GenesisSyncTypeOperation[model.GenesisProcess] {
 	return &GenesisSyncTypeOperation[model.GenesisProcess]{
 		nodeIP: nodeIP,
+		config: config,
 		store: cache.New(
 			time.Duration(expired)*time.Second,
 			time.Duration(interval)*time.Second,

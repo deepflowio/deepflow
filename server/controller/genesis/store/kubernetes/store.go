@@ -244,7 +244,7 @@ func (k *KubernetesStorage) generateCache() {
 			} else {
 				endpoint = net.JoinHostPort(domain.ControllerIP, strconv.Itoa(k.listenNodePort))
 			}
-			cacheMap[k.formatKey(db.ORGID, domain.ClusterID)] = common.ClusterDest{
+			cacheMap[k.formatKey(db.ORGID, subDomain.ClusterID)] = common.ClusterDest{
 				Endpoint:        endpoint,
 				DomainLcuuid:    domain.Lcuuid,
 				SubDomainLcuuid: subDomain.Lcuuid,
