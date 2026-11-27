@@ -88,13 +88,22 @@ impl Obfuscator {
             Ok(tokens) => tokens,
             Err(TokenizerError { location, .. }) => {
                 // if sql is truncated, try again before error location, and append a phantom word token to the end
-                let byte_offset = sql
+                let line_start = sql
                     .split_inclusive('\n')
                     .take(location.line.saturating_sub(1) as usize)
                     .map(|l| l.len())
                     .sum::<usize>()
-                    + (location.column as usize).saturating_sub(1);
-                let truncated = &sql[..byte_offset.min(sql.len())];
+                    .min(sql.len());
+                // location.column counts characters rather than bytes, so
+                // convert it to a byte offset: with multi-byte UTF-8 before
+                // the error, using it as a byte index slices mid-character
+                // and panics (issue #11791).
+                let column_bytes = sql[line_start..]
+                    .chars()
+                    .take((location.column as usize).saturating_sub(1))
+                    .map(char::len_utf8)
+                    .sum::<usize>();
+                let truncated = &sql[..line_start + column_bytes];
                 let mut tokens = Tokenizer::new(&dialect, truncated)
                     .with_unescape(false)
                     .tokenize()?;
@@ -357,6 +366,38 @@ WHERE name = 'hell"#;
 SELECT *
 FROM table
 WHERE name = ?"#;
+        let result = Obfuscator::apply(input).unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn multibyte_truncated() {
+        // A tokenize error located after multi-byte UTF-8: the error
+        // location's column counts characters, so using it as a byte
+        // offset sliced mid-character and panicked before the
+        // char-boundary fix (issue #11791).
+        let input = "SELECT * FROM t WHERE a = 中文'";
+        let expected = "SELECT * FROM t WHERE a = ?";
+        let result = Obfuscator::apply(input).unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn multibyte_truncated_second_line() {
+        // Same panic class with multi-byte text on the preceding line and
+        // on the error line itself.
+        let input = "-- 中文注释\nSELECT * FROM t WHERE a = 中文'";
+        let expected = "-- 中文注释\nSELECT * FROM t WHERE a = ?";
+        let result = Obfuscator::apply(input).unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn multibyte_inside_truncated_string() {
+        // Multi-byte text inside the truncated literal itself: the
+        // truncated retry must still obfuscate it.
+        let input = "SELECT * FROM t WHERE a = '中文";
+        let expected = "SELECT * FROM t WHERE a = ?";
         let result = Obfuscator::apply(input).unwrap();
         assert_eq!(result, expected);
     }
