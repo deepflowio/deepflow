@@ -26,14 +26,14 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (k *KubernetesGather) getConfigMaps() (configMaps []model.ConfigMap, err error) {
+func (k *KubernetesGather) getConfigMaps() ([]model.ConfigMap, error) {
 	log.Debug("get configmaps starting", logger.NewORGPrefix(k.orgID))
+	configMaps := []model.ConfigMap{}
 	for _, c := range k.k8sInfo["*v1.ConfigMap"] {
-		cData, cErr := simplejson.NewJson([]byte(c))
-		if cErr != nil {
-			err = cErr
-			log.Errorf("configmap initialization simplejson error: (%s)", cErr.Error(), logger.NewORGPrefix(k.orgID))
-			return
+		cData, err := simplejson.NewJson([]byte(c))
+		if err != nil {
+			log.Errorf("configmap initialization simplejson error: (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
+			return nil, err
 		}
 		metaData, ok := cData.CheckGet("metadata")
 		if !ok {
@@ -81,5 +81,5 @@ func (k *KubernetesGather) getConfigMaps() (configMaps []model.ConfigMap, err er
 		k.configMapToLcuuid[[2]string{namespace, name}] = uLcuuid
 	}
 	log.Debug("get configmaps complete", logger.NewORGPrefix(k.orgID))
-	return
+	return configMaps, nil
 }

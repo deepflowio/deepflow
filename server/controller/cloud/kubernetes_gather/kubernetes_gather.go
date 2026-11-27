@@ -18,6 +18,7 @@ package kubernetes_gather
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -386,6 +387,14 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		}
 		k.vinterfaceData = append(k.vinterfaceData, v)
 	}
+	if len(k.vinterfaceData) == 0 {
+		errMsg := fmt.Sprintf("no vinterface data found for the cluster: %s", k.ClusterID)
+		return model.KubernetesGatherResource{
+			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
+			ErrorMessage: errMsg,
+		}, errors.New(errMsg)
+	}
+	k.cloudStatsd.RefreshAPIMoniter("VInterface", len(k.vinterfaceData), time.Time{})
 
 	region, err := k.getRegion()
 	if err != nil {
@@ -415,7 +424,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		return model.KubernetesGatherResource{}, err
 	}
 
-	podNodes, nodeNetwork, podNetwork, err := k.getPodNodes()
+	nodeNetwork, podNetwork, podNodes, err := k.getPodNodes()
 	if err != nil {
 		return model.KubernetesGatherResource{}, err
 	}
@@ -451,7 +460,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	podGroups = append(podGroups, podRSCs...)
 	podGroupConfigMapConnections = append(podGroupConfigMapConnections, podRSCsConfigMapConnections...)
 
-	podServices, servicePorts, podGroupPorts, serviceNetworks, serviceSubnets, serviceVinterfaces, serviceIPs, err := k.getPodServices()
+	serviceNetwork, podServices, servicePorts, podGroupPorts, serviceSubnets, serviceVinterfaces, serviceIPs, err := k.getPodServices()
 	if err != nil {
 		return model.KubernetesGatherResource{}, err
 	}
@@ -495,7 +504,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		PodNodeSubnets:               nodeSubnets,
 		PodNodeVInterfaces:           nodeVInterfaces,
 		PodNodeIPs:                   nodeIPs,
-		PodServiceNetwork:            serviceNetworks,
+		PodServiceNetwork:            serviceNetwork,
 		PodServiceSubnets:            serviceSubnets,
 		PodServiceVInterfaces:        serviceVinterfaces,
 		PodServiceIPs:                serviceIPs,

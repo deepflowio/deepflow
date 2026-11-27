@@ -23,22 +23,14 @@ import (
 
 	simplejson "github.com/bitly/go-simplejson"
 	lua "github.com/yuin/gopher-lua"
-	"gorm.io/gorm"
 
-	"github.com/deepflowio/deepflow/server/controller/common"
-	mysqlmodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
+	metamodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
 var log = logger.MustGetLogger("cloud.kubernetes_gather.plugin")
 
-func GeneratePodGroup(orgID int, db *gorm.DB, metaData *simplejson.Json) (string, string, error) {
-	var plugins []mysqlmodel.Plugin
-	err := db.Where("type = ?", common.PLUGIN_TYPE_LUA).Find(&plugins).Error
-	if err != nil {
-		return "", "", err
-	}
-
+func GeneratePodGroup(orgID int, metaData *simplejson.Json, plugins []metamodel.Plugin) (string, string, error) {
 	if len(plugins) == 0 {
 		return "", "", nil
 	}

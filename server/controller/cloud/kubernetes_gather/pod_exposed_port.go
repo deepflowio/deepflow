@@ -31,7 +31,7 @@ func (k *KubernetesGather) getPodExposedServices() ([]model.PodService, []model.
 	exposedPorts, err := common.ParseRangePorts(k.PodExposedPorts)
 	if err != nil {
 		log.Errorf("parse pod exposed ports (%s) failed: %s", k.PodExposedPorts, err.Error(), logger.NewORGPrefix(k.orgID))
-		return []model.PodService{}, []model.PodServicePort{}, err
+		return nil, nil, err
 	}
 	for _, exposedPort := range exposedPorts {
 		svcKey := k.Name + ":" + strconv.Itoa(exposedPort)

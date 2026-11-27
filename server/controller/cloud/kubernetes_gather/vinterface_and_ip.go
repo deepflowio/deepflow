@@ -31,8 +31,14 @@ import (
 	"github.com/mikioh/ipaddr"
 )
 
-func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []model.Subnet, nodeVInterfaces, podVInterfaces []model.VInterface, nodeIPs, podIPs []model.IP, err error) {
+func (k *KubernetesGather) getVInterfacesAndIPs() ([]model.Subnet, []model.Subnet, []model.VInterface, []model.VInterface, []model.IP, []model.IP, error) {
 	log.Debug("get vinterfaces,ips starting", logger.NewORGPrefix(k.orgID))
+	nodeSubnets := []model.Subnet{}
+	podSubnets := []model.Subnet{}
+	nodeVInterfaces := []model.VInterface{}
+	podVInterfaces := []model.VInterface{}
+	nodeIPs := []model.IP{}
+	podIPs := []model.IP{}
 	hostIPToNodeIPs := map[string][]string{}
 	deviceUUIDToPodLcuuid := map[string]string{}
 	hostIPToNodeLcuuid := map[string]string{}
@@ -53,7 +59,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	portNameRegex, err := regexp.Compile(k.PortNameRegex)
 	if err != nil {
 		log.Errorf("config port name regex (%s) complie failed", k.PortNameRegex, logger.NewORGPrefix(k.orgID))
-		return
+		return nil, nil, nil, nil, nil, nil, err
 	}
 
 	// 获取vinterface API返回中host ip与其上所有node ip的对应关系
@@ -779,5 +785,5 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	}
 
 	log.Debug("get vinterfaces,ips complete", logger.NewORGPrefix(k.orgID))
-	return
+	return nodeSubnets, podSubnets, nodeVInterfaces, podVInterfaces, nodeIPs, podIPs, nil
 }

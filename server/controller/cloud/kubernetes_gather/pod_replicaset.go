@@ -27,14 +27,16 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []model.PodReplicaSet, podRSCs []model.PodGroup, podGroupConfigMapConnections []model.PodGroupConfigMapConnection, err error) {
+func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() ([]model.PodReplicaSet, []model.PodGroup, []model.PodGroupConfigMapConnection, error) {
 	log.Debug("get replicasets,replicasetcontrollers starting", logger.NewORGPrefix(k.orgID))
+	podRSs := []model.PodReplicaSet{}
+	podRSCs := []model.PodGroup{}
+	podGroupConfigMapConnections := []model.PodGroupConfigMapConnection{}
 	for _, r := range k.k8sInfo["*v1.ReplicaSet"] {
-		rData, rErr := simplejson.NewJson([]byte(r))
-		if rErr != nil {
-			err = rErr
-			log.Errorf("replicaset,replicasetcontroller initialization simplejson error: (%s)", rErr.Error(), logger.NewORGPrefix(k.orgID))
-			return
+		rData, err := simplejson.NewJson([]byte(r))
+		if err != nil {
+			log.Errorf("replicaset,replicasetcontroller initialization simplejson error: (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
+			return nil, nil, nil, err
 		}
 		metaData, ok := rData.CheckGet("metadata")
 		if !ok {
@@ -139,5 +141,5 @@ func (k *KubernetesGather) getReplicaSetsAndReplicaSetControllers() (podRSs []mo
 		k.rsLcuuidToPodGroupLcuuid[uLcuuid] = podGroupLcuuid
 	}
 	log.Debug("get replicasets,replicasetcontrollers complete", logger.NewORGPrefix(k.orgID))
-	return
+	return podRSs, podRSCs, podGroupConfigMapConnections, nil
 }

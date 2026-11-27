@@ -25,11 +25,22 @@ import (
 	"github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/plugin"
 	"github.com/deepflowio/deepflow/server/controller/cloud/model"
 	"github.com/deepflowio/deepflow/server/controller/common"
+	metamodel "github.com/deepflowio/deepflow/server/controller/db/metadb/model"
 	"github.com/deepflowio/deepflow/server/libs/logger"
 )
 
-func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupConfigMapConnections []model.PodGroupConfigMapConnection, err error) {
+func (k *KubernetesGather) getPodGroups() ([]model.PodGroup, []model.PodGroupConfigMapConnection, error) {
 	log.Debug("get podgroups starting", logger.NewORGPrefix(k.orgID))
+	podGroups := []model.PodGroup{}
+	podGroupConfigMapConnections := []model.PodGroupConfigMapConnection{}
+
+	var plugins []metamodel.Plugin
+	err := k.db.Where("type = ?", common.PLUGIN_TYPE_LUA).Find(&plugins).Error
+	if err != nil {
+		log.Warningf("get plugins error: (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
+		return nil, nil, err
+	}
+
 	podControllers := [5][]string{}
 	podControllers[0] = k.k8sInfo["*v1.Deployment"]
 	podControllers[1] = k.k8sInfo["*v1.StatefulSet"]
@@ -48,11 +59,10 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 	for t, podController := range podControllers {
 		for _, c := range podController {
 			podTargetPorts := map[string]int{}
-			cData, cErr := simplejson.NewJson([]byte(c))
-			if cErr != nil {
-				err = cErr
-				log.Errorf("podgroup initialization simplejson error: (%s)", cErr.Error(), logger.NewORGPrefix(k.orgID))
-				return
+			cData, err := simplejson.NewJson([]byte(c))
+			if err != nil {
+				log.Errorf("podgroup initialization simplejson error: (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
+				return nil, nil, err
 			}
 			metaData, ok := cData.CheckGet("metadata")
 			if !ok {
@@ -111,7 +121,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 					// the lua plugin can be used to abstract the name and type of the workload according to the pod information
 					// 当某些 pod 因为缺少对应的工作负载或对应的工作负载不被支持的时候，
 					// 可以通过 lua 插件根据 pod 的信息来抽象出符合规则的工作负载名称和类型
-					abstractPGType, abstractPGName, err := plugin.GeneratePodGroup(k.orgID, k.db, metaData)
+					abstractPGType, abstractPGName, err := plugin.GeneratePodGroup(k.orgID, metaData, plugins)
 					if err != nil {
 						log.Warningf("pod (%s) abstract pod group failed: (%s)", name, err.Error(), logger.NewORGPrefix(k.orgID))
 						continue
@@ -226,18 +236,19 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, podGroupC
 		}
 	}
 	log.Debug("get podgroups complete", logger.NewORGPrefix(k.orgID))
-	return
+	return podGroups, podGroupConfigMapConnections, nil
 }
 
-func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGroup, podGroupConfigMapConnections []model.PodGroupConfigMapConnection, err error) {
+func (k *KubernetesGather) getPodReplicationControllers() ([]model.PodGroup, []model.PodGroupConfigMapConnection, error) {
 	log.Debug("get replicationcontrollers starting", logger.NewORGPrefix(k.orgID))
+	podRCs := []model.PodGroup{}
+	podGroupConfigMapConnections := []model.PodGroupConfigMapConnection{}
 	for _, r := range k.k8sInfo["*v1.ReplicationController"] {
 		podTargetPorts := map[string]int{}
-		rData, rErr := simplejson.NewJson([]byte(r))
-		if rErr != nil {
-			err = rErr
-			log.Errorf("replicationcontroller initialization simplejson error: (%s)", rErr.Error(), logger.NewORGPrefix(k.orgID))
-			return
+		rData, err := simplejson.NewJson([]byte(r))
+		if err != nil {
+			log.Errorf("replicationcontroller initialization simplejson error: (%s)", err.Error(), logger.NewORGPrefix(k.orgID))
+			return nil, nil, err
 		}
 		metaData, ok := rData.CheckGet("metadata")
 		if !ok {
@@ -327,5 +338,5 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 		podGroupConfigMapConnections = append(podGroupConfigMapConnections, k.pgSpecGenerateConnections(namespace, name, uLcuuid, spec)...)
 	}
 	log.Debug("get replicationcontrollers complete", logger.NewORGPrefix(k.orgID))
-	return
+	return podRCs, podGroupConfigMapConnections, nil
 }
