@@ -94,7 +94,8 @@ impl Obfuscator {
                     .map(|l| l.len())
                     .sum::<usize>()
                     + (location.column as usize).saturating_sub(1);
-                let truncated = &sql[..byte_offset.min(sql.len())];
+                let byte_offset = byte_offset.min(sql.len());
+                let truncated = &sql[..sql.floor_char_boundary(byte_offset)];
                 let mut tokens = Tokenizer::new(&dialect, truncated)
                     .with_unescape(false)
                     .tokenize()?;
