@@ -501,6 +501,152 @@ pub mod kernel_version {
     }
 }
 
+pub mod ai_agent_enforcement {
+    use std::sync::Arc;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum EnforcementMode {
+        AuditOnly,
+        Block,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct ExecRuleInput {
+        pub id: String,
+        pub mode: EnforcementMode,
+        pub exact: Vec<String>,
+        pub prefix: Vec<String>,
+        pub suffix: Vec<String>,
+        pub argv_matches: Vec<ExecArgvMatchInput>,
+        pub cmdline_prefixes: Vec<String>,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum ExecArgvMatchOp {
+        Exact,
+        Prefix,
+        Suffix,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct ExecArgvMatchInput {
+        pub index: u8,
+        pub op: ExecArgvMatchOp,
+        pub value: String,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct SyscallRuleInput {
+        pub id: String,
+        pub mode: EnforcementMode,
+        pub names: Vec<String>,
+        pub symbols: Vec<String>,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct PolicyHit {
+        pub rule_index: u32,
+        pub rule_id: String,
+        pub mode: EnforcementMode,
+        pub kernel_event_source: KernelEventSource,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum KernelEventSource {
+        None,
+        Lsm,
+        KprobeOverride,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct CompiledExecPolicy {
+        pub epoch: u64,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct CompiledSyscallPolicy {
+        pub epoch: u64,
+    }
+
+    impl CompiledExecPolicy {
+        pub fn match_exec(&self, _exec_path: &str, _cmdline: &str) -> Option<PolicyHit> {
+            None
+        }
+
+        pub fn sync_to_bpf_maps(
+            &self,
+            _exec_rules_fd: i32,
+            _policy_epoch_fd: i32,
+            _max_records: usize,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    impl CompiledSyscallPolicy {
+        pub fn to_bpf_records(&self) -> Vec<BpfSyscallRuleRecord> {
+            vec![]
+        }
+
+        pub fn sync_to_bpf_maps(
+            &self,
+            _syscall_rules_fd: i32,
+            _policy_epoch_fd: i32,
+            _max_records: usize,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct BpfSyscallRuleRecord {
+        pub rule_index: u32,
+        pub mode: u8,
+        pub syscall_key: u8,
+        pub reserved: u16,
+        pub syscall_id: u32,
+        pub errno_code: i32,
+        pub rule_id: [u8; 64],
+        pub syscall_name: [u8; 32],
+    }
+
+    impl Default for BpfSyscallRuleRecord {
+        fn default() -> Self {
+            Self {
+                rule_index: 0,
+                mode: 0,
+                syscall_key: 0,
+                reserved: 0,
+                syscall_id: 0,
+                errno_code: 0,
+                rule_id: [0; 64],
+                syscall_name: [0; 32],
+            }
+        }
+    }
+
+    pub fn compile_exec_rules(_rules: &[ExecRuleInput]) -> Result<CompiledExecPolicy, String> {
+        Ok(CompiledExecPolicy { epoch: 0 })
+    }
+
+    pub fn compile_syscall_rules(
+        _rules: &[SyscallRuleInput],
+    ) -> Result<CompiledSyscallPolicy, String> {
+        Ok(CompiledSyscallPolicy { epoch: 0 })
+    }
+
+    pub fn syscall_override_symbols(_syscall_key: u8) -> &'static [&'static str] {
+        &[]
+    }
+
+    pub fn set_global_exec_policy(_policy: Option<CompiledExecPolicy>) {}
+
+    pub fn global_exec_policy() -> Option<Arc<CompiledExecPolicy>> {
+        None
+    }
+}
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod rpc {
     pub mod remote_exec {
@@ -534,6 +680,15 @@ pub mod ai_agent {
             false
         }
 
+        pub fn register_process_matcher(
+            &self,
+            _pid: u32,
+            _process_name: &str,
+            _now: Duration,
+        ) -> bool {
+            false
+        }
+
         pub fn is_ai_agent(&self, _pid: u32) -> bool {
             false
         }
@@ -551,6 +706,10 @@ pub mod ai_agent {
         }
 
         pub fn cleanup_dead_pids(&self, _alive_pids: &[u32]) -> Vec<u32> {
+            vec![]
+        }
+
+        pub fn remove_process_matcher_root(&self, _root_pid: u32) -> Vec<u32> {
             vec![]
         }
 

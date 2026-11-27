@@ -131,6 +131,8 @@ func (e *EventStore) NativeTagVersion() uint32 {
 		return nativetag.GetTableNativeTagsVersion(e.OrgId, nativetag.EVENT_PROC_PERM_EVENT)
 	case common.PROC_OPS_EVENT:
 		return nativetag.GetTableNativeTagsVersion(e.OrgId, nativetag.EVENT_PROC_OPS_EVENT)
+	case common.PROC_BLOCK_EVENT:
+		return nativetag.GetTableNativeTagsVersion(e.OrgId, nativetag.EVENT_PROC_BLOCK_EVENT)
 	default:
 		return nativetag.GetTableNativeTagsVersion(e.OrgId, nativetag.EVENT_EVENT)
 	}
@@ -160,6 +162,8 @@ func (e *EventStore) DataSource() uint32 {
 		return uint32(config.PROC_PERM_EVENT)
 	case common.PROC_OPS_EVENT:
 		return uint32(config.PROC_OPS_EVENT)
+	case common.PROC_BLOCK_EVENT:
+		return uint32(config.PROC_BLOCK_EVENT)
 	default:
 		return uint32(config.MAX_DATASOURCE_ID)
 	}
@@ -292,6 +296,8 @@ func GenEventCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, co
 		columns = ProcPermEventColumns()
 	case common.PROC_OPS_EVENT.TableName():
 		columns = ProcOpsEventColumns()
+	case common.PROC_BLOCK_EVENT.TableName():
+		columns = ProcBlockEventColumns()
 	}
 	if table == common.FILE_EVENT.TableName() || table == common.FILE_MGMT_EVENT.TableName() || table == common.FILE_AGG_EVENT.TableName() {
 		partition = DefaultFileEventPartition
@@ -299,7 +305,7 @@ func GenEventCKTable(cluster, storagePolicy, table, ckdbType string, ttl int, co
 
 	aggr1S := true
 	switch table {
-	case common.FILE_AGG_EVENT.TableName(), common.FILE_MGMT_EVENT.TableName(), common.PROC_PERM_EVENT.TableName(), common.PROC_OPS_EVENT.TableName():
+	case common.FILE_AGG_EVENT.TableName(), common.FILE_MGMT_EVENT.TableName(), common.PROC_PERM_EVENT.TableName(), common.PROC_OPS_EVENT.TableName(), common.PROC_BLOCK_EVENT.TableName():
 		aggr1S = false
 	}
 

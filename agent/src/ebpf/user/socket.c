@@ -312,8 +312,7 @@ static inline void config_probes_for_ai_agent(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setgid");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setreuid");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_setregid");
-	/* fork propagation is AI-agent-specific; exec/exit are already covered by
-	 * config_probes_for_proc_event(). */
+	/* fork propagation is AI-agent-specific. */
 	tps_set_symbol(tps, "tracepoint/sched/sched_process_fork");
 }
 #else
@@ -3232,6 +3231,9 @@ int running_socket_tracer(tracer_callback_t handle,
 	ebpf_info("Config go_tracing_timeout: %d\n", go_tracing_timeout);
 
 	tracer->data_limit_max = socket_data_limit_max;
+
+	if (extended_socket_tracer_ready(tracer))
+		return -EINVAL;
 
 	// Insert prog of output data into map for using BPF Tail Calls.
 	insert_output_prog_to_map(tracer);

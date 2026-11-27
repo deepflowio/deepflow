@@ -41,6 +41,17 @@ void __attribute__ ((weak)) extended_prog_jump_tables(struct bpf_tracer *tracer)
 {
 }
 
+int __attribute__ ((weak)) extended_socket_tracer_ready(struct bpf_tracer *tracer)
+{
+	return 0;
+}
+
+int __attribute__ ((weak)) extended_map_reuse_fd(const char *obj_name,
+						 const char *map_name)
+{
+	return -1;
+}
+
 int __attribute__ ((weak)) collect_extended_uprobe_syms_from_procfs(struct
 								    tracer_probes_conf
 								    *conf)

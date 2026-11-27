@@ -39,6 +39,24 @@
 
 #define __user
 
+/*
+ * Linux 5.2+ kernels allow programs larger than the old 4096-insn cap, but
+ * Linux 5.15 still has a 1,000,000 processed-insn verifier complexity limit.
+ * AI Agent governance adds state to syscall socket hot paths, so split those
+ * paths in the 5.2_plus object while leaving uprobe paths on the old layout.
+ */
+#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
+#define USE_SOCKET_TRACE_TAIL_CALLS 1
+#endif
+
+#if defined(LINUX_VER_5_2_PLUS) && defined(EXTENDED_AI_AGENT_FILE_IO)
+#define USE_SOCKET_TRACE_SYSCALL_TAIL_CALLS 1
+#endif
+
+#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+#define USE_SOCKET_TRACE_INLINE_OUTPUT 1
+#endif
+
 #ifdef EXTENDED_AI_AGENT_FILE_IO
 #ifndef AI_AGENT_PROC_FORK
 #define AI_AGENT_PROC_FORK  1
@@ -1329,7 +1347,7 @@ static __inline void trace_process(struct socket_info_s *socket_info_ptr,
 	}
 }
 
-#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+#ifdef USE_SOCKET_TRACE_INLINE_OUTPUT
 static __inline int
 __output_data_common(void *ctx, struct tracer_ctx_s *tracer_ctx,
 		     struct __socket_data_buffer *v_buff,
@@ -1751,7 +1769,23 @@ __data_submit(struct pt_regs *ctx, struct conn_info_s *conn_info,
 			p->protocols[idx] = (__u8) v->data_type;
 		}
 	}
+#endif
 
+#ifdef USE_SOCKET_TRACE_SYSCALL_TAIL_CALLS
+	if (extra->source == DATA_SOURCE_SYSCALL) {
+		struct tail_calls_context *context =
+		    (struct tail_calls_context *)v->data;
+		context->max_size_limit = data_max_sz;
+		context->push_reassembly_bytes = send_reasm_bytes;
+		context->vecs = (bool) vecs;
+		context->is_close = false;
+		context->dir = conn_info->direction;
+
+		return SUBMIT_OK;
+	}
+#endif
+
+#ifdef USE_SOCKET_TRACE_INLINE_OUTPUT
 	return __output_data_common(ctx, tracer_ctx, v_buff, args,
 				    conn_info->direction, (bool) vecs,
 				    tracer_ctx->data_limit_max, false,
@@ -1843,7 +1877,11 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	if (!(sk != NULL &&
 	      ((sock_state = is_tcp_udp_data(sk, offset, conn_info))
 	       != SOCK_CHECK_TYPE_ERROR))) {
-#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+#ifdef USE_SOCKET_TRACE_SYSCALL_TAIL_CALLS
+		if (extra->source == DATA_SOURCE_SYSCALL)
+			return -2;
+#endif
+#ifdef USE_SOCKET_TRACE_INLINE_OUTPUT
 		return trace_io_event_common(ctx, offset, args, direction, id);
 #else
 		return -2; // This means attempting to handle I/O events.
@@ -1914,7 +1952,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 
 	if (act == INFER_TERMINATE)
 		return -1;
-#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
+#ifdef USE_SOCKET_TRACE_TAIL_CALLS
 	if (disable_kprobe && extra->source == DATA_SOURCE_SYSCALL)
 		return -1;
 
@@ -1938,6 +1976,26 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 				      PROG_PROTO_INFER_KP_2_IDX);
 		}
 	}
+#elif defined(USE_SOCKET_TRACE_SYSCALL_TAIL_CALLS)
+	if (extra->source == DATA_SOURCE_SYSCALL) {
+		if (disable_kprobe)
+			return -1;
+
+		if (act == INFER_CONTINUE) {
+			ctx_map->tail_call.conn_info = __conn_info;
+			ctx_map->tail_call.extra = *extra;
+			ctx_map->tail_call.bytes_count = bytes_count;
+			ctx_map->tail_call.offset = offset;
+			ctx_map->tail_call.dir = direction;
+#ifdef SUPPORTS_KPROBE_ONLY
+			bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
+				      PROG_PROTO_INFER_KP_2_IDX);
+#else
+			bpf_tail_call(ctx, &NAME(progs_jmp_tp_map),
+				      PROG_PROTO_INFER_TP_2_IDX);
+#endif
+		}
+	}
 #endif
 
 	if (conn_info->protocol == PROTO_CUSTOM) {
@@ -1950,7 +2008,7 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	// data_submit can be performed, otherwise MySQL data may be lost
 	if (conn_info->protocol != PROTO_UNKNOWN ||
 	    conn_info->message_type != MSG_UNKNOWN) {
-#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
+#ifdef USE_SOCKET_TRACE_TAIL_CALLS
 		/*
 		 * Fill in tail call context information.
 		 */
@@ -1959,6 +2017,17 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 		ctx_map->tail_call.bytes_count = bytes_count;
 		ctx_map->tail_call.offset = offset;
 		return 0;
+#elif defined(USE_SOCKET_TRACE_SYSCALL_TAIL_CALLS)
+		if (extra->source == DATA_SOURCE_SYSCALL) {
+			ctx_map->tail_call.conn_info = __conn_info;
+			ctx_map->tail_call.extra = *extra;
+			ctx_map->tail_call.bytes_count = bytes_count;
+			ctx_map->tail_call.offset = offset;
+			return 0;
+		}
+		return __data_submit(ctx, conn_info, args, extra->vecs,
+				     bytes_count, offset, args->enter_ts,
+				     extra);
 #else
 		return __data_submit(ctx, conn_info, args, extra->vecs,
 				     bytes_count, offset, args->enter_ts,
@@ -1983,7 +2052,8 @@ static __inline void process_syscall_data(struct pt_regs *ctx, __u64 id,
 
 	int result = process_data(ctx, id, direction, args, bytes_count, &extra);
 	if (result == 0) {
-#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
+#if defined(USE_SOCKET_TRACE_TAIL_CALLS) || \
+	defined(USE_SOCKET_TRACE_SYSCALL_TAIL_CALLS)
 #ifdef SUPPORTS_KPROBE_ONLY
 		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
 			      PROG_DATA_SUBMIT_KP_IDX);
@@ -2017,7 +2087,8 @@ static __inline void process_syscall_data_vecs(struct pt_regs *ctx, __u64 id,
 
 	int result = process_data(ctx, id, direction, args, bytes_count, &extra);
 	if (result == 0) {
-#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
+#if defined(USE_SOCKET_TRACE_TAIL_CALLS) || \
+	defined(USE_SOCKET_TRACE_SYSCALL_TAIL_CALLS)
 #ifdef SUPPORTS_KPROBE_ONLY
 		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map),
 			      PROG_DATA_SUBMIT_KP_IDX);
@@ -2960,7 +3031,7 @@ static __inline void __push_close_event(__u64 pid_tgid, __u64 uid, __u64 seq,
 	v->fd = fd;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
 
-#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
+#ifdef USE_SOCKET_TRACE_TAIL_CALLS
 	struct tail_calls_context *context =
 	    (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
@@ -3343,7 +3414,7 @@ static __inline int output_extra_data_common(struct data_args_t *args, struct __
 	return 0;
 }
 
-#if defined(LINUX_VER_KFUNC) || defined(LINUX_VER_5_2_PLUS)
+#ifdef USE_SOCKET_TRACE_INLINE_OUTPUT
 static __inline int __output_data_common(void *ctx,
 					 struct tracer_ctx_s *tracer_ctx,
 					 struct __socket_data_buffer *v_buff,

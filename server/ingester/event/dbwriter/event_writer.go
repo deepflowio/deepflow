@@ -106,7 +106,7 @@ func NewEventWriter(eventType common.EventType, decoderIndex int, config *config
 	case common.RESOURCE_EVENT:
 		w.ttl = config.EventTTL
 		w.writerConfig = config.CKWriterConfig
-	case common.FILE_EVENT, common.FILE_AGG_EVENT, common.FILE_MGMT_EVENT, common.PROC_PERM_EVENT, common.PROC_OPS_EVENT:
+	case common.FILE_EVENT, common.FILE_AGG_EVENT, common.FILE_MGMT_EVENT, common.PROC_PERM_EVENT, common.PROC_OPS_EVENT, common.PROC_BLOCK_EVENT:
 		w.ttl = config.FileEventTTL
 		w.writerConfig = config.FileEventCKWriterConfig
 	case common.K8S_EVENT:

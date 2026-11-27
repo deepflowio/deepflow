@@ -438,7 +438,7 @@ static __inline int trace_io_event_common(void *ctx,
 	v->thread_trace_id = trace_id;
 	v->msg_type = MSG_COMMON;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
-#if !defined(LINUX_VER_KFUNC) && !defined(LINUX_VER_5_2_PLUS)
+#ifdef USE_SOCKET_TRACE_TAIL_CALLS
 	struct tail_calls_context *context =
 	    (struct tail_calls_context *)v->data;
 	context->max_size_limit = data_max_sz;
