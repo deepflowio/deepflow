@@ -126,7 +126,8 @@ func (n *PodNamespace) generateUpdateInfo(diffBase *diffbase.PodNamespace, cloud
 			updateTags = cloudItem.CloudTags
 		}
 		tagsJson, _ := json.Marshal(updateTags)
-		mapInfo["learned_cloud_tags"] = tagsJson
+		// 使用字符串参数，避免达梦将字节切片按二进制类型写入文本字段。
+		mapInfo["learned_cloud_tags"] = string(tagsJson)
 		structInfo.LearnedCloudTags.Set(diffBase.LearnedCloudTags, cloudItem.CloudTags)
 	}
 
