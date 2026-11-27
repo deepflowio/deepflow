@@ -695,7 +695,6 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 	if result == nil || len(result.Values) == 0 {
 		return &prompb.ReadResponse{Results: []*prompb.QueryResult{{}}}, nil
 	}
-	cacheEnabled := config.Cfg.Prometheus.Cache.RemoteReadCache && !strings.Contains(metricsName, "__")
 	log.Debugf("resTransToProm: result length: %d", len(result.Values))
 	columnIndexes := []int{-1, -1, -1, -1, -1, -1, -1}
 	otherTagCount := 0
@@ -907,13 +906,6 @@ func (p *prometheusReader) respTransToProm(ctx context.Context, metricsName stri
 			// avoid duplicated __name__ label
 			if filterTagMap[PROMETHEUS_METRICS_NAME] == "" {
 				pairs = append(pairs, prompb.Label{Name: PROMETHEUS_METRICS_NAME, Value: metricsName})
-			}
-
-			if cacheEnabled {
-				// pre-sorted labels string
-				// if cache enabled, it will append in cache and remove it in return
-				// only when remote read, because only `remote read cache` need use label string to compare
-				pairs = append(pairs, prompb.Label{Name: model.CACHE_LABEL_STRING_TAG, Value: deepflowNativeTagString})
 			}
 
 			series = &prompb.TimeSeries{Labels: pairs}

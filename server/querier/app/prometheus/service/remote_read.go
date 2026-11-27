@@ -31,7 +31,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/deepflowio/deepflow/server/querier/app/prometheus/cache"
+	cachenew "github.com/deepflowio/deepflow/server/querier/app/prometheus/cache_new"
 	"github.com/deepflowio/deepflow/server/querier/common"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse"
@@ -57,8 +57,8 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	if req.Queries[0].Hints == nil || req.Queries[0].Matchers == nil {
 		return nil, "", "", 0, errors.New("req.Queries dont have hint or matchers! ")
 	}
-	start, end := cache.GetPromRequestQueryTime(req.Queries[0])
-	metricName := cache.GetMetricFromLabelMatcher(&req.Queries[0].Matchers)
+	start, end := cachenew.GetPromRequestQueryTime(req.Queries[0])
+	metricName := cachenew.GetMetricFromLabelMatcher(&req.Queries[0].Matchers)
 	cacheOrgFilterKey := fmt.Sprintf("%s-%s", p.orgID, strings.Join(p.blockTeamID, "-"))
 
 	var response *prompb.ReadResponse
@@ -67,7 +67,7 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 		// when error occurs, means query not finished yet, remove the first query placeholder
 		// if error is nil, means query finished, don't clean key
 		if err != nil || response == nil {
-			cache.PromReadResponseCache().Remove(r, cacheOrgFilterKey, p.extraFilters)
+			cachenew.GlobalReadCache().Fail(r, cacheOrgFilterKey, p.extraFilters)
 		}
 	}(req)
 
@@ -75,31 +75,26 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 	// for DeepFlow Native metrics, don't use cache
 	cacheAvailable := config.Cfg.Prometheus.Cache.RemoteReadCache && !strings.Contains(metricName, "__")
 	if cacheAvailable {
-		var hit cache.CacheHit
-		var cacheItem *cache.CacheItem
-		cacheItem, hit, start, end = cache.PromReadResponseCache().Get(req.Queries[0], start, end, cacheOrgFilterKey, p.extraFilters)
-		if cacheItem != nil {
-			response = cacheItem.Data()
-		}
+		lookup := cachenew.GlobalReadCache().Get(req.Queries[0], start, end, cacheOrgFilterKey, p.extraFilters)
 
-		if hit == cache.CacheKeyFoundNil && cacheItem != nil {
-			// found item, but is loading by other request
-			loadCompleted := cacheItem.GetLoadCompleteSignal()
-
-			select {
-			case <-time.After(time.Duration(config.Cfg.Prometheus.Cache.CacheFirstTimeout) * time.Second):
-				log.Infof("req [%s:%d-%d] wait 10 seconds to get cache result", metricName, start, end)
+		if lookup.Status == cachenew.StatusPending {
+			// another goroutine is loading the same range; wait with a timeout then retry
+			waitCtx, cancel := context.WithTimeout(ctx, time.Duration(config.Cfg.Prometheus.Cache.CacheFirstTimeout)*time.Second)
+			defer cancel()
+			if !lookup.Wait(waitCtx) {
+				log.Infof("req [%s:%d-%d] wait %d seconds to get cache result", metricName, start, end, config.Cfg.Prometheus.Cache.CacheFirstTimeout)
 				return response, "", "", 0, errors.New("query timeout, retry to get response! ")
-			case <-loadCompleted:
-				cacheItem, hit, start, end = cache.PromReadResponseCache().Get(req.Queries[0], start, end, cacheOrgFilterKey, p.extraFilters)
-				if cacheItem != nil {
-					response = cacheItem.Data()
-				}
-				log.Debugf("req [%s:%d-%d] get cached result", metricName, start, end)
 			}
+			lookup = cachenew.GlobalReadCache().Get(req.Queries[0], start, end, cacheOrgFilterKey, p.extraFilters)
+			log.Debugf("req [%s:%d-%d] get cached result", metricName, start, end)
 		}
 
-		if hit == cache.CacheHitFull {
+		if lookup.Data != nil {
+			response = lookup.Data
+		}
+		start, end = lookup.QStart, lookup.QEnd
+
+		if lookup.Status == cachenew.StatusFull {
 			return response, "", "", 0, nil
 		}
 	}
@@ -180,13 +175,13 @@ func (p *prometheusReader) promReaderExecute(ctx context.Context, req *prompb.Re
 		}
 	}
 
-	api_query_start, api_query_end := cache.GetPromRequestQueryTime(req.Queries[0])
+	api_query_start, api_query_end := cachenew.GetPromRequestQueryTime(req.Queries[0])
 	// response trans to prom resp
 	resp, err = p.respTransToProm(ctx, metricName, api_query_start, api_query_end, result)
 
 	if cacheAvailable {
 		// merge result into cache
-		response = cache.PromReadResponseCache().AddOrMerge(req, resp, cacheOrgFilterKey, p.extraFilters)
+		response = cachenew.GlobalReadCache().Complete(req, resp, cacheOrgFilterKey, p.extraFilters)
 	} else {
 		// not using cache, query result would be real result
 		response = resp

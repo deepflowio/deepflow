@@ -19,11 +19,9 @@ package cache
 import (
 	"fmt"
 	"sort"
-	"sync"
 	"time"
 	"unsafe"
 
-	"github.com/deepflowio/deepflow/server/libs/lru"
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/promql/parser"
@@ -34,407 +32,290 @@ const (
 	pointPtrSize = int(unsafe.Sizeof(&promql.Point{}))
 )
 
-type item[T any] struct {
-	start int64
-	end   int64
-	step  int64
-	vType parser.ValueType // origin value type
-	data  T
-
-	loadCompleted chan struct{}
+// promqlEntry bundles a promql.Result with its original value type so the cache
+// can distinguish between instant (vector → stored as matrix) and range queries.
+type promqlEntry struct {
+	result promql.Result
+	vType  parser.ValueType
 }
 
-func dataSizeOf(r *item[promql.Result]) uint64 {
-	if r == nil {
-		return 0
-	}
-	var size uintptr
-	size = unsafe.Sizeof(r.start) + unsafe.Sizeof(r.end) + unsafe.Sizeof(r.step) + unsafe.Sizeof(r.vType)
-	matrix, err := r.data.Matrix()
-	if err != nil {
-		totalPoints := 0
-		for _, m := range matrix {
-			for _, v := range m.Metric {
-				size += uintptr(len(v.Name) + len(v.Value))
-				size += unsafe.Sizeof((*string)(unsafe.Pointer(&v.Name))) + unsafe.Sizeof((*string)(unsafe.Pointer(&v.Value)))
-			}
-			totalPoints += len(m.Points)
-		}
-		size += uintptr(totalPoints*pointSize + totalPoints*pointPtrSize)
-	}
-	return uint64(size)
-}
-
+// Cacher is a time-range cache for computed PromQL results.
+// It wraps TimedCache[promqlEntry] and provides the same public API as the
+// previous implementation so callers in service/promql.go are unaffected.
 type Cacher struct {
-	entries *lru.Cache[string, *item[promql.Result]]
-	lock    *sync.RWMutex
-
-	cleanUpCache *time.Ticker
+	c *TimedCache[promqlEntry]
 }
 
+// NewCacher creates a Cacher configured from Cfg.
 func NewCacher() *Cacher {
-	c := &Cacher{
-		lock:    &sync.RWMutex{},
-		entries: lru.NewCache[string, *item[promql.Result]](config.Cfg.Prometheus.Cache.CacheMaxCount),
-	}
-	go c.startUpCleanCache(config.Cfg.Prometheus.Cache.CacheCleanInterval)
-	return c
-}
-
-func (c *Cacher) startUpCleanCache(cleanUpInterval int) {
-	c.cleanUpCache = time.NewTicker(time.Duration(cleanUpInterval) * time.Second)
-	defer func() {
-		c.cleanUpCache.Stop()
-		if err := recover(); err != nil {
-			go c.startUpCleanCache(cleanUpInterval)
-		}
-	}()
-	for range c.cleanUpCache.C {
-		c.cleanCache()
+	cfg := config.Cfg.Prometheus.Cache
+	// promql timestamps are in milliseconds, so scale the gap accordingly.
+	allowGapMs := int64(cfg.CacheAllowTimeGap) * 1000
+	return &Cacher{
+		c: NewTimedCache(TimedCacheOptions[promqlEntry]{
+			MaxCount:      cfg.CacheMaxCount,
+			MaxItemSize:   cfg.CacheItemSize,
+			CleanInterval: time.Duration(cfg.CacheCleanInterval) * time.Second,
+			AllowTimeGap:  allowGapMs,
+			MergeFn:       mergePromqlEntry,
+			CopyFn:        copyPromqlEntry,
+			SizeFn:        sizeofPromqlEntry,
+		}),
 	}
 }
 
-func (c *Cacher) cleanCache() {
-	keys := c.entries.Keys()
-	for _, k := range keys {
-		item, ok := c.entries.Peek(k)
-		if !ok {
-			continue
-		}
-		size := dataSizeOf(item)
-		if size > config.Cfg.Prometheus.Cache.CacheItemSize {
-			log.Infof("cache item remove: %s, real size: %d", k, size)
-			c.lock.Lock()
-			c.entries.Remove(k)
-			c.lock.Unlock()
-		}
-	}
-}
-
+// Fetch checks whether [start,end] is available in the cache for key.
+// Returns (result, fixedStart, fixedEnd, queryRequired).
+//   - queryRequired==true: caller must query and then call Merge.
+//   - queryRequired==false: result is valid; fixedStart==0 && fixedEnd==0 means full hit.
 func (c *Cacher) Fetch(key string, start, end int64) (r promql.Result, fixedStart int64, fixedEnd int64, queryRequired bool) {
-	c.lock.RLock()
-	entry, ok := c.entries.Get(key)
-	c.lock.RUnlock()
-	if !ok {
-		c.lock.Lock()
-		c.entries.Add(key, &item[promql.Result]{vType: parser.ValueTypeNone, loadCompleted: make(chan struct{})})
-		c.lock.Unlock()
+	for {
+		e, hit, qs, qe := c.c.Get(key, start, end)
 
-		return promql.Result{Err: fmt.Errorf("key %s not found", key)}, start, end, true
-	}
+		switch hit {
+		case CacheKeyNotFound:
+			// placeholder inserted; caller must Merge or Remove
+			return promql.Result{Err: fmt.Errorf("key %s not found", key)}, start, end, true
 
-	if entry.vType == parser.ValueTypeNone {
-		select {
-		case <-time.After(time.Duration(config.Cfg.Prometheus.Cache.CacheFirstTimeout) * time.Second):
-			log.Infof("req [%s:%d-%d] wait %d to get cache result", key, start, end, config.Cfg.Prometheus.Cache.CacheFirstTimeout)
-			return promql.Result{Err: fmt.Errorf("key %s not found", key)}, start, end, false
-		case <-entry.loadCompleted:
-			entry, ok = c.entries.Get(key)
-			if !ok {
-				return promql.Result{Err: fmt.Errorf("key %s load failed", key)}, start, end, true
+		case CacheKeyFoundNil:
+			// pending: another goroutine is loading; wait then retry via loop
+			select {
+			case <-time.After(time.Duration(config.Cfg.Prometheus.Cache.CacheFirstTimeout) * time.Second):
+				log.Infof("req [%s:%d-%d] wait %d to get cache result", key, start, end, config.Cfg.Prometheus.Cache.CacheFirstTimeout)
+				return promql.Result{Err: fmt.Errorf("key %s not found", key)}, start, end, false
+			case <-e.loaded:
+				// re-check after loading completes; loop back to Get
+				continue
 			}
-			log.Debugf("req [%s:%d-%d] get cached result", key, start, end)
-		}
-	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+		case CacheMiss:
+			// range is disjoint; new placeholder was inserted
+			return promql.Result{Err: fmt.Errorf("key %s not found", key)}, start, end, true
 
-	if entry.vType == parser.ValueTypeVector {
-		r, queryRequired = c.fetchInstant(entry, start, end)
-		return r, start, end, queryRequired
-	} else if entry.vType == parser.ValueTypeMatrix {
-		return c.fetchRange(entry, start, end)
-	}
-
-	return promql.Result{Err: fmt.Errorf("value Type %s not found", key)}, start, end, true
-}
-
-func (c *Cacher) fetchRange(entry *item[promql.Result], start, end int64) (r promql.Result, fixedStart int64, fixedEnd int64, queryRequired bool) {
-	fixedStart, fixedEnd = c.validateQueryTs(start, end, entry.start, entry.end)
-	if fixedStart == 0 && fixedEnd == 0 {
-		return c.extractSubData(entry.data, start, end), fixedStart, fixedEnd, false
-	}
-	return entry.data, fixedStart, fixedEnd, true
-}
-
-func (c *Cacher) fetchInstant(entry *item[promql.Result], start, end int64) (r promql.Result, queryRequired bool) {
-	// for instant query, all data will storage as matrix, but depends on query promql, get difference result:
-	// query node_cpu_seconds_total: get vector, find out the matched query time
-	// query node_cpu_seconds_total[1m]: get matrix, find out the matched query time range
-	samples, err := entry.data.Matrix()
-	if err != nil {
-		return promql.Result{Err: err}, true
-	}
-	if samples.Len() > 0 {
-		result := make(promql.Vector, 0, samples.Len())
-		sampleCount := 0
-		// only when end == Points.T, can be added (time completely equal)
-		for i := 0; i < samples.Len(); i++ {
-			findEndTimeAt := sort.Search(len(samples[i].Points), func(j int) bool {
-				return samples[i].Points[j].T >= end && samples[i].Points[j].T <= end+int64(config.Cfg.Prometheus.Cache.CacheAllowTimeGap*1e3)
-			})
-			if findEndTimeAt < len(samples[i].Points) {
-				sampleCount++
-				if samples[i].Metric != nil {
-					// when Metric == nil, means it's null result
-					result = append(result, promql.Sample{Metric: samples[i].Metric, Point: samples[i].Points[findEndTimeAt]})
+		case CacheHitFull:
+			pe := e.data
+			if pe.vType == parser.ValueTypeVector {
+				res, ok := c.fetchInstant(pe, end)
+				if ok {
+					return res, start, end, false
 				}
-			} // else not found
-		}
-		if sampleCount > 0 {
-			return promql.Result{Value: result}, false
+				return promql.Result{}, start, end, true
+			}
+			return pe.result, 0, 0, false
+
+		case CacheHitPart:
+			pe := e.data
+			if pe.vType == parser.ValueTypeVector {
+				// for instant queries, partial hit means the timestamp isn't in cache
+				return pe.result, qs, qe, true
+			}
+			// range query partial hit: return the sub-range of cached data
+			sub := extractSubData(pe.result, start, end)
+			return sub, qs, qe, true
+
+		default:
+			return promql.Result{Err: fmt.Errorf("unexpected cache state for %s", key)}, start, end, true
 		}
 	}
-	return promql.Result{}, true
 }
 
-func (c *Cacher) validateQueryTs(start, end int64, cacheStart, cacheEnd int64) (int64, int64) {
-	// cache miss:
-	// left
-	if end < cacheStart {
-		return start, end
+// Merge stores or merges res for [start,end] into the cache entry for key.
+// Returns the (merged) result as seen by callers.
+func (c *Cacher) Merge(key string, start, end, step int64, res promql.Result) (promql.Result, error) {
+	pe := promqlEntry{result: res, vType: res.Value.Type()}
+	// vectors are stored as matrices internally for uniform merge logic
+	if pe.vType == parser.ValueTypeVector {
+		v, err := res.Vector()
+		if err == nil {
+			pe.result.Value = vectorToMatrix(&v, end)
+		}
 	}
-	// right
-	if start > cacheEnd {
-		return start, end
-	}
-	// outside
-	if start < cacheStart && end > cacheEnd {
-		return start, end
-	}
+	merged := c.c.Merge(key, start, end, pe)
+	return merged.result, nil
+}
 
-	// cache hit
-	if start < cacheStart {
-		return start, cacheStart
-	}
+// Remove deletes a pending-only entry (used for error cleanup).
+func (c *Cacher) Remove(key string) {
+	c.c.Remove(key)
+}
 
-	if end > cacheEnd {
-		if end-cacheEnd <= int64(config.Cfg.Prometheus.Cache.CacheAllowTimeGap*1e3) {
-			return 0, 0
-		} else {
-			return cacheEnd, end
+// ---------------------------------------------------------------------------
+// instant query helpers
+// ---------------------------------------------------------------------------
+
+func (c *Cacher) fetchInstant(pe promqlEntry, end int64) (promql.Result, bool) {
+	samples, err := pe.result.Matrix()
+	if err != nil {
+		return promql.Result{Err: err}, false
+	}
+	if samples.Len() == 0 {
+		return promql.Result{}, false
+	}
+	gapMs := int64(config.Cfg.Prometheus.Cache.CacheAllowTimeGap) * 1000
+	result := make(promql.Vector, 0, samples.Len())
+	sampleCount := 0
+	for i := 0; i < samples.Len(); i++ {
+		// sort.Search requires a monotonic predicate (false → true).
+		// The previous predicate `T >= end && T <= end+gapMs` is false→true→false,
+		// which violates the contract. Use `T >= end` (monotonic), then verify
+		// the upper bound with a post-condition check.
+		at := sort.Search(len(samples[i].Points), func(j int) bool {
+			return samples[i].Points[j].T >= end
+		})
+		if at < len(samples[i].Points) && samples[i].Points[at].T <= end+gapMs {
+			sampleCount++
+			if samples[i].Metric != nil {
+				result = append(result, promql.Sample{Metric: samples[i].Metric, Point: samples[i].Points[at]})
+			}
+		}
+	}
+	if sampleCount > 0 {
+		return promql.Result{Value: result}, true
+	}
+	return promql.Result{}, false
+}
+
+// ---------------------------------------------------------------------------
+// merge / copy / size helpers
+// ---------------------------------------------------------------------------
+
+func mergePromqlEntry(cached promqlEntry, cs, ce int64, newPe promqlEntry, ns, ne int64) promqlEntry {
+	// ensure new data stored as matrix
+	if newPe.vType == parser.ValueTypeVector {
+		v, err := newPe.result.Vector()
+		if err == nil {
+			newPe.result.Value = vectorToMatrix(&v, ne)
 		}
 	}
 
-	// cache hit, not query anything, return cache data
-	if start >= cacheStart && cacheEnd >= end {
-		return 0, 0
+	// disjoint or completely superseded — replace
+	if ne <= cs || ns >= ce || (ns < cs && ne > ce) {
+		return newPe
 	}
 
-	return start, end
+	mergedResult, err := matrixMerge(newPe.result.Value.(promql.Matrix), &cached.result)
+	if err != nil {
+		return newPe
+	}
+	return promqlEntry{result: mergedResult, vType: cached.vType}
 }
 
-func (c *Cacher) extractSubData(r promql.Result, start, end int64) promql.Result {
+// mergePoints returns a new []promql.Point containing all points from both
+// slices in time order, handling all four overlap cases. Never aliases either input.
+func mergePoints(existing, newPts []promql.Point) []promql.Point {
+	if len(existing) == 0 {
+		result := make([]promql.Point, len(newPts))
+		copy(result, newPts)
+		return result
+	}
+	if len(newPts) == 0 {
+		result := make([]promql.Point, len(existing))
+		copy(result, existing)
+		return result
+	}
+
+	existEnd := existing[len(existing)-1].T
+	existStart := existing[0].T
+	newEnd := newPts[len(newPts)-1].T
+
+	if existEnd < newPts[0].T {
+		// existing: [   ]
+		// new:             [   ]
+		result := make([]promql.Point, len(existing)+len(newPts))
+		copy(result, existing)
+		copy(result[len(existing):], newPts)
+		return result
+	} else if existStart > newEnd {
+		// existing:        [   ]
+		// new:      [   ]
+		result := make([]promql.Point, len(newPts)+len(existing))
+		copy(result, newPts)
+		copy(result[len(newPts):], existing)
+		return result
+	} else if existEnd >= newPts[0].T && existEnd < newEnd {
+		// existing: [   ]
+		// new:        [   ]
+		at := sort.Search(len(newPts), func(i int) bool {
+			return newPts[i].T > existEnd
+		})
+		result := make([]promql.Point, len(existing)+(len(newPts)-at))
+		copy(result, existing)
+		copy(result[len(existing):], newPts[at:])
+		return result
+	} else if existStart <= newEnd && existStart > newPts[0].T {
+		// existing:   [   ]
+		// new:      [   ]
+		at := sort.Search(len(newPts), func(i int) bool {
+			return newPts[i].T >= existStart
+		})
+		result := make([]promql.Point, at+len(existing))
+		copy(result, newPts[:at])
+		copy(result[at:], existing)
+		return result
+	}
+	// existing completely contains new (or identical); keep existing
+	result := make([]promql.Point, len(existing))
+	copy(result, existing)
+	return result
+}
+
+func matrixMerge(resp promql.Matrix, cache *promql.Result) (promql.Result, error) {
+	cacheMatrix, err := cache.Matrix()
+	if err != nil {
+		return promql.Result{Err: err}, err
+	}
+
+	// Build result as fresh allocations so MergeFn never aliases cached data.
+	result := make(promql.Matrix, len(cacheMatrix))
+	for i, s := range cacheMatrix {
+		pts := make([]promql.Point, len(s.Points))
+		copy(pts, s.Points)
+		result[i] = promql.Series{Metric: s.Metric, Points: pts}
+	}
+
+	appendMatrix := make([]promql.Series, 0, len(resp))
+	for _, series := range resp {
+		matched := false
+		// Use indexed iteration (not range-copy) so mutations to result[i].Points
+		// are actually persisted — a range-copy would silently discard them.
+		for i := range result {
+			if result[i].Metric != nil && promLabelsEqual(&result[i].Metric, &series.Metric) {
+				result[i].Points = mergePoints(result[i].Points, series.Points)
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			appendMatrix = append(appendMatrix, series)
+		}
+	}
+	if len(appendMatrix) > 0 {
+		result = append(result, appendMatrix...)
+	}
+	return promql.Result{Value: result}, nil
+}
+
+func extractSubData(r promql.Result, start, end int64) promql.Result {
 	matrix, err := r.Matrix()
 	if err != nil {
 		return promql.Result{Err: err}
 	}
 	result := make(promql.Matrix, 0, len(matrix))
 	for _, series := range matrix {
-		newSeries := promql.Series{Metric: series.Metric}
 		begin := sort.Search(len(series.Points), func(i int) bool {
 			return series.Points[i].T >= start
 		})
 		stop := sort.Search(len(series.Points), func(i int) bool {
-			return series.Points[i].T > end // include end
+			return series.Points[i].T > end
 		})
-		newSeries.Points = series.Points[begin:stop]
-		result = append(result, newSeries)
+		pts := make([]promql.Point, stop-begin)
+		copy(pts, series.Points[begin:stop])
+		result = append(result, promql.Series{Metric: series.Metric, Points: pts})
 	}
 	return promql.Result{Value: result}
 }
 
-func (c *Cacher) Remove(key string) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if entry, ok := c.entries.Peek(key); ok && entry.vType == parser.ValueTypeNone {
-		c.entries.Remove(key)
-	}
-}
-
-func (c *Cacher) Merge(key string, start, end, step int64, res promql.Result) (promql.Result, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	entry, ok := c.entries.Get(key)
-	if !ok || (entry.vType == parser.ValueTypeNone) {
-		item := item[promql.Result]{
-			start: start,
-			end:   end,
-			step:  step,
-			data:  res,
-			vType: res.Value.Type(),
-		}
-
-		if item.data.Value.Type() == parser.ValueTypeVector {
-			v, err := res.Vector()
-			if err == nil {
-				item.data.Value = vectorTomatrix(&v, end)
-				item.vType = parser.ValueTypeVector // mark origin value type
-			}
-			// else not vector, merge directly
-		}
-		c.entries.Add(key, &item)
-		return res, nil
-	}
-
-	var mergeResult promql.Result
-	switch res.Value.Type() {
-	case parser.ValueTypeVector:
-		vector, err := res.Vector()
-		if err != nil {
-			return res, err
-		}
-		mergeResult, err = c.vectorMerge(vector, &entry.data)
-		if err != nil {
-			return promql.Result{Err: err}, err
-		}
-	case parser.ValueTypeMatrix:
-		// replace
-		// cached: [   ]
-		// result:       [   ]
-
-		// cached:       [   ]
-		// result: [   ]
-		if start > entry.end || end < entry.start {
-			entry.start = start
-			entry.end = end
-			entry.data = res
-		}
-
-		// cached:  [   ]
-		// result: [     ]
-		if start < entry.start && end > entry.end {
-			entry.start = start
-			entry.end = end
-			entry.data = res
-		}
-
-		matrix, err := res.Matrix()
-		if err != nil {
-			return res, err
-		}
-		mergeResult, err = c.matrixMerge(matrix, &entry.data)
-		if err != nil {
-			return promql.Result{Err: err}, err
-		}
-	default:
-	}
-
-	if entry.end < end {
-		entry.end = end
-	}
-	if entry.start > start {
-		entry.start = start
-	}
-
-	entry.data = mergeResult
-
-	if entry.loadCompleted != nil {
-		select {
-		case _, ok := <-entry.loadCompleted:
-			log.Debugf("entry loadCompleted closed: %v", ok)
-		default:
-			close(entry.loadCompleted)
-		}
-	}
-	return entry.data, nil
-}
-
-func (c *Cacher) matrixMerge(resp promql.Matrix, cache *promql.Result) (promql.Result, error) {
-	cacheMatrix, err := cache.Matrix()
-	if err != nil {
-		return promql.Result{Err: err}, err
-	}
-	// avoid slice growth, but it maybe waste of memory
-	appendMatrix := make([]promql.Series, 0, len(resp))
-	for _, series := range resp {
-		labelsMismatch := 0
-		for _, cachedTs := range cacheMatrix {
-			if cachedTs.Metric != nil && promLabelsEqual(&cachedTs.Metric, &series.Metric) {
-				existsStartT := cachedTs.Points[0].T
-				existsEndT := cachedTs.Points[len(cachedTs.Points)-1].T
-
-				if existsEndT < series.Points[0].T {
-					// cached: [   ]
-					// result:       [   ]
-					cachedTs.Points = append(cachedTs.Points, series.Points...)
-				} else if existsStartT > series.Points[len(series.Points)-1].T {
-					// cached:       [   ]
-					// result: [   ]
-					cachedTs.Points = append(series.Points, cachedTs.Points...)
-				} else if existsEndT >= series.Points[0].T && existsEndT < series.Points[len(series.Points)-1].T {
-					// cached: [   ]
-					// result:   [   ]
-					// cached data & resp overlap
-					overlapPointAt := sort.Search(len(series.Points), func(i int) bool {
-						return series.Points[i].T > existsEndT
-					})
-					cachedTs.Points = append(cachedTs.Points, series.Points[overlapPointAt:]...)
-				} else if existsStartT <= series.Points[len(series.Points)-1].T && existsStartT > series.Points[0].T {
-					// cached:   [   ]
-					// result: [   ]
-					overlapPointAt := sort.Search(len(series.Points), func(i int) bool {
-						return series.Points[i].T >= existsStartT
-					})
-					cachedTs.Points = append(series.Points[:overlapPointAt], cachedTs.Points...)
-				}
-			} else {
-				labelsMismatch++
-			}
-		}
-		if labelsMismatch == len(cacheMatrix) {
-			appendMatrix = append(appendMatrix, series)
-		}
-	}
-	if len(appendMatrix) > 0 {
-		cacheMatrix = append(cacheMatrix, appendMatrix...)
-	}
-	return promql.Result{Value: cacheMatrix}, nil
-}
-
-func (c *Cacher) vectorMerge(resp promql.Vector, cache *promql.Result) (promql.Result, error) {
-	cacheMatrix, err := cache.Matrix()
-	if err != nil {
-		return promql.Result{Err: err}, err
-	}
-	// resp as outside
-	// avoid slice growth, but it maybe waste of memory
-	appendMatrix := make([]promql.Series, 0, len(resp))
-	for _, samples := range resp {
-		labelsMismatch := 0
-		for _, cachedTs := range cacheMatrix {
-			if cachedTs.Metric != nil && promLabelsEqual(&cachedTs.Metric, &samples.Metric) {
-				insertedPointAt := sort.Search(len(cachedTs.Points), func(i int) bool {
-					return cachedTs.Points[i].T >= samples.Point.T
-				})
-				if insertedPointAt == len(cachedTs.Points) {
-					cachedTs.Points = append(cachedTs.Points, samples.Point)
-				} else {
-					if cachedTs.Points[insertedPointAt].T != samples.Point.T {
-						cachedTs.Points = append(cachedTs.Points, promql.Point{})
-						copy(cachedTs.Points[insertedPointAt+1:], cachedTs.Points[insertedPointAt:])
-						cachedTs.Points[insertedPointAt] = samples.Point
-					}
-				}
-			} else {
-				labelsMismatch++
-			}
-		}
-		if labelsMismatch == len(cacheMatrix) {
-			// when labels mismatch in all cache, means that's a new Series
-			appendMatrix = append(appendMatrix, promql.Series{Metric: samples.Metric, Points: []promql.Point{samples.Point}})
-		}
-	}
-	if len(appendMatrix) > 0 {
-		cacheMatrix = append(cacheMatrix, appendMatrix...)
-	}
-	return promql.Result{Value: cacheMatrix}, nil
-}
-
-func vectorTomatrix(v *promql.Vector, time int64) promql.Matrix {
+func vectorToMatrix(v *promql.Vector, t int64) promql.Matrix {
 	output := make(promql.Matrix, 0, len(*v))
 	for _, m := range *v {
 		output = append(output, promql.Series{
@@ -442,12 +323,48 @@ func vectorTomatrix(v *promql.Vector, time int64) promql.Matrix {
 			Points: []promql.Point{m.Point},
 		})
 	}
-	if (len(*v)) == 0 {
-		// when query result = 0, mark an empty result, telling that there's no data at the point
+	if len(*v) == 0 {
 		output = append(output, promql.Series{
-			Metric: nil,                             // nil labels, MARK for null result
-			Points: []promql.Point{{T: time, V: 0}}, // time = query end
+			Metric: nil,
+			Points: []promql.Point{{T: t, V: 0}},
 		})
 	}
 	return output
 }
+
+func copyPromqlEntry(pe promqlEntry) promqlEntry {
+	if pe.result.Value == nil {
+		return pe
+	}
+	matrix, err := pe.result.Matrix()
+	if err != nil {
+		return pe
+	}
+	copied := make(promql.Matrix, len(matrix))
+	for i, series := range matrix {
+		pts := make([]promql.Point, len(series.Points))
+		copy(pts, series.Points)
+		copied[i] = promql.Series{Metric: series.Metric, Points: pts}
+	}
+	return promqlEntry{result: promql.Result{Value: copied}, vType: pe.vType}
+}
+
+func sizeofPromqlEntry(pe promqlEntry) uint64 {
+	matrix, err := pe.result.Matrix()
+	if err != nil {
+		return 0
+	}
+	var size uintptr
+	totalPoints := 0
+	for _, m := range matrix {
+		for _, v := range m.Metric {
+			size += uintptr(len(v.Name) + len(v.Value))
+			size += unsafe.Sizeof((*string)(unsafe.Pointer(&v.Name))) +
+				unsafe.Sizeof((*string)(unsafe.Pointer(&v.Value)))
+		}
+		totalPoints += len(m.Points)
+	}
+	size += uintptr(totalPoints*pointSize + totalPoints*pointPtrSize)
+	return uint64(size)
+}
+

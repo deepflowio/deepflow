@@ -17,7 +17,6 @@
 package model
 
 const (
-	CACHE_LABEL_STRING_TAG  = "__cache_label_string__"
 	PROMETHEUS_LABELS_INDEX = "__labels_index__"
 )
 
