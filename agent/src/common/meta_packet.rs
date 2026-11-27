@@ -1057,7 +1057,7 @@ impl<'a> MetaPacket<'a> {
         }
 
         let packet_header_size = if self.lookup_key.proto == IpProtocol::UDP
-            && self.lookup_key.proto == IpProtocol::TCP
+            || self.lookup_key.proto == IpProtocol::TCP
         {
             self.header_type.min_packet_size()
                 + self.l2_l3_opt_size as usize
@@ -1693,5 +1693,39 @@ mod tests {
         assert_eq!(start.l4_payload_len, 32_768);
         assert_eq!(start.reasm_bytes, 32_768);
         assert_eq!(start.get_captured_byte(), 32_768);
+    }
+
+    // The non-eBPF path of `get_captured_byte` used to test
+    // `proto == UDP && proto == TCP`, which no single packet can satisfy, so TCP
+    // and UDP fell through to the IPv4/IPv6 branches and had the whole L4 header
+    // omitted from the subtraction: 20 bytes for TCP, 8 for UDP. The header is
+    // now taken from `header_type`, which carries the L4 header, and the TCP
+    // options are counted too. Without that, `captured_request_byte` and
+    // `captured_response_byte` in the L7 logs overcount mirrored traffic.
+    #[test]
+    fn get_captured_byte_for_mirrored_tcp_includes_the_l4_header_and_options() {
+        // The default tap port is FROM_LOCAL_MAC, i.e. not eBPF, so this
+        // reaches the branch under test.
+        let mut pkt = MetaPacket::default();
+        pkt.lookup_key.proto = IpProtocol::TCP;
+        pkt.lookup_key.eth_type = EthernetType::IPV4;
+        pkt.header_type = HeaderType::Ipv4Tcp;
+        pkt.l4_opt_size = 12; // e.g. TCP timestamps
+        pkt.raw = Some(RawPacket::from(vec![0u8; 200]));
+
+        // 54 (eth + ip + tcp) + 12 (options)
+        assert_eq!(pkt.get_captured_byte(), 200 - 54 - 12);
+    }
+
+    #[test]
+    fn get_captured_byte_for_mirrored_udp_includes_the_l4_header() {
+        let mut pkt = MetaPacket::default();
+        pkt.lookup_key.proto = IpProtocol::UDP;
+        pkt.lookup_key.eth_type = EthernetType::IPV4;
+        pkt.header_type = HeaderType::Ipv4Udp;
+        pkt.raw = Some(RawPacket::from(vec![0u8; 100]));
+
+        // 42 (eth + ip + udp); UDP carries no options
+        assert_eq!(pkt.get_captured_byte(), 100 - 42);
     }
 }
