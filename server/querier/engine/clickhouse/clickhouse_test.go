@@ -35,6 +35,7 @@ import (
 	"github.com/deepflowio/deepflow/server/querier/config"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/client"
 	"github.com/deepflowio/deepflow/server/querier/engine/clickhouse/metrics"
+	tagdescription "github.com/deepflowio/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowio/deepflow/server/querier/parse"
 )
 
@@ -688,6 +689,54 @@ func TestGetSql(t *testing.T) {
 			if err != nil {
 				t.Errorf("\nerror %v", err)
 			}
+		}
+	}
+}
+
+func TestL7ProtocolDatabaseEnumCandidates(t *testing.T) {
+	if err := Load(); err != nil {
+		t.Fatal(err)
+	}
+
+	enums, ok := tagdescription.TAG_INT_ENUMS["l7_protocol"]
+	if !ok {
+		t.Fatal("missing l7_protocol int enum")
+	}
+	got := make(map[int]struct {
+		en string
+		zh string
+	}, len(enums))
+	for _, item := range enums {
+		value, ok := item.Value.(int)
+		if !ok {
+			t.Fatalf("unexpected l7_protocol enum value type %T", item.Value)
+		}
+		got[value] = struct {
+			en string
+			zh string
+		}{
+			en: fmt.Sprint(item.DisplayNameEN),
+			zh: fmt.Sprint(item.DisplayNameZH),
+		}
+	}
+
+	expected := map[int]struct {
+		en string
+		zh string
+	}{
+		60: {en: "MySQL", zh: "MySQL"},
+		61: {en: "PostgreSQL", zh: "PostgreSQL"},
+		62: {en: "Oracle", zh: "Oracle"},
+		63: {en: "Dameng", zh: "达梦"},
+		64: {en: "DB2", zh: "DB2"},
+		65: {en: "TDSQL", zh: "TDSQL"},
+		66: {en: "OceanBase", zh: "OceanBase"},
+		67: {en: "GoldenDB", zh: "GoldenDB"},
+		68: {en: "Kingbase", zh: "人大金仓"},
+	}
+	for value, want := range expected {
+		if got[value] != want {
+			t.Errorf("l7_protocol enum %d = %+v, want %+v", value, got[value], want)
 		}
 	}
 }

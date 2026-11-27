@@ -222,7 +222,7 @@ func L7FlowLogColumns() []*ckdb.Column {
 	l7Columns = append(l7Columns, ckdb.NewColumn("_id", ckdb.UInt64))
 	l7Columns = append(l7Columns, L7BaseColumns()...)
 	l7Columns = append(l7Columns,
-		ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("0:未知 1:其他, 20:http1, 21:http2, 40:dubbo, 60:mysql, 80:redis, 100:kafka, 101:mqtt, 120:dns"),
+		ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("0:未知, 20:http1, 21:http2, 40:dubbo, 60:mysql, 61:postgresql, 62:oracle, 63:dameng, 64:db2, 65:tdsql, 66:oceanbase, 67:goldendb, 68:kingbase, 80:redis, 100:kafka, 101:mqtt, 120:dns"),
 		ckdb.NewColumn("biz_protocol", ckdb.LowCardinalityString).SetIndex(ckdb.IndexNone).SetComment("应用协议"),
 		ckdb.NewColumn("version", ckdb.LowCardinalityString).SetComment("协议版本"),
 		ckdb.NewColumn("type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("日志类型, 0:请求, 1:响应, 2:会话"),
