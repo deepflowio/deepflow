@@ -3094,7 +3094,8 @@ int running_socket_tracer(tracer_callback_t handle,
 	socket_tracer_set_probes(tps);
 	golang_trace_init();
 	openssl_trace_init();
-	create_and_init_proc_info_caches();
+	if ((ret = create_and_init_proc_info_caches()))
+		return ret;
 
 	struct bpf_tracer *tracer =
 	    setup_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
