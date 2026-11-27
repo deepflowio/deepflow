@@ -69,8 +69,14 @@ impl EpcNetIpKey {
 
     fn clone_by_masklen(&self, masklen: usize, is_ipv4: bool) -> Self {
         let max_prefix = if is_ipv4 { IPV4_BITS } else { IPV6_BITS };
+        let shift = max_prefix.saturating_sub(masklen);
+        let mask = if shift >= max_prefix {
+            0
+        } else {
+            u128::MAX << shift
+        };
         Self {
-            ip: self.ip & (u128::MAX << max_prefix.saturating_sub(masklen)),
+            ip: self.ip & mask,
             epc_id: self.epc_id,
             masklen: masklen as u8,
         }
